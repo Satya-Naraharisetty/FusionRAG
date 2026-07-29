@@ -1,0 +1,21 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      # Run the Ruff linter and auto-fix simple violations
+      - id: ruff
+        args: [ --fix ]
+        files: ^backend/
+      # Run the Ruff formatter
+      - id: ruff-format
+        files: ^backend/
+
+  - repo: local
+    hooks:
+      # Run frontend ESLint check using system npm
+      - id: frontend-lint
+        name: Frontend ESLint
+        entry: npm --prefix frontend run lint
+        language: system
+        files: ^frontend/src/.*\.(js|jsx|ts|tsx)$
+        pass_filenames: false

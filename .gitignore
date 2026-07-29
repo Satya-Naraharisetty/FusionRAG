@@ -216,3 +216,20 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Node/React
+node_modules/
+/frontend/node_modules/
+/frontend/dist/
+/frontend/build/
+.eslintcache
+
+# Local Ingested & Vector Databases Data Directories
+/backend/data/
+/backend/data/uploads/
+/backend/data/vector_storage/
+
+# Local Environment Overrides
+.env*.local
+*.local
+
