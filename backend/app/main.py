@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -16,6 +17,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1.health import router as health_router
+from app.api.v1.auth import router as auth_router
+from app.auth.domain.exceptions import (
+    DuplicateAccountException,
+    InvalidCredentialsException,
+    AccountDisabledException,
+    InvalidSessionException,
+)
 from app.core.config import ConfigurationError, settings
 
 # Run centralized logging configuration setup before other imports
@@ -44,6 +52,7 @@ def run_startup_validations() -> None:
         "POSTGRES_DB": settings.POSTGRES_DB,
         "REDIS_HOST": settings.REDIS_HOST,
         "QDRANT_HOST": settings.QDRANT_HOST,
+        "JWT_SECRET": settings.JWT_SECRET,
     }
     
     empty_vars = [k for k, v in required_vars.items() if not v or not str(v).strip()]
@@ -225,9 +234,10 @@ async def validation_exception_handler(
     return format_error_response(
         code="VALIDATION_ERROR",
         message="Request parameters or body payload failed schema validations.",
-        details=exc.errors(),
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
+        details=jsonable_encoder(exc.errors()),
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     )
+
 
 @app.exception_handler(ValidationError)
 async def pydantic_validation_exception_handler(
@@ -236,9 +246,66 @@ async def pydantic_validation_exception_handler(
     return format_error_response(
         code="VALIDATION_ERROR",
         message="Data validation checks failed.",
-        details=exc.errors(),
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
+        details=jsonable_encoder(exc.errors()),
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     )
+
+@app.exception_handler(DuplicateAccountException)
+async def duplicate_account_exception_handler(
+    _request: Request, exc: DuplicateAccountException
+):
+    logger.info("Registration rejected: email already registered")
+    return format_error_response(
+        code="DUPLICATE_ACCOUNT",
+        message="An account with this email address already exists.",
+        status_code=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+@app.exception_handler(InvalidCredentialsException)
+async def invalid_credentials_exception_handler(
+    _request: Request, exc: InvalidCredentialsException
+):
+    logger.info(f"Failed authentication: {exc}")
+    return format_error_response(
+        code="INVALID_CREDENTIALS",
+        message="Invalid email or password.",
+        status_code=status.HTTP_401_UNAUTHORIZED,
+    )
+
+
+@app.exception_handler(AccountDisabledException)
+async def account_disabled_exception_handler(
+    _request: Request, exc: AccountDisabledException
+):
+    logger.info("Action blocked: account has been deactivated.")
+    return format_error_response(
+        code="ACCOUNT_DISABLED",
+        message="Account has been deactivated.",
+        status_code=status.HTTP_401_UNAUTHORIZED,
+    )
+
+
+@app.exception_handler(InvalidSessionException)
+async def invalid_session_exception_handler(
+    _request: Request, exc: InvalidSessionException
+):
+    logger.info(f"Session validation rejected: {exc}")
+    response = format_error_response(
+        code="INVALID_SESSION",
+        message="Session is invalid, expired, or has been revoked.",
+        status_code=status.HTTP_401_UNAUTHORIZED,
+    )
+    response.delete_cookie(
+        key=settings.COOKIE_NAME,
+        path=settings.COOKIE_PATH,
+        domain=settings.COOKIE_DOMAIN,
+        secure=settings.COOKIE_SECURE,
+        httponly=True,
+        samesite=settings.COOKIE_SAMESITE,
+    )
+    return response
+
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(_request: Request, exc: Exception):
@@ -246,10 +313,12 @@ async def unhandled_exception_handler(_request: Request, exc: Exception):
     return format_error_response(
         code="INTERNAL_SERVER_ERROR",
         message="An unexpected system error occurred.",
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
     )
 
+
 app.include_router(health_router, prefix=settings.API_V1_STR, tags=["Health"])
+app.include_router(auth_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root_route():

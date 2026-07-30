@@ -3,6 +3,13 @@ from fastapi import Request
 from qdrant_client import QdrantClient
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import DeclarativeBase
+
+class Base(DeclarativeBase):
+    """
+    Central declarative base class for all SQLAlchemy ORM models.
+    """
+    pass
 
 # Dependency Injection Provider Functions
 

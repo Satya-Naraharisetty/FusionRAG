@@ -76,6 +76,18 @@ class Settings(BaseSettings):
             return [str(x) for x in v]
         return ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+    # JWT & Cookie Configurations
+    JWT_SECRET: str
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    COOKIE_NAME: str = "refresh_token"
+    COOKIE_DOMAIN: str | None = None
+    COOKIE_PATH: str = "/api/v1/auth"
+    COOKIE_SECURE: bool = True
+    COOKIE_SAMESITE: str = "lax"
+    COOKIE_MAX_AGE: int = 7 * 24 * 60 * 60
+
     # Logging Configurations
     LOG_FORMAT: str = "TEXT"
     LOG_LEVEL: str = "INFO"
