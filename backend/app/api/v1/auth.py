@@ -1,6 +1,8 @@
-from typing import Any, Dict
+from typing import Any
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+
 from app.api.dependencies import get_auth_service, get_current_user_context
 from app.auth.domain.schemas import (
     TokenResponseSchema,
@@ -136,7 +138,7 @@ def logout(
 
 @router.get("/me", response_model=UserResponseSchema)
 def get_me(
-    current_user: Dict[str, Any] = Depends(get_current_user_context),
+    current_user: dict[str, Any] = Depends(get_current_user_context),
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """

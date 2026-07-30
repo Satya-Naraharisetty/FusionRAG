@@ -5,13 +5,17 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase
 
+
 class Base(DeclarativeBase):
     """
     Central declarative base class for all SQLAlchemy ORM models.
     """
+
     pass
 
+
 # Dependency Injection Provider Functions
+
 
 def get_db(request: Request):
     """
@@ -23,12 +27,13 @@ def get_db(request: Request):
         raise RuntimeError(
             "Database session factory is not initialized in application state."
         )
-    
+
     db = session_factory()
     try:
         yield db
     finally:
         db.close()
+
 
 def get_redis(request: Request) -> redis.Redis:
     """
@@ -39,6 +44,7 @@ def get_redis(request: Request) -> redis.Redis:
         raise RuntimeError("Redis client is not initialized in application state.")
     return redis_client
 
+
 def get_qdrant(request: Request) -> QdrantClient:
     """
     FastAPI DI provider to retrieve the lifespan-managed Qdrant client.
@@ -48,7 +54,9 @@ def get_qdrant(request: Request) -> QdrantClient:
         raise RuntimeError("Qdrant client is not initialized in application state.")
     return qdrant_client
 
+
 # Client Initialization Helper Functions
+
 
 def init_postgres_engine(database_url: str) -> Engine:
     """
@@ -58,8 +66,9 @@ def init_postgres_engine(database_url: str) -> Engine:
         database_url,
         pool_pre_ping=True,  # Validates connection health before handing it to a worker
         pool_size=10,
-        max_overflow=20
+        max_overflow=20,
     )
+
 
 def init_redis_client(host: str, port: int) -> redis.Redis:
     """
@@ -70,15 +79,12 @@ def init_redis_client(host: str, port: int) -> redis.Redis:
         port=port,
         decode_responses=True,
         socket_timeout=3.0,
-        socket_connect_timeout=3.0
+        socket_connect_timeout=3.0,
     )
+
 
 def init_qdrant_client(host: str, port: int) -> QdrantClient:
     """
     Instantiates the Qdrant approximate nearest neighbor client.
     """
-    return QdrantClient(
-        host=host,
-        port=port,
-        timeout=3.0
-    )
+    return QdrantClient(host=host, port=port, timeout=3.0)

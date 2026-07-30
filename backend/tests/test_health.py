@@ -11,6 +11,7 @@ def test_liveness_check(client):
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {"status": "alive"}
 
+
 def test_readiness_check_all_healthy(client):
     """
     Asserts GET /api/v1/health/readiness returns healthy indicators.
@@ -23,13 +24,14 @@ def test_readiness_check_all_healthy(client):
 
     response = client.get("/api/v1/health/readiness")
     assert response.status_code == status.HTTP_200_OK
-    
+
     data = response.json()
     assert data["status"] == "healthy"
     assert data["services"]["postgres"] == "connected"
     assert data["services"]["redis"] == "connected"
     assert data["services"]["vector_db"] == "connected"
     assert "x-request-id" in response.headers
+
 
 def test_readiness_check_postgres_down(client):
     """
@@ -44,12 +46,13 @@ def test_readiness_check_postgres_down(client):
 
     response = client.get("/api/v1/health/readiness")
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    
+
     data = response.json()
     assert data["status"] == "unhealthy"
     assert "disconnected" in data["services"]["postgres"]
     assert data["services"]["redis"] == "connected"
     assert data["services"]["vector_db"] == "connected"
+
 
 def test_readiness_check_redis_down(client):
     """
@@ -62,7 +65,7 @@ def test_readiness_check_redis_down(client):
 
     response = client.get("/api/v1/health/readiness")
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    
+
     data = response.json()
     assert data["status"] == "unhealthy"
     assert data["services"]["postgres"] == "connected"

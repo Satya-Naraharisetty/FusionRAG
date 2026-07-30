@@ -1,8 +1,9 @@
 import hashlib
-from datetime import datetime, UTC
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import UUID
+
 from sqlalchemy.orm import Session
+
 from app.auth.domain.interfaces import SessionRepository
 from app.auth.domain.schemas import SessionDomain
 from app.auth.infrastructure.persistence.models import SQLAlchemySession
@@ -18,7 +19,7 @@ class SQLAlchemySessionRepository(SessionRepository):
         """
         return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
-    def find_active_by_token(self, token: str) -> Optional[SessionDomain]:
+    def find_active_by_token(self, token: str) -> SessionDomain | None:
         """
         Query an active, unrevoked session by raw token string.
         Applies row locking (with_for_update) to prevent concurrency race issues.
@@ -39,7 +40,7 @@ class SQLAlchemySessionRepository(SessionRepository):
             return None
         return SessionDomain.model_validate(db_session)
 
-    def find_by_token(self, token: str) -> Optional[SessionDomain]:
+    def find_by_token(self, token: str) -> SessionDomain | None:
         """
         Query any session (including revoked or expired) by raw token string.
         """

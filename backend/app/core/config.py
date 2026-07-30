@@ -9,7 +9,9 @@ class ConfigurationError(RuntimeError):
     """
     Exception raised when configuration variables are missing or invalid.
     """
+
     pass
+
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Hybrid RAG Chatbot"
@@ -29,7 +31,7 @@ class Settings(BaseSettings):
         if isinstance(v, str) and v.strip():
             return v
         data = info.data
-        
+
         # Verify required database connection credentials are provided
         required_fields = [
             "POSTGRES_USER",
@@ -39,8 +41,7 @@ class Settings(BaseSettings):
             "POSTGRES_DB",
         ]
         missing_fields = [
-            f for f in required_fields
-            if f not in data or data[f] is None
+            f for f in required_fields if f not in data or data[f] is None
         ]
         if missing_fields:
             missing_str = ", ".join(missing_fields)
@@ -48,7 +49,7 @@ class Settings(BaseSettings):
                 f"Cannot assemble DATABASE_URL due to missing "
                 f"PostgreSQL configurations: {missing_str}"
             )
-            
+
         return f"postgresql://{data.get('POSTGRES_USER')}:{data.get('POSTGRES_PASSWORD')}@{data.get('POSTGRES_SERVER')}:{data.get('POSTGRES_PORT')}/{data.get('POSTGRES_DB')}"
 
     # Redis Configurations
@@ -92,11 +93,20 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "TEXT"
     LOG_LEVEL: str = "INFO"
 
+    # Ingestion & Upload Configurations
+    UPLOAD_DIR: str = "data/uploads"
+    MAX_UPLOAD_SIZE: int = 25 * 1024 * 1024  # 25 MB default
+
+    # Chunking Configurations
+    CHUNK_SIZE: int = 500
+    CHUNK_OVERLAP: int = 50
+    MIN_CHUNK_SIZE: int = 50
+    CHUNK_STRATEGY: str = "recursive"
+
     model_config = SettingsConfigDict(
-        case_sensitive=True,
-        env_file=".env",
-        env_file_encoding="utf-8"
+        case_sensitive=True, env_file=".env", env_file_encoding="utf-8"
     )
+
 
 # Instantiate settings singleton
 settings = Settings()

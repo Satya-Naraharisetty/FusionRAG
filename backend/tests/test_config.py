@@ -11,7 +11,10 @@ def test_settings_parsing():
         POSTGRES_PASSWORD="test_password",
         POSTGRES_DB="test_database",
         REDIS_HOST="localhost",
-        QDRANT_HOST="localhost"
+        QDRANT_HOST="localhost",
     )
     assert settings.PROJECT_NAME == "Hybrid RAG Chatbot"
-    assert settings.DATABASE_URL == "postgresql://test_user:test_password@localhost:5432/test_database"
+    assert (
+        settings.DATABASE_URL
+        == "postgresql://test_user:test_password@localhost:5432/test_database"
+    )

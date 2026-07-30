@@ -1,14 +1,18 @@
 import os
 import sys
 from logging.config import fileConfig
+
 from sqlalchemy import create_engine, pool
+
 from alembic import context
 
 # Add app directory to Python path to ensure backend imports work inside Alembic context
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.core.config import settings
 from app.auth.infrastructure.persistence.models import Base
+from app.core.config import settings
+
+# Import new models for Alembic autogenerate detection
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -61,9 +65,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

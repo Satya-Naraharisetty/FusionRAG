@@ -1,7 +1,7 @@
 import logging
 from datetime import timedelta
-from typing import Optional, Tuple
 from uuid import UUID
+
 from app.auth.domain.exceptions import (
     AccountDisabledException,
     DuplicateAccountException,
@@ -13,9 +13,9 @@ from app.auth.domain.interfaces import (
     SessionRepository,
     TimeProvider,
     TokenProvider,
+    UnitOfWork,
     UserRepository,
     UUIDGenerator,
-    UnitOfWork,
 )
 from app.auth.domain.schemas import SessionDomain, UserDomain
 from app.core.config import settings
@@ -90,9 +90,9 @@ class AuthService:
     def create_session(
         self,
         user_id: UUID,
-        user_agent: Optional[str] = None,
-        ip_address: Optional[str] = None,
-    ) -> Tuple[str, str]:
+        user_agent: str | None = None,
+        ip_address: str | None = None,
+    ) -> tuple[str, str]:
         """
         Create a new active session, generating access and refresh tokens.
         """
@@ -133,9 +133,9 @@ class AuthService:
     def refresh_session(
         self,
         raw_refresh_token: str,
-        user_agent: Optional[str] = None,
-        ip_address: Optional[str] = None,
-    ) -> Tuple[str, str]:
+        user_agent: str | None = None,
+        ip_address: str | None = None,
+    ) -> tuple[str, str]:
         """
         Validate and rotate the refresh token session atomically in a single transaction.
         """
@@ -158,7 +158,9 @@ class AuthService:
                         },
                     )
                     self._uow.commit()  # Commit the mass revocation immediately
-                raise InvalidSessionException("Session is invalid, expired, or revoked.")
+                raise InvalidSessionException(
+                    "Session is invalid, expired, or revoked."
+                )
 
             user = self._user_repo.get_by_id(session.user_id)
             if not user or not user.is_active:
@@ -220,7 +222,7 @@ class AuthService:
             self._uow.rollback()
             raise
 
-    def get_user_by_id(self, user_id: UUID) -> Optional[UserDomain]:
+    def get_user_by_id(self, user_id: UUID) -> UserDomain | None:
         """
         Query a user by UUID.
         """

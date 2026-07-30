@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 # Banned common weak passwords as per modern NIST recommendations
@@ -72,8 +72,8 @@ class SessionDomain(BaseModel):
     is_revoked: bool
     created_at: datetime
     last_used_at: datetime
-    revoked_at: Optional[datetime] = None
-    user_agent: Optional[str] = None
-    ip_address: Optional[str] = None
+    revoked_at: datetime | None = None
+    user_agent: str | None = None
+    ip_address: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

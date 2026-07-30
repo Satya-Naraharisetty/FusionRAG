@@ -1,8 +1,10 @@
 import concurrent.futures
+
 import pytest
 from fastapi import status
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+
 from app.auth.infrastructure.persistence.models import Base
 from app.core.config import settings
 
@@ -241,6 +243,7 @@ def test_refresh_concurrency_fails(client, test_db):
 
     def do_refresh():
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         thread_client = TestClient(app)

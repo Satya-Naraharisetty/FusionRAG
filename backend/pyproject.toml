@@ -19,6 +19,9 @@ dependencies = [
     "python-multipart>=0.0.9",
     "alembic>=1.13.0",
     "email-validator>=2.0.0",
+    "pypdf>=4.0.0",
+    "python-docx>=1.1.0",
+    "langdetect>=1.0.9",
 ]
 
 [project.optional-dependencies]
@@ -36,7 +39,11 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "C4", "ARG", "PTH"]
-ignore = ["B008"]
+ignore = ["B008", "E501", "ARG001", "ARG002", "B904", "N818", "UP042", "E712"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG001", "N806", "E501"]
+"alembic/*" = ["PTH"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"

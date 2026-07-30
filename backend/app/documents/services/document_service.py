@@ -1,0 +1,226 @@
+import logging
+import pathlib
+import re
+from uuid import UUID
+
+from app.auth.domain.interfaces import TimeProvider, UnitOfWork, UUIDGenerator
+from app.documents.domain.exceptions import (
+    DocumentNotFound,
+    DocumentTooLarge,
+    DuplicateDocumentException,
+    UnauthorizedDocumentAccess,
+    UnsupportedDocumentType,
+)
+from app.documents.domain.interfaces import (
+    ChecksumGenerator,
+    DocumentRepository,
+    StorageProvider,
+    TaskQueue,
+)
+from app.documents.domain.models import Document, DocumentStatus
+from app.documents.infrastructure.extractors import ExtractorFactory
+from app.documents.services.document_processing_service import DocumentProcessingService
+
+logger = logging.getLogger(__name__)
+
+
+class DocumentService:
+    def __init__(
+        self,
+        document_repo: DocumentRepository,
+        storage_provider: StorageProvider,
+        extractor_factory: ExtractorFactory,
+        checksum_generator: ChecksumGenerator,
+        task_queue: TaskQueue,
+        document_processing_service: DocumentProcessingService,
+        uow: UnitOfWork,
+        uuid_generator: UUIDGenerator,
+        time_provider: TimeProvider,
+        max_upload_size: int,
+    ) -> None:
+        self._document_repo = document_repo
+        self._storage_provider = storage_provider
+        self._extractor_factory = extractor_factory
+        self._checksum_generator = checksum_generator
+        self._task_queue = task_queue
+        self._document_processing_service = document_processing_service
+        self._uow = uow
+        self._uuid_generator = uuid_generator
+        self._time_provider = time_provider
+        self._max_upload_size = max_upload_size
+
+    def upload_document(
+        self,
+        original_filename: str,
+        content_type: str,
+        file_bytes: bytes,
+        user_id: UUID,
+    ) -> Document:
+        """
+        Validates, registers, and triggers the ingestion pipeline for a new document.
+        """
+        # 1. Reject empty files
+        if not file_bytes or len(file_bytes) == 0:
+            raise DocumentCorruptedError("Uploaded file is empty.")
+
+        # 2. Validate file size
+        if len(file_bytes) > self._max_upload_size:
+            raise DocumentTooLarge(
+                f"File size {len(file_bytes)} exceeds maximum limit {self._max_upload_size}."
+            )
+
+        # 3. Sanitize filename
+        safe_original_name = self._sanitize_filename(original_filename)
+
+        # 4. Validate MIME and extension support
+        try:
+            self._extractor_factory.get_extractor(content_type, safe_original_name)
+        except UnsupportedDocumentType:
+            raise
+        except Exception as e:
+            raise UnsupportedDocumentType(f"Validation failed: {e}") from e
+
+        # 5. Generate checksum & check for duplicate for THIS user
+        checksum = self._checksum_generator.generate(file_bytes)
+        existing = self._document_repo.get_by_checksum_and_user(checksum, user_id)
+        if existing:
+            raise DuplicateDocumentException(
+                f"A document with identical content already exists in your library (ID: {existing.id})."
+            )
+
+        # 6. Generate UUID & save to storage
+        document_id = self._uuid_generator.generate()
+        storage_key = self._storage_provider.save(
+            filename=safe_original_name,
+            content=file_bytes,
+            user_id=user_id,
+            document_id=document_id,
+        )
+
+        # 7. Create DB record as QUEUED
+        now = self._time_provider.get_now()
+        document = Document(
+            id=document_id,
+            user_id=user_id,
+            filename=storage_key,
+            original_filename=safe_original_name,
+            content_type=content_type,
+            file_size=len(file_bytes),
+            checksum=checksum,
+            status=DocumentStatus.QUEUED,
+            extractor_version="v1",
+            failure_reason=None,
+            page_count=None,
+            word_count=None,
+            language=None,
+            created_at=now,
+            updated_at=now,
+            processing_started_at=None,
+            processing_completed_at=None,
+        )
+
+        try:
+            saved_doc = self._document_repo.save(document)
+            self._uow.commit()
+        except Exception:
+            self._uow.rollback()
+            # Clean up the file from storage if DB write fails
+            self._storage_provider.delete(storage_key)
+            raise
+
+        # 8. Trigger asynchronous processing task
+        self._task_queue.enqueue(
+            self._document_processing_service.process_document, saved_doc.id
+        )
+
+        return saved_doc
+
+    def list_documents(self, user_id: UUID) -> list[Document]:
+        """
+        Lists all documents belonging to a user.
+        """
+        return self._document_repo.list_by_user(user_id)
+
+    def get_document_by_id(self, id: UUID, user_id: UUID) -> Document:
+        """
+        Retrieves a document. Validates existence and ownership.
+        """
+        document = self._document_repo.get_by_id(id)
+        if not document:
+            raise DocumentNotFound(f"Document with ID {id} not found.")
+
+        if document.user_id != user_id:
+            raise UnauthorizedDocumentAccess(
+                "You do not have permission to access this document."
+            )
+
+        return document
+
+    def delete_document(self, id: UUID, user_id: UUID) -> None:
+        """
+        Deletes the document database record first (source of truth) and then deletes the storage file.
+        """
+        # Verify document exists and belongs to the user
+        document = self.get_document_by_id(id, user_id)
+
+        try:
+            # Delete DB record (will cascade delete chunks in PostgreSQL)
+            self._document_repo.delete(id)
+            self._uow.commit()
+        except Exception:
+            self._uow.rollback()
+            raise
+
+        # Attempt storage deletion (failures are logged, not raised)
+        self._storage_provider.delete(document.filename)
+
+    def reprocess_document(self, id: UUID, user_id: UUID) -> Document:
+        """
+        Triggers reprocessing for a document by resetting its status to QUEUED.
+        """
+        # Fetch and verify ownership with row locking
+        try:
+            document = self._document_repo.get_by_id_for_update(id)
+            if not document:
+                raise DocumentNotFound(f"Document with ID {id} not found.")
+
+            if document.user_id != user_id:
+                raise UnauthorizedDocumentAccess(
+                    "You do not have permission to reprocess this document."
+                )
+
+            # State transition check and update status
+            document.transition_to(DocumentStatus.QUEUED)
+            document.failure_reason = None
+            document.processing_started_at = None
+            document.processing_completed_at = None
+            document.updated_at = self._time_provider.get_now()
+
+            saved_doc = self._document_repo.save(document)
+            self._uow.commit()
+        except Exception:
+            self._uow.rollback()
+            raise
+
+        # Enqueue processing task
+        self._task_queue.enqueue(
+            self._document_processing_service.process_document, saved_doc.id
+        )
+
+        return saved_doc
+
+    def _sanitize_filename(self, filename: str) -> str:
+        """
+        Strips folder paths and illegal path traversal characters from filename.
+        """
+        base = pathlib.Path(filename).name
+        cleaned = re.sub(r"[^\w\.\-]", "_", base)
+        if not cleaned or cleaned in (".", ".."):
+            cleaned = "unnamed_file"
+        return cleaned
+
+
+class DocumentCorruptedError(UnsupportedDocumentType):
+    """Raised when the uploaded file is zero-byte / empty."""
+
+    pass

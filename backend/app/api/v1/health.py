@@ -12,18 +12,22 @@ from app.db.session import get_db, get_qdrant, get_redis
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
 class ServiceStatuses(BaseModel):
     postgres: str
     vector_db: str
     redis: str
+
 
 class ReadinessResponse(BaseModel):
     status: str
     version: str
     services: ServiceStatuses
 
+
 class LivenessResponse(BaseModel):
     status: str
+
 
 @router.get("/health/liveness", response_model=LivenessResponse)
 def liveness_check():
@@ -32,12 +36,13 @@ def liveness_check():
     """
     return LivenessResponse(status="alive")
 
+
 @router.get("/health/readiness", response_model=ReadinessResponse)
 def readiness_check(
     response: Response,
     db: Session = Depends(get_db),
     redis_client: redis.Redis = Depends(get_redis),
-    qdrant_client: QdrantClient = Depends(get_qdrant)
+    qdrant_client: QdrantClient = Depends(get_qdrant),
 ):
     """
     Deep readiness check probe verifying connections to backing database systems.
@@ -86,8 +91,6 @@ def readiness_check(
         status=status_text,
         version="0.1.0",
         services=ServiceStatuses(
-            postgres=postgres_status,
-            vector_db=vector_db_status,
-            redis=redis_status
-        )
+            postgres=postgres_status, vector_db=vector_db_status, redis=redis_status
+        ),
     )

@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 from uuid import UUID
+
 from app.auth.domain.schemas import SessionDomain, UserDomain
 
 
@@ -23,21 +24,21 @@ class PasswordHasher(ABC):
 
 class TokenProvider(ABC):
     @abstractmethod
-    def create_access_token(self, claims: Dict[str, Any]) -> str:
+    def create_access_token(self, claims: dict[str, Any]) -> str:
         """
         Create a stateless access token.
         """
         pass
 
     @abstractmethod
-    def create_refresh_token(self, claims: Dict[str, Any]) -> str:
+    def create_refresh_token(self, claims: dict[str, Any]) -> str:
         """
         Create a refresh token.
         """
         pass
 
     @abstractmethod
-    def decode_token(self, token: str) -> Dict[str, Any]:
+    def decode_token(self, token: str) -> dict[str, Any]:
         """
         Decode and verify a token, returning its claims.
         """
@@ -46,14 +47,14 @@ class TokenProvider(ABC):
 
 class UserRepository(ABC):
     @abstractmethod
-    def get_by_email(self, email: str) -> Optional[UserDomain]:
+    def get_by_email(self, email: str) -> UserDomain | None:
         """
         Fetch a user by email address.
         """
         pass
 
     @abstractmethod
-    def get_by_id(self, id: UUID) -> Optional[UserDomain]:
+    def get_by_id(self, id: UUID) -> UserDomain | None:
         """
         Fetch a user by UUID.
         """
@@ -69,14 +70,14 @@ class UserRepository(ABC):
 
 class SessionRepository(ABC):
     @abstractmethod
-    def find_active_by_token(self, token: str) -> Optional[SessionDomain]:
+    def find_active_by_token(self, token: str) -> SessionDomain | None:
         """
         Find an active session by raw refresh token.
         """
         pass
 
     @abstractmethod
-    def find_by_token(self, token: str) -> Optional[SessionDomain]:
+    def find_by_token(self, token: str) -> SessionDomain | None:
         """
         Find any session (active, expired, or revoked) by raw refresh token.
         """

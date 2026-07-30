@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
-from typing import List, Optional
+
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.db.session import Base
 
 
@@ -27,7 +28,7 @@ class SQLAlchemyUser(Base):
     )
 
     # Relationships
-    sessions: Mapped[List["SQLAlchemySession"]] = relationship(
+    sessions: Mapped[list["SQLAlchemySession"]] = relationship(
         "SQLAlchemySession", back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -55,11 +56,11 @@ class SQLAlchemySession(Base):
         onupdate=func.now(),
         nullable=False,
     )
-    revoked_at: Mapped[Optional[datetime]] = mapped_column(
+    revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    user_agent: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    ip_address: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Relationships
     user: Mapped["SQLAlchemyUser"] = relationship(
