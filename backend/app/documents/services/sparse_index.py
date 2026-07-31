@@ -21,6 +21,20 @@ def tokenize(text: str) -> list[str]:
 
 class BM25:
     def __init__(self, corpus: list[list[str]], k1: float = 1.5, b: float = 0.75):
+        """
+        Initializes the BM25 scorer.
+
+        Args:
+            corpus: A list of tokenized documents.
+            k1: Term frequency scaling parameter (default: 1.5).
+                Controls term frequency saturation. A higher value increases the importance
+                of multiple occurrences of a term, while a lower value makes term weight
+                saturate faster. 1.5 is the standard Lucene/Elasticsearch default for English.
+            b: Document length normalization parameter (default: 0.75).
+                Controls scaling by document length. b=1.0 scales term weights fully by
+                document length, and b=0.0 turns off length normalization entirely.
+                0.75 is the industry-standard default.
+        """
         self.k1 = k1
         self.b = b
         self.corpus_size = len(corpus)
@@ -67,6 +81,15 @@ class InMemoryBM25Index(SparseIndex):
         k1: float = 1.5,
         b: float = 0.75,
     ) -> None:
+        """
+        Initializes the InMemory BM25 Index.
+
+        Args:
+            chunk_repo: The repository to fetch chunk documents from.
+            index_cache: The cache layer to prevent redundant index rebuilds.
+            k1: Term frequency scaling parameter (default: 1.5).
+            b: Document length normalization parameter (default: 0.75).
+        """
         self._chunk_repo = chunk_repo
         self._index_cache = index_cache
         self._k1 = k1

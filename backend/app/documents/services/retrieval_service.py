@@ -19,6 +19,8 @@ from app.documents.domain.models import (
     RetrievalMode,
     RetrievedChunk,
     SearchResult,
+    FusionMethod,
+    RerankerName,
 )
 
 logger = logging.getLogger(__name__)
@@ -255,7 +257,7 @@ class RetrievalService:
             t0 = time.perf_counter()
             fused_results = self._fusion_engine.fuse(dense_results, sparse_results)
             fusion_latency = time.perf_counter() - t0
-            fusion_method = "RRF"
+            fusion_method = FusionMethod.RRF
         elif retrieval_mode == RetrievalMode.SEMANTIC:
             fused_results = dense_results
         else:  # SPARSE
@@ -310,5 +312,9 @@ class RetrievalService:
             dense_matches=dense_results,
             sparse_matches=sparse_results,
             fusion_method=fusion_method,
-            reranker=type(self._reranker).__name__ if self._enable_reranker else None,
+            reranker=(
+                RerankerName(type(self._reranker).__name__)
+                if self._enable_reranker and type(self._reranker).__name__ in RerankerName._value2member_map_
+                else None
+            ),
         )

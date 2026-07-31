@@ -117,6 +117,12 @@ To maximize search accuracy, the system must execute queries against two paralle
 1.  **Sparse Retrieval (BM25):** 
     *   Keyword search index using full-text tokenization and stemming.
     *   Optimized for exact matches, acronyms, product codes, and specific names.
+    *   Uses the standard Okapi BM25 ranking formula:
+        $$Score(D, Q) = \sum_{i=1}^{n} IDF(q_i) \cdot \frac{f(q_i, D) \cdot (k_1 + 1)}{f(q_i, D) + k_1 \cdot \left(1 - b + b \cdot \frac{|D|}{avgdl}\right)}$$
+        where:
+        *   $k_1$ is the term frequency scaling parameter (default $= 1.5$). It controls the non-linear term frequency saturation. Higher values delay saturation, while lower values cause frequency rewards to saturate faster.
+        *   $b$ is the document length normalization parameter (default $= 0.75$). It determines the scale of length normalization. A value of $1.0$ applies full length normalization (penalizing long documents), and $0.0$ applies none.
+
 2.  **Dense Retrieval:**
     *   Vector database index (e.g., Qdrant, Chroma, or pgvector) utilizing HNSW indexes for approximate nearest neighbor (ANN) search.
     *   Optimized for semantic matching and conceptual alignment.

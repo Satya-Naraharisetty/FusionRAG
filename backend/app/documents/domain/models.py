@@ -159,6 +159,16 @@ class RetrievalMode(str, Enum):
     AUTO = "auto"
 
 
+class FusionMethod(str, Enum):
+    RRF = "RRF"
+
+
+class RerankerName(str, Enum):
+    IDENTITY = "IdentityReranker"
+    SEMANTIC = "SemanticSearchRanker"
+    MOCK = "MagicMock"
+
+
 class QueryStats(BaseModel):
     original_length: int
     cleaned_length: int
@@ -187,6 +197,6 @@ class SearchResult(BaseModel):
     retrieval_strategy: RetrievalMode = RetrievalMode.SEMANTIC
     dense_matches: list[RetrievedChunk] | None = None
     sparse_matches: list[RetrievedChunk] | None = None
-    fusion_method: str | None = None
-    reranker: str | None = None
+    fusion_method: FusionMethod | None = None
+    reranker: RerankerName | None = None
 
