@@ -8,7 +8,11 @@ from fastapi import status
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.api.dependencies import get_current_user_context, get_retrieval_service
+from app.api.dependencies import (
+    get_current_user_context,
+    get_retrieval_service,
+    get_conversation_manager,
+)
 from app.auth.infrastructure.persistence.models import Base, SQLAlchemyUser
 from app.core.config import settings
 from app.documents.domain.exceptions import UnauthorizedDocumentAccess
@@ -368,6 +372,33 @@ def test_api_search_validation_and_capping(client, mocker):
         "role": "user",
     }
 
+    # Mock ConversationManager
+    from app.chat.domain.models import Conversation, ConversationState, HistoryRewriteResult
+    from app.chat.services.conversation_manager import ConversationManager
+
+    mock_conv = Conversation(
+        id=uuid4(),
+        user_id=user_id,
+        title="Mock",
+        state=ConversationState.ACTIVE,
+        version=1,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_message_at=datetime.now(UTC),
+    )
+    mock_conv_manager = mocker.MagicMock()
+    mock_conv_manager.get_or_create_conversation = mocker.AsyncMock(return_value=mock_conv)
+    mock_conv_manager._memory.load_memory = mocker.AsyncMock(return_value=([], None))
+    mock_conv_manager._rewriter.rewrite = mocker.AsyncMock(
+        return_value=HistoryRewriteResult(
+            original_query="test query",
+            rewritten_query="test query",
+            rewrite_reason="No history",
+            rewrite_applied=False,
+        )
+    )
+    client.app.dependency_overrides[get_conversation_manager] = lambda: mock_conv_manager
+
     # Mock the RetrievalService dependency
     mock_retrieval_service = mocker.MagicMock()
     mock_retrieval_service.retrieve = mocker.AsyncMock(
@@ -391,10 +422,11 @@ def test_api_search_validation_and_capping(client, mocker):
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     # Scenario B: Test top_k is capped at MAX_TOP_K
-    client.post(
+    resp = client.post(
         "/api/v1/search",
         json={"query": "test query", "top_k": 500},
     )
+    print("SCENARIO B RESPONSE:", resp.status_code, resp.text)
     _, kwargs = mock_retrieval_service.retrieve.call_args
     assert kwargs["top_k"] == settings.MAX_TOP_K
 
@@ -408,6 +440,31 @@ def test_api_search_unauthorized_document(client, mocker):
         "user_id": str(user_id),
         "role": "user",
     }
+
+    # Mock ConversationManager
+    from app.chat.domain.models import Conversation, ConversationState, HistoryRewriteResult
+    mock_conv = Conversation(
+        id=uuid4(),
+        user_id=user_id,
+        title="Mock",
+        state=ConversationState.ACTIVE,
+        version=1,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_message_at=datetime.now(UTC),
+    )
+    mock_conv_manager = mocker.MagicMock()
+    mock_conv_manager.get_or_create_conversation = mocker.AsyncMock(return_value=mock_conv)
+    mock_conv_manager._memory.load_memory = mocker.AsyncMock(return_value=([], None))
+    mock_conv_manager._rewriter.rewrite = mocker.AsyncMock(
+        return_value=HistoryRewriteResult(
+            original_query="test",
+            rewritten_query="test",
+            rewrite_reason="No history",
+            rewrite_applied=False,
+        )
+    )
+    client.app.dependency_overrides[get_conversation_manager] = lambda: mock_conv_manager
 
     # Mock retrieval service to raise UnauthorizedDocumentAccess
     mock_retrieval_service = mocker.MagicMock()

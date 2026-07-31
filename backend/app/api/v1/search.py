@@ -4,17 +4,25 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.api.dependencies import get_current_user_context, get_retrieval_service
+from app.api.dependencies import (
+    get_current_user_context,
+    get_retrieval_service,
+    get_conversation_manager,
+)
 from app.core.config import settings
 from app.documents.domain.exceptions import UnauthorizedDocumentAccess
 from app.documents.domain.models import RetrievalMode, RetrievedChunk
 from app.documents.services.retrieval_service import RetrievalService
+from app.chat.services.conversation_manager import ConversationManager
 
 router = APIRouter(tags=["Search"])
 
 
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="The search query text.")
+    conversation_id: UUID | None = Field(
+        default=None, description="Optional conversation ID to run history-aware search."
+    )
     top_k: int | None = Field(
         default=None, description="The maximum number of chunks to return."
     )
@@ -39,6 +47,9 @@ class SearchResponse(BaseModel):
     total_matches: int = Field(
         ..., description="The total number of matching document chunks."
     )
+    conversation_id: UUID = Field(
+        ..., description="The conversation ID associated with this search."
+    )
 
 
 @router.post("/search", response_model=SearchResponse, status_code=status.HTTP_200_OK)
@@ -46,12 +57,22 @@ async def search_documents(
     request: SearchRequest,
     user_context: dict[str, Any] = Depends(get_current_user_context),
     retrieval_service: RetrievalService = Depends(get_retrieval_service),
+    conversation_manager: ConversationManager = Depends(get_conversation_manager),
 ) -> SearchResponse:
     """
-    Search document chunks using semantic similarity query.
+    Search document chunks using history-aware hybrid retrieval.
     Returns ranked chunks matching query and filters.
     """
     user_id = UUID(user_context["user_id"])
+
+    # 0. Load or create conversation session to retrieve history context
+    conversation = await conversation_manager.get_or_create_conversation(request.conversation_id, user_id)
+    conversation_id = conversation.id
+
+    # 1. Fetch memory history and rewrite query to standalone form
+    recent_messages, _ = await conversation_manager._memory.load_memory(conversation_id)
+    rewrite_result = await conversation_manager._rewriter.rewrite(request.query, recent_messages)
+    query_to_retrieve = rewrite_result.rewritten_query
 
     # 1. Resolve and validate top_k parameter
     top_k = request.top_k
@@ -76,7 +97,7 @@ async def search_documents(
     try:
         # 3. Call RetrievalService search pipeline
         search_result = await retrieval_service.retrieve(
-            query=request.query,
+            query=query_to_retrieve,
             user_id=user_id,
             top_k=top_k,
             document_ids=request.document_ids,
@@ -89,6 +110,7 @@ async def search_documents(
             results=search_result.retrieved_chunks,
             retrieval_time_ms=round(search_result.retrieval_time * 1000, 2),
             total_matches=search_result.total_matches,
+            conversation_id=conversation_id,
         )
 
     except UnauthorizedDocumentAccess as e:

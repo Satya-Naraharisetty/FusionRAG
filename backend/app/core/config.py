@@ -145,6 +145,16 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
 
+    # Conversation Memory & History-Aware Retrieval Configurations
+    ENABLE_CONVERSATION_MEMORY: bool = True
+    ENABLE_HISTORY_REWRITE: bool = True
+    ENABLE_MEMORY_SUMMARIZATION: bool = True
+    MAX_MESSAGES_PER_CONTEXT: int = 12
+    MAX_MEMORY_TOKENS: int = 3000
+    SUMMARY_TRIGGER_MESSAGES: int = 20
+    SUMMARY_MAX_TOKENS: int = 400
+    MAX_CONVERSATION_AGE_DAYS: int = 90
+
     model_config = SettingsConfigDict(
         case_sensitive=True, env_file=".env", env_file_encoding="utf-8"
     )

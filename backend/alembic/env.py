@@ -13,6 +13,16 @@ from app.auth.infrastructure.persistence.models import Base
 from app.core.config import settings
 
 # Import new models for Alembic autogenerate detection
+from app.documents.infrastructure.persistence.models import (
+    SQLAlchemyDocument,
+    SQLAlchemyChunk,
+    SQLAlchemyEmbedding,
+)
+from app.chat.infrastructure.persistence.models import (
+    ConversationORM,
+    ConversationMessageORM,
+    ConversationSummaryORM,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

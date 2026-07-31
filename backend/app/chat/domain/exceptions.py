@@ -26,3 +26,23 @@ class TokenBudgetExceeded(ChatException):
 class StreamingCancelled(ChatException):
     """Raised when a streaming request is cancelled by the client."""
     pass
+
+
+class ConversationNotFoundException(ChatException):
+    """Raised when a conversation is not found."""
+    pass
+
+
+class ConversationConcurrentUpdateException(ChatException):
+    """Raised when an optimistic locking version conflict is detected."""
+    pass
+
+
+class UnauthorizedConversationAccessException(ChatException):
+    """Raised when a user attempts to access a conversation they do not own."""
+    pass
+
+
+class InvalidStatusTransitionException(ChatException):
+    """Raised when a message status transition is illegal."""
+    pass

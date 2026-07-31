@@ -160,6 +160,46 @@ class MockLLMProvider:
         yield "Answer", self.usage
 
 
+class MockMessageRepository:
+    async def create_assistant_message(self, conversation_id, message_id, role, content=""):
+        from app.chat.domain.models import ConversationMessage, MessageRole, MessageStatus
+        from datetime import datetime
+        return ConversationMessage(
+            id=message_id,
+            conversation_id=conversation_id,
+            role=role,
+            content=content,
+            status=MessageStatus.PENDING,
+            created_at=datetime.utcnow(),
+        )
+
+    async def fail_message(self, message_id, error_message=None):
+        pass
+
+
+class MockConversationManager:
+    def __init__(self):
+        self._message_repo = MockMessageRepository()
+
+    async def get_or_create_conversation(self, conversation_id, user_id):
+        from app.chat.domain.models import Conversation, ConversationState
+        from datetime import datetime
+        from uuid import uuid4
+        return Conversation(
+            id=conversation_id or uuid4(),
+            user_id=user_id,
+            title="Mock Conversation",
+            state=ConversationState.ACTIVE,
+            version=1,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            last_message_at=datetime.utcnow(),
+        )
+
+    async def finalize_message(self, conversation_id, message_id, assistant_content, prompt_tokens, completion_tokens, citations=None):
+        pass
+
+
 @pytest.mark.asyncio
 async def test_answer_generation_service_success():
     doc_id = uuid4()
@@ -178,7 +218,8 @@ async def test_answer_generation_service_success():
 
     retrieval_service = MockRetrievalService(chunks)
     estimator = CharacterTokenEstimator()
-    context_builder = ContextBuilder(estimator, 1000)
+    from app.chat.services.conversation_context_builder import ConversationContextBuilder
+    context_builder = ConversationContextBuilder()
     prompt_builder = PromptBuilder("")
     llm_provider = MockLLMProvider()
 
@@ -188,12 +229,14 @@ async def test_answer_generation_service_success():
         prompt_builder=prompt_builder,
         llm_provider=llm_provider,
         token_estimator=estimator,
+        conversation_manager=MockConversationManager(),
         model="gpt-4o-mini",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
         max_context_tokens=1000,
         reserved_completion_tokens=50,
+        enable_conversation_memory=False,
     )
 
     response = await service.generate_answer("How are you?", uuid4(), 10)
@@ -209,7 +252,8 @@ async def test_answer_generation_service_success():
 async def test_answer_generation_service_empty_retrieval():
     retrieval_service = MockRetrievalService([])
     estimator = CharacterTokenEstimator()
-    context_builder = ContextBuilder(estimator, 1000)
+    from app.chat.services.conversation_context_builder import ConversationContextBuilder
+    context_builder = ConversationContextBuilder()
     prompt_builder = PromptBuilder("")
     llm_provider = MockLLMProvider()
 
@@ -219,12 +263,14 @@ async def test_answer_generation_service_empty_retrieval():
         prompt_builder=prompt_builder,
         llm_provider=llm_provider,
         token_estimator=estimator,
+        conversation_manager=MockConversationManager(),
         model="gpt-4o-mini",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
         max_context_tokens=1000,
         reserved_completion_tokens=50,
+        enable_conversation_memory=False,
     )
 
     with pytest.raises(NoRelevantContext):
@@ -246,7 +292,8 @@ async def test_answer_generation_service_budget_violations():
     ]
     retrieval_service = MockRetrievalService(chunks)
     estimator = CharacterTokenEstimator()
-    context_builder = ContextBuilder(estimator, 1000)
+    from app.chat.services.conversation_context_builder import ConversationContextBuilder
+    context_builder = ConversationContextBuilder()
     prompt_builder = PromptBuilder("")
     llm_provider = MockLLMProvider()
 
@@ -257,12 +304,14 @@ async def test_answer_generation_service_budget_violations():
         prompt_builder=prompt_builder,
         llm_provider=llm_provider,
         token_estimator=estimator,
+        conversation_manager=MockConversationManager(),
         model="gpt-4o-mini",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=5,  # Tiny system prompt budget
         max_context_tokens=1000,
         reserved_completion_tokens=50,
+        enable_conversation_memory=False,
     )
     with pytest.raises(TokenBudgetExceeded):
         await service_sys_limit.generate_answer("How are you?", uuid4(), 10)
@@ -274,12 +323,14 @@ async def test_answer_generation_service_budget_violations():
         prompt_builder=prompt_builder,
         llm_provider=llm_provider,
         token_estimator=estimator,
+        conversation_manager=MockConversationManager(),
         model="gpt-4o-mini",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
         max_context_tokens=1000,
         reserved_completion_tokens=50,
+        enable_conversation_memory=False,
     )
     long_question = "a" * 8000  # 2000 tokens
     with pytest.raises(PromptTooLarge):
@@ -314,7 +365,7 @@ def test_api_chat_success(client):
     )
 
     class MockAnswerServiceSync:
-        async def generate_answer(self, question, user_id, top_k, document_ids=None, filters=None):
+        async def generate_answer(self, question, user_id, top_k, conversation_id=None, document_ids=None, filters=None):
             return mock_response
 
     # Setup overrides
@@ -343,7 +394,7 @@ def test_api_chat_streaming(client):
     doc_id = uuid4()
     chunk_id = uuid4()
 
-    async def mock_stream_generator(question, user_id, top_k, document_ids=None, filters=None):
+    async def mock_stream_generator(question, user_id, top_k, conversation_id=None, document_ids=None, filters=None):
         yield {
             "event": "metadata",
             "data": {
@@ -390,8 +441,8 @@ def test_api_chat_streaming(client):
         }
 
     class MockAnswerServiceStream:
-        def generate_answer_stream(self, question, user_id, top_k, document_ids=None, filters=None):
-            return mock_stream_generator(question, user_id, top_k, document_ids, filters)
+        def generate_answer_stream(self, question, user_id, top_k, conversation_id=None, document_ids=None, filters=None):
+            return mock_stream_generator(question, user_id, top_k, conversation_id, document_ids, filters)
 
     mock_user_id = uuid4()
     app.dependency_overrides[get_current_user_context] = lambda: {"user_id": str(mock_user_id), "role": "user"}
@@ -419,7 +470,7 @@ def test_api_chat_streaming(client):
 
 def test_api_chat_exceptions(client):
     class MockAnswerServiceExceptions:
-        async def generate_answer(self, question, user_id, top_k, document_ids=None, filters=None):
+        async def generate_answer(self, question, user_id, top_k, conversation_id=None, document_ids=None, filters=None):
             raise NoRelevantContext("Empty database context.")
 
     app.dependency_overrides[get_current_user_context] = lambda: {"user_id": str(uuid4()), "role": "user"}

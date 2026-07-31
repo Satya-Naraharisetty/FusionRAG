@@ -420,12 +420,204 @@ def get_context_builder(
     )
 
 
+def get_conversation_repository(db: Session = Depends(get_db)) -> Any:
+    from app.chat.infrastructure.persistence.repositories import SQLAlchemyConversationRepository
+    return SQLAlchemyConversationRepository(db)
+
+
+def get_message_repository(db: Session = Depends(get_db)) -> Any:
+    from app.chat.infrastructure.persistence.repositories import SQLAlchemyMessageRepository
+    return SQLAlchemyMessageRepository(db)
+
+
+def get_summary_repository(db: Session = Depends(get_db)) -> Any:
+    from app.chat.infrastructure.persistence.repositories import SQLAlchemySummaryRepository
+    return SQLAlchemySummaryRepository(db)
+
+
+def get_conversation_access_service(
+    conversation_repo=Depends(get_conversation_repository),
+) -> Any:
+    from app.chat.services.access_service import ConversationAccessService
+    return ConversationAccessService(conversation_repo)
+
+
+def get_conversation_memory(
+    message_repo=Depends(get_message_repository),
+    summary_repo=Depends(get_summary_repository),
+) -> Any:
+    from app.chat.services.rolling_memory import RollingConversationMemory
+    return RollingConversationMemory(
+        message_repo=message_repo,
+        summary_repo=summary_repo,
+        max_messages=settings.MAX_MESSAGES_PER_CONTEXT,
+    )
+
+
+def get_history_rewrite_cache(request: Request = None) -> Any:
+    from app.chat.infrastructure.cache import MemoryRewriteCache, RedisRewriteCache
+    redis_client = None
+    if request:
+        try:
+            redis_client = getattr(request.app.state, "redis", None)
+        except Exception:
+            pass
+    if redis_client:
+        return RedisRewriteCache(redis_client)
+    return MemoryRewriteCache()
+
+
+def get_history_rewriter(
+    llm_provider=Depends(get_llm_provider),
+    cache=Depends(get_history_rewrite_cache),
+) -> Any:
+    from app.chat.services.history_rewriter import LLMHistoryRewriter
+    model = (
+        settings.GEMINI_CHAT_MODEL
+        if settings.LLM_PROVIDER == "gemini"
+        else settings.OPENAI_CHAT_MODEL
+    )
+    return LLMHistoryRewriter(llm_provider, model=model, cache=cache, cache_ttl_seconds=3600)
+
+
+def get_conversation_title_generator(
+    llm_provider=Depends(get_llm_provider),
+) -> Any:
+    from app.chat.services.title_generator import LLMConversationTitleGenerator
+    model = (
+        settings.GEMINI_CHAT_MODEL
+        if settings.LLM_PROVIDER == "gemini"
+        else settings.OPENAI_CHAT_MODEL
+    )
+    return LLMConversationTitleGenerator(llm_provider, model=model)
+
+
+def get_conversation_context_builder() -> Any:
+    from app.chat.services.conversation_context_builder import ConversationContextBuilder
+    return ConversationContextBuilder()
+
+
+# Global SimpleEventDispatcher instances cache
+_dispatcher_instance = None
+
+
+async def run_background_summarization(
+    conversation_id: Any,
+    message_id: Any,
+    db_session_factory: Any,
+    llm_provider_instance: Any,
+) -> None:
+    import logging
+    logger = logging.getLogger(__name__)
+    db = db_session_factory()
+    try:
+        from app.chat.infrastructure.persistence.repositories import (
+            SQLAlchemyMessageRepository,
+            SQLAlchemySummaryRepository,
+        )
+        from app.chat.services.conversation_summarizer import LLMConversationSummarizer
+
+        message_repo = SQLAlchemyMessageRepository(db)
+        summary_repo = SQLAlchemySummaryRepository(db)
+
+        count = await message_repo.count_messages(conversation_id)
+        if count >= settings.SUMMARY_TRIGGER_MESSAGES:
+            model = (
+                settings.GEMINI_CHAT_MODEL
+                if settings.LLM_PROVIDER == "gemini"
+                else settings.OPENAI_CHAT_MODEL
+            )
+            summarizer = LLMConversationSummarizer(
+                llm_provider=llm_provider_instance,
+                summary_repo=summary_repo,
+                message_repo=message_repo,
+                model=model,
+                summary_max_tokens=settings.SUMMARY_MAX_TOKENS,
+            )
+
+            # Fetch all messages in chronological order
+            messages = await message_repo.get_recent_messages(conversation_id, limit=1000)
+            up_to_idx = count - settings.MAX_MESSAGES_PER_CONTEXT - 1
+            if up_to_idx >= 0:
+                up_to_msg = messages[up_to_idx]
+                await summarizer.summarize(conversation_id, up_to_msg.id)
+                db.commit()
+    except Exception as e:
+        logger.exception(f"Error during background summarization task: {e}")
+    finally:
+        db.close()
+
+
+def get_event_dispatcher(
+    request: Request = None,
+    llm_provider=Depends(get_llm_provider),
+) -> Any:
+    global _dispatcher_instance
+    if _dispatcher_instance is None:
+        from app.chat.domain.events import ConversationMessageCreated
+        from app.documents.infrastructure.event_dispatcher import SimpleEventDispatcher
+        from app.documents.infrastructure.tasks import FastAPIBackgroundTasksQueue
+
+        _dispatcher_instance = SimpleEventDispatcher()
+
+        def handle_message_added(event: ConversationMessageCreated) -> None:
+            # Resolve task queue
+            if request and hasattr(request, "background_tasks"):
+                task_queue = FastAPIBackgroundTasksQueue(request.background_tasks)
+            else:
+                from app.documents.infrastructure.tasks import SyncTaskQueue
+                task_queue = SyncTaskQueue()
+
+            session_factory = getattr(request.app.state, "db_session_factory", None) if request else None
+            if not session_factory:
+                from sqlalchemy.orm import sessionmaker
+                from app.db.session import init_postgres_engine
+                engine = init_postgres_engine(settings.DATABASE_URL)
+                session_factory = sessionmaker(bind=engine)
+
+            task_queue.enqueue(
+                run_background_summarization,
+                event.conversation_id,
+                event.message_id,
+                session_factory,
+                llm_provider,
+            )
+
+        _dispatcher_instance.register(ConversationMessageCreated, handle_message_added)
+
+    return _dispatcher_instance
+
+
+def get_conversation_manager(
+    conversation_repo=Depends(get_conversation_repository),
+    message_repo=Depends(get_message_repository),
+    summary_repo=Depends(get_summary_repository),
+    access_service=Depends(get_conversation_access_service),
+    memory=Depends(get_conversation_memory),
+    rewriter=Depends(get_history_rewriter),
+    title_generator=Depends(get_conversation_title_generator),
+    event_dispatcher=Depends(get_event_dispatcher),
+) -> Any:
+    from app.chat.services.conversation_manager import ConversationManager
+    return ConversationManager(
+        conversation_repo=conversation_repo,
+        message_repo=message_repo,
+        summary_repo=summary_repo,
+        access_service=access_service,
+        memory=memory,
+        rewriter=rewriter,
+        title_generator=title_generator,
+        event_dispatcher=event_dispatcher,
+    )
+
+
 def get_answer_generation_service(
     retrieval_service=Depends(get_retrieval_service),
-    context_builder=Depends(get_context_builder),
     prompt_builder=Depends(get_prompt_builder),
     llm_provider=Depends(get_llm_provider),
     token_estimator=Depends(get_token_estimator),
+    conversation_manager=Depends(get_conversation_manager),
+    conversation_context_builder=Depends(get_conversation_context_builder),
 ) -> Any:
     from app.chat.services.answer_generation_service import AnswerGenerationService
     model = (
@@ -435,14 +627,17 @@ def get_answer_generation_service(
     )
     return AnswerGenerationService(
         retrieval_service=retrieval_service,
-        context_builder=context_builder,
         prompt_builder=prompt_builder,
         llm_provider=llm_provider,
         token_estimator=token_estimator,
+        conversation_manager=conversation_manager,
+        context_builder=conversation_context_builder,
         model=model,
         temperature=settings.TEMPERATURE,
         max_response_tokens=settings.MAX_RESPONSE_TOKENS,
         system_prompt_tokens_limit=settings.SYSTEM_PROMPT_TOKENS,
         max_context_tokens=settings.MAX_CONTEXT_TOKENS,
         reserved_completion_tokens=settings.RESERVED_COMPLETION_TOKENS,
+        max_memory_tokens=settings.MAX_MEMORY_TOKENS,
+        enable_conversation_memory=settings.ENABLE_CONVERSATION_MEMORY,
     )

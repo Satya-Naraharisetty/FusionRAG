@@ -25,6 +25,9 @@ router = APIRouter(tags=["Chat"])
 
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1, description="The user's question.")
+    conversation_id: UUID | None = Field(
+        default=None, description="Optional conversation ID to continue a session."
+    )
     document_ids: list[UUID] | None = Field(
         default_factory=list, description="Optional document IDs to restrict search."
     )
@@ -56,6 +59,7 @@ async def chat(
             question=chat_req.question,
             user_id=user_id,
             top_k=top_k,
+            conversation_id=chat_req.conversation_id,
             document_ids=chat_req.document_ids,
             filters=chat_req.filters,
         )
@@ -68,6 +72,7 @@ async def chat(
                     question=chat_req.question,
                     user_id=user_id,
                     top_k=top_k,
+                    conversation_id=chat_req.conversation_id,
                     document_ids=chat_req.document_ids,
                     filters=chat_req.filters,
                 ):
