@@ -140,3 +140,75 @@ class SQLAlchemyChunkRepository(ChunkRepository):
             .count()
         )
         return count == len(unique_ids)
+
+    async def get_filtered_chunks(
+        self,
+        user_id: UUID,
+        document_ids: list[UUID] | None = None,
+        tags: list[str] | None = None,
+        filter_metadata: dict[str, Any] | None = None,
+    ) -> list[Chunk]:
+        query = (
+            self._db.query(SQLAlchemyChunk)
+            .options(joinedload(SQLAlchemyChunk.document))
+            .join(SQLAlchemyDocument)
+            .filter(SQLAlchemyDocument.user_id == user_id)
+        )
+        if document_ids:
+            query = query.filter(SQLAlchemyChunk.document_id.in_(document_ids))
+
+        db_chunks = query.all()
+
+        chunks = []
+        for c in db_chunks:
+            meta = dict(c.metadata_json) if c.metadata_json else {}
+
+            # Tags filter
+            if tags:
+                chunk_tags = meta.get("tags") or []
+                if isinstance(chunk_tags, str):
+                    chunk_tags = [chunk_tags]
+                if not any(t in chunk_tags for t in tags):
+                    continue
+
+            # Metadata filter
+            if filter_metadata:
+                match = True
+                for k, v in filter_metadata.items():
+                    if meta.get(k) != v:
+                        match = False
+                        break
+                if not match:
+                    continue
+
+            chunk = Chunk(
+                id=c.id,
+                document_id=c.document_id,
+                chunk_index=c.chunk_index,
+                text=c.text,
+                character_start=c.character_start,
+                character_end=c.character_end,
+                token_estimate=c.token_estimate,
+                metadata=meta,
+                created_at=c.created_at,
+            )
+            chunk.metadata["document_name"] = c.document.original_filename
+            chunks.append(chunk)
+
+        return chunks
+
+    async def get_chunks_metadata_stats(self, user_id: UUID) -> dict[str, Any]:
+        from sqlalchemy import func
+        result = (
+            self._db.query(
+                func.count(SQLAlchemyChunk.id).label("count"),
+                func.max(SQLAlchemyChunk.created_at).label("max_created_at"),
+            )
+            .join(SQLAlchemyDocument)
+            .filter(SQLAlchemyDocument.user_id == user_id)
+            .first()
+        )
+        return {
+            "count": result[0] if result and result[0] is not None else 0,
+            "max_created_at": result[1] if result and result[1] is not None else None,
+        }

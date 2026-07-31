@@ -3,7 +3,14 @@ from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
-from app.documents.domain.models import Chunk, Document, Embedding, ExtractionResult, RetrievedChunk
+from app.documents.domain.models import (
+    Chunk,
+    Document,
+    Embedding,
+    ExtractionResult,
+    ProcessedQuery,
+    RetrievedChunk,
+)
 
 
 class StorageProvider(ABC):
@@ -152,6 +159,26 @@ class ChunkRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    async def get_filtered_chunks(
+        self,
+        user_id: UUID,
+        document_ids: list[UUID] | None = None,
+        tags: list[str] | None = None,
+        filter_metadata: dict[str, Any] | None = None,
+    ) -> list[Chunk]:
+        """
+        Retrieves all chunks belonging to a user, with optional filters.
+        """
+        pass
+
+    @abstractmethod
+    async def get_chunks_metadata_stats(self, user_id: UUID) -> dict[str, Any]:
+        """
+        Returns count and max created_at for a user's chunks to detect drift.
+        """
+        pass
+
 
 class EmbeddingGenerator(ABC):
     @abstractmethod
@@ -259,5 +286,143 @@ class SearchRanker(ABC):
     ) -> list[RetrievedChunk]:
         """
         Ranks a list of retrieved chunks based on the query.
+        """
+        pass
+
+
+class QueryProcessor(ABC):
+    @abstractmethod
+    def process(self, query: str) -> ProcessedQuery:
+        """
+        Processes a query, returning the processed query string and statistics.
+        """
+        pass
+
+
+class IndexCache(ABC):
+    @abstractmethod
+    def get(self, user_id: UUID) -> Any | None:
+        """
+        Retrieves cached index data for a user.
+        """
+        pass
+
+    @abstractmethod
+    def set(self, user_id: UUID, index_data: Any, stats: dict[str, Any]) -> None:
+        """
+        Caches index data for a user, associated with database metadata stats.
+        """
+        pass
+
+    @abstractmethod
+    def get_stats(self, user_id: UUID) -> dict[str, Any] | None:
+        """
+        Gets the metadata stats associated with the user's cached index.
+        """
+        pass
+
+    @abstractmethod
+    def invalidate(self, user_id: UUID) -> None:
+        """
+        Invalidates a user's cached index.
+        """
+        pass
+
+
+class SparseIndex(ABC):
+    @abstractmethod
+    async def index_chunks(self, user_id: UUID, chunks: list[Chunk]) -> None:
+        """
+        Indexes the given chunks into the sparse index for the specified user.
+        """
+        pass
+
+    @abstractmethod
+    async def search(
+        self,
+        query: str,
+        user_id: UUID,
+        top_k: int,
+        document_ids: list[UUID] | None = None,
+        tags: list[str] | None = None,
+        filter_metadata: dict[str, Any] | None = None,
+    ) -> list[RetrievedChunk]:
+        """
+        Searches the sparse index.
+        """
+        pass
+
+
+class SparseRetriever(ABC):
+    @abstractmethod
+    async def retrieve(
+        self,
+        query: str,
+        user_id: UUID,
+        top_k: int,
+        document_ids: list[UUID] | None = None,
+        tags: list[str] | None = None,
+        filter_metadata: dict[str, Any] | None = None,
+    ) -> list[RetrievedChunk]:
+        """
+        Retrieves matching document chunks using sparse retrieval.
+        """
+        pass
+
+
+class DenseRetriever(ABC):
+    @abstractmethod
+    async def retrieve(
+        self,
+        query: str,
+        user_id: UUID,
+        top_k: int,
+        document_ids: list[UUID] | None = None,
+        tags: list[str] | None = None,
+        filter_metadata: dict[str, Any] | None = None,
+    ) -> list[RetrievedChunk]:
+        """
+        Retrieves matching document chunks using dense vector search.
+        """
+        pass
+
+
+class FusionEngine(ABC):
+    @abstractmethod
+    def fuse(
+        self,
+        dense_results: list[RetrievedChunk],
+        sparse_results: list[RetrievedChunk],
+    ) -> list[RetrievedChunk]:
+        """
+        Fuses dense and sparse search results into a single ranked list.
+        """
+        pass
+
+
+class MMRSelector(ABC):
+    @abstractmethod
+    def select(
+        self,
+        chunks: list[RetrievedChunk],
+        top_k: int,
+        mmr_lambda: float = 0.5,
+        similarity_fn: Callable[[RetrievedChunk, RetrievedChunk], float] | None = None,
+    ) -> list[RetrievedChunk]:
+        """
+        Applies Maximum Marginal Relevance to select top_k diverse chunks.
+        """
+        pass
+
+
+class Reranker(ABC):
+    @abstractmethod
+    def rerank(
+        self,
+        query: str,
+        chunks: list[RetrievedChunk],
+    ) -> list[RetrievedChunk]:
+        """
+        Reranks retrieved chunks for the given query.
         """
         pass

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from app.api.dependencies import get_current_user_context, get_retrieval_service
 from app.core.config import settings
 from app.documents.domain.exceptions import UnauthorizedDocumentAccess
-from app.documents.domain.models import RetrievedChunk
+from app.documents.domain.models import RetrievalMode, RetrievedChunk
 from app.documents.services.retrieval_service import RetrievalService
 
 router = APIRouter(tags=["Search"])
@@ -23,6 +23,9 @@ class SearchRequest(BaseModel):
     )
     filters: dict[str, Any] | None = Field(
         default_factory=dict, description="Optional metadata filters."
+    )
+    retrieval_mode: RetrievalMode | None = Field(
+        default=None, description="The retrieval mode: 'semantic', 'sparse', 'hybrid', or 'auto'."
     )
 
 
@@ -79,6 +82,7 @@ async def search_documents(
             document_ids=request.document_ids,
             tags=tags,
             filter_metadata=req_filters,
+            retrieval_mode=request.retrieval_mode,
         )
 
         return SearchResponse(

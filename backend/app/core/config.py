@@ -121,6 +121,16 @@ class Settings(BaseSettings):
     VECTOR_COLLECTION_NAME: str = "documents"
     SEARCH_TIMEOUT: float = 3.0
 
+    # Hybrid Search Settings
+    ENABLE_HYBRID_SEARCH: bool = True
+    ENABLE_MMR: bool = True
+    ENABLE_RERANKER: bool = True
+    BM25_TOP_K: int = 20
+    VECTOR_TOP_K: int = 20
+    RRF_K: int = 60
+    MMR_LAMBDA: float = 0.5
+    RERANK_TOP_K: int = 5
+
     # LLM Orchestration & Answer Generation Configurations
     LLM_PROVIDER: str = "gemini"
     OPENAI_CHAT_MODEL: str = "gpt-4o-mini"

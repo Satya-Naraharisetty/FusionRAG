@@ -313,21 +313,69 @@ def get_search_ranker() -> SearchRanker:
     return SemanticSearchRanker()
 
 
+def get_index_cache():
+    from functools import lru_cache
+    from app.documents.services.index_cache import InMemoryIndexCache
+
+    @lru_cache
+    def _get_cache():
+        return InMemoryIndexCache()
+    return _get_cache()
+
+
 def get_retrieval_service(
     generator: EmbeddingGenerator = Depends(get_embedding_generator),
     vector_store: VectorStore = Depends(get_vector_store),
     chunk_repo: ChunkRepository = Depends(get_chunk_repository),
-    ranker: SearchRanker = Depends(get_search_ranker),
+    index_cache=Depends(get_index_cache),
 ) -> RetrievalService:
     from app.documents.services.retrieval_service import RetrievalService
+    from app.documents.services.query_processor import DefaultQueryProcessor
+    from app.documents.services.dense_retriever import QdrantDenseRetriever
+    from app.documents.services.sparse_index import InMemoryBM25Index
+    from app.documents.services.sparse_retriever import BM25Retriever
+    from app.documents.services.fusion import ReciprocalRankFusionEngine
+    from app.documents.services.mmr import DefaultMMRSelector
+    from app.documents.services.reranker import IdentityReranker
 
-    return RetrievalService(
+    acronyms = {"rag": "retrieval augmented generation", "llm": "large language model"}
+    typos = {"searc": "search", "retreival": "retrieval", "embeding": "embedding"}
+
+    query_processor = DefaultQueryProcessor(acronyms=acronyms, typos=typos)
+
+    dense_retriever = QdrantDenseRetriever(
         embedding_generator=generator,
         vector_store=vector_store,
         chunk_repo=chunk_repo,
-        ranker=ranker,
         similarity_threshold=settings.SIMILARITY_THRESHOLD,
         search_timeout=settings.SEARCH_TIMEOUT,
+    )
+
+    sparse_index = InMemoryBM25Index(
+        chunk_repo=chunk_repo,
+        index_cache=index_cache,
+    )
+    sparse_retriever = BM25Retriever(sparse_index=sparse_index)
+
+    fusion_engine = ReciprocalRankFusionEngine(rrf_k=settings.RRF_K)
+    mmr_selector = DefaultMMRSelector()
+    reranker = IdentityReranker()
+
+    return RetrievalService(
+        query_processor=query_processor,
+        dense_retriever=dense_retriever,
+        sparse_retriever=sparse_retriever,
+        fusion_engine=fusion_engine,
+        mmr_selector=mmr_selector,
+        reranker=reranker,
+        chunk_repo=chunk_repo,
+        enable_hybrid_search=settings.ENABLE_HYBRID_SEARCH,
+        enable_mmr=settings.ENABLE_MMR,
+        enable_reranker=settings.ENABLE_RERANKER,
+        vector_top_k=settings.VECTOR_TOP_K,
+        bm25_top_k=settings.BM25_TOP_K,
+        mmr_lambda=settings.MMR_LAMBDA,
+        rerank_top_k=settings.RERANK_TOP_K,
     )
 
 

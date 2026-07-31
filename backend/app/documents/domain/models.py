@@ -152,10 +152,41 @@ class RetrievedChunk(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
+class RetrievalMode(str, Enum):
+    SEMANTIC = "semantic"
+    SPARSE = "sparse"
+    HYBRID = "hybrid"
+    AUTO = "auto"
+
+
+class QueryStats(BaseModel):
+    original_length: int
+    cleaned_length: int
+    word_count: int
+    char_count: int
+    has_acronyms_expanded: bool
+    has_typos_corrected: bool
+    processing_time_ms: float
+    expansions_count: int
+    corrections_count: int
+
+
+class ProcessedQuery(BaseModel):
+    original_query: str
+    cleaned_query: str
+    expanded_query: str
+    stats: QueryStats
+
+
 class SearchResult(BaseModel):
     original_query: str
     retrieval_time: float
     total_matches: int
     retrieved_chunks: list[RetrievedChunk]
     search_strategy: str = "semantic"
+    retrieval_strategy: RetrievalMode = RetrievalMode.SEMANTIC
+    dense_matches: list[RetrievedChunk] | None = None
+    sparse_matches: list[RetrievedChunk] | None = None
+    fusion_method: str | None = None
+    reranker: str | None = None
 
