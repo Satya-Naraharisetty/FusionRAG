@@ -10,6 +10,8 @@ os.environ["POSTGRES_PASSWORD"] = "mock_password"
 os.environ["POSTGRES_DB"] = "mock_db"
 os.environ["REDIS_HOST"] = "mock_redis"
 os.environ["QDRANT_HOST"] = "mock_qdrant"
+os.environ["OPENAI_API_KEY"] = "mock-key"
+
 
 # 2. Patch database connection helper functions before app.main imports them
 import app.db.session  # noqa: E402

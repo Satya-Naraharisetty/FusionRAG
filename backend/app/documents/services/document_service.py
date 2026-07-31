@@ -20,6 +20,7 @@ from app.documents.domain.interfaces import (
 from app.documents.domain.models import Document, DocumentStatus
 from app.documents.infrastructure.extractors import ExtractorFactory
 from app.documents.services.document_processing_service import DocumentProcessingService
+from app.documents.services.embedding_service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ class DocumentService:
         checksum_generator: ChecksumGenerator,
         task_queue: TaskQueue,
         document_processing_service: DocumentProcessingService,
+        embedding_service: EmbeddingService,
         uow: UnitOfWork,
         uuid_generator: UUIDGenerator,
         time_provider: TimeProvider,
@@ -44,6 +46,7 @@ class DocumentService:
         self._checksum_generator = checksum_generator
         self._task_queue = task_queue
         self._document_processing_service = document_processing_service
+        self._embedding_service = embedding_service
         self._uow = uow
         self._uuid_generator = uuid_generator
         self._time_provider = time_provider
@@ -164,12 +167,20 @@ class DocumentService:
         document = self.get_document_by_id(id, user_id)
 
         try:
-            # Delete DB record (will cascade delete chunks in PostgreSQL)
+            # Delete DB record (will cascade delete chunks and document_embeddings in PostgreSQL)
             self._document_repo.delete(id)
             self._uow.commit()
         except Exception:
             self._uow.rollback()
             raise
+
+        # Clean up vectors from the vector store after PostgreSQL commit is successful
+        try:
+            self._embedding_service.delete_embeddings(document.id)
+        except Exception as e:
+            logger.error(
+                f"Failed to delete Qdrant vectors during document deletion {document.id}: {e}"
+            )
 
         # Attempt storage deletion (failures are logged, not raised)
         self._storage_provider.delete(document.filename)

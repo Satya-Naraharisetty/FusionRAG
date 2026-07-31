@@ -2,6 +2,7 @@ import logging
 from uuid import UUID
 
 from app.auth.domain.interfaces import TimeProvider, UnitOfWork
+from app.documents.domain.events import DocumentProcessingCompleted, EventDispatcher
 from app.documents.domain.interfaces import (
     ChunkRepository,
     DocumentRepository,
@@ -28,6 +29,7 @@ class DocumentProcessingService:
         chunking_service: ChunkingService,
         uow: UnitOfWork,
         time_provider: TimeProvider,
+        event_dispatcher: EventDispatcher = None,
     ) -> None:
         self._document_repo = document_repo
         self._chunk_repo = chunk_repo
@@ -38,6 +40,7 @@ class DocumentProcessingService:
         self._chunking_service = chunking_service
         self._uow = uow
         self._time_provider = time_provider
+        self._event_dispatcher = event_dispatcher
 
     def process_document(self, document_id: UUID) -> None:
         """
@@ -121,6 +124,19 @@ class DocumentProcessingService:
 
             self._uow.commit()
             logger.info(f"Ingestion completed successfully for document {document_id}")
+
+            # Transactional Event Dispatch: dispatch only after successful commit.
+            if self._event_dispatcher:
+                try:
+                    self._event_dispatcher.dispatch(
+                        DocumentProcessingCompleted(
+                            document_id=document.id, user_id=document.user_id
+                        )
+                    )
+                except Exception as ev_err:
+                    logger.error(
+                        f"Failed to dispatch DocumentProcessingCompleted event for document {document_id}: {ev_err}"
+                    )
 
         except Exception as e:
             self._uow.rollback()

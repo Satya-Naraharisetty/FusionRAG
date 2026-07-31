@@ -59,6 +59,17 @@ class Settings(BaseSettings):
     # Qdrant Vector DB Configurations
     QDRANT_HOST: str
     QDRANT_PORT: int = 6333
+    QDRANT_COLLECTION: str = "documents"
+
+    # Embedding Configurations
+    EMBEDDING_PROVIDER: str = "openai"
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_DIMENSION: int = 1536
+    EMBEDDING_BATCH_SIZE: int = 32
+    EMBEDDING_VERSION: str = "v1"
+
+    # OpenAI API Configurations
+    OPENAI_API_KEY: str = ""
 
     # CORS Configurations
     BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]

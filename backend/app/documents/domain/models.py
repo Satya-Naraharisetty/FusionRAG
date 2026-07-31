@@ -89,3 +89,51 @@ class ExtractionResult(BaseModel):
 
 class ChunkResult(BaseModel):
     chunks: list[Chunk]
+
+
+class EmbeddingStatus(str, Enum):
+    PENDING = "PENDING"
+    GENERATING = "GENERATING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class EmbeddingStateMachine:
+    _transitions: dict[EmbeddingStatus, list[EmbeddingStatus]] = {
+        EmbeddingStatus.PENDING: [EmbeddingStatus.GENERATING],
+        EmbeddingStatus.GENERATING: [EmbeddingStatus.COMPLETED, EmbeddingStatus.FAILED],
+        EmbeddingStatus.FAILED: [EmbeddingStatus.PENDING],
+        EmbeddingStatus.COMPLETED: [EmbeddingStatus.PENDING],
+    }
+
+    @classmethod
+    def validate_transition(
+        cls, current: EmbeddingStatus, target: EmbeddingStatus
+    ) -> None:
+        if current == target:
+            return
+        allowed = cls._transitions.get(current, [])
+        if target not in allowed:
+            from app.documents.domain.exceptions import InvalidStateTransitionException
+
+            raise InvalidStateTransitionException(
+                f"Invalid embedding transition from {current.name} to {target.name}"
+            )
+
+
+class EmbeddingMetadata(BaseModel):
+    provider: str
+    model: str
+    dimension: int
+    embedding_version: str
+
+
+class Embedding(BaseModel):
+    id: UUID
+    chunk_id: UUID
+    status: EmbeddingStatus
+    metadata: EmbeddingMetadata
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
