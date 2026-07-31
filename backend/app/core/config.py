@@ -114,6 +114,13 @@ class Settings(BaseSettings):
     MIN_CHUNK_SIZE: int = 50
     CHUNK_STRATEGY: str = "recursive"
 
+    # Retrieval & Search Configurations
+    DEFAULT_TOP_K: int = 10
+    MAX_TOP_K: int = 100
+    SIMILARITY_THRESHOLD: float = 0.25
+    VECTOR_COLLECTION_NAME: str = "documents"
+    SEARCH_TIMEOUT: float = 3.0
+
     model_config = SettingsConfigDict(
         case_sensitive=True, env_file=".env", env_file_encoding="utf-8"
     )

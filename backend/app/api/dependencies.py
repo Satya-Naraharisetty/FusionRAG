@@ -27,6 +27,8 @@ from app.documents.domain.interfaces import (
     EmbeddingGenerator,
     EmbeddingRepository,
     VectorStore,
+    ChunkRepository,
+    SearchRanker,
 )
 from app.documents.infrastructure.checksum import SHA256ChecksumGenerator
 from app.documents.infrastructure.event_dispatcher import SimpleEventDispatcher
@@ -193,7 +195,7 @@ def get_vector_store(request: Request = None) -> VectorStore:
 
     return QdrantVectorStore(
         client=qdrant_client,
-        collection_name=settings.QDRANT_COLLECTION,
+        collection_name=settings.VECTOR_COLLECTION_NAME,
         dimension=settings.EMBEDDING_DIMENSION,
     )
 
@@ -296,4 +298,34 @@ def get_document_service(
         uuid_generator=SystemUUIDGenerator(),
         time_provider=SystemTimeProvider(),
         max_upload_size=settings.MAX_UPLOAD_SIZE,
+    )
+
+
+def get_chunk_repository(db: Session = Depends(get_db)) -> ChunkRepository:
+    from app.documents.infrastructure.persistence.repositories.chunk_repository import (
+        SQLAlchemyChunkRepository,
+    )
+    return SQLAlchemyChunkRepository(db)
+
+
+def get_search_ranker() -> SearchRanker:
+    from app.documents.services.ranking import SemanticSearchRanker
+    return SemanticSearchRanker()
+
+
+def get_retrieval_service(
+    generator: EmbeddingGenerator = Depends(get_embedding_generator),
+    vector_store: VectorStore = Depends(get_vector_store),
+    chunk_repo: ChunkRepository = Depends(get_chunk_repository),
+    ranker: SearchRanker = Depends(get_search_ranker),
+) -> RetrievalService:
+    from app.documents.services.retrieval_service import RetrievalService
+
+    return RetrievalService(
+        embedding_generator=generator,
+        vector_store=vector_store,
+        chunk_repo=chunk_repo,
+        ranker=ranker,
+        similarity_threshold=settings.SIMILARITY_THRESHOLD,
+        search_timeout=settings.SEARCH_TIMEOUT,
     )

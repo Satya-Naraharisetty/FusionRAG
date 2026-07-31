@@ -1,10 +1,11 @@
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.documents.domain.interfaces import ChunkRepository
 from app.documents.domain.models import Chunk
-from app.documents.infrastructure.persistence.models import SQLAlchemyChunk
+from app.documents.infrastructure.persistence.models import SQLAlchemyChunk, SQLAlchemyDocument
 
 
 class SQLAlchemyChunkRepository(ChunkRepository):
@@ -65,3 +66,77 @@ class SQLAlchemyChunkRepository(ChunkRepository):
             )
             for c in db_chunks
         ]
+
+    async def load_chunk_text(self, chunk_id: UUID) -> str | None:
+        """
+        Loads the text of a single chunk.
+        """
+        db_chunk = (
+            self._db.query(SQLAlchemyChunk)
+            .filter(SQLAlchemyChunk.id == chunk_id)
+            .first()
+        )
+        return db_chunk.text if db_chunk else None
+
+    async def load_metadata(self, chunk_id: UUID) -> dict[str, Any] | None:
+        """
+        Loads the metadata of a single chunk.
+        """
+        db_chunk = (
+            self._db.query(SQLAlchemyChunk)
+            .filter(SQLAlchemyChunk.id == chunk_id)
+            .first()
+        )
+        return db_chunk.metadata_json if db_chunk else None
+
+    async def batch_lookup(self, chunk_ids: list[UUID]) -> list[Chunk]:
+        """
+        Batch lookups chunks by their IDs.
+        Uses eager loading on document to prevent N+1 queries.
+        """
+        if not chunk_ids:
+            return []
+
+        db_chunks = (
+            self._db.query(SQLAlchemyChunk)
+            .options(joinedload(SQLAlchemyChunk.document))
+            .filter(SQLAlchemyChunk.id.in_(chunk_ids))
+            .all()
+        )
+
+        chunks = []
+        for c in db_chunks:
+            chunk = Chunk(
+                id=c.id,
+                document_id=c.document_id,
+                chunk_index=c.chunk_index,
+                text=c.text,
+                character_start=c.character_start,
+                character_end=c.character_end,
+                token_estimate=c.token_estimate,
+                metadata=dict(c.metadata_json),
+                created_at=c.created_at,
+            )
+            # Embed original filename in metadata so it is accessible downstream
+            chunk.metadata["document_name"] = c.document.original_filename
+            chunks.append(chunk)
+
+        return chunks
+
+    async def verify_document_ownership(self, document_ids: list[UUID], user_id: UUID) -> bool:
+        """
+        Verifies that all specified document_ids belong to the user_id.
+        """
+        if not document_ids:
+            return True
+
+        unique_ids = list(set(document_ids))
+        count = (
+            self._db.query(SQLAlchemyDocument)
+            .filter(
+                SQLAlchemyDocument.id.in_(unique_ids),
+                SQLAlchemyDocument.user_id == user_id,
+            )
+            .count()
+        )
+        return count == len(unique_ids)

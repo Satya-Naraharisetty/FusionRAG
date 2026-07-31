@@ -3,7 +3,7 @@ from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
-from app.documents.domain.models import Chunk, Document, Embedding, ExtractionResult
+from app.documents.domain.models import Chunk, Document, Embedding, ExtractionResult, RetrievedChunk
 
 
 class StorageProvider(ABC):
@@ -124,6 +124,34 @@ class ChunkRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    async def load_chunk_text(self, chunk_id: UUID) -> str | None:
+        """
+        Loads the text of a single chunk.
+        """
+        pass
+
+    @abstractmethod
+    async def load_metadata(self, chunk_id: UUID) -> dict[str, Any] | None:
+        """
+        Loads the metadata of a single chunk.
+        """
+        pass
+
+    @abstractmethod
+    async def batch_lookup(self, chunk_ids: list[UUID]) -> list[Chunk]:
+        """
+        Batch lookups chunks by their IDs.
+        """
+        pass
+
+    @abstractmethod
+    async def verify_document_ownership(self, document_ids: list[UUID], user_id: UUID) -> bool:
+        """
+        Verifies that all specified document_ids belong to the user_id.
+        """
+        pass
+
 
 class EmbeddingGenerator(ABC):
     @abstractmethod
@@ -175,6 +203,22 @@ class VectorStore(ABC):
         """
         pass
 
+    @abstractmethod
+    async def search(
+        self,
+        query_vector: list[float],
+        top_k: int,
+        user_id: UUID,
+        document_ids: list[UUID] | None = None,
+        tags: list[str] | None = None,
+        filter_metadata: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Asynchronously searches the vector store using the query vector.
+        """
+        pass
+
 
 class EmbeddingRepository(ABC):
     @abstractmethod
@@ -202,5 +246,18 @@ class EmbeddingRepository(ABC):
     def list_by_document(self, document_id: UUID) -> list[Embedding]:
         """
         Lists all embedding metadata associated with a document's chunks.
+        """
+        pass
+
+
+class SearchRanker(ABC):
+    @abstractmethod
+    def rank(
+        self,
+        query: str,
+        chunks: list[RetrievedChunk],
+    ) -> list[RetrievedChunk]:
+        """
+        Ranks a list of retrieved chunks based on the query.
         """
         pass

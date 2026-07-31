@@ -137,3 +137,25 @@ class Embedding(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RetrievedChunk(BaseModel):
+    chunk_id: UUID
+    document_id: UUID
+    document_name: str
+    text: str
+    similarity_score: float
+    normalized_score: float | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    chunk_index: int
+
+    model_config = ConfigDict(frozen=True)
+
+
+class SearchResult(BaseModel):
+    original_query: str
+    retrieval_time: float
+    total_matches: int
+    retrieved_chunks: list[RetrievedChunk]
+    search_strategy: str = "semantic"
+

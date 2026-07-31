@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any
 from uuid import UUID
@@ -117,3 +118,90 @@ class QdrantVectorStore(VectorStore):
         except Exception as e:
             logger.warning(f"Qdrant health check failed: {e}")
             return False
+
+    def _search_sync(
+        self,
+        query_vector: list[float],
+        top_k: int,
+        user_id: UUID,
+        document_ids: list[UUID] | None = None,
+        tags: list[str] | None = None,
+        filter_metadata: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
+        self._ensure_collection()
+
+        must_conditions = [
+            FieldCondition(
+                key="user_id",
+                match=MatchValue(value=str(user_id)),
+            )
+        ]
+
+        if document_ids:
+            from qdrant_client.models import MatchAny
+            must_conditions.append(
+                FieldCondition(
+                    key="document_id",
+                    match=MatchAny(any_of=[str(d_id) for d_id in document_ids]),
+                )
+            )
+
+        if tags:
+            from qdrant_client.models import MatchAny
+            must_conditions.append(
+                FieldCondition(
+                    key="tags",
+                    match=MatchAny(any_of=tags),
+                )
+            )
+
+        if filter_metadata:
+            for k, v in filter_metadata.items():
+                must_conditions.append(
+                    FieldCondition(
+                        key=f"metadata.{k}",
+                        match=MatchValue(value=v),
+                    )
+                )
+
+        results = self._client.search(
+            collection_name=self._collection_name,
+            query_vector=query_vector,
+            query_filter=Filter(must=must_conditions),
+            limit=top_k,
+            timeout=timeout,
+        )
+
+        return [
+            {
+                "id": UUID(r.id) if isinstance(r.id, str) else r.id,
+                "score": r.score,
+                "payload": r.payload or {},
+            }
+            for r in results
+        ]
+
+    async def search(
+        self,
+        query_vector: list[float],
+        top_k: int,
+        user_id: UUID,
+        document_ids: list[UUID] | None = None,
+        tags: list[str] | None = None,
+        filter_metadata: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Asynchronously searches the vector store using the query vector.
+        """
+        return await asyncio.to_thread(
+            self._search_sync,
+            query_vector=query_vector,
+            top_k=top_k,
+            user_id=user_id,
+            document_ids=document_ids,
+            tags=tags,
+            filter_metadata=filter_metadata,
+            timeout=timeout,
+        )
