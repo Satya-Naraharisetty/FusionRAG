@@ -329,3 +329,72 @@ def get_retrieval_service(
         similarity_threshold=settings.SIMILARITY_THRESHOLD,
         search_timeout=settings.SEARCH_TIMEOUT,
     )
+
+
+# --- Chat & LLM Orchestration Component Dependency Injection ---
+
+def get_token_estimator():
+    from app.chat.services.token_estimator import CharacterTokenEstimator
+    return CharacterTokenEstimator()
+
+
+def get_llm_provider():
+    from app.core.config import ConfigurationError
+    if settings.LLM_PROVIDER == "openai":
+        from app.chat.infrastructure.openai_provider import OpenAIProvider
+        return OpenAIProvider(api_key=settings.OPENAI_API_KEY)
+    elif settings.LLM_PROVIDER == "gemini":
+        from app.chat.infrastructure.gemini_provider import GeminiProvider
+        return GeminiProvider(api_key=settings.GEMINI_API_KEY)
+    else:
+        raise ConfigurationError(f"Unsupported LLM provider: {settings.LLM_PROVIDER}")
+
+
+# Global PromptBuilder instance cached system prompt at startup
+_prompt_builder_instance = None
+
+
+def get_prompt_builder():
+    global _prompt_builder_instance
+    if _prompt_builder_instance is None:
+        from app.chat.services.prompt_builder import PromptBuilder
+        _prompt_builder_instance = PromptBuilder(system_prompt_path=settings.SYSTEM_PROMPT_PATH)
+    return _prompt_builder_instance
+
+
+def get_context_builder(
+    token_estimator=Depends(get_token_estimator),
+) -> Any:
+    from app.chat.services.context_builder import ContextBuilder
+    return ContextBuilder(
+        token_estimator=token_estimator,
+        max_context_tokens=settings.MAX_CONTEXT_TOKENS,
+    )
+
+
+def get_answer_generation_service(
+    retrieval_service=Depends(get_retrieval_service),
+    context_builder=Depends(get_context_builder),
+    prompt_builder=Depends(get_prompt_builder),
+    llm_provider=Depends(get_llm_provider),
+    token_estimator=Depends(get_token_estimator),
+) -> Any:
+    from app.chat.services.answer_generation_service import AnswerGenerationService
+    model = (
+        settings.GEMINI_CHAT_MODEL
+        if settings.LLM_PROVIDER == "gemini"
+        else settings.OPENAI_CHAT_MODEL
+    )
+    return AnswerGenerationService(
+        retrieval_service=retrieval_service,
+        context_builder=context_builder,
+        prompt_builder=prompt_builder,
+        llm_provider=llm_provider,
+        token_estimator=token_estimator,
+        model=model,
+        temperature=settings.TEMPERATURE,
+        max_response_tokens=settings.MAX_RESPONSE_TOKENS,
+        system_prompt_tokens_limit=settings.SYSTEM_PROMPT_TOKENS,
+        max_context_tokens=settings.MAX_CONTEXT_TOKENS,
+        reserved_completion_tokens=settings.RESERVED_COMPLETION_TOKENS,
+    )

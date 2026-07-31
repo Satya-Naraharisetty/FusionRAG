@@ -17,6 +17,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1.auth import router as auth_router
+from app.api.v1.chat import router as chat_router
 from app.api.v1.documents import router as documents_router
 from app.api.v1.health import router as health_router
 from app.api.v1.search import router as search_router
@@ -25,6 +26,13 @@ from app.auth.domain.exceptions import (
     DuplicateAccountException,
     InvalidCredentialsException,
     InvalidSessionException,
+)
+from app.chat.domain.exceptions import (
+    NoRelevantContext,
+    LLMProviderError,
+    PromptTooLarge,
+    TokenBudgetExceeded,
+    StreamingCancelled,
 )
 from app.core.config import ConfigurationError, settings
 
@@ -401,6 +409,52 @@ async def invalid_state_transition_handler(
     )
 
 
+@app.exception_handler(NoRelevantContext)
+async def no_relevant_context_handler(_request: Request, exc: NoRelevantContext):
+    return format_error_response(
+        code="NO_RELEVANT_CONTEXT",
+        message=str(exc),
+        status_code=status.HTTP_404_NOT_FOUND,
+    )
+
+
+@app.exception_handler(LLMProviderError)
+async def llm_provider_error_handler(_request: Request, exc: LLMProviderError):
+    return format_error_response(
+        code="LLM_PROVIDER_ERROR",
+        message=str(exc),
+        status_code=status.HTTP_502_BAD_GATEWAY,
+    )
+
+
+@app.exception_handler(PromptTooLarge)
+async def prompt_too_large_handler(_request: Request, exc: PromptTooLarge):
+    return format_error_response(
+        code="PROMPT_TOO_LARGE",
+        message=str(exc),
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+    )
+
+
+@app.exception_handler(TokenBudgetExceeded)
+async def token_budget_exceeded_handler(_request: Request, exc: TokenBudgetExceeded):
+    return format_error_response(
+        code="TOKEN_BUDGET_EXCEEDED",
+        message=str(exc),
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+    )
+
+
+@app.exception_handler(StreamingCancelled)
+async def streaming_cancelled_handler(_request: Request, exc: StreamingCancelled):
+    logger.info("Streaming client disconnected gracefully.")
+    return format_error_response(
+        code="STREAMING_CANCELLED",
+        message=str(exc),
+        status_code=499,
+    )
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(_request: Request, exc: Exception):
     logger.error(f"Unhandled system crash: {exc}", exc_info=True)
@@ -415,6 +469,7 @@ app.include_router(health_router, prefix=settings.API_V1_STR, tags=["Health"])
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(documents_router, prefix=settings.API_V1_STR)
 app.include_router(search_router, prefix=settings.API_V1_STR)
+app.include_router(chat_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

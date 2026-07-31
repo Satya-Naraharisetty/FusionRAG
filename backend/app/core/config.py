@@ -121,6 +121,20 @@ class Settings(BaseSettings):
     VECTOR_COLLECTION_NAME: str = "documents"
     SEARCH_TIMEOUT: float = 3.0
 
+    # LLM Orchestration & Answer Generation Configurations
+    LLM_PROVIDER: str = "gemini"
+    OPENAI_CHAT_MODEL: str = "gpt-4o-mini"
+    GEMINI_CHAT_MODEL: str = "gemini-1.5-flash"
+    TEMPERATURE: float = 0.0
+    MAX_CONTEXT_TOKENS: int = 4000
+    MAX_RESPONSE_TOKENS: int = 1000
+    SYSTEM_PROMPT_PATH: str = "app/core/prompts/system_prompt.txt"
+    SYSTEM_PROMPT_TOKENS: int = 1000
+    RESERVED_COMPLETION_TOKENS: int = 500
+    ENABLE_STREAMING: bool = True
+    OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
+
     model_config = SettingsConfigDict(
         case_sensitive=True, env_file=".env", env_file_encoding="utf-8"
     )
