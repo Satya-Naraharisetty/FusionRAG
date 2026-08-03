@@ -328,7 +328,7 @@ def get_retrieval_service(
     vector_store: VectorStore = Depends(get_vector_store),
     chunk_repo: ChunkRepository = Depends(get_chunk_repository),
     index_cache=Depends(get_index_cache),
-) -> RetrievalService:
+) -> "RetrievalService":
     from app.documents.services.retrieval_service import RetrievalService
     from app.documents.services.query_processor import DefaultQueryProcessor
     from app.documents.services.dense_retriever import QdrantDenseRetriever
@@ -387,15 +387,20 @@ def get_token_estimator():
 
 
 def get_llm_provider():
-    from app.core.config import ConfigurationError
-    if settings.LLM_PROVIDER == "openai":
-        from app.chat.infrastructure.openai_provider import OpenAIProvider
-        return OpenAIProvider(api_key=settings.OPENAI_API_KEY)
-    elif settings.LLM_PROVIDER == "gemini":
-        from app.chat.infrastructure.gemini_provider import GeminiProvider
-        return GeminiProvider(api_key=settings.GEMINI_API_KEY)
-    else:
-        raise ConfigurationError(f"Unsupported LLM provider: {settings.LLM_PROVIDER}")
+    from app.chat.infrastructure.openai_provider import OpenAIProvider
+    from app.chat.infrastructure.gemini_provider import GeminiProvider
+    from app.chat.infrastructure.failover_proxy import ProviderFailoverProxy
+
+    primary = GeminiProvider(api_key=settings.GEMINI_API_KEY)
+    backup = OpenAIProvider(api_key=settings.OPENAI_API_KEY)
+    
+    # ProviderFailoverProxy coordinates fallback policies
+    return ProviderFailoverProxy(
+        primary=primary,
+        backup=backup,
+        failure_threshold=settings.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+        recovery_timeout=settings.CIRCUIT_BREAKER_RECOVERY_TIMEOUT
+    )
 
 
 # Global PromptBuilder instance cached system prompt at startup
@@ -814,5 +819,135 @@ def get_regression_runner():
 def get_report_generator():
     from app.evaluation.reports.report_generator import ReportGenerator
     return ReportGenerator(output_dir=settings.EVALUATION_RESULTS_DIR)
+
+
+# --- Production Backend Layer Dependency Providers ---
+
+_cache_instance = None
+
+def get_cache(request: Request = None) -> Any:
+    global _cache_instance
+    if _cache_instance is None:
+        from app.core.cache.memory_cache import InMemoryCache
+        from app.core.cache.redis_cache import RedisCache
+        from app.core.cache.multi_tier import MultiTierCache
+
+        redis_client = None
+        if request:
+            try:
+                redis_client = getattr(request.app.state, "redis", None)
+            except Exception:
+                pass
+        
+        l1 = InMemoryCache()
+        if redis_client:
+            l2 = RedisCache(redis_client)
+            _cache_instance = MultiTierCache(l1, l2)
+        else:
+            _cache_instance = l1
+    return _cache_instance
+
+
+def get_distributed_lock(request: Request = None) -> Any:
+    from app.core.cache.lock import RedisDistributedLock, InMemoryDistributedLock
+    redis_client = None
+    if request:
+        try:
+            redis_client = getattr(request.app.state, "redis", None)
+        except Exception:
+            pass
+    if redis_client:
+        return RedisDistributedLock(redis_client)
+    return InMemoryDistributedLock()
+
+
+def get_rate_limiter(request: Request = None) -> Any:
+    from app.core.security.rate_limiter import RateLimiter
+    redis_client = None
+    if request:
+        try:
+            redis_client = getattr(request.app.state, "redis", None)
+        except Exception:
+            pass
+    return RateLimiter(
+        redis_client=redis_client,
+        requests_per_minute=settings.RATE_LIMIT_REQUESTS_PER_MINUTE,
+        burst=settings.RATE_LIMIT_BURST
+    )
+
+
+def get_idempotency_manager(request: Request = None) -> Any:
+    from app.core.security.idempotency import IdempotencyManager
+    redis_client = None
+    if request:
+        try:
+            redis_client = getattr(request.app.state, "redis", None)
+        except Exception:
+            pass
+    if redis_client:
+        return IdempotencyManager(redis_client)
+    return None
+
+
+def get_resource_quota_service(db: Session = Depends(get_db), request: Request = None) -> Any:
+    from app.core.security.quotas import ResourceQuotaService
+    redis_client = None
+    if request:
+        try:
+            redis_client = getattr(request.app.state, "redis", None)
+        except Exception:
+            pass
+    return ResourceQuotaService(db, redis_client)
+
+
+_pricing_provider = None
+
+def get_pricing_provider() -> Any:
+    global _pricing_provider
+    if _pricing_provider is None:
+        from app.core.cost.pricing_provider import YAMLPricingProvider
+        import os
+        yaml_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "core", "cost", "pricing.yaml"
+        )
+        _pricing_provider = YAMLPricingProvider(yaml_path)
+    return _pricing_provider
+
+
+_feature_flag_service = None
+
+def get_feature_flag_service() -> Any:
+    global _feature_flag_service
+    if _feature_flag_service is None:
+        from app.core.feature_flags.flags import FeatureFlagService, SettingsFeatureFlagProvider
+        provider = SettingsFeatureFlagProvider()
+        _feature_flag_service = FeatureFlagService(provider)
+    return _feature_flag_service
+
+
+_event_bus_instance = None
+
+def get_event_bus(request: Request = None) -> Any:
+    global _event_bus_instance
+    if _event_bus_instance is None:
+        from app.core.events.redis_bus import RedisEventBus
+        redis_client = None
+        if request:
+            try:
+                redis_client = getattr(request.app.state, "redis", None)
+            except Exception:
+                pass
+        if redis_client:
+            _event_bus_instance = RedisEventBus(redis_client)
+        else:
+            # Fallback to local dispatch placeholder
+            class InProcessEventBus:
+                async def publish(self, event):
+                    pass
+                async def subscribe(self, event_type, handler):
+                    pass
+            _event_bus_instance = InProcessEventBus()
+    return _event_bus_instance
 
 

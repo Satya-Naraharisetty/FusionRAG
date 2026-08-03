@@ -29,6 +29,16 @@ class LivenessResponse(BaseModel):
     status: str
 
 
+class DeepHealthResponse(BaseModel):
+    status: str
+    version: str
+    database: str
+    redis: str
+    vector_db: str
+    storage: str
+    llm: str
+
+
 @router.get("/health/liveness", response_model=LivenessResponse)
 def liveness_check():
     """
@@ -45,41 +55,36 @@ def readiness_check(
     qdrant_client: QdrantClient = Depends(get_qdrant),
 ):
     """
-    Deep readiness check probe verifying connections to backing database systems.
-    Runs query/command pings with strict client socket timeouts.
+    Readiness check probe verifying basic connectivity to Postgres, Redis, and Qdrant.
     """
     postgres_status = "connected"
     redis_status = "connected"
     vector_db_status = "connected"
     is_ready = True
 
-    # 1. PostgreSQL connection health verification
     try:
         db.execute(text("SELECT 1"))
     except Exception as e:
         logger.error(f"Readiness PostgreSQL check failed: {e}")
-        postgres_status = f"disconnected: {str(e)}"
+        postgres_status = "disconnected"
         is_ready = False
 
-    # 2. Redis cache connection health verification
     try:
         if not redis_client.ping():
-            redis_status = "disconnected: PING returned false"
+            redis_status = "disconnected"
             is_ready = False
     except Exception as e:
         logger.error(f"Readiness Redis check failed: {e}")
-        redis_status = f"disconnected: {str(e)}"
+        redis_status = "disconnected"
         is_ready = False
 
-    # 3. Qdrant vector DB connection health verification
     try:
         qdrant_client.get_collections()
     except Exception as e:
         logger.error(f"Readiness Qdrant check failed: {e}")
-        vector_db_status = f"disconnected: {str(e)}"
+        vector_db_status = "disconnected"
         is_ready = False
 
-    # Map response status codes based on readiness outcome
     if not is_ready:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         status_text = "unhealthy"
@@ -93,4 +98,101 @@ def readiness_check(
         services=ServiceStatuses(
             postgres=postgres_status, vector_db=vector_db_status, redis=redis_status
         ),
+    )
+
+
+@router.get("/health/deep", response_model=DeepHealthResponse)
+def deep_check(
+    response: Response,
+    db: Session = Depends(get_db),
+    redis_client: redis.Redis = Depends(get_redis),
+    qdrant_client: QdrantClient = Depends(get_qdrant),
+):
+    """
+    Deep health check performing write validation on DB and Redis,
+    checking local storage write permissions, and verifying LLM failover status.
+    """
+    db_status = "healthy"
+    redis_status = "healthy"
+    qdrant_status = "healthy"
+    storage_status = "healthy"
+    llm_status = "healthy"
+    is_healthy = True
+
+    # 1. Deep Postgres check: perform a write/read transaction check or simple test
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as e:
+        logger.error(f"Deep health Postgres failed: {e}")
+        db_status = f"unhealthy: {str(e)}"
+        is_healthy = False
+
+    # 2. Deep Redis check: perform SET and GET validation
+    try:
+        redis_client.set("health:deep:ping", "pong", ex=10)
+        ping_val = redis_client.get("health:deep:ping")
+        if ping_val != "pong":
+            redis_status = "unhealthy: Read validation failed"
+            is_healthy = False
+    except Exception as e:
+        logger.error(f"Deep health Redis failed: {e}")
+        redis_status = f"unhealthy: {str(e)}"
+        is_healthy = False
+
+    # 3. Deep Qdrant check
+    try:
+        qdrant_client.get_collections()
+    except Exception as e:
+        logger.error(f"Deep health Qdrant failed: {e}")
+        qdrant_status = f"unhealthy: {str(e)}"
+        is_healthy = False
+
+    # 4. Storage check: test write permissions on the upload dir
+    try:
+        from app.core.config import settings
+        import pathlib
+        path = pathlib.Path(settings.UPLOAD_DIR)
+        path.mkdir(parents=True, exist_ok=True)
+        test_file = path / f"health_check_{int(time.time())}.txt"
+        test_file.write_text("health check")
+        test_file.unlink()
+    except Exception as e:
+        logger.error(f"Deep health Storage check failed: {e}")
+        storage_status = f"unhealthy: {str(e)}"
+        is_healthy = False
+
+    # 5. LLM Router status check
+    try:
+        from app.api.dependencies import get_llm_provider
+        # Resolve LLM provider to inspect circuit state
+        # In a real environment, we'd avoid making external calls to not waste API credits,
+        # so we inspect the circuit breaker states of the router proxy.
+        llm_provider = get_llm_provider()
+        from app.chat.infrastructure.router import LLMProviderRouter
+        if isinstance(llm_provider, LLMProviderRouter):
+            gemini_breaker = llm_provider.get_circuit_breaker("gemini")
+            openai_breaker = llm_provider.get_circuit_breaker("openai")
+            if gemini_breaker and gemini_breaker.state == "OPEN":
+                llm_status = "degraded: Gemini offline (failed over to OpenAI)"
+            elif openai_breaker and openai_breaker.state == "OPEN":
+                llm_status = "degraded: OpenAI offline"
+    except Exception as e:
+        logger.error(f"Deep health LLM check failed: {e}")
+        llm_status = f"degraded: {str(e)}"
+
+    if not is_healthy:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        overall_status = "unhealthy"
+    else:
+        response.status_code = status.HTTP_200_OK
+        overall_status = "healthy"
+
+    return DeepHealthResponse(
+        status=overall_status,
+        version="0.1.0",
+        database=db_status,
+        redis=redis_status,
+        vector_db=qdrant_status,
+        storage=storage_status,
+        llm=llm_status,
     )

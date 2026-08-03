@@ -37,6 +37,20 @@ class StorageProvider(ABC):
         """
         pass
 
+    @abstractmethod
+    def generate_presigned_upload_url(self, key: str, expires_in: int = 3600) -> str:
+        """
+        Generates a direct upload URL.
+        """
+        pass
+
+    @abstractmethod
+    def generate_presigned_download_url(self, key: str, expires_in: int = 3600) -> str:
+        """
+        Generates a direct download URL.
+        """
+        pass
+
 
 class DocumentExtractor(ABC):
     @abstractmethod

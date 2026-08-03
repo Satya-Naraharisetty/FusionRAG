@@ -70,17 +70,24 @@ def init_postgres_engine(database_url: str) -> Engine:
     )
 
 
+_redis_pool = None
+
+
 def init_redis_client(host: str, port: int) -> redis.Redis:
     """
     Instantiates the Redis key-value cache client connection pool.
     """
-    return redis.Redis(
-        host=host,
-        port=port,
-        decode_responses=True,
-        socket_timeout=3.0,
-        socket_connect_timeout=3.0,
-    )
+    global _redis_pool
+    if _redis_pool is None:
+        _redis_pool = redis.ConnectionPool(
+            host=host,
+            port=port,
+            decode_responses=True,
+            socket_timeout=3.0,
+            socket_connect_timeout=3.0,
+            max_connections=50,  # Optimized production size
+        )
+    return redis.Redis(connection_pool=_redis_pool)
 
 
 def init_qdrant_client(host: str, port: int) -> QdrantClient:

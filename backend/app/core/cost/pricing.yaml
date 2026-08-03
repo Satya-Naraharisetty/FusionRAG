@@ -1,0 +1,10 @@
+models:
+  gemini-1.5-flash:
+    input_cost_per_million: 0.075
+    output_cost_per_million: 0.30
+  gpt-4o-mini:
+    input_cost_per_million: 0.15
+    output_cost_per_million: 0.60
+  text-embedding-3-small:
+    input_cost_per_million: 0.02
+    output_cost_per_million: 0.02

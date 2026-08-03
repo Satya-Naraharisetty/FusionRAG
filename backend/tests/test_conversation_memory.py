@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 from uuid import UUID, uuid4
 import pytest
@@ -382,7 +382,7 @@ async def test_rolling_conversation_memory(chat_test_db, test_users):
             role=MessageRole.USER if i % 2 == 0 else MessageRole.ASSISTANT,
             content=f"Message {i}",
             status=MessageStatus.COMPLETED,
-            created_at=datetime.utcnow(),
+            created_at=datetime.utcnow() + timedelta(milliseconds=i),
         )
         await msg_repo.add_message(msg)
 
@@ -450,7 +450,7 @@ async def test_conversation_summarizer(chat_test_db, test_users):
             role=MessageRole.USER if i % 2 == 0 else MessageRole.ASSISTANT,
             content=f"Exchange {i}",
             status=MessageStatus.COMPLETED,
-            created_at=datetime.utcnow(),
+            created_at=datetime.utcnow() + timedelta(milliseconds=i),
         )
         await msg_repo.add_message(msg)
 

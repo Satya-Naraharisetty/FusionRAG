@@ -57,3 +57,15 @@ class LocalStorageProvider(StorageProvider):
                     parent_dir.rmdir()
             except Exception as e:
                 logger.warning(f"Failed to physically delete file {key}: {e}")
+
+    def generate_presigned_upload_url(self, key: str, expires_in: int = 3600) -> str:
+        """
+        Generates a direct upload URL. Returns local endpoint URL.
+        """
+        return f"http://localhost:8000/api/v1/documents/upload-local/{key}"
+
+    def generate_presigned_download_url(self, key: str, expires_in: int = 3600) -> str:
+        """
+        Generates a direct download URL. Returns local endpoint URL.
+        """
+        return f"http://localhost:8000/api/v1/documents/download-local/{key}"

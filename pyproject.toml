@@ -48,9 +48,15 @@ ignore = ["B008", "E501", "ARG001", "ARG002", "B904", "N818", "UP042", "E712"]
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-ra -q"
-testpaths = ["tests"]
+testpaths = ["backend/tests"]
 asyncio_mode = "auto"
+norecursedirs = ["backend/app/scratch", "app/scratch", ".venv", ".git"]
 
 [tool.setuptools]
 packages = ["app"]
+
+[dependency-groups]
+dev = [
+    "pytest-timeout>=2.4.0",
+]
 

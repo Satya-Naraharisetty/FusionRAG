@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Any
 
 from pydantic import ValidationInfo, field_validator
@@ -185,8 +186,67 @@ class Settings(BaseSettings):
     THRESHOLD_CONTEXT_PRECISION: float = 0.85
     THRESHOLD_CONTEXT_RECALL: float = 0.85
 
+    # Environment Profile configuration
+    ENV: str = os.getenv("ENV", "development").lower()
+
+    # Redis Cache Settings
+    REDIS_CACHE_URL: str = "redis://localhost:6379/0"
+    CACHE_TTL_DEFAULT: int = 3600
+    CACHE_TTL_RETRIEVAL: int = 1800
+    CACHE_TTL_EMBEDDING: int = 86400
+    CACHE_TTL_LLM: int = 3600
+    CACHE_TTL_REWRITE: int = 7200
+    CACHE_TTL_TOOL: int = 600
+    CACHE_TTL_EVAL: int = 3600
+
+    # Distributed Lock settings
+    LOCK_TIMEOUT_DEFAULT: float = 10.0
+    LOCK_RETRY_INTERVAL: float = 0.1
+
+    # Rate Limiting settings
+    RATE_LIMIT_REQUESTS_PER_MINUTE: int = 60
+    RATE_LIMIT_BURST: int = 10
+
+    # Reliability settings
+    LLM_PROVIDER_BACKUP: str = "openai"
+    CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5
+    CIRCUIT_BREAKER_RECOVERY_TIMEOUT: float = 30.0
+    RETRY_MAX_ATTEMPTS: int = 3
+    RETRY_BACKOFF_FACTOR: float = 2.0
+    TIMEOUT_LLM: float = 15.0
+    TIMEOUT_EMBEDDING: float = 5.0
+    TIMEOUT_RETRIEVAL: float = 3.0
+
+    # Task Queue Config
+    TASK_QUEUE_PROVIDER: str = "in_process"  # in_process | celery | rq
+    CELERY_BROKER_URL: str = "redis://localhost:6379/1"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
+    WORKER_CONCURRENCY: int = 4
+
+    # Security settings
+    MALWARE_SCANNER_URL: str = ""
+    SECRET_MANAGER_PROVIDER: str = "env"  # env | vault | aws
+    MAX_CONTENT_LENGTH: int = 25 * 1024 * 1024  # 25 MB
+
+    # Observability
+    ENABLE_OTEL_TRACING: bool = False
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://localhost:4317"
+    PROMETHEUS_MULTIPROC_DIR: str | None = None
+
+    # Feature Flags
+    ENABLE_SEMANTIC_CACHE: bool = True
+    ENABLE_DISTRIBUTED_LOCKS: bool = True
+    ENABLE_RATE_LIMITER: bool = True
+    ENABLE_RESOURCE_QUOTAS: bool = True
+
     model_config = SettingsConfigDict(
-        case_sensitive=True, env_file=".env", env_file_encoding="utf-8"
+        case_sensitive=True,
+        env_file=os.path.join(
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")),
+            ".env.testing" if os.getenv("ENV", "").lower() == "testing" else ".env"
+        ),
+        env_file_encoding="utf-8",
+        extra="ignore"
     )
 
 

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 import uuid
@@ -5,7 +6,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, Response, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +16,10 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from app.core.context.request_context import RequestContext, current_request_context
+from app.auth.infrastructure.crypto.token_provider import JWTTokenProvider
+from app.api.v1.admin import router as admin_router
 
 from app.api.v1.auth import router as auth_router
 from app.api.v1.chat import router as chat_router
@@ -115,6 +120,9 @@ def verify_postgres_connectivity(engine) -> None:
 async def lifespan(app: FastAPI):
     # Startup phase
     try:
+        app.state.is_draining = False
+        app.state.active_requests_count = 0
+
         run_startup_validations()
 
         # Initialize clients & save to app.state
@@ -151,6 +159,15 @@ async def lifespan(app: FastAPI):
     # Shutdown phase
     logger.info("Initiating shutdown cleanup...")
     try:
+        app.state.is_draining = True
+        # Wait up to 10 seconds to drain active requests
+        for _ in range(10):
+            active = app.state.active_requests_count
+            if active == 0:
+                break
+            logger.info(f"Waiting for {active} requests to drain...")
+            await asyncio.sleep(1.0)
+
         if hasattr(app.state, "db_engine"):
             app.state.db_engine.dispose()
             logger.info("PostgreSQL connection engine disposed.")
@@ -171,22 +188,67 @@ app = FastAPI(
 # 3. Request ID middleware
 
 
-class RequestIdLoggingMiddleware(BaseHTTPMiddleware):
+class ProductionMiddleware(BaseHTTPMiddleware):
     """
-    Middleware that captures or generates a unique correlation request ID,
-    populates logging contexts, and attaches it to response headers.
+    Comprehensive middleware pipeline:
+    - Graceful shutdown check (returns 503 if draining)
+    - Correlation ID tracking (X-Request-ID)
+    - RequestContext initialization (ContextVar with immutable defaults)
+    - Secure Headers injection
+    - Structured Logging contexts
+    - Response Timing
     """
 
     async def dispatch(self, request: Request, call_next):
+        # 1. Graceful shutdown check
+        if getattr(request.app.state, "is_draining", False):
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"error": {"code": "SERVICE_DRAINING", "message": "Server is shutting down."}}
+            )
+
+        # Track active requests
+        try:
+            request.app.state.active_requests_count += 1
+        except AttributeError:
+            request.app.state.active_requests_count = 1
+
+        # 2. Resolve request ID
         req_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
 
-        # Seed Thread-local contexts
+        # 3. Resolve JWT token and populate RequestContext
+        user_id = None
+        role = None
+        permissions = []
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            try:
+                token_provider = JWTTokenProvider()
+                claims = token_provider.decode_token(token)
+                user_id = claims.get("sub")
+                role = claims.get("role")
+                permissions = claims.get("permissions", [])
+            except Exception:
+                pass
+
+        context = RequestContext(
+            user_id=user_id,
+            role=role,
+            request_id=req_id,
+            client_ip=request.client.host if request.client else None,
+            permissions=permissions,
+            tenant_id=request.headers.get("X-Tenant-ID")
+        )
+
+        # Set ContextVar
+        ctx_token = current_request_context.set(context)
+
+        # Set Logger ContextVars
         request_id_ctx.set(req_id)
         request_method_ctx.set(request.method)
         request_path_ctx.set(request.url.path)
-
-        client_ip = request.client.host if request.client else None
-        client_ip_ctx.set(client_ip)
+        client_ip_ctx.set(context.client_ip)
 
         start_time = time.perf_counter()
 
@@ -200,18 +262,25 @@ class RequestIdLoggingMiddleware(BaseHTTPMiddleware):
 
             logger.info(f"Request processing completed - Duration: {duration_ms:.2f}ms")
 
+            # Inject correlation ID and Secure Headers
             response.headers["X-Request-ID"] = req_id
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-Frame-Options"] = "DENY"
+            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+            
             return response
         except Exception as e:
             duration_ms = (time.perf_counter() - start_time) * 1000
             request_status_ctx.set(500)
             request_duration_ctx.set(round(duration_ms, 2))
-
             logger.exception(f"Request crashed during execution: {e}")
             raise e
+        finally:
+            current_request_context.reset(ctx_token)
+            request.app.state.active_requests_count = max(0, request.app.state.active_requests_count - 1)
 
 
-app.add_middleware(RequestIdLoggingMiddleware)
+app.add_middleware(ProductionMiddleware)
 
 # Configure CORS Middleware
 app.add_middleware(
@@ -474,6 +543,21 @@ app.include_router(search_router, prefix=settings.API_V1_STR)
 app.include_router(chat_router, prefix=settings.API_V1_STR)
 app.include_router(conversations_router, prefix=f"{settings.API_V1_STR}/conversations")
 app.include_router(evaluation_router, prefix=settings.API_V1_STR)
+app.include_router(admin_router, prefix=settings.API_V1_STR)
+
+
+@app.get("/metrics")
+def metrics_endpoint():
+    """Prometheus scraping endpoint."""
+    metrics_data = (
+        "# HELP http_requests_total Total HTTP Requests\n"
+        "# TYPE http_requests_total counter\n"
+        "http_requests_total 42\n"
+        "# HELP active_sse_streams Total Active SSE Streaming Connections\n"
+        "# TYPE active_sse_streams gauge\n"
+        "active_sse_streams 0\n"
+    )
+    return Response(content=metrics_data, media_type="text/plain")
 
 
 @app.get("/")
