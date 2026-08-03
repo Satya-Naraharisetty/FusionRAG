@@ -740,3 +740,79 @@ def get_chat_orchestrator(
         enable_tool_calling=settings.ENABLE_TOOL_CALLING,
     )
 
+
+# --- Evaluation Component Dependency Injection ---
+
+def get_dataset_loader():
+    from app.evaluation.datasets.dataset_loader import DatasetLoader
+    return DatasetLoader()
+
+
+def get_ragas_provider():
+    from app.evaluation.runners.ragas_provider import RagasProvider
+    return RagasProvider()
+
+
+def get_deepeval_provider():
+    from app.evaluation.runners.deepeval_provider import DeepEvalProvider
+    return DeepEvalProvider()
+
+
+def get_retrieval_evaluator(
+    retrieval_service=Depends(get_retrieval_service),
+):
+    from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
+    return RetrievalEvaluator(retrieval_service)
+
+
+def get_agent_evaluator():
+    from app.evaluation.services.agent_evaluator import AgentEvaluator
+    return AgentEvaluator()
+
+
+def get_tool_evaluator():
+    from app.evaluation.services.tool_evaluator import ToolEvaluator
+    return ToolEvaluator()
+
+
+def get_conversation_evaluator():
+    from app.evaluation.services.conversation_evaluator import ConversationEvaluator
+    return ConversationEvaluator()
+
+
+def get_evaluation_runner(
+    retrieval_evaluator=Depends(get_retrieval_evaluator),
+    agent_evaluator=Depends(get_agent_evaluator),
+    tool_evaluator=Depends(get_tool_evaluator),
+    conversation_evaluator=Depends(get_conversation_evaluator),
+    ragas_provider=Depends(get_ragas_provider),
+    deepeval_provider=Depends(get_deepeval_provider)
+):
+    from app.evaluation.runners.evaluation_runner import EvaluationRunner
+    return EvaluationRunner(
+        retrieval_evaluator=retrieval_evaluator,
+        agent_evaluator=agent_evaluator,
+        tool_evaluator=tool_evaluator,
+        conversation_evaluator=conversation_evaluator,
+        ragas_provider=ragas_provider,
+        deepeval_provider=deepeval_provider
+    )
+
+
+def get_benchmark_runner(
+    evaluation_runner=Depends(get_evaluation_runner)
+):
+    from app.evaluation.runners.benchmark_runner import BenchmarkRunner
+    return BenchmarkRunner(evaluation_runner=evaluation_runner)
+
+
+def get_regression_runner():
+    from app.evaluation.runners.regression_runner import RegressionRunner
+    return RegressionRunner()
+
+
+def get_report_generator():
+    from app.evaluation.reports.report_generator import ReportGenerator
+    return ReportGenerator(output_dir=settings.EVALUATION_RESULTS_DIR)
+
+

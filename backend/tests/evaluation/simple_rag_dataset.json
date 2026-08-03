@@ -1,0 +1,33 @@
+{
+  "description": "Simple RAG Golden Evaluation Dataset",
+  "samples": [
+    {
+      "id": "rag-01",
+      "question": "What is the primary capital of France?",
+      "expected_answer": "Paris is the capital and most populous city of France.",
+      "ground_truth_context": [
+        "Paris is the official capital city of France, situated along the Seine River."
+      ],
+      "difficulty": "easy",
+      "topic": "geography",
+      "retrieval_required": true,
+      "tools_required": false,
+      "conversation_required": false,
+      "expected_documents": ["doc-france-01"]
+    },
+    {
+      "id": "rag-02",
+      "question": "How deep is the Mariana Trench?",
+      "expected_answer": "The Mariana Trench reaches a depth of approximately 10,994 meters (36,070 feet) at the Challenger Deep.",
+      "ground_truth_context": [
+        "The Challenger Deep is the deepest known point in the Earth's oceans, located in the southern end of the Mariana Trench at about 11,000 meters."
+      ],
+      "difficulty": "medium",
+      "topic": "geography",
+      "retrieval_required": true,
+      "tools_required": false,
+      "conversation_required": false,
+      "expected_documents": ["doc-ocean-02"]
+    }
+  ]
+}

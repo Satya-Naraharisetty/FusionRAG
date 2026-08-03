@@ -165,6 +165,26 @@ class Settings(BaseSettings):
     TOOL_AUTO_RETRY_COUNT: int = 1
     TOOL_RECURSION_PROTECTION: bool = True
 
+    # Evaluation & Benchmarking Configurations
+    ENABLE_EVALUATION: bool = True
+    ENABLE_RAGAS: bool = True
+    ENABLE_DEEPEVAL: bool = True
+    EVALUATION_PROVIDER: str = "gemini"
+    ENABLE_GOLDEN_DATASETS: bool = True
+    ENABLE_REGRESSION_TESTS: bool = True
+    ENABLE_AGENT_EVALUATION: bool = True
+    ENABLE_TOOL_EVALUATION: bool = True
+    ENABLE_CONVERSATION_EVALUATION: bool = True
+    MAX_EVALUATION_CONCURRENCY: int = 4
+    SAVE_EVALUATION_RESULTS: bool = True
+    EVALUATION_RESULTS_DIR: str = "data/evaluation"
+
+    # Default quality thresholds
+    THRESHOLD_FAITHFULNESS: float = 0.90
+    THRESHOLD_ANSWER_RELEVANCY: float = 0.88
+    THRESHOLD_CONTEXT_PRECISION: float = 0.85
+    THRESHOLD_CONTEXT_RECALL: float = 0.85
+
     model_config = SettingsConfigDict(
         case_sensitive=True, env_file=".env", env_file_encoding="utf-8"
     )

@@ -1,0 +1,38 @@
+name: PR Quick Evaluation Check
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  quick-evaluation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          uv pip install --system .
+          uv pip install --system -e ".[dev]"
+          uv pip install --system ragas deepeval langchain-google-vertexai
+
+      - name: Run Quick Mock Benchmark
+        run: |
+          cd backend
+          python scripts/benchmark.py --dataset tests/evaluation/simple_rag_dataset.json --profile quick --mock
+
+      - name: Upload Evaluation Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-evaluation-reports
+          path: backend/data/evaluation/

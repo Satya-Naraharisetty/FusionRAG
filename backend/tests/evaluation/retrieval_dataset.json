@@ -1,0 +1,19 @@
+{
+  "description": "Retrieval Performance Evaluation Dataset",
+  "samples": [
+    {
+      "id": "ret-01",
+      "question": "What is the core algorithm for Reciprocal Rank Fusion?",
+      "expected_answer": "RRF scores documents based on reciprocal of their ranks.",
+      "ground_truth_context": [
+        "Reciprocal Rank Fusion (RRF) is an algorithm that evaluates document ranks across search systems."
+      ],
+      "difficulty": "medium",
+      "topic": "retrieval",
+      "retrieval_required": true,
+      "tools_required": false,
+      "conversation_required": false,
+      "expected_documents": ["doc-rrf-01"]
+    }
+  ]
+}

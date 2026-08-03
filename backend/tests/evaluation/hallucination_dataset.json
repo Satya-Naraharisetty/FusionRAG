@@ -1,0 +1,19 @@
+{
+  "description": "Hallucination Detection Evaluation Dataset",
+  "samples": [
+    {
+      "id": "hal-01",
+      "question": "What is the primary capital of France?",
+      "expected_answer": "Paris is the capital of France.",
+      "ground_truth_context": [
+        "Paris is the official capital city of France."
+      ],
+      "difficulty": "easy",
+      "topic": "geography",
+      "retrieval_required": true,
+      "tools_required": false,
+      "conversation_required": false,
+      "expected_documents": ["doc-france-01"]
+    }
+  ]
+}

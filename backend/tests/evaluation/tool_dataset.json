@@ -1,0 +1,16 @@
+{
+  "description": "Tool Execution Evaluation Dataset",
+  "samples": [
+    {
+      "id": "tool-01",
+      "question": "What is 4567 multiplied by 89?",
+      "expected_answer": "406463",
+      "expected_tools": ["calculator"],
+      "difficulty": "easy",
+      "topic": "math",
+      "retrieval_required": false,
+      "tools_required": true,
+      "conversation_required": false
+    }
+  ]
+}

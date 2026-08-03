@@ -1,0 +1,16 @@
+{
+  "description": "Agent Execution and Reasoning Evaluation Dataset",
+  "samples": [
+    {
+      "id": "agent-01",
+      "question": "Calculate the square root of 144, then find out what the current time is.",
+      "expected_answer": "12",
+      "expected_tools": ["calculator", "datetime"],
+      "difficulty": "medium",
+      "topic": "agentic",
+      "retrieval_required": false,
+      "tools_required": true,
+      "conversation_required": false
+    }
+  ]
+}

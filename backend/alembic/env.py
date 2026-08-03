@@ -23,6 +23,11 @@ from app.chat.infrastructure.persistence.models import (
     ConversationMessageORM,
     ConversationSummaryORM,
 )
+from app.evaluation.infrastructure.persistence.models import (
+    SQLAlchemyEvaluationRun,
+    SQLAlchemyEvaluationResult,
+    SQLAlchemyBenchmarkRun,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

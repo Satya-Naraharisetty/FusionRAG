@@ -1,0 +1,23 @@
+{
+  "description": "Conversation Memory Evaluation Dataset",
+  "samples": [
+    {
+      "id": "conv-01",
+      "question": "What is its population?",
+      "expected_answer": "The population of Paris is approximately 2.1 million people.",
+      "ground_truth_context": [
+        "Paris has a population of around 2,100,000 residents within its city limits."
+      ],
+      "conversation_history": [
+        {"role": "user", "content": "Tell me about Paris, France."},
+        {"role": "assistant", "content": "Paris is the capital of France, known for its culture and landmarks."}
+      ],
+      "difficulty": "medium",
+      "topic": "geography",
+      "retrieval_required": true,
+      "tools_required": false,
+      "conversation_required": true,
+      "expected_documents": ["doc-paris-pop-01"]
+    }
+  ]
+}
