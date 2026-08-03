@@ -12,9 +12,21 @@ class ChatRole(str, Enum):
     ASSISTANT = "assistant"
 
 
+class MessageRole(str, Enum):
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
+    TOOL = "tool"
+    DEVELOPER = "developer"
+    FUNCTION = "function"
+
+
 class ChatMessage(BaseModel):
-    role: ChatRole
-    content: str
+    role: ChatRole | MessageRole | str
+    content: str | None = None
+    tool_calls: list[dict[str, Any]] | None = None
+    tool_call_id: str | None = None
+    name: str | None = None
 
 
 class Usage(BaseModel):
@@ -47,15 +59,6 @@ class ConversationState(str, Enum):
     ACTIVE = "active"
     ARCHIVED = "archived"
     DELETED = "deleted"  # Soft-deleted status for retention service cleanup
-
-
-class MessageRole(str, Enum):
-    SYSTEM = "system"
-    USER = "user"
-    ASSISTANT = "assistant"
-    TOOL = "tool"
-    DEVELOPER = "developer"
-    FUNCTION = "function"
 
 
 class MessageStatus(str, Enum):

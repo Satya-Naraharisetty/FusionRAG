@@ -641,3 +641,102 @@ def get_answer_generation_service(
         max_memory_tokens=settings.MAX_MEMORY_TOKENS,
         enable_conversation_memory=settings.ENABLE_CONVERSATION_MEMORY,
     )
+
+
+def get_tool_registry(
+    retrieval_service=Depends(get_retrieval_service)
+) -> Any:
+    from app.chat.services.tool_registry import ToolRegistry
+    from app.chat.services.tools.semantic_search import SearchKnowledgeTool
+    from app.chat.services.tools.document_retrieval import RetrieveDocumentTool
+    from app.chat.services.tools.chunk_retrieval import RetrieveChunkTool
+    from app.chat.services.tools.citation_lookup import CitationLookupTool
+    from app.chat.services.tools.calculator import CalculatorTool
+    from app.chat.services.tools.datetime import DateTimeTool
+
+    tools = [
+        SearchKnowledgeTool(retrieval_service),
+        RetrieveDocumentTool(),
+        RetrieveChunkTool(),
+        CitationLookupTool(),
+        CalculatorTool(),
+        DateTimeTool(),
+    ]
+    registry = ToolRegistry(tools)
+    # Register aliases
+    registry.register(tools[0], aliases=["semantic_search", "document_search"])
+    return registry
+
+
+def get_tool_discovery_service(
+    registry=Depends(get_tool_registry)
+) -> Any:
+    from app.chat.services.tool_discovery import ToolDiscoveryService
+    return ToolDiscoveryService(registry)
+
+
+def get_tool_executor() -> Any:
+    from app.chat.services.tool_executor import ToolExecutor
+    return ToolExecutor(
+        timeout=settings.TOOL_EXECUTION_TIMEOUT,
+        result_size_limit=settings.TOOL_RESULT_SIZE_LIMIT,
+        auto_retry_count=settings.TOOL_AUTO_RETRY_COUNT,
+    )
+
+
+def get_agent_executor(
+    llm_provider=Depends(get_llm_provider),
+    registry=Depends(get_tool_registry),
+    executor=Depends(get_tool_executor),
+    conversation_manager=Depends(get_conversation_manager),
+    token_estimator=Depends(get_token_estimator),
+) -> Any:
+    from app.chat.services.agent_executor import AgentExecutor
+    return AgentExecutor(
+        llm_provider=llm_provider,
+        tool_registry=registry,
+        tool_executor=executor,
+        conversation_manager=conversation_manager,
+        token_estimator=token_estimator,
+        max_iterations=settings.MAX_TOOL_ITERATIONS,
+        max_tools_per_request=settings.MAX_TOOLS_PER_REQUEST,
+    )
+
+
+def get_chat_orchestrator(
+    retrieval_service=Depends(get_retrieval_service),
+    prompt_builder=Depends(get_prompt_builder),
+    llm_provider=Depends(get_llm_provider),
+    token_estimator=Depends(get_token_estimator),
+    conversation_manager=Depends(get_conversation_manager),
+    conversation_context_builder=Depends(get_conversation_context_builder),
+    agent_executor=Depends(get_agent_executor),
+) -> Any:
+    from app.chat.services.chat_orchestrator import ChatOrchestrator
+    from app.chat.services.llm_generation_service import LLMGenerationService
+
+    llm_gen = LLMGenerationService(llm_provider)
+    model = (
+        settings.GEMINI_CHAT_MODEL
+        if settings.LLM_PROVIDER == "gemini"
+        else settings.OPENAI_CHAT_MODEL
+    )
+    return ChatOrchestrator(
+        retrieval_service=retrieval_service,
+        prompt_builder=prompt_builder,
+        llm_generation_service=llm_gen,
+        token_estimator=token_estimator,
+        conversation_manager=conversation_manager,
+        context_builder=conversation_context_builder,
+        agent_executor=agent_executor,
+        model=model,
+        temperature=settings.TEMPERATURE,
+        max_response_tokens=settings.MAX_RESPONSE_TOKENS,
+        system_prompt_tokens_limit=settings.SYSTEM_PROMPT_TOKENS,
+        max_context_tokens=settings.MAX_CONTEXT_TOKENS,
+        reserved_completion_tokens=settings.RESERVED_COMPLETION_TOKENS,
+        max_memory_tokens=settings.MAX_MEMORY_TOKENS,
+        enable_conversation_memory=settings.ENABLE_CONVERSATION_MEMORY,
+        enable_tool_calling=settings.ENABLE_TOOL_CALLING,
+    )
+

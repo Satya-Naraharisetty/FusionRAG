@@ -155,6 +155,16 @@ class Settings(BaseSettings):
     SUMMARY_MAX_TOKENS: int = 400
     MAX_CONVERSATION_AGE_DAYS: int = 90
 
+    # Agentic Tool Calling Configurations
+    ENABLE_TOOL_CALLING: bool = True
+    MAX_TOOL_ITERATIONS: int = 5
+    MAX_TOOLS_PER_REQUEST: int = 10
+    TOOL_EXECUTION_TIMEOUT: float = 30.0
+    TOOL_RESULT_SIZE_LIMIT: int = 50000
+    TOOL_OBSERVABILITY_ENABLED: bool = True
+    TOOL_AUTO_RETRY_COUNT: int = 1
+    TOOL_RECURSION_PROTECTION: bool = True
+
     model_config = SettingsConfigDict(
         case_sensitive=True, env_file=".env", env_file_encoding="utf-8"
     )

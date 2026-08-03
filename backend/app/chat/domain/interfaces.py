@@ -21,6 +21,29 @@ class TokenEstimator(ABC):
         pass
 
 
+from app.chat.domain.agents import ToolCall, ToolDefinition
+
+
+class ProviderResponse(tuple):
+    def __new__(cls, content: str | None, usage: Usage, tool_calls: list[ToolCall] | None = None):
+        return super().__new__(cls, (content or "", usage))
+
+    def __init__(self, content: str | None, usage: Usage, tool_calls: list[ToolCall] | None = None):
+        self.content = content or ""
+        self.usage = usage
+        self.tool_calls = tool_calls or []
+
+
+class StreamChunk(tuple):
+    def __new__(cls, text_delta: str, usage: Usage | None = None, tool_calls: list[ToolCall] | None = None):
+        return super().__new__(cls, (text_delta, usage))
+
+    def __init__(self, text_delta: str, usage: Usage | None = None, tool_calls: list[ToolCall] | None = None):
+        self.text_delta = text_delta
+        self.usage = usage
+        self.tool_calls = tool_calls or []
+
+
 class LLMProvider(ABC):
     @abstractmethod
     async def generate(
@@ -29,10 +52,11 @@ class LLMProvider(ABC):
         model: str,
         temperature: float,
         max_tokens: int,
-    ) -> tuple[str, Usage]:
+        tools: list[ToolDefinition] | None = None,
+        tool_choice: str | None = None,
+    ) -> ProviderResponse:
         """
-        Generate a complete response from the LLM.
-        Returns a tuple of (generated_text, usage_metrics).
+        Generate a response from the LLM, optionally utilizing tool calling.
         """
         pass
 
@@ -43,10 +67,11 @@ class LLMProvider(ABC):
         model: str,
         temperature: float,
         max_tokens: int,
-    ) -> AsyncIterator[tuple[str, Usage | None]]:
+        tools: list[ToolDefinition] | None = None,
+        tool_choice: str | None = None,
+    ) -> AsyncIterator[StreamChunk]:
         """
-        Stream the LLM response.
-        Yields tuples of (text_delta, usage_metrics_at_end_or_none).
+        Stream the LLM response, yielding text chunks and tool calls.
         """
         pass
 

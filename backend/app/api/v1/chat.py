@@ -16,7 +16,7 @@ from app.chat.domain.exceptions import (
     TokenBudgetExceeded,
 )
 from app.chat.domain.models import AnswerResponse
-from app.chat.services.answer_generation_service import AnswerGenerationService
+from app.chat.services.chat_orchestrator import ChatOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ async def chat(
     request: Request,
     chat_req: ChatRequest,
     user_context: dict[str, Any] = Depends(get_current_user_context),
-    service: AnswerGenerationService = Depends(get_answer_generation_service),
+    orchestrator: ChatOrchestrator = Depends(get_answer_generation_service),
 ):
     """
     Orchestration endpoint that retrieves documents and generates a grounded response.
@@ -55,7 +55,7 @@ async def chat(
 
     if not chat_req.stream:
         # Standard synchronous path (exceptions caught by global handlers)
-        response = await service.generate_answer(
+        response = await orchestrator.generate_answer(
             question=chat_req.question,
             user_id=user_id,
             top_k=top_k,
@@ -68,7 +68,7 @@ async def chat(
         # Server-Sent Events (SSE) streaming path
         async def event_generator():
             try:
-                async for event in service.generate_answer_stream(
+                async for event in orchestrator.generate_answer_stream(
                     question=chat_req.question,
                     user_id=user_id,
                     top_k=top_k,

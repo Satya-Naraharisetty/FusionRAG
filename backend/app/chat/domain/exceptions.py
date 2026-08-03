@@ -46,3 +46,29 @@ class UnauthorizedConversationAccessException(ChatException):
 class InvalidStatusTransitionException(ChatException):
     """Raised when a message status transition is illegal."""
     pass
+
+
+class ToolException(ChatException):
+    """Base exception for tool-related errors."""
+    pass
+
+
+class ToolNotFoundError(ToolException):
+    """Raised when a tool is requested but not found in the registry."""
+    pass
+
+
+class ToolValidationError(ToolException):
+    """Raised when tool arguments fail validation."""
+    pass
+
+
+class ToolExecutionException(ToolException):
+    """Raised when tool execution fails or times out."""
+    pass
+
+
+class AgentIterationLimitExceeded(ChatException):
+    """Raised when the maximum agent reasoning loop iterations is exceeded."""
+    pass
+
