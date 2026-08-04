@@ -52,9 +52,9 @@ def main() -> None:
 
             if len(completed_runs) < 2:
                 print(
-                    "Error: Could not resolve runs. Database must have at least 2 completed runs to perform comparison."
+                    "Warning: Could not resolve runs. Database must have at least 2 completed runs to perform comparison. Skipping regression analysis."
                 )
-                sys.exit(1)
+                sys.exit(0)
 
             if not candidate_id:
                 candidate_id = str(completed_runs[0].id)
