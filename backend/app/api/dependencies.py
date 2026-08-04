@@ -141,8 +141,9 @@ def get_checksum_generator() -> SHA256ChecksumGenerator:
     return SHA256ChecksumGenerator()
 
 
-def get_storage_provider() -> LocalStorageProvider:
-    return LocalStorageProvider(upload_dir=settings.UPLOAD_DIR)
+def get_storage_provider(db: Session = Depends(get_db)) -> Any:
+    from app.documents.infrastructure.storage import DatabaseStorageProvider
+    return DatabaseStorageProvider(db)
 
 
 def get_extractor_factory() -> ExtractorFactory:
@@ -254,7 +255,7 @@ def get_document_processing_service(
     return DocumentProcessingService(
         document_repo=SQLAlchemyDocumentRepository(db),
         chunk_repo=SQLAlchemyChunkRepository(db),
-        storage_provider=get_storage_provider(),
+        storage_provider=get_storage_provider(db),
         extractor_factory=get_extractor_factory(),
         text_cleaner=get_text_cleaner(),
         metadata_extractor=get_metadata_extractor(),
@@ -288,7 +289,7 @@ def get_document_service(
 
     return DocumentService(
         document_repo=SQLAlchemyDocumentRepository(db),
-        storage_provider=get_storage_provider(),
+        storage_provider=get_storage_provider(db),
         extractor_factory=get_extractor_factory(),
         checksum_generator=get_checksum_generator(),
         task_queue=task_queue,

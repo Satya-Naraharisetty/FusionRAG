@@ -325,7 +325,7 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
         code="VALIDATION_ERROR",
         message="Request parameters or body payload failed schema validations.",
         details=jsonable_encoder(exc.errors()),
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
     )
 
 
@@ -337,7 +337,7 @@ async def pydantic_validation_exception_handler(
         code="VALIDATION_ERROR",
         message="Data validation checks failed.",
         details=jsonable_encoder(exc.errors()),
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
     )
 
 
@@ -414,7 +414,7 @@ async def document_too_large_handler(_request: Request, exc: DocumentTooLarge):
     return format_error_response(
         code="DOCUMENT_TOO_LARGE",
         message=str(exc),
-        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
     )
 
 
@@ -454,7 +454,7 @@ async def document_corrupted_handler(_request: Request, exc: DocumentCorrupted):
     return format_error_response(
         code="DOCUMENT_CORRUPTED",
         message=str(exc),
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
     )
 
 
@@ -503,7 +503,7 @@ async def prompt_too_large_handler(_request: Request, exc: PromptTooLarge):
     return format_error_response(
         code="PROMPT_TOO_LARGE",
         message=str(exc),
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
     )
 
 
@@ -512,7 +512,7 @@ async def token_budget_exceeded_handler(_request: Request, exc: TokenBudgetExcee
     return format_error_response(
         code="TOKEN_BUDGET_EXCEEDED",
         message=str(exc),
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
     )
 
 

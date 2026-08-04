@@ -217,7 +217,7 @@ def test_upload_large_file_rejected(client, doc_test_db):
             files=file_payload,
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert response.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+        assert response.status_code == status.HTTP_413_CONTENT_TOO_LARGE
         assert response.json()["error"]["code"] == "DOCUMENT_TOO_LARGE"
 
 

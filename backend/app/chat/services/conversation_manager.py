@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from uuid import UUID
 
 from app.chat.domain.events import ConversationCreated, ConversationMessageCreated
@@ -63,7 +63,7 @@ class ConversationManager:
             return conversation
 
         # Create new conversation
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         new_conv = Conversation(
             id=uuid.uuid4(),
             user_id=user_id,
@@ -101,14 +101,14 @@ class ConversationManager:
             role=MessageRole.USER,
             content=question,
             status=MessageStatus.COMPLETED,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
         await self._message_repo.add_message(user_message)
 
         # 5. Update last_message_at and message count in conversation details
         conversation = await self._conversation_repo.get_conversation(conversation_id)
         if conversation:
-            conversation.last_message_at = datetime.utcnow()
+            conversation.last_message_at = datetime.now(UTC)
             conversation.metadata.message_count = await self._message_repo.count_messages(conversation_id)
             await self._conversation_repo.update_conversation(conversation)
 

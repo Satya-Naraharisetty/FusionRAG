@@ -163,14 +163,14 @@ class MockLLMProvider:
 class MockMessageRepository:
     async def create_assistant_message(self, conversation_id, message_id, role, content=""):
         from app.chat.domain.models import ConversationMessage, MessageRole, MessageStatus
-        from datetime import datetime
+        from datetime import datetime, UTC
         return ConversationMessage(
             id=message_id,
             conversation_id=conversation_id,
             role=role,
             content=content,
             status=MessageStatus.PENDING,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
 
     async def fail_message(self, message_id, error_message=None):
@@ -183,7 +183,7 @@ class MockConversationManager:
 
     async def get_or_create_conversation(self, conversation_id, user_id):
         from app.chat.domain.models import Conversation, ConversationState
-        from datetime import datetime
+        from datetime import datetime, UTC
         from uuid import uuid4
         return Conversation(
             id=conversation_id or uuid4(),
@@ -191,9 +191,9 @@ class MockConversationManager:
             title="Mock Conversation",
             state=ConversationState.ACTIVE,
             version=1,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-            last_message_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            last_message_at=datetime.now(UTC),
         )
 
     async def finalize_message(self, conversation_id, message_id, assistant_content, prompt_tokens, completion_tokens, citations=None):
@@ -201,6 +201,7 @@ class MockConversationManager:
 
 
 @pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:AnswerGenerationService is deprecated:DeprecationWarning")
 async def test_answer_generation_service_success():
     doc_id = uuid4()
     chunk_id = uuid4()
@@ -249,6 +250,7 @@ async def test_answer_generation_service_success():
 
 
 @pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:AnswerGenerationService is deprecated:DeprecationWarning")
 async def test_answer_generation_service_empty_retrieval():
     retrieval_service = MockRetrievalService([])
     estimator = CharacterTokenEstimator()
@@ -278,6 +280,7 @@ async def test_answer_generation_service_empty_retrieval():
 
 
 @pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:AnswerGenerationService is deprecated:DeprecationWarning")
 async def test_answer_generation_service_budget_violations():
     chunks = [
         RetrievedChunk(

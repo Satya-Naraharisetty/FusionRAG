@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 
 from app.chat.domain.agents import (
@@ -38,7 +38,7 @@ class DateTimeTool(BuiltinTool):
         context: ToolContext,
         cancellation_token: Any | None = None,
     ) -> ToolResult:
-        now_str = datetime.utcnow().isoformat()
+        now_str = datetime.now(UTC).isoformat()
         return ToolResult(
             tool_call_id="",
             name=self.definition.name,

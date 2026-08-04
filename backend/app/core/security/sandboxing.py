@@ -37,8 +37,6 @@ class SafeCalculator:
             if isinstance(node.value, (int, float)):
                 return node.value
             raise TypeError("Only numeric constants are supported.")
-        elif hasattr(ast, "Num") and isinstance(node, getattr(ast, "Num")):  # Fallback support for older python versions
-            return getattr(node, "n")
         elif isinstance(node, ast.BinOp):
             left = cls._eval_node(node.left)
             right = cls._eval_node(node.right)

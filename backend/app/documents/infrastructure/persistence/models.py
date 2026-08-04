@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -113,3 +114,10 @@ class SQLAlchemyEmbedding(Base):
 
     # Relationships
     chunk: Mapped["SQLAlchemyChunk"] = relationship("SQLAlchemyChunk")
+
+
+class SQLAlchemyDocumentFile(Base):
+    __tablename__ = "document_files"
+
+    key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)

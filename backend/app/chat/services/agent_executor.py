@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any, AsyncIterator, Callable, Coroutine
 
 from app.chat.domain.agents import (
@@ -108,7 +108,7 @@ class AgentExecutor:
             iteration = AgentIteration(
                 step=step,
                 state=AgentState.THINKING,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(UTC),
             )
 
             tools = [tool.definition for tool in self.tool_registry.list_tools()]
@@ -172,7 +172,7 @@ class AgentExecutor:
                         }
                         for tc in tool_calls
                     ],
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(UTC),
                 )
             )
 
@@ -219,7 +219,7 @@ class AgentExecutor:
                             "is_error": result.is_error,
                             "execution_time_ms": result.execution_time_ms,
                         },
-                        created_at=datetime.utcnow(),
+                        created_at=datetime.now(UTC),
                     )
                 )
 
@@ -273,7 +273,7 @@ class AgentExecutor:
             iteration = AgentIteration(
                 step=step,
                 state=AgentState.THINKING,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(UTC),
             )
 
             # Format and list registered tools
@@ -387,7 +387,7 @@ class AgentExecutor:
                         }
                         for tc in tool_calls
                     ],
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(UTC),
                 )
             )
 
@@ -463,7 +463,7 @@ class AgentExecutor:
                             "is_error": result.is_error,
                             "execution_time_ms": result.execution_time_ms,
                         },
-                        created_at=datetime.utcnow(),
+                        created_at=datetime.now(UTC),
                     )
                 )
 

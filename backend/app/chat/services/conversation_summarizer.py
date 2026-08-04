@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from uuid import UUID
 
 from app.chat.domain.interfaces import (
@@ -123,7 +123,7 @@ class LLMConversationSummarizer(ConversationSummarizer):
             covered_from_message_id=prev_summary.covered_from_message_id if prev_summary else messages_to_summarize[0].id,
             covered_until_message_id=up_to_message_id,
             message_count=len(messages_to_summarize),
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
 
         return await self._summary_repo.save_summary(new_summary)

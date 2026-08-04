@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 from pydantic import BaseModel, Field
 
@@ -33,7 +33,7 @@ class EvaluationDataset(BaseModel):
     version: str
     hash: str
     sample_count: int
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     description: str | None = None
     samples: list[EvaluationSample] = Field(default_factory=list)
 

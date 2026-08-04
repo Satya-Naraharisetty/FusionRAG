@@ -1,7 +1,11 @@
 import os
 import uuid
+from pathlib import Path
 import pytest
-from datetime import datetime
+from datetime import datetime, UTC
+
+# Absolute path to the evaluation dataset fixtures, independent of CWD
+_DATASET_PATH = str(Path(__file__).parent / "evaluation" / "simple_rag_dataset.json")
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -25,7 +29,8 @@ def db_session():
     Creates an in-memory SQLite database session specifically for testing
     evaluation persistence models.
     """
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+    from sqlalchemy.pool import StaticPool
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(bind=engine)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = SessionLocal()
@@ -36,10 +41,9 @@ def db_session():
 
 def test_dataset_loader():
     loader = DatasetLoader()
-    dataset_path = "tests/evaluation/simple_rag_dataset.json"
     
     # Check loading
-    dataset = loader.load_dataset(dataset_path, "test-ds", "1.0.0")
+    dataset = loader.load_dataset(_DATASET_PATH, "test-ds", "1.0.0")
     assert dataset.dataset_id == "test-ds"
     assert dataset.version == "1.0.0"
     assert dataset.sample_count == 2
@@ -66,7 +70,7 @@ def test_dataset_loader():
 @pytest.mark.asyncio
 async def test_ragas_and_deepeval_mock_providers():
     loader = DatasetLoader()
-    dataset = loader.load_dataset("tests/evaluation/simple_rag_dataset.json", "test-ds", "1.0.0")
+    dataset = loader.load_dataset(_DATASET_PATH, "test-ds", "1.0.0")
 
     ragas = RagasProvider()
     deepeval = DeepEvalProvider()
@@ -102,7 +106,7 @@ async def test_retrieval_evaluator_math():
     evaluator = RetrievalEvaluator(retrieval_service_mock)
     
     loader = DatasetLoader()
-    dataset = loader.load_dataset("tests/evaluation/simple_rag_dataset.json", "test-ds", "1.0.0")
+    dataset = loader.load_dataset(_DATASET_PATH, "test-ds", "1.0.0")
 
     # Run in mock mode to verify calculations
     results = await evaluator.evaluate_samples(dataset.samples, mock=True)
@@ -125,7 +129,7 @@ async def test_agent_tool_conversation_evaluators():
     conv_eval = ConversationEvaluator()
 
     loader = DatasetLoader()
-    dataset = loader.load_dataset("tests/evaluation/simple_rag_dataset.json", "test-ds", "1.0.0")
+    dataset = loader.load_dataset(_DATASET_PATH, "test-ds", "1.0.0")
 
     # Add mock execution metadata
     for sample in dataset.samples:
@@ -176,7 +180,7 @@ async def test_benchmark_runner_and_regression_checks(db_session):
     runner = BenchmarkRunner(evaluation_runner=eval_runner)
 
     loader = DatasetLoader()
-    dataset = loader.load_dataset("tests/evaluation/simple_rag_dataset.json", "test-ds", "1.0.0")
+    dataset = loader.load_dataset(_DATASET_PATH, "test-ds", "1.0.0")
 
     # Run Benchmark (Baseline Run)
     baseline_run = await runner.run_benchmark(
@@ -232,7 +236,7 @@ def test_report_generation(db_session):
         status="COMPLETED",
         total_samples=1,
         completed_samples=1,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(UTC)
     )
     db_session.add(run_record)
     db_session.commit()
@@ -275,21 +279,25 @@ def test_report_generation(db_session):
 
 
 @pytest.mark.asyncio
-async def test_api_routes(client):
+async def test_api_routes(client, db_session):
     # The endpoints check authentication, which triggers get_current_user_context.
     # In tests, get_current_user_context returns mock context of a user.
     # Let's verify route access or validation check.
     # To test admin route, we mock the dependency override
     from app.main import app
     from app.api.v1.evaluation import check_admin_user
+    from app.db.session import get_db
 
+    # Override get_db with the in-memory SQLite session used by other evaluation tests
+    app.dependency_overrides[get_db] = lambda: db_session
     # Mock admin override
     app.dependency_overrides[check_admin_user] = lambda: {"user_id": str(uuid.uuid4()), "role": "admin"}
-    
+
     # Test listing runs (returns empty or list)
     response = client.get("/api/v1/evaluation/runs")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
-    # Clean up override
+    # Clean up overrides
     app.dependency_overrides.pop(check_admin_user, None)
+    app.dependency_overrides.pop(get_db, None)

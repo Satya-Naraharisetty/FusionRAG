@@ -37,9 +37,7 @@ class SafeCalculator:
             raise ValueError(f"Invalid math syntax: {e}")
 
     def _eval_node(self, node):
-        if hasattr(ast, "Num") and isinstance(node, ast.Num):  # Python < 3.8
-            return node.n
-        elif isinstance(node, ast.Constant):  # Python >= 3.8
+        if isinstance(node, ast.Constant):  # Python >= 3.8
             if isinstance(node.value, (int, float)):
                 return node.value
             raise TypeError(f"Constant must be numeric, got {type(node.value)}")

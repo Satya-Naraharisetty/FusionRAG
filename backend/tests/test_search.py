@@ -419,7 +419,7 @@ def test_api_search_validation_and_capping(client, mocker):
         "/api/v1/search",
         json={"query": "test query", "top_k": 0},
     )
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     # Scenario B: Test top_k is capped at MAX_TOP_K
     resp = client.post(

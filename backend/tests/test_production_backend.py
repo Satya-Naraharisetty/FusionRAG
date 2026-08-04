@@ -132,7 +132,9 @@ async def test_retry_policy_exponential_backoff():
 @pytest.mark.asyncio
 async def test_timeout_policy():
     async def long_running_task():
-        await asyncio.sleep(10)
+        # Sleep long enough to exceed timeout_seconds=0.1, but not so long
+        # that event-loop teardown stalls when the task is cancelled (Windows).
+        await asyncio.sleep(0.5)
         return "done"
 
     with pytest.raises(TimeoutException):

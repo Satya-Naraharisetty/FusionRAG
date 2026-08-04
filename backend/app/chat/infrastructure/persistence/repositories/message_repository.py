@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Any
 from uuid import UUID
 
@@ -84,7 +84,7 @@ class SQLAlchemyMessageRepository(MessageRepository):
             role=role.value,
             content=content,
             status=MessageStatus.PENDING.value,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
         self._db.add(orm)
         self._db.flush()

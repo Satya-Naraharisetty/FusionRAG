@@ -72,7 +72,7 @@ def test_register_weak_password_fails(client, test_db):
         "/api/v1/auth/register",
         json={"email": "weak@example.com", "password": "password"},
     )
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 def test_login_success_sets_cookies(client, test_db):

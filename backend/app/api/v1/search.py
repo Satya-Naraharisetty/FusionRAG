@@ -81,7 +81,7 @@ async def search_documents(
     else:
         if top_k <= 0:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="top_k must be a positive integer greater than 0.",
             )
         # Cap top_k at MAX_TOP_K setting

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -98,7 +98,7 @@ class SQLAlchemyConversationRepository(ConversationRepository):
         orm.settings_json = conversation.settings.model_dump()
         orm.metadata_json = conversation.metadata.model_dump()
         orm.last_message_at = conversation.last_message_at
-        orm.updated_at = datetime.utcnow()
+        orm.updated_at = datetime.now(UTC)
         orm.version = conversation.version
 
         try:
@@ -119,5 +119,5 @@ class SQLAlchemyConversationRepository(ConversationRepository):
         )
         if orm:
             orm.state = ConversationState.DELETED.value
-            orm.updated_at = datetime.utcnow()
+            orm.updated_at = datetime.now(UTC)
             self._db.flush()

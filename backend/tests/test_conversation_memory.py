@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 import json
 from uuid import UUID, uuid4
 import pytest
@@ -90,15 +90,15 @@ def test_users(chat_test_db):
         id=uuid4(),
         email=f"test_1_{uuid4()}@example.com",
         hashed_password="hashedpassword123",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
     user2 = SQLAlchemyUser(
         id=uuid4(),
         email=f"test_2_{uuid4()}@example.com",
         hashed_password="hashedpassword123",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
     db.add(user1)
     db.add(user2)
@@ -171,9 +171,9 @@ async def test_conversation_repository_crud(chat_test_db, test_users):
         title="Initial Title",
         state=ConversationState.ACTIVE,
         version=1,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        last_message_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_message_at=datetime.now(UTC),
     )
 
     # Create
@@ -223,9 +223,9 @@ async def test_conversation_repository_crud(chat_test_db, test_users):
         title="Active Conv",
         state=ConversationState.ACTIVE,
         version=1,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        last_message_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_message_at=datetime.now(UTC),
     )
     await repo.create_conversation(active_conv)
     listed = await repo.list_conversations(user_id)
@@ -250,9 +250,9 @@ async def test_conversation_access_service(chat_test_db, test_users):
         title="User 1 Conversation",
         state=ConversationState.ACTIVE,
         version=1,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        last_message_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_message_at=datetime.now(UTC),
     )
     await repo.create_conversation(conv)
 
@@ -286,9 +286,9 @@ async def test_message_repository_lifecycle(chat_test_db, test_users):
         title="Chat",
         state=ConversationState.ACTIVE,
         version=1,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        last_message_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_message_at=datetime.now(UTC),
     )
     await conv_repo.create_conversation(conv)
 
@@ -300,7 +300,7 @@ async def test_message_repository_lifecycle(chat_test_db, test_users):
         role=MessageRole.USER,
         content="Hello!",
         status=MessageStatus.COMPLETED,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
     )
     await msg_repo.add_message(user_msg)
 
@@ -367,9 +367,9 @@ async def test_rolling_conversation_memory(chat_test_db, test_users):
         title="Chat",
         state=ConversationState.ACTIVE,
         version=1,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        last_message_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_message_at=datetime.now(UTC),
     )
     await conv_repo.create_conversation(conv)
 
@@ -382,7 +382,7 @@ async def test_rolling_conversation_memory(chat_test_db, test_users):
             role=MessageRole.USER if i % 2 == 0 else MessageRole.ASSISTANT,
             content=f"Message {i}",
             status=MessageStatus.COMPLETED,
-            created_at=datetime.utcnow() + timedelta(milliseconds=i),
+            created_at=datetime.now(UTC) + timedelta(milliseconds=i),
         )
         await msg_repo.add_message(msg)
 
@@ -403,7 +403,7 @@ async def test_rolling_conversation_memory(chat_test_db, test_users):
         covered_from_message_id=msg_ids[0],
         covered_until_message_id=msg_ids[2],
         message_count=3,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
     )
     await sum_repo.save_summary(summary_obj)
 
@@ -433,9 +433,9 @@ async def test_conversation_summarizer(chat_test_db, test_users):
         title="Chat",
         state=ConversationState.ACTIVE,
         version=1,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        last_message_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_message_at=datetime.now(UTC),
     )
     await conv_repo.create_conversation(conv)
 
@@ -450,7 +450,7 @@ async def test_conversation_summarizer(chat_test_db, test_users):
             role=MessageRole.USER if i % 2 == 0 else MessageRole.ASSISTANT,
             content=f"Exchange {i}",
             status=MessageStatus.COMPLETED,
-            created_at=datetime.utcnow() + timedelta(milliseconds=i),
+            created_at=datetime.now(UTC) + timedelta(milliseconds=i),
         )
         await msg_repo.add_message(msg)
 
@@ -492,14 +492,14 @@ async def test_query_rewriter_heuristics_and_caching():
             conversation_id=uuid4(),
             role=MessageRole.USER,
             content="Who created Python?",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         ),
         ConversationMessage(
             id=uuid4(),
             conversation_id=uuid4(),
             role=MessageRole.ASSISTANT,
             content="Guido van Rossum in 1991.",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         ),
     ]
 
@@ -532,9 +532,9 @@ def test_prompt_builder_budgeting():
         title="Chat",
         state=ConversationState.ACTIVE,
         version=1,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        last_message_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_message_at=datetime.now(UTC),
     )
     recent_messages = [
         ConversationMessage(
@@ -542,14 +542,14 @@ def test_prompt_builder_budgeting():
             conversation_id=conversation.id,
             role=MessageRole.USER,
             content="First question here.",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         ),
         ConversationMessage(
             id=uuid4(),
             conversation_id=conversation.id,
             role=MessageRole.ASSISTANT,
             content="Answer to first question.",
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         ),
     ]
 
@@ -560,7 +560,7 @@ def test_prompt_builder_budgeting():
         covered_from_message_id=uuid4(),
         covered_until_message_id=uuid4(),
         message_count=2,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
     )
 
     retrieved_chunks = [
@@ -614,6 +614,7 @@ def test_prompt_builder_budgeting():
 # --- 6. End-to-End RAG Answer Generation Tests ---
 
 @pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:AnswerGenerationService is deprecated:DeprecationWarning")
 async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
     db = chat_test_db()
     conv_repo = SQLAlchemyConversationRepository(db)
@@ -648,9 +649,9 @@ async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
         title="New Conversation",
         state=ConversationState.ACTIVE,
         version=1,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        last_message_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_message_at=datetime.now(UTC),
     )
     await conv_repo.create_conversation(conv)
 
@@ -736,6 +737,7 @@ async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
 
 # --- 7. API Router Endpoint Integration Tests ---
 
+@pytest.mark.filterwarnings("ignore:AnswerGenerationService is deprecated:DeprecationWarning")
 def test_conversations_api_flow(client, chat_test_db):
     # 1. Setup mock services and configure overrides at start
     db_session = chat_test_db()

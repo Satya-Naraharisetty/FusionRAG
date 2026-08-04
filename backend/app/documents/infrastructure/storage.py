@@ -2,7 +2,10 @@ import logging
 import pathlib
 import uuid
 
+from sqlalchemy.orm import Session
+
 from app.documents.domain.interfaces import StorageProvider
+from app.documents.infrastructure.persistence.models import SQLAlchemyDocumentFile
 
 logger = logging.getLogger(__name__)
 
@@ -68,4 +71,41 @@ class LocalStorageProvider(StorageProvider):
         """
         Generates a direct download URL. Returns local endpoint URL.
         """
+        return f"http://localhost:8000/api/v1/documents/download-local/{key}"
+
+
+class DatabaseStorageProvider(StorageProvider):
+    def __init__(self, db: Session) -> None:
+        self.db = db
+
+    def save(
+        self, filename: str, content: bytes, user_id: uuid.UUID, document_id: uuid.UUID
+    ) -> str:
+        ext = pathlib.Path(filename).suffix.lower()
+        key = f"user_{user_id}/{document_id}{ext}"
+        
+        doc_file = SQLAlchemyDocumentFile(key=key, content=content)
+        self.db.add(doc_file)
+        self.db.commit()
+        
+        return key
+
+    def get(self, key: str) -> bytes:
+        doc_file = self.db.query(SQLAlchemyDocumentFile).filter_by(key=key).first()
+        if not doc_file:
+            raise FileNotFoundError(f"File not found in database storage: {key}")
+        return doc_file.content
+
+    def delete(self, key: str) -> None:
+        doc_file = self.db.query(SQLAlchemyDocumentFile).filter_by(key=key).first()
+        if doc_file:
+            self.db.delete(doc_file)
+            self.db.commit()
+        else:
+            logger.warning(f"File {key} not found for deletion in database.")
+
+    def generate_presigned_upload_url(self, key: str, expires_in: int = 3600) -> str:
+        return f"http://localhost:8000/api/v1/documents/upload-local/{key}"
+
+    def generate_presigned_download_url(self, key: str, expires_in: int = 3600) -> str:
         return f"http://localhost:8000/api/v1/documents/download-local/{key}"
