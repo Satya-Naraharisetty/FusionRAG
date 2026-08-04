@@ -60,7 +60,7 @@ async def main() -> None:
         generator = get_embedding_generator()
         vector_store = get_vector_store(request=None)
         chunk_repo = get_chunk_repository(db)
-        index_cache = get_index_cache()()
+        index_cache = get_index_cache()
 
         retrieval_service = get_retrieval_service(
             generator=generator,

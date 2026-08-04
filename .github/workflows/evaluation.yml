@@ -45,7 +45,7 @@ jobs:
         run: |
           uv pip install --system .
           uv pip install --system -e ".[dev]"
-          uv pip install --system ragas deepeval langchain-google-vertexai
+          uv pip install --system ragas deepeval langchain-google-vertexai langchain-community
 
       - name: Run Quick Mock Benchmark
         run: |
