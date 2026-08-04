@@ -12,6 +12,9 @@ jobs:
       POSTGRES_PASSWORD: postgres
       POSTGRES_SERVER: localhost
       POSTGRES_DB: hybrid_rag
+      REDIS_HOST: localhost
+      QDRANT_HOST: localhost
+      JWT_SECRET: testing_secret
     services:
       postgres:
         image: postgres:15
