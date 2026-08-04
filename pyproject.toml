@@ -55,6 +55,7 @@ norecursedirs = ["backend/app/scratch", "app/scratch", ".venv", ".git"]
 timeout = 30
 
 [tool.setuptools]
+package-dir = {"" = "backend"}
 packages = ["app"]
 
 [dependency-groups]
