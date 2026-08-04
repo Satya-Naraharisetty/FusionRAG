@@ -413,7 +413,7 @@ async def test_retrieval_orchestrator_integration(mocker):
     fusion_engine.fuse.return_value = [fused_chunk]
 
     mmr_selector = MagicMock()
-    mmr_selector.select.side_effect = lambda chunks, top_k, **kwargs: chunks[:top_k]
+    mmr_selector.select.side_effect = lambda chunks, top_k, **kwargs: chunks[:top_k]  # noqa: ARG005
 
     reranker = MagicMock()
     reranker.rerank.side_effect = lambda _query, chunks: chunks
