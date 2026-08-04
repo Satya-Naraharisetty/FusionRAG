@@ -50,6 +50,7 @@ jobs:
       - name: Run Quick Mock Benchmark
         run: |
           cd backend
+          alembic upgrade head
           python scripts/benchmark.py --dataset tests/evaluation/simple_rag_dataset.json --profile quick --mock
 
       - name: Upload Evaluation Reports
