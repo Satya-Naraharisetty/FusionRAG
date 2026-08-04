@@ -123,9 +123,13 @@ class OpenAIProvider(LLMProvider):
                     completion_tokens=usage_data.get("completion_tokens", 0),
                     total_tokens=usage_data.get("total_tokens", 0),
                 )
-                return ProviderResponse(content=content, usage=usage, tool_calls=tool_calls)
+                return ProviderResponse(
+                    content=content, usage=usage, tool_calls=tool_calls
+                )
         except httpx.HTTPStatusError as e:
-            raise LLMProviderError(f"OpenAI API returned status {e.response.status_code}: {e.response.text}")
+            raise LLMProviderError(
+                f"OpenAI API returned status {e.response.status_code}: {e.response.text}"
+            )
         except httpx.RequestError as e:
             raise LLMProviderError(f"OpenAI network request failed: {e}")
         except (KeyError, IndexError) as e:
@@ -177,7 +181,7 @@ class OpenAIProvider(LLMProvider):
                         if line == "data: [DONE]":
                             break
                         if line.startswith("data: "):
-                            data_str = line[len("data: "):].strip()
+                            data_str = line[len("data: ") :].strip()
                             data = json.loads(data_str)
 
                             usage_data = data.get("usage", None)
@@ -185,7 +189,9 @@ class OpenAIProvider(LLMProvider):
                             if usage_data:
                                 usage = Usage(
                                     prompt_tokens=usage_data.get("prompt_tokens", 0),
-                                    completion_tokens=usage_data.get("completion_tokens", 0),
+                                    completion_tokens=usage_data.get(
+                                        "completion_tokens", 0
+                                    ),
                                     total_tokens=usage_data.get("total_tokens", 0),
                                 )
 
@@ -202,18 +208,26 @@ class OpenAIProvider(LLMProvider):
                                     if idx not in accumulated_tcs:
                                         accumulated_tcs[idx] = {
                                             "id": dtc.get("id", ""),
-                                            "name": dtc.get("function", {}).get("name", ""),
+                                            "name": dtc.get("function", {}).get(
+                                                "name", ""
+                                            ),
                                             "arguments": [],
                                         }
 
                                     if dtc.get("id"):
                                         accumulated_tcs[idx]["id"] = dtc["id"]
                                     if dtc.get("function", {}).get("name"):
-                                        accumulated_tcs[idx]["name"] = dtc["function"]["name"]
+                                        accumulated_tcs[idx]["name"] = dtc["function"][
+                                            "name"
+                                        ]
                                     if dtc.get("function", {}).get("arguments"):
-                                        accumulated_tcs[idx]["arguments"].append(dtc["function"]["arguments"])
+                                        accumulated_tcs[idx]["arguments"].append(
+                                            dtc["function"]["arguments"]
+                                        )
 
-                                    arg_chunk = dtc.get("function", {}).get("arguments", "")
+                                    arg_chunk = dtc.get("function", {}).get(
+                                        "arguments", ""
+                                    )
                                     tool_calls.append(
                                         ToolCall(
                                             id=accumulated_tcs[idx]["id"],
@@ -223,9 +237,15 @@ class OpenAIProvider(LLMProvider):
                                     )
 
                             if delta_content or tool_calls or usage:
-                                yield StreamChunk(text_delta=delta_content, usage=usage, tool_calls=tool_calls)
+                                yield StreamChunk(
+                                    text_delta=delta_content,
+                                    usage=usage,
+                                    tool_calls=tool_calls,
+                                )
         except httpx.HTTPStatusError as e:
-            raise LLMProviderError(f"OpenAI API returned status {e.response.status_code}: {e.response.text}")
+            raise LLMProviderError(
+                f"OpenAI API returned status {e.response.status_code}: {e.response.text}"
+            )
         except httpx.RequestError as e:
             raise LLMProviderError(f"OpenAI network request failed: {e}")
         except json.JSONDecodeError as e:

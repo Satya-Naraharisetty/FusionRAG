@@ -12,11 +12,23 @@ from app.evaluation.runners.ragas_provider import RagasProvider
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Run offline evaluation on a dataset.")
-    parser.add_argument("--dataset", required=True, help="Path to dataset file (JSON, JSONL, YAML, CSV).")
-    parser.add_argument("--dataset-id", default="cli-dataset", help="Dataset ID for versioning.")
+    parser.add_argument(
+        "--dataset",
+        required=True,
+        help="Path to dataset file (JSON, JSONL, YAML, CSV).",
+    )
+    parser.add_argument(
+        "--dataset-id", default="cli-dataset", help="Dataset ID for versioning."
+    )
     parser.add_argument("--version", default="1.0.0", help="Dataset version.")
-    parser.add_argument("--mock", action="store_true", help="Run in mock/stub mode without LLM calls.")
-    parser.add_argument("--metrics", default="faithfulness,answer_relevancy", help="Comma-separated metrics to run.")
+    parser.add_argument(
+        "--mock", action="store_true", help="Run in mock/stub mode without LLM calls."
+    )
+    parser.add_argument(
+        "--metrics",
+        default="faithfulness,answer_relevancy",
+        help="Comma-separated metrics to run.",
+    )
     args = parser.parse_args()
 
     loader = DatasetLoader()
@@ -26,7 +38,9 @@ async def main() -> None:
         print(f"Error loading dataset: {e}")
         sys.exit(1)
 
-    print(f"Loaded dataset '{dataset.dataset_id}' (v{dataset.version}) with {dataset.sample_count} samples.")
+    print(
+        f"Loaded dataset '{dataset.dataset_id}' (v{dataset.version}) with {dataset.sample_count} samples."
+    )
     print(f"Dataset Hash: {dataset.hash}")
 
     provider = RagasProvider()
@@ -39,7 +53,7 @@ async def main() -> None:
     print("\n" + "=" * 40)
     print("EVALUATION RESULT SUMMARY")
     print("=" * 40)
-    
+
     # Calculate averages
     averages = {}
     for r in results:

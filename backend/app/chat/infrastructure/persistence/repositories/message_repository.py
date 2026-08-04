@@ -53,7 +53,9 @@ class SQLAlchemyMessageRepository(MessageRepository):
         self._db.flush()
         return self._to_domain(orm)
 
-    async def get_recent_messages(self, conversation_id: UUID, limit: int, offset: int = 0) -> list[ConversationMessage]:
+    async def get_recent_messages(
+        self, conversation_id: UUID, limit: int, offset: int = 0
+    ) -> list[ConversationMessage]:
         orms = (
             self._db.query(ConversationMessageORM)
             .filter(ConversationMessageORM.conversation_id == conversation_id)
@@ -75,7 +77,11 @@ class SQLAlchemyMessageRepository(MessageRepository):
         )
 
     async def create_assistant_message(
-        self, conversation_id: UUID, message_id: UUID, role: MessageRole, content: str = ""
+        self,
+        conversation_id: UUID,
+        message_id: UUID,
+        role: MessageRole,
+        content: str = "",
     ) -> ConversationMessage:
         orm = ConversationMessageORM(
             id=message_id,
@@ -97,7 +103,11 @@ class SQLAlchemyMessageRepository(MessageRepository):
         )
         if orm:
             from app.chat.domain.exceptions import InvalidStatusTransitionException
-            if orm.status not in (MessageStatus.PENDING.value, MessageStatus.STREAMING.value):
+
+            if orm.status not in (
+                MessageStatus.PENDING.value,
+                MessageStatus.STREAMING.value,
+            ):
                 raise InvalidStatusTransitionException(
                     f"Cannot transition message {message_id} from {orm.status} to STREAMING"
                 )
@@ -106,7 +116,11 @@ class SQLAlchemyMessageRepository(MessageRepository):
             self._db.flush()
 
     async def complete_message(
-        self, message_id: UUID, prompt_tokens: int, completion_tokens: int, citations: list[dict[str, Any]] | None = None
+        self,
+        message_id: UUID,
+        prompt_tokens: int,
+        completion_tokens: int,
+        citations: list[dict[str, Any]] | None = None,
     ) -> ConversationMessage:
         orm = (
             self._db.query(ConversationMessageORM)
@@ -117,7 +131,11 @@ class SQLAlchemyMessageRepository(MessageRepository):
             raise RuntimeError(f"Message {message_id} not found to complete.")
 
         from app.chat.domain.exceptions import InvalidStatusTransitionException
-        if orm.status not in (MessageStatus.PENDING.value, MessageStatus.STREAMING.value):
+
+        if orm.status not in (
+            MessageStatus.PENDING.value,
+            MessageStatus.STREAMING.value,
+        ):
             raise InvalidStatusTransitionException(
                 f"Cannot transition message {message_id} from {orm.status} to COMPLETED"
             )
@@ -129,7 +147,9 @@ class SQLAlchemyMessageRepository(MessageRepository):
         self._db.flush()
         return self._to_domain(orm)
 
-    async def fail_message(self, message_id: UUID, error_message: str | None = None) -> ConversationMessage:
+    async def fail_message(
+        self, message_id: UUID, error_message: str | None = None
+    ) -> ConversationMessage:
         orm = (
             self._db.query(ConversationMessageORM)
             .filter(ConversationMessageORM.id == message_id)
@@ -139,7 +159,11 @@ class SQLAlchemyMessageRepository(MessageRepository):
             raise RuntimeError(f"Message {message_id} not found to fail.")
 
         from app.chat.domain.exceptions import InvalidStatusTransitionException
-        if orm.status not in (MessageStatus.PENDING.value, MessageStatus.STREAMING.value):
+
+        if orm.status not in (
+            MessageStatus.PENDING.value,
+            MessageStatus.STREAMING.value,
+        ):
             raise InvalidStatusTransitionException(
                 f"Cannot transition message {message_id} from {orm.status} to FAILED"
             )

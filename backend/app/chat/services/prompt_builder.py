@@ -13,13 +13,11 @@ class PromptBuilder:
         self.system_prompt_path = system_prompt_path
         self._default_system_prompt = (
             "You are a helpful and precise AI assistant. Answer the user's question using ONLY the provided context.\n"
-            "If the information is not present in the context, say \"I cannot answer this question based on the provided context.\"\n"
+            'If the information is not present in the context, say "I cannot answer this question based on the provided context."\n'
             "Do not invent any facts, make assumptions, or extrapolate beyond the provided text. Support every statement with citations to the source chunks (e.g. [Chunk 1], [Chunk 2])."
         )
         self._default_user_template = (
-            "Context:\n{context}\n\n"
-            "Question: {question}\n\n"
-            "Answer:"
+            "Context:\n{context}\n\nQuestion: {question}\n\nAnswer:"
         )
         # Load and cache system prompt at initialization
         self._system_prompt = self._load_system_prompt()
@@ -33,7 +31,9 @@ class PromptBuilder:
                     logger.info(f"Loaded system prompt from {self.system_prompt_path}")
                     return content
             except Exception as e:
-                logger.error(f"Failed to read system prompt file at {self.system_prompt_path}: {e}")
+                logger.error(
+                    f"Failed to read system prompt file at {self.system_prompt_path}: {e}"
+                )
         logger.warning("Using default system prompt fallback.")
         return self._default_system_prompt
 
@@ -73,8 +73,10 @@ class PromptBuilder:
         # 1. System Prompt & Summaries
         system_content = self._system_prompt
         if context_obj.summary:
-            system_content += f"\n\nConversation Summary:\n{context_obj.summary.summary}"
-        
+            system_content += (
+                f"\n\nConversation Summary:\n{context_obj.summary.summary}"
+            )
+
         system_tokens = token_estimator.estimate(system_content)
 
         # 2. Current Question baseline (without document context)
@@ -100,7 +102,9 @@ class PromptBuilder:
             if accumulated_history_tokens + msg_tokens > remaining_budget:
                 break
 
-            role_map = ChatRole.USER if msg.role == MessageRole.USER else ChatRole.ASSISTANT
+            role_map = (
+                ChatRole.USER if msg.role == MessageRole.USER else ChatRole.ASSISTANT
+            )
             history_messages.append(ChatMessage(role=role_map, content=msg.content))
             accumulated_history_tokens += msg_tokens
 
@@ -138,9 +142,7 @@ class PromptBuilder:
         concatenated_context = "".join(concatenated_parts).strip()
 
         # 5. Assemble final prompt messages
-        final_messages = [
-            ChatMessage(role=ChatRole.SYSTEM, content=system_content)
-        ]
+        final_messages = [ChatMessage(role=ChatRole.SYSTEM, content=system_content)]
         # Append history
         final_messages.extend(history_messages)
 
@@ -151,4 +153,3 @@ class PromptBuilder:
         final_messages.append(ChatMessage(role=ChatRole.USER, content=user_content))
 
         return final_messages, chunk_references
-

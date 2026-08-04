@@ -50,7 +50,9 @@ class AgentExecutor:
         self.max_iterations = max_iterations
         self.max_tools_per_request = max_tools_per_request
 
-    async def execute_single_tool(self, tc: ToolCall, context: ToolContext) -> ToolResult:
+    async def execute_single_tool(
+        self, tc: ToolCall, context: ToolContext
+    ) -> ToolResult:
         tool_start = time.perf_counter()
         try:
             tool = self.tool_registry.get(tc.name)
@@ -79,7 +81,11 @@ class AgentExecutor:
         result = await self.execute_single_tool(tc, context)
         await event_callback(
             "tool_call_finished",
-            {"id": tc.id, "name": tc.name, "execution_time_ms": result.execution_time_ms},
+            {
+                "id": tc.id,
+                "name": tc.name,
+                "execution_time_ms": result.execution_time_ms,
+            },
         )
         await event_callback(
             "tool_result",
@@ -129,6 +135,7 @@ class AgentExecutor:
                 tools=tools,
             )
             from app.chat.domain.interfaces import ProviderResponse
+
             if isinstance(response, tuple) and not hasattr(response, "tool_calls"):
                 response = ProviderResponse(content=response[0], usage=response[1])
 
@@ -300,6 +307,7 @@ class AgentExecutor:
                 tools=tools,
             ):
                 from app.chat.domain.interfaces import StreamChunk
+
                 if isinstance(chunk, tuple) and not hasattr(chunk, "text_delta"):
                     chunk = StreamChunk(text_delta=chunk[0], usage=chunk[1])
                 text_delta = chunk.text_delta
@@ -318,7 +326,9 @@ class AgentExecutor:
                                 "arguments_str": "",
                             }
                         if tc.arguments and "delta" in tc.arguments:
-                            accumulated_tool_calls[tc.id]["arguments_str"] += tc.arguments["delta"]
+                            accumulated_tool_calls[tc.id]["arguments_str"] += (
+                                tc.arguments["delta"]
+                            )
 
                 if chunk.usage:
                     final_usage = chunk.usage

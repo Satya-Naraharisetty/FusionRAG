@@ -51,6 +51,7 @@ class GroundedContext(BaseModel):
 
 # --- Milestone 8 Additions ---
 
+
 class LLMProviderType(str, Enum):
     GEMINI = "gemini"
     OPENAI = "openai"
@@ -115,7 +116,9 @@ class Conversation(BaseModel):
         return ChatSession(
             conversation_id=self.id,
             active_model=self.settings.model,
-            active_provider=self.settings.provider.value if isinstance(self.settings.provider, Enum) else str(self.settings.provider),
+            active_provider=self.settings.provider.value
+            if isinstance(self.settings.provider, Enum)
+            else str(self.settings.provider),
             system_prompt_version=self.settings.system_prompt_version,
             created_at=self.created_at,
         )
@@ -184,6 +187,7 @@ class HistoryRewriteResult(BaseModel):
 
 # --- Backwards compatibility & Answer Response update ---
 
+
 class AnswerResponse(BaseModel):
     answer: str
     citations: list[Citation]
@@ -194,4 +198,3 @@ class AnswerResponse(BaseModel):
     usage: Usage
     conversation_id: UUID | None = None
     diagnostics: RetrievalDiagnostics | None = None
-

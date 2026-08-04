@@ -153,6 +153,7 @@ def deep_check(
         import pathlib
 
         from app.core.config import settings
+
         path = pathlib.Path(settings.UPLOAD_DIR)
         path.mkdir(parents=True, exist_ok=True)
         test_file = path / f"health_check_{int(time.time())}.txt"
@@ -166,11 +167,13 @@ def deep_check(
     # 5. LLM Router status check
     try:
         from app.api.dependencies import get_llm_provider
+
         # Resolve LLM provider to inspect circuit state
         # In a real environment, we'd avoid making external calls to not waste API credits,
         # so we inspect the circuit breaker states of the router proxy.
         llm_provider = get_llm_provider()
         from app.chat.infrastructure.router import LLMProviderRouter
+
         if isinstance(llm_provider, LLMProviderRouter):
             gemini_breaker = llm_provider.get_circuit_breaker("gemini")
             openai_breaker = llm_provider.get_circuit_breaker("openai")

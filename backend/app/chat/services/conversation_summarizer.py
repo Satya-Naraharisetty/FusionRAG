@@ -30,13 +30,17 @@ class LLMConversationSummarizer(ConversationSummarizer):
         self._model = model
         self._summary_max_tokens = summary_max_tokens
 
-    async def summarize(self, conversation_id: UUID, up_to_message_id: UUID) -> ConversationSummary:
+    async def summarize(
+        self, conversation_id: UUID, up_to_message_id: UUID
+    ) -> ConversationSummary:
         """
         Summarize conversation history up to a specific message ID.
         Fuses any existing summary with newer messages to create a versioned rolling summary.
         """
         # 1. Fetch messages for the conversation
-        messages = await self._message_repo.get_recent_messages(conversation_id, limit=1000)
+        messages = await self._message_repo.get_recent_messages(
+            conversation_id, limit=1000
+        )
         # Reverse to get chronological order (ascending) if get_recent_messages returns descending
         # Wait, get_recent_messages in SQLAlchemyMessageRepository reverses and returns chronological!
         # So it is already in ascending order.
@@ -47,7 +51,9 @@ class LLMConversationSummarizer(ConversationSummarizer):
                 break
 
         if target_idx == -1:
-            raise RuntimeError(f"Message {up_to_message_id} was not found in conversation history.")
+            raise RuntimeError(
+                f"Message {up_to_message_id} was not found in conversation history."
+            )
 
         # Slices from beginning up to the target message
         messages_to_summarize = messages[: target_idx + 1]
@@ -68,7 +74,11 @@ class LLMConversationSummarizer(ConversationSummarizer):
             if prev_covered_idx != -1:
                 new_messages_only = messages_to_summarize[prev_covered_idx + 1 :]
             else:
-                new_messages_only = [m for m in messages_to_summarize if m.created_at > prev_summary.created_at]
+                new_messages_only = [
+                    m
+                    for m in messages_to_summarize
+                    if m.created_at > prev_summary.created_at
+                ]
         else:
             new_messages_only = messages_to_summarize
 
@@ -120,7 +130,9 @@ class LLMConversationSummarizer(ConversationSummarizer):
             conversation_id=conversation_id,
             summary=summary_text,
             summary_version=(prev_summary.summary_version + 1) if prev_summary else 1,
-            covered_from_message_id=prev_summary.covered_from_message_id if prev_summary else messages_to_summarize[0].id,
+            covered_from_message_id=prev_summary.covered_from_message_id
+            if prev_summary
+            else messages_to_summarize[0].id,
             covered_until_message_id=up_to_message_id,
             message_count=len(messages_to_summarize),
             created_at=datetime.now(UTC),

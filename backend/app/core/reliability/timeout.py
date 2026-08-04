@@ -6,6 +6,7 @@ from typing import Any
 
 class TimeoutException(Exception):
     """Exception raised when an operation exceeds its configured timeout duration."""
+
     pass
 
 
@@ -15,7 +16,9 @@ async def timeout_policy(
     """Execute a callable and raise TimeoutException if timeout_seconds is exceeded."""
     try:
         if asyncio.iscoroutinefunction(func):
-            return await asyncio.wait_for(func(*args, **kwargs), timeout=timeout_seconds)
+            return await asyncio.wait_for(
+                func(*args, **kwargs), timeout=timeout_seconds
+            )
         else:
             return await asyncio.wait_for(
                 asyncio.to_thread(func, *args, **kwargs), timeout=timeout_seconds
@@ -28,9 +31,12 @@ async def timeout_policy(
 
 def with_timeout(timeout_seconds: float):
     """Decorator to enforce a execution timeout on an async function."""
+
     def decorator(func: Callable):
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             return await timeout_policy(func, timeout_seconds, *args, **kwargs)
+
         return wrapper
+
     return decorator

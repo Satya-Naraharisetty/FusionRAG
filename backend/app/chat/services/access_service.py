@@ -18,7 +18,9 @@ class ConversationAccessService:
         """
         conversation = await self._conversation_repo.get_conversation(conversation_id)
         if not conversation:
-            raise ConversationNotFoundException(f"Conversation {conversation_id} was not found.")
+            raise ConversationNotFoundException(
+                f"Conversation {conversation_id} was not found."
+            )
 
         if conversation.user_id != user_id:
             raise UnauthorizedConversationAccessException(

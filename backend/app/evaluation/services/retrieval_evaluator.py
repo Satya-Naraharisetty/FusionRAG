@@ -22,10 +22,7 @@ class RetrievalEvaluator:
         self.retrieval_service = retrieval_service
 
     async def evaluate_samples(
-        self,
-        samples: list[EvaluationSample],
-        top_k: int = 10,
-        mock: bool = False
+        self, samples: list[EvaluationSample], top_k: int = 10, mock: bool = False
     ) -> list[EvaluationResult]:
         results = []
 
@@ -38,37 +35,48 @@ class RetrievalEvaluator:
                 latency = 0.05
                 gts = sample.ground_truth_context or []
                 for i, gt in enumerate(gts[:3]):
-                    retrieved_chunks.append({
-                        "text": gt,
-                        "score": 0.85 - (i * 0.05),
-                        "chunk_id": f"chunk-gt-{i}",
-                        "document_id": sample.expected_documents[i] if sample.expected_documents and i < len(sample.expected_documents) else f"doc-gt-{i}"
-                    })
-                retrieved_chunks.append({
-                    "text": "This is a random unrelated document text chunk for search noise.",
-                    "score": 0.35,
-                    "chunk_id": "chunk-noise",
-                    "document_id": "doc-noise"
-                })
+                    retrieved_chunks.append(
+                        {
+                            "text": gt,
+                            "score": 0.85 - (i * 0.05),
+                            "chunk_id": f"chunk-gt-{i}",
+                            "document_id": sample.expected_documents[i]
+                            if sample.expected_documents
+                            and i < len(sample.expected_documents)
+                            else f"doc-gt-{i}",
+                        }
+                    )
+                retrieved_chunks.append(
+                    {
+                        "text": "This is a random unrelated document text chunk for search noise.",
+                        "score": 0.35,
+                        "chunk_id": "chunk-noise",
+                        "document_id": "doc-noise",
+                    }
+                )
             else:
                 try:
                     filters = sample.metadata.get("filters")
                     document_ids = sample.metadata.get("document_ids")
-                    
+
                     chunks = await self.retrieval_service.retrieve(
                         query=sample.question,
                         top_k=top_k,
                         document_ids=document_ids,
-                        filters=filters
+                        filters=filters,
                     )
-                    
+
                     for c in chunks:
-                        retrieved_chunks.append({
-                            "text": c.text,
-                            "score": c.score if hasattr(c, "score") else 1.0,
-                            "chunk_id": str(c.id) if hasattr(c, "id") else "",
-                            "document_id": str(c.document_id) if hasattr(c, "document_id") else ""
-                        })
+                        retrieved_chunks.append(
+                            {
+                                "text": c.text,
+                                "score": c.score if hasattr(c, "score") else 1.0,
+                                "chunk_id": str(c.id) if hasattr(c, "id") else "",
+                                "document_id": str(c.document_id)
+                                if hasattr(c, "document_id")
+                                else "",
+                            }
+                        )
                 except Exception as e:
                     logger.error(f"Retrieval failed for sample {sample.id}: {e}")
 
@@ -80,15 +88,21 @@ class RetrievalEvaluator:
                     text=c["text"],
                     score=c["score"],
                     chunk_id=c["chunk_id"],
-                    document_id=c["document_id"]
+                    document_id=c["document_id"],
                 )
                 for c in retrieved_chunks
             ]
 
             # 2. Evaluate using registered metrics
             metric_results = []
-            retrieval_metrics = ["hit_rate", "precision_at_k", "recall_at_k", "mrr", "ndcg"]
-            
+            retrieval_metrics = [
+                "hit_rate",
+                "precision_at_k",
+                "recall_at_k",
+                "mrr",
+                "ndcg",
+            ]
+
             for m_name in retrieval_metrics:
                 try:
                     metric = MetricRegistry.get_metric(m_name)
@@ -107,15 +121,17 @@ class RetrievalEvaluator:
             sample_metadata["latency"] = latency
             sample_metadata["error_category"] = error_category
 
-            results.append(EvaluationResult(
-                sample_id=sample.id,
-                question=sample.question,
-                expected_answer=sample.expected_answer,
-                latency=latency,
-                error_category=error_category,
-                metrics=metric_results,
-                retrieved_contexts=retrieved_contexts,
-                metadata=sample_metadata
-            ))
+            results.append(
+                EvaluationResult(
+                    sample_id=sample.id,
+                    question=sample.question,
+                    expected_answer=sample.expected_answer,
+                    latency=latency,
+                    error_category=error_category,
+                    metrics=metric_results,
+                    retrieved_contexts=retrieved_contexts,
+                    metadata=sample_metadata,
+                )
+            )
 
         return results

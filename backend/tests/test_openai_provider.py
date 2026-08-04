@@ -58,6 +58,7 @@ async def test_openai_provider_generate_api_error():
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         import httpx
+
         # Simulate a 401 Unauthorized API error
         mock_response = MagicMock()
         mock_response.status_code = 401

@@ -37,7 +37,9 @@ class LLMHistoryRewriter(HistoryRewriter):
             "3. Keep the tone and intent of the original question."
         )
 
-    def _get_cache_key(self, conversation_id: UUID, last_message_id: UUID, question: str) -> str:
+    def _get_cache_key(
+        self, conversation_id: UUID, last_message_id: UUID, question: str
+    ) -> str:
         q_hash = hashlib.sha256(question.strip().lower().encode("utf-8")).hexdigest()
         return f"rewrite:{conversation_id}:{last_message_id}:{q_hash}"
 
@@ -51,9 +53,31 @@ class LLMHistoryRewriter(HistoryRewriter):
 
         # Pronouns and contextual keywords
         pronouns = {
-            "it", "its", "they", "them", "their", "he", "him", "his", "she", "her", "hers",
-            "this", "that", "these", "those", "then", "there", "here", "himself", "herself",
-            "former", "latter", "whom", "whose", "which"
+            "it",
+            "its",
+            "they",
+            "them",
+            "their",
+            "he",
+            "him",
+            "his",
+            "she",
+            "her",
+            "hers",
+            "this",
+            "that",
+            "these",
+            "those",
+            "then",
+            "there",
+            "here",
+            "himself",
+            "herself",
+            "former",
+            "latter",
+            "whom",
+            "whose",
+            "which",
         }
         words = set(q_lower.translate(str.maketrans("", "", "?.,!/")).split())
 
@@ -62,7 +86,18 @@ class LLMHistoryRewriter(HistoryRewriter):
             return True
 
         # Check for conversational follow-ups
-        follow_up_phrases = ["about", "more", "explain", "why", "how", "what about", "tell me", "what was", "who was", "where was"]
+        follow_up_phrases = [
+            "about",
+            "more",
+            "explain",
+            "why",
+            "how",
+            "what about",
+            "tell me",
+            "what was",
+            "who was",
+            "where was",
+        ]
         for phrase in follow_up_phrases:
             if phrase in q_lower:
                 return True
@@ -73,7 +108,9 @@ class LLMHistoryRewriter(HistoryRewriter):
 
         return False
 
-    async def rewrite(self, question: str, history: list[ConversationMessage]) -> HistoryRewriteResult:
+    async def rewrite(
+        self, question: str, history: list[ConversationMessage]
+    ) -> HistoryRewriteResult:
         """
         Rewrite follow-up question to standalone form based on conversational context.
         Uses cached responses to minimize latency and LLM cost.
@@ -98,7 +135,9 @@ class LLMHistoryRewriter(HistoryRewriter):
 
         # 3. Check Cache
         last_message = history[-1]
-        cache_key = self._get_cache_key(last_message.conversation_id, last_message.id, question)
+        cache_key = self._get_cache_key(
+            last_message.conversation_id, last_message.id, question
+        )
 
         try:
             cached_val = await self._cache.get(cache_key)
@@ -114,15 +153,22 @@ class LLMHistoryRewriter(HistoryRewriter):
             logger.warning(f"Failed to read from rewrite cache: {e}")
 
         # 4. Generate standalone question via LLM
-        messages = [
-            ChatMessage(role=ChatRole.SYSTEM, content=self._system_prompt)
-        ]
+        messages = [ChatMessage(role=ChatRole.SYSTEM, content=self._system_prompt)]
         # Include last 6 messages to keep context concise
         for msg in history[-6:]:
-            messages.append(ChatMessage(role=ChatRole.USER if msg.role == MessageRole.USER else ChatRole.ASSISTANT, content=msg.content))
+            messages.append(
+                ChatMessage(
+                    role=ChatRole.USER
+                    if msg.role == MessageRole.USER
+                    else ChatRole.ASSISTANT,
+                    content=msg.content,
+                )
+            )
 
         # Add current follow-up
-        messages.append(ChatMessage(role=ChatRole.USER, content=f"Follow-up question: {question}"))
+        messages.append(
+            ChatMessage(role=ChatRole.USER, content=f"Follow-up question: {question}")
+        )
 
         try:
             rewritten_text, _ = await self._llm_provider.generate(
@@ -150,7 +196,9 @@ class LLMHistoryRewriter(HistoryRewriter):
             )
 
         except Exception as e:
-            logger.exception(f"Error during query rewriting: {e}. Falling back to original question.")
+            logger.exception(
+                f"Error during query rewriting: {e}. Falling back to original question."
+            )
             return HistoryRewriteResult(
                 original_query=question,
                 rewritten_query=question,

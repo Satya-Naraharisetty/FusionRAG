@@ -243,10 +243,10 @@ class Settings(BaseSettings):
         case_sensitive=True,
         env_file=os.path.join(
             os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")),
-            ".env.testing" if os.getenv("ENV", "").lower() == "testing" else ".env"
+            ".env.testing" if os.getenv("ENV", "").lower() == "testing" else ".env",
         ),
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
 

@@ -203,7 +203,12 @@ class ProductionMiddleware(BaseHTTPMiddleware):
         if getattr(request.app.state, "is_draining", False):
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                content={"error": {"code": "SERVICE_DRAINING", "message": "Server is shutting down."}}
+                content={
+                    "error": {
+                        "code": "SERVICE_DRAINING",
+                        "message": "Server is shutting down.",
+                    }
+                },
             )
 
         # Track active requests
@@ -237,7 +242,7 @@ class ProductionMiddleware(BaseHTTPMiddleware):
             request_id=req_id,
             client_ip=request.client.host if request.client else None,
             permissions=permissions,
-            tenant_id=request.headers.get("X-Tenant-ID")
+            tenant_id=request.headers.get("X-Tenant-ID"),
         )
 
         # Set ContextVar
@@ -266,7 +271,7 @@ class ProductionMiddleware(BaseHTTPMiddleware):
             response.headers["X-Content-Type-Options"] = "nosniff"
             response.headers["X-Frame-Options"] = "DENY"
             response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-            
+
             return response
         except Exception as e:
             duration_ms = (time.perf_counter() - start_time) * 1000
@@ -276,7 +281,9 @@ class ProductionMiddleware(BaseHTTPMiddleware):
             raise e
         finally:
             current_request_context.reset(ctx_token)
-            request.app.state.active_requests_count = max(0, request.app.state.active_requests_count - 1)
+            request.app.state.active_requests_count = max(
+                0, request.app.state.active_requests_count - 1
+            )
 
 
 app.add_middleware(ProductionMiddleware)

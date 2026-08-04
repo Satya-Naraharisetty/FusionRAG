@@ -3,6 +3,7 @@ import re
 
 class PromptInjectionError(ValueError):
     """Exception raised when a potential prompt injection is detected."""
+
     pass
 
 

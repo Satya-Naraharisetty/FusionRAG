@@ -17,13 +17,7 @@ async def test_gemini_provider_generate_success():
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [{"text": "This is Gemini's answer."}]
-                }
-            }
-        ],
+        "candidates": [{"content": {"parts": [{"text": "This is Gemini's answer."}]}}],
         "usageMetadata": {
             "promptTokenCount": 15,
             "candidatesTokenCount": 5,
@@ -53,7 +47,7 @@ async def test_gemini_provider_generate_success():
         # Verify Gemini URL format
         assert "gemini-1.5-flash:generateContent" in args[0]
         assert "key=test-key" in args[0]
-        
+
         # Verify payload mapping
         payload = kwargs["json"]
         assert payload["systemInstruction"]["parts"][0]["text"] == "System prompt"
@@ -71,6 +65,7 @@ async def test_gemini_provider_generate_api_error():
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         import httpx
+
         # Simulate a 400 Bad Request API error
         mock_response = MagicMock()
         mock_response.status_code = 400

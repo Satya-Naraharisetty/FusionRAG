@@ -12,8 +12,12 @@ class ReciprocalRankFusionEngine(FusionEngine):
         sparse_results: list[RetrievedChunk],
     ) -> list[RetrievedChunk]:
         # Track ranks (1-indexed)
-        dense_ranks = {chunk.chunk_id: idx + 1 for idx, chunk in enumerate(dense_results)}
-        sparse_ranks = {chunk.chunk_id: idx + 1 for idx, chunk in enumerate(sparse_results)}
+        dense_ranks = {
+            chunk.chunk_id: idx + 1 for idx, chunk in enumerate(dense_results)
+        }
+        sparse_ranks = {
+            chunk.chunk_id: idx + 1 for idx, chunk in enumerate(sparse_results)
+        }
 
         # Collect all unique chunks
         chunk_map = {}
@@ -36,7 +40,9 @@ class ReciprocalRankFusionEngine(FusionEngine):
             rrf_scores[chunk_id] = score
 
         # Sort chunks by RRF score descending
-        sorted_chunk_ids = sorted(rrf_scores.keys(), key=lambda cid: rrf_scores[cid], reverse=True)
+        sorted_chunk_ids = sorted(
+            rrf_scores.keys(), key=lambda cid: rrf_scores[cid], reverse=True
+        )
 
         fused_chunks = []
         for chunk_id in sorted_chunk_ids:

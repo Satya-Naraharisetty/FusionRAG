@@ -30,7 +30,7 @@ class DefaultQueryProcessor(QueryProcessor):
         has_typos_corrected = False
 
         if self.typos:
-            words = re.findall(r'\b\w+\b', cleaned_base)
+            words = re.findall(r"\b\w+\b", cleaned_base)
             corrected_words = []
             for w in words:
                 if w in self.typos:
@@ -43,7 +43,7 @@ class DefaultQueryProcessor(QueryProcessor):
 
         # 3. Clean query for dense search (whitespace and punctuation normalized, no acronym expansion)
         # Replace non-alphanumeric/non-whitespace characters with space
-        cleaned_query = re.sub(r'[^\w\s]', ' ', typo_corrected)
+        cleaned_query = re.sub(r"[^\w\s]", " ", typo_corrected)
         cleaned_query = " ".join(cleaned_query.split())
 
         # 4. Expanded query for sparse search (with acronym expansions)
@@ -64,7 +64,7 @@ class DefaultQueryProcessor(QueryProcessor):
             expanded_query = " ".join(expanded_words) if words else cleaned_query
 
         # Re-apply punctuation cleanup and whitespace normalization on expanded query
-        expanded_query = re.sub(r'[^\w\s]', ' ', expanded_query)
+        expanded_query = re.sub(r"[^\w\s]", " ", expanded_query)
         expanded_query = " ".join(expanded_query.split())
 
         end_time = time.perf_counter()

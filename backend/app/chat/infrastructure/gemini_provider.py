@@ -43,12 +43,14 @@ class GeminiProvider(LLMProvider):
             parts = []
             if role_str == "tool":
                 role = "tool"
-                parts.append({
-                    "functionResponse": {
-                        "name": msg.name,
-                        "response": {"result": msg.content}
+                parts.append(
+                    {
+                        "functionResponse": {
+                            "name": msg.name,
+                            "response": {"result": msg.content},
+                        }
                     }
-                })
+                )
             elif role_str == "assistant" or role_str == "model":
                 role = "model"
                 if msg.content:
@@ -62,27 +64,26 @@ class GeminiProvider(LLMProvider):
                                 args = json.loads(args)
                             except ValueError:
                                 pass
-                        parts.append({
-                            "functionCall": {
-                                "name": func_call.get("name"),
-                                "args": args
+                        parts.append(
+                            {
+                                "functionCall": {
+                                    "name": func_call.get("name"),
+                                    "args": args,
+                                }
                             }
-                        })
+                        )
             else:
                 role = "user"
                 parts.append({"text": msg.content})
 
-            contents.append({
-                "role": role,
-                "parts": parts
-            })
+            contents.append({"role": role, "parts": parts})
 
         payload = {
             "contents": contents,
             "generationConfig": {
                 "temperature": temperature,
                 "maxOutputTokens": max_tokens,
-            }
+            },
         }
 
         if system_instruction_content:
@@ -93,11 +94,13 @@ class GeminiProvider(LLMProvider):
         if tools:
             function_declarations = []
             for t in tools:
-                function_declarations.append({
-                    "name": t.name,
-                    "description": t.description,
-                    "parameters": t.parameters
-                })
+                function_declarations.append(
+                    {
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.parameters,
+                    }
+                )
             payload["tools"] = [{"functionDeclarations": function_declarations}]
 
             if tool_choice:
@@ -106,11 +109,7 @@ class GeminiProvider(LLMProvider):
                     mode = "NONE"
                 elif tool_choice == "any":
                     mode = "ANY"
-                payload["toolConfig"] = {
-                    "functionCallingConfig": {
-                        "mode": mode
-                    }
-                }
+                payload["toolConfig"] = {"functionCallingConfig": {"mode": mode}}
 
         return payload
 
@@ -127,7 +126,9 @@ class GeminiProvider(LLMProvider):
             raise LLMProviderError("Gemini API key is missing or not configured.")
 
         url = self._get_url(model, stream=False)
-        payload = self._build_payload(messages, temperature, max_tokens, tools, tool_choice)
+        payload = self._build_payload(
+            messages, temperature, max_tokens, tools, tool_choice
+        )
         headers = {"Content-Type": "application/json"}
 
         try:
@@ -143,7 +144,9 @@ class GeminiProvider(LLMProvider):
 
                 candidates = data.get("candidates", [])
                 if not candidates:
-                    raise LLMProviderError("No generation candidates returned from Gemini.")
+                    raise LLMProviderError(
+                        "No generation candidates returned from Gemini."
+                    )
 
                 content = ""
                 tool_calls = []
@@ -154,11 +157,13 @@ class GeminiProvider(LLMProvider):
                     if "functionCall" in part:
                         fc = part["functionCall"]
                         tc_id = f"call_{fc['name']}_{uuid.uuid4().hex[:8]}"
-                        tool_calls.append(ToolCall(
-                            id=tc_id,
-                            name=fc["name"],
-                            arguments=fc.get("args") or {}
-                        ))
+                        tool_calls.append(
+                            ToolCall(
+                                id=tc_id,
+                                name=fc["name"],
+                                arguments=fc.get("args") or {},
+                            )
+                        )
 
                 usage_data = data.get("usageMetadata", {})
                 usage = Usage(
@@ -166,9 +171,13 @@ class GeminiProvider(LLMProvider):
                     completion_tokens=usage_data.get("candidatesTokenCount", 0),
                     total_tokens=usage_data.get("totalTokenCount", 0),
                 )
-                return ProviderResponse(content=content, usage=usage, tool_calls=tool_calls)
+                return ProviderResponse(
+                    content=content, usage=usage, tool_calls=tool_calls
+                )
         except httpx.HTTPStatusError as e:
-            raise LLMProviderError(f"Gemini API returned status {e.response.status_code}: {e.response.text}")
+            raise LLMProviderError(
+                f"Gemini API returned status {e.response.status_code}: {e.response.text}"
+            )
         except httpx.RequestError as e:
             raise LLMProviderError(f"Gemini network request failed: {e}")
         except Exception as e:
@@ -187,7 +196,9 @@ class GeminiProvider(LLMProvider):
             raise LLMProviderError("Gemini API key is missing or not configured.")
 
         url = self._get_url(model, stream=True)
-        payload = self._build_payload(messages, temperature, max_tokens, tools, tool_choice)
+        payload = self._build_payload(
+            messages, temperature, max_tokens, tools, tool_choice
+        )
         headers = {"Content-Type": "application/json"}
 
         try:
@@ -210,39 +221,53 @@ class GeminiProvider(LLMProvider):
                         if not line:
                             continue
                         if line.startswith("data: "):
-                            data_str = line[len("data: "):].strip()
+                            data_str = line[len("data: ") :].strip()
                             data = json.loads(data_str)
 
                             candidates = data.get("candidates", [])
                             delta_content = ""
                             tool_calls = []
                             if candidates:
-                                parts = candidates[0].get("content", {}).get("parts", [])
+                                parts = (
+                                    candidates[0].get("content", {}).get("parts", [])
+                                )
                                 for part in parts:
                                     if "text" in part:
                                         delta_content = part["text"]
                                     if "functionCall" in part:
                                         fc = part["functionCall"]
-                                        tc_id = f"call_{fc['name']}_{uuid.uuid4().hex[:8]}"
-                                        tool_calls.append(ToolCall(
-                                            id=tc_id,
-                                            name=fc["name"],
-                                            arguments=fc.get("args") or {}
-                                        ))
+                                        tc_id = (
+                                            f"call_{fc['name']}_{uuid.uuid4().hex[:8]}"
+                                        )
+                                        tool_calls.append(
+                                            ToolCall(
+                                                id=tc_id,
+                                                name=fc["name"],
+                                                arguments=fc.get("args") or {},
+                                            )
+                                        )
 
                             usage_data = data.get("usageMetadata", None)
                             usage = None
                             if usage_data:
                                 usage = Usage(
                                     prompt_tokens=usage_data.get("promptTokenCount", 0),
-                                    completion_tokens=usage_data.get("candidatesTokenCount", 0),
+                                    completion_tokens=usage_data.get(
+                                        "candidatesTokenCount", 0
+                                    ),
                                     total_tokens=usage_data.get("totalTokenCount", 0),
                                 )
 
                             if delta_content or tool_calls or usage:
-                                yield StreamChunk(text_delta=delta_content, usage=usage, tool_calls=tool_calls)
+                                yield StreamChunk(
+                                    text_delta=delta_content,
+                                    usage=usage,
+                                    tool_calls=tool_calls,
+                                )
         except httpx.HTTPStatusError as e:
-            raise LLMProviderError(f"Gemini API returned status {e.response.status_code}: {e.response.text}")
+            raise LLMProviderError(
+                f"Gemini API returned status {e.response.status_code}: {e.response.text}"
+            )
         except httpx.RequestError as e:
             raise LLMProviderError(f"Gemini network request failed: {e}")
         except json.JSONDecodeError as e:

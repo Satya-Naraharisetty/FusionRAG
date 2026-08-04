@@ -35,7 +35,9 @@ class YAMLPricingProvider(BasePricingProvider):
                 for model, costs in models_data.items():
                     self._pricing_cache[model] = ModelPricing(
                         input_cost_per_million=costs.get("input_cost_per_million", 0.0),
-                        output_cost_per_million=costs.get("output_cost_per_million", 0.0),
+                        output_cost_per_million=costs.get(
+                            "output_cost_per_million", 0.0
+                        ),
                     )
         except Exception:
             self._set_fallbacks()

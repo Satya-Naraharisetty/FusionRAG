@@ -15,7 +15,13 @@ class DatasetLoader:
     Supports JSON, JSONL, CSV, and YAML formats.
     """
 
-    def load_dataset(self, file_path: str, dataset_id: str, version: str, description: str | None = None) -> EvaluationDataset:
+    def load_dataset(
+        self,
+        file_path: str,
+        dataset_id: str,
+        version: str,
+        description: str | None = None,
+    ) -> EvaluationDataset:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Dataset file not found: {file_path}")
 
@@ -32,7 +38,9 @@ class DatasetLoader:
                     if not description and "description" in data:
                         description = data["description"]
                 else:
-                    raise ValueError("JSON dataset must be a list of samples or a dict with a 'samples' key.")
+                    raise ValueError(
+                        "JSON dataset must be a list of samples or a dict with a 'samples' key."
+                    )
 
         elif ext == ".jsonl":
             with open(file_path, encoding="utf-8") as f:
@@ -50,7 +58,9 @@ class DatasetLoader:
                     if not description and "description" in data:
                         description = data["description"]
                 else:
-                    raise ValueError("YAML dataset must be a list of samples or a dict with a 'samples' key.")
+                    raise ValueError(
+                        "YAML dataset must be a list of samples or a dict with a 'samples' key."
+                    )
 
         elif ext == ".csv":
             with open(file_path, encoding="utf-8") as f:
@@ -58,9 +68,14 @@ class DatasetLoader:
                 for row in reader:
                     # Parse CSV fields into appropriate structures
                     sample_dict = dict(row)
-                    
+
                     # Convert list-like strings
-                    for list_field in ["ground_truth_context", "expected_tools", "expected_citations", "expected_documents"]:
+                    for list_field in [
+                        "ground_truth_context",
+                        "expected_tools",
+                        "expected_citations",
+                        "expected_documents",
+                    ]:
                         if sample_dict.get(list_field):
                             try:
                                 val = json.loads(sample_dict[list_field])
@@ -69,31 +84,47 @@ class DatasetLoader:
                                 else:
                                     sample_dict[list_field] = [str(val)]
                             except Exception:
-                                sample_dict[list_field] = [x.strip() for x in sample_dict[list_field].split(",") if x.strip()]
+                                sample_dict[list_field] = [
+                                    x.strip()
+                                    for x in sample_dict[list_field].split(",")
+                                    if x.strip()
+                                ]
 
                     # Convert boolean fields
-                    for bool_field in ["retrieval_required", "tools_required", "conversation_required"]:
+                    for bool_field in [
+                        "retrieval_required",
+                        "tools_required",
+                        "conversation_required",
+                    ]:
                         if bool_field in sample_dict:
-                            sample_dict[bool_field] = sample_dict[bool_field].lower() in ("true", "1", "yes")
+                            sample_dict[bool_field] = sample_dict[
+                                bool_field
+                            ].lower() in ("true", "1", "yes")
 
                     # Parse conversation history
                     if sample_dict.get("conversation_history"):
                         try:
-                            sample_dict["conversation_history"] = json.loads(sample_dict["conversation_history"])
+                            sample_dict["conversation_history"] = json.loads(
+                                sample_dict["conversation_history"]
+                            )
                         except Exception:
                             sample_dict["conversation_history"] = []
 
                     # Parse metadata
                     if sample_dict.get("metadata"):
                         try:
-                            sample_dict["metadata"] = json.loads(sample_dict["metadata"])
+                            sample_dict["metadata"] = json.loads(
+                                sample_dict["metadata"]
+                            )
                         except Exception:
                             sample_dict["metadata"] = {}
 
                     raw_samples.append(sample_dict)
 
         else:
-            raise ValueError(f"Unsupported file format: {ext}. Supported formats: JSON, JSONL, YAML, CSV")
+            raise ValueError(
+                f"Unsupported file format: {ext}. Supported formats: JSON, JSONL, YAML, CSV"
+            )
 
         # Parse and validate samples
         samples = []
@@ -101,10 +132,12 @@ class DatasetLoader:
             # Guarantee ID
             if "id" not in raw or not raw["id"]:
                 raw["id"] = f"{dataset_id}-{version}-{i}"
-            
+
             # Basic validation
             if "question" not in raw or not raw["question"]:
-                raise ValueError(f"Sample at index {i} is missing required 'question' field.")
+                raise ValueError(
+                    f"Sample at index {i} is missing required 'question' field."
+                )
 
             sample = EvaluationSample(**raw)
             samples.append(sample)
@@ -118,7 +151,7 @@ class DatasetLoader:
             hash=dataset_hash,
             sample_count=len(samples),
             description=description,
-            samples=samples
+            samples=samples,
         )
 
     def compute_hash(self, samples: list[EvaluationSample]) -> str:
@@ -144,7 +177,9 @@ class DatasetLoader:
                 return False
         return True
 
-    def split_train_test(self, dataset: EvaluationDataset, test_size: float = 0.2, seed: int = 42) -> tuple[EvaluationDataset, EvaluationDataset]:
+    def split_train_test(
+        self, dataset: EvaluationDataset, test_size: float = 0.2, seed: int = 42
+    ) -> tuple[EvaluationDataset, EvaluationDataset]:
         """
         Split a dataset into train and test datasets.
         """
@@ -165,7 +200,7 @@ class DatasetLoader:
             hash=self.compute_hash(train_samples),
             sample_count=len(train_samples),
             description=f"Train split of {dataset.dataset_id}",
-            samples=train_samples
+            samples=train_samples,
         )
 
         test_ds = EvaluationDataset(
@@ -174,12 +209,14 @@ class DatasetLoader:
             hash=self.compute_hash(test_samples),
             sample_count=len(test_samples),
             description=f"Test split of {dataset.dataset_id}",
-            samples=test_samples
+            samples=test_samples,
         )
 
         return train_ds, test_ds
 
-    def sampling(self, dataset: EvaluationDataset, n: int, seed: int = 42) -> EvaluationDataset:
+    def sampling(
+        self, dataset: EvaluationDataset, n: int, seed: int = 42
+    ) -> EvaluationDataset:
         """
         Return a subset of n random samples.
         """
@@ -195,7 +232,7 @@ class DatasetLoader:
             hash=self.compute_hash(sampled_samples),
             sample_count=len(sampled_samples),
             description=f"Sampled subset of size {n} from {dataset.dataset_id}",
-            samples=sampled_samples
+            samples=sampled_samples,
         )
 
     def filtering(
@@ -206,7 +243,7 @@ class DatasetLoader:
         topic: str | None = None,
         retrieval_required: bool | None = None,
         tools_required: bool | None = None,
-        conversation_required: bool | None = None
+        conversation_required: bool | None = None,
     ) -> EvaluationDataset:
         """
         Filter samples by difficulty, tags, topic, and capability flags.
@@ -217,11 +254,17 @@ class DatasetLoader:
                 continue
             if topic and s.topic != topic:
                 continue
-            if retrieval_required is not None and s.retrieval_required != retrieval_required:
+            if (
+                retrieval_required is not None
+                and s.retrieval_required != retrieval_required
+            ):
                 continue
             if tools_required is not None and s.tools_required != tools_required:
                 continue
-            if conversation_required is not None and s.conversation_required != conversation_required:
+            if (
+                conversation_required is not None
+                and s.conversation_required != conversation_required
+            ):
                 continue
             if tags:
                 sample_tags = s.metadata.get("tags", [])
@@ -235,5 +278,5 @@ class DatasetLoader:
             hash=self.compute_hash(filtered_samples),
             sample_count=len(filtered_samples),
             description=f"Filtered subset of {dataset.dataset_id}",
-            samples=filtered_samples
+            samples=filtered_samples,
         )

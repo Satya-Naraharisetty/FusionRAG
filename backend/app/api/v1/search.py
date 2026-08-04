@@ -21,7 +21,8 @@ router = APIRouter(tags=["Search"])
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="The search query text.")
     conversation_id: UUID | None = Field(
-        default=None, description="Optional conversation ID to run history-aware search."
+        default=None,
+        description="Optional conversation ID to run history-aware search.",
     )
     top_k: int | None = Field(
         default=None, description="The maximum number of chunks to return."
@@ -33,7 +34,8 @@ class SearchRequest(BaseModel):
         default_factory=dict, description="Optional metadata filters."
     )
     retrieval_mode: RetrievalMode | None = Field(
-        default=None, description="The retrieval mode: 'semantic', 'sparse', 'hybrid', or 'auto'."
+        default=None,
+        description="The retrieval mode: 'semantic', 'sparse', 'hybrid', or 'auto'.",
     )
 
 
@@ -66,12 +68,16 @@ async def search_documents(
     user_id = UUID(user_context["user_id"])
 
     # 0. Load or create conversation session to retrieve history context
-    conversation = await conversation_manager.get_or_create_conversation(request.conversation_id, user_id)
+    conversation = await conversation_manager.get_or_create_conversation(
+        request.conversation_id, user_id
+    )
     conversation_id = conversation.id
 
     # 1. Fetch memory history and rewrite query to standalone form
     recent_messages, _ = await conversation_manager._memory.load_memory(conversation_id)
-    rewrite_result = await conversation_manager._rewriter.rewrite(request.query, recent_messages)
+    rewrite_result = await conversation_manager._rewriter.rewrite(
+        request.query, recent_messages
+    )
     query_to_retrieve = rewrite_result.rewritten_query
 
     # 1. Resolve and validate top_k parameter

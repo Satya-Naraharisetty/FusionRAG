@@ -8,7 +8,9 @@ logger = logging.getLogger(__name__)
 
 
 class ContextBuilder:
-    def __init__(self, token_estimator: TokenEstimator, max_context_tokens: int) -> None:
+    def __init__(
+        self, token_estimator: TokenEstimator, max_context_tokens: int
+    ) -> None:
         self.token_estimator = token_estimator
         self.max_context_tokens = max_context_tokens
 

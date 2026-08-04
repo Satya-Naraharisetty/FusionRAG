@@ -121,7 +121,9 @@ def test_prompt_builder_caching_and_messages(tmp_path):
     builder = PromptBuilder(system_prompt_path=str(prompt_file))
     assert builder.get_system_prompt() == "Custom system instruction template."
 
-    messages = builder.build_messages(question="What is RAG?", context="RAG content text.")
+    messages = builder.build_messages(
+        question="What is RAG?", context="RAG content text."
+    )
     assert len(messages) == 2
     assert messages[0].role == "system"
     assert messages[0].content == "Custom system instruction template."
@@ -134,7 +136,9 @@ class MockRetrievalService:
     def __init__(self, chunks=None):
         self.chunks = chunks or []
 
-    async def retrieve(self, query, user_id, top_k, document_ids=None, filter_metadata=None):
+    async def retrieve(
+        self, query, user_id, top_k, document_ids=None, filter_metadata=None
+    ):
         return SearchResult(
             original_query=query,
             retrieval_time=0.005,
@@ -146,7 +150,9 @@ class MockRetrievalService:
 class MockLLMProvider:
     def __init__(self, response_text="Mocked Answer", usage=None):
         self.response_text = response_text
-        self.usage = usage or Usage(prompt_tokens=10, completion_tokens=5, total_tokens=15)
+        self.usage = usage or Usage(
+            prompt_tokens=10, completion_tokens=5, total_tokens=15
+        )
 
     async def generate(self, messages, model, temperature, max_tokens):
         return self.response_text, self.usage
@@ -158,13 +164,16 @@ class MockLLMProvider:
 
 
 class MockMessageRepository:
-    async def create_assistant_message(self, conversation_id, message_id, role, content=""):
+    async def create_assistant_message(
+        self, conversation_id, message_id, role, content=""
+    ):
         from datetime import UTC, datetime
 
         from app.chat.domain.models import (
             ConversationMessage,
             MessageStatus,
         )
+
         return ConversationMessage(
             id=message_id,
             conversation_id=conversation_id,
@@ -187,6 +196,7 @@ class MockConversationManager:
         from uuid import uuid4
 
         from app.chat.domain.models import Conversation, ConversationState
+
         return Conversation(
             id=conversation_id or uuid4(),
             user_id=user_id,
@@ -198,12 +208,22 @@ class MockConversationManager:
             last_message_at=datetime.now(UTC),
         )
 
-    async def finalize_message(self, conversation_id, message_id, assistant_content, prompt_tokens, completion_tokens, citations=None):
+    async def finalize_message(
+        self,
+        conversation_id,
+        message_id,
+        assistant_content,
+        prompt_tokens,
+        completion_tokens,
+        citations=None,
+    ):
         pass
 
 
 @pytest.mark.asyncio
-@pytest.mark.filterwarnings("ignore:AnswerGenerationService is deprecated:DeprecationWarning")
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
 async def test_answer_generation_service_success():
     doc_id = uuid4()
     chunk_id = uuid4()
@@ -224,6 +244,7 @@ async def test_answer_generation_service_success():
     from app.chat.services.conversation_context_builder import (
         ConversationContextBuilder,
     )
+
     context_builder = ConversationContextBuilder()
     prompt_builder = PromptBuilder("")
     llm_provider = MockLLMProvider()
@@ -254,13 +275,16 @@ async def test_answer_generation_service_success():
 
 
 @pytest.mark.asyncio
-@pytest.mark.filterwarnings("ignore:AnswerGenerationService is deprecated:DeprecationWarning")
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
 async def test_answer_generation_service_empty_retrieval():
     retrieval_service = MockRetrievalService([])
     estimator = CharacterTokenEstimator()
     from app.chat.services.conversation_context_builder import (
         ConversationContextBuilder,
     )
+
     context_builder = ConversationContextBuilder()
     prompt_builder = PromptBuilder("")
     llm_provider = MockLLMProvider()
@@ -286,7 +310,9 @@ async def test_answer_generation_service_empty_retrieval():
 
 
 @pytest.mark.asyncio
-@pytest.mark.filterwarnings("ignore:AnswerGenerationService is deprecated:DeprecationWarning")
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
 async def test_answer_generation_service_budget_violations():
     chunks = [
         RetrievedChunk(
@@ -304,6 +330,7 @@ async def test_answer_generation_service_budget_violations():
     from app.chat.services.conversation_context_builder import (
         ConversationContextBuilder,
     )
+
     context_builder = ConversationContextBuilder()
     prompt_builder = PromptBuilder("")
     llm_provider = MockLLMProvider()
@@ -376,13 +403,26 @@ def test_api_chat_success(client):
     )
 
     class MockAnswerServiceSync:
-        async def generate_answer(self, question, user_id, top_k, conversation_id=None, document_ids=None, filters=None):
+        async def generate_answer(
+            self,
+            question,
+            user_id,
+            top_k,
+            conversation_id=None,
+            document_ids=None,
+            filters=None,
+        ):
             return mock_response
 
     # Setup overrides
     mock_user_id = uuid4()
-    app.dependency_overrides[get_current_user_context] = lambda: {"user_id": str(mock_user_id), "role": "user"}
-    app.dependency_overrides[get_answer_generation_service] = lambda: MockAnswerServiceSync()
+    app.dependency_overrides[get_current_user_context] = lambda: {
+        "user_id": str(mock_user_id),
+        "role": "user",
+    }
+    app.dependency_overrides[get_answer_generation_service] = lambda: (
+        MockAnswerServiceSync()
+    )
 
     payload = {
         "question": "What is RAG?",
@@ -405,7 +445,9 @@ def test_api_chat_streaming(client):
     doc_id = uuid4()
     chunk_id = uuid4()
 
-    async def mock_stream_generator(question, user_id, top_k, conversation_id=None, document_ids=None, filters=None):
+    async def mock_stream_generator(
+        question, user_id, top_k, conversation_id=None, document_ids=None, filters=None
+    ):
         yield {
             "event": "metadata",
             "data": {
@@ -447,17 +489,36 @@ def test_api_chat_streaming(client):
                 "generation_time_ms": 100.0,
                 "total_time_ms": 110.0,
                 "model": "gpt-4o-mini",
-                "usage": {"prompt_tokens": 15, "completion_tokens": 5, "total_tokens": 20},
+                "usage": {
+                    "prompt_tokens": 15,
+                    "completion_tokens": 5,
+                    "total_tokens": 20,
+                },
             },
         }
 
     class MockAnswerServiceStream:
-        def generate_answer_stream(self, question, user_id, top_k, conversation_id=None, document_ids=None, filters=None):
-            return mock_stream_generator(question, user_id, top_k, conversation_id, document_ids, filters)
+        def generate_answer_stream(
+            self,
+            question,
+            user_id,
+            top_k,
+            conversation_id=None,
+            document_ids=None,
+            filters=None,
+        ):
+            return mock_stream_generator(
+                question, user_id, top_k, conversation_id, document_ids, filters
+            )
 
     mock_user_id = uuid4()
-    app.dependency_overrides[get_current_user_context] = lambda: {"user_id": str(mock_user_id), "role": "user"}
-    app.dependency_overrides[get_answer_generation_service] = lambda: MockAnswerServiceStream()
+    app.dependency_overrides[get_current_user_context] = lambda: {
+        "user_id": str(mock_user_id),
+        "role": "user",
+    }
+    app.dependency_overrides[get_answer_generation_service] = lambda: (
+        MockAnswerServiceStream()
+    )
 
     payload = {
         "question": "Say hello world",
@@ -481,11 +542,24 @@ def test_api_chat_streaming(client):
 
 def test_api_chat_exceptions(client):
     class MockAnswerServiceExceptions:
-        async def generate_answer(self, question, user_id, top_k, conversation_id=None, document_ids=None, filters=None):
+        async def generate_answer(
+            self,
+            question,
+            user_id,
+            top_k,
+            conversation_id=None,
+            document_ids=None,
+            filters=None,
+        ):
             raise NoRelevantContext("Empty database context.")
 
-    app.dependency_overrides[get_current_user_context] = lambda: {"user_id": str(uuid4()), "role": "user"}
-    app.dependency_overrides[get_answer_generation_service] = lambda: MockAnswerServiceExceptions()
+    app.dependency_overrides[get_current_user_context] = lambda: {
+        "user_id": str(uuid4()),
+        "role": "user",
+    }
+    app.dependency_overrides[get_answer_generation_service] = lambda: (
+        MockAnswerServiceExceptions()
+    )
 
     payload = {"question": "What is RAG?"}
     response = client.post("/api/v1/chat", json=payload)

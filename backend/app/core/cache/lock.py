@@ -73,7 +73,7 @@ class InMemoryDistributedLock(BaseDistributedLock):
         async with self._global_lock:
             if lock_name not in self._locks:
                 self._locks[lock_name] = asyncio.Lock()
-        
+
         lock = self._locks[lock_name]
         try:
             # Attempt to acquire lock using wait_for timeout

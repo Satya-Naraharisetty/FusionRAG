@@ -80,7 +80,9 @@ class ChatOrchestrator:
         start_time = time.perf_counter()
 
         # 1. Resolve / Create conversation session
-        conversation = await self.conversation_manager.get_or_create_conversation(conversation_id, user_id)
+        conversation = await self.conversation_manager.get_or_create_conversation(
+            conversation_id, user_id
+        )
         conversation_id = conversation.id
 
         # Enforce budget checks on system prompt and baseline question size
@@ -98,12 +100,17 @@ class ChatOrchestrator:
 
         # 2. Memory context preparation and query rewriting
         if self.enable_conversation_memory:
-            context_obj, rewrite_result = await self.conversation_manager.prepare_context(
+            (
+                context_obj,
+                rewrite_result,
+            ) = await self.conversation_manager.prepare_context(
                 conversation_id, user_id, question
             )
             query_to_retrieve = rewrite_result.rewritten_query
         else:
-            context_obj = ConversationContext(conversation=conversation, recent_messages=[])
+            context_obj = ConversationContext(
+                conversation=conversation, recent_messages=[]
+            )
             rewrite_result = HistoryRewriteResult(
                 original_query=question,
                 rewritten_query=question,
@@ -125,11 +132,17 @@ class ChatOrchestrator:
 
         # Check if we have no chunks
         if not search_result.retrieved_chunks:
-            raise NoRelevantContext("No relevant document context found for the question.")
+            raise NoRelevantContext(
+                "No relevant document context found for the question."
+            )
 
         # 4. Gather Diagnostics
-        dense_count = len(search_result.dense_matches) if search_result.dense_matches else 0
-        sparse_count = len(search_result.sparse_matches) if search_result.sparse_matches else 0
+        dense_count = (
+            len(search_result.dense_matches) if search_result.dense_matches else 0
+        )
+        sparse_count = (
+            len(search_result.sparse_matches) if search_result.sparse_matches else 0
+        )
         diagnostics = RetrievalDiagnostics(
             rewritten=rewrite_result.rewrite_applied,
             dense_count=dense_count,
@@ -158,7 +171,9 @@ class ChatOrchestrator:
         )
 
         if not final_chunks:
-            raise NoRelevantContext("No relevant document context fits within the token budget.")
+            raise NoRelevantContext(
+                "No relevant document context fits within the token budget."
+            )
 
         # 7. Create assistant message in database (status = PENDING)
         assistant_message_id = uuid.uuid4()
@@ -176,7 +191,7 @@ class ChatOrchestrator:
                 tool_context = ToolContext(
                     user_id=user_id,
                     conversation_id=conversation_id,
-                    db_session=self.conversation_manager._conversation_repo._db, # access underlying SQLAlchemy Session
+                    db_session=self.conversation_manager._conversation_repo._db,  # access underlying SQLAlchemy Session
                 )
                 agent_resp = await self.agent_executor.execute(
                     messages=messages,
@@ -189,7 +204,8 @@ class ChatOrchestrator:
                 usage = Usage(
                     prompt_tokens=agent_resp.total_prompt_tokens,
                     completion_tokens=agent_resp.total_completion_tokens,
-                    total_tokens=agent_resp.total_prompt_tokens + agent_resp.total_completion_tokens,
+                    total_tokens=agent_resp.total_prompt_tokens
+                    + agent_resp.total_completion_tokens,
                 )
             else:
                 response = await self.llm_generation_service.generate(
@@ -199,6 +215,7 @@ class ChatOrchestrator:
                     max_tokens=self.max_response_tokens,
                 )
                 from app.chat.domain.interfaces import ProviderResponse
+
                 if isinstance(response, tuple) and not hasattr(response, "content"):
                     response = ProviderResponse(content=response[0], usage=response[1])
                 answer_text = response.content
@@ -206,7 +223,9 @@ class ChatOrchestrator:
 
             generation_time_ms = (time.perf_counter() - gen_start_time) * 1000
         except Exception as e:
-            await self.conversation_manager._message_repo.fail_message(assistant_message_id, str(e))
+            await self.conversation_manager._message_repo.fail_message(
+                assistant_message_id, str(e)
+            )
             raise
 
         # 9. Map Citations
@@ -277,7 +296,9 @@ class ChatOrchestrator:
         start_time = time.perf_counter()
 
         # 1. Resolve / Create conversation session
-        conversation = await self.conversation_manager.get_or_create_conversation(conversation_id, user_id)
+        conversation = await self.conversation_manager.get_or_create_conversation(
+            conversation_id, user_id
+        )
         conversation_id = conversation.id
 
         # Enforce budget checks on system prompt and baseline question size
@@ -295,12 +316,17 @@ class ChatOrchestrator:
 
         # 2. Memory context preparation and query rewriting
         if self.enable_conversation_memory:
-            context_obj, rewrite_result = await self.conversation_manager.prepare_context(
+            (
+                context_obj,
+                rewrite_result,
+            ) = await self.conversation_manager.prepare_context(
                 conversation_id, user_id, question
             )
             query_to_retrieve = rewrite_result.rewritten_query
         else:
-            context_obj = ConversationContext(conversation=conversation, recent_messages=[])
+            context_obj = ConversationContext(
+                conversation=conversation, recent_messages=[]
+            )
             rewrite_result = HistoryRewriteResult(
                 original_query=question,
                 rewritten_query=question,
@@ -322,11 +348,17 @@ class ChatOrchestrator:
 
         # Check if we have no chunks
         if not search_result.retrieved_chunks:
-            raise NoRelevantContext("No relevant document context found for the question.")
+            raise NoRelevantContext(
+                "No relevant document context found for the question."
+            )
 
         # 4. Gather Diagnostics
-        dense_count = len(search_result.dense_matches) if search_result.dense_matches else 0
-        sparse_count = len(search_result.sparse_matches) if search_result.sparse_matches else 0
+        dense_count = (
+            len(search_result.dense_matches) if search_result.dense_matches else 0
+        )
+        sparse_count = (
+            len(search_result.sparse_matches) if search_result.sparse_matches else 0
+        )
         diagnostics = RetrievalDiagnostics(
             rewritten=rewrite_result.rewrite_applied,
             dense_count=dense_count,
@@ -355,7 +387,9 @@ class ChatOrchestrator:
         )
 
         if not final_chunks:
-            raise NoRelevantContext("No relevant document context fits within the token budget.")
+            raise NoRelevantContext(
+                "No relevant document context fits within the token budget."
+            )
 
         # 7. Create assistant message in database (status = PENDING)
         assistant_message_id = uuid.uuid4()
@@ -419,8 +453,10 @@ class ChatOrchestrator:
                     if event["event"] == "text":
                         text_val = event["data"]["text"]
                         full_answer_list.append(text_val)
-                        await self.conversation_manager._message_repo.append_stream_chunk(
-                            assistant_message_id, text_val
+                        await (
+                            self.conversation_manager._message_repo.append_stream_chunk(
+                                assistant_message_id, text_val
+                            )
                         )
                     # Propagate event
                     yield event
@@ -428,7 +464,9 @@ class ChatOrchestrator:
                     if event["event"] == "done":
                         final_usage = Usage(
                             prompt_tokens=event["data"]["usage"]["prompt_tokens"],
-                            completion_tokens=event["data"]["usage"]["completion_tokens"],
+                            completion_tokens=event["data"]["usage"][
+                                "completion_tokens"
+                            ],
                             total_tokens=event["data"]["usage"]["total_tokens"],
                         )
             else:
@@ -439,13 +477,16 @@ class ChatOrchestrator:
                     max_tokens=self.max_response_tokens,
                 ):
                     from app.chat.domain.interfaces import StreamChunk
+
                     if isinstance(chunk, tuple) and not hasattr(chunk, "text_delta"):
                         chunk = StreamChunk(text_delta=chunk[0], usage=chunk[1])
                     text_delta = chunk.text_delta
                     if text_delta:
                         full_answer_list.append(text_delta)
-                        await self.conversation_manager._message_repo.append_stream_chunk(
-                            assistant_message_id, text_delta
+                        await (
+                            self.conversation_manager._message_repo.append_stream_chunk(
+                                assistant_message_id, text_delta
+                            )
                         )
                         yield {
                             "event": "text",
@@ -495,7 +536,9 @@ class ChatOrchestrator:
                 }
 
         except Exception as e:
-            await self.conversation_manager._message_repo.fail_message(assistant_message_id, str(e))
+            await self.conversation_manager._message_repo.fail_message(
+                assistant_message_id, str(e)
+            )
             yield {
                 "event": "error",
                 "data": {

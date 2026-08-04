@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def tokenize(text: str) -> list[str]:
     # Lowercase, punctuation cleanup, and whitespace split
     text = text.lower()
-    text = re.sub(r'[^\w\s]', ' ', text)
+    text = re.sub(r"[^\w\s]", " ", text)
     return text.split()
 
 
@@ -38,7 +38,11 @@ class BM25:
         self.k1 = k1
         self.b = b
         self.corpus_size = len(corpus)
-        self.avgdl = sum(len(doc) for doc in corpus) / self.corpus_size if self.corpus_size > 0 else 0
+        self.avgdl = (
+            sum(len(doc) for doc in corpus) / self.corpus_size
+            if self.corpus_size > 0
+            else 0
+        )
         self.doc_freqs = Counter()
         self.doc_lengths = []
         self.doc_term_counts = []
@@ -67,7 +71,9 @@ class BM25:
                     tf = term_counts[term]
                     idf = self.idf.get(term, 0.0)
                     numerator = tf * (self.k1 + 1)
-                    denominator = tf + self.k1 * (1.0 - self.b + self.b * (doc_len / self.avgdl))
+                    denominator = tf + self.k1 * (
+                        1.0 - self.b + self.b * (doc_len / self.avgdl)
+                    )
                     score += idf * (numerator / denominator)
             scores.append(score)
         return scores
@@ -104,15 +110,18 @@ class InMemoryBM25Index(SparseIndex):
         async with self._lock:
             cache_stats = self._index_cache.get_stats(user_id)
             if cache_stats:
-                if (
-                    cache_stats.get("count") == db_stats.get("count")
-                    and cache_stats.get("max_created_at") == db_stats.get("max_created_at")
+                if cache_stats.get("count") == db_stats.get(
+                    "count"
+                ) and cache_stats.get("max_created_at") == db_stats.get(
+                    "max_created_at"
                 ):
                     # Cache is fresh
                     return
 
             # Stale or missing cache - rebuild
-            logger.info(f"Rebuilding BM25 index for user {user_id} due to cache miss/stats mismatch.")
+            logger.info(
+                f"Rebuilding BM25 index for user {user_id} due to cache miss/stats mismatch."
+            )
             chunks = await self._chunk_repo.get_filtered_chunks(user_id=user_id)
 
             if not chunks:
@@ -152,7 +161,11 @@ class InMemoryBM25Index(SparseIndex):
         # 2. Retrieve from cache
         async with self._lock:
             index_data = self._index_cache.get(user_id)
-            if not index_data or not index_data.get("chunks") or not index_data.get("bm25"):
+            if (
+                not index_data
+                or not index_data.get("chunks")
+                or not index_data.get("bm25")
+            ):
                 return []
 
             chunks = index_data["chunks"]
@@ -225,7 +238,9 @@ class InMemoryBM25Index(SparseIndex):
                 RetrievedChunk(
                     chunk_id=chunk.id,
                     document_id=chunk.document_id,
-                    document_name=chunk.metadata.get("document_name", "Unknown Document"),
+                    document_name=chunk.metadata.get(
+                        "document_name", "Unknown Document"
+                    ),
                     text=chunk.text,
                     similarity_score=score,
                     normalized_score=normalized_score,

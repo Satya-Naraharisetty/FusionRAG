@@ -57,7 +57,9 @@ class RetrieveDocumentTool(BuiltinTool):
             )
 
         db = context.db_session
-        doc = db.query(SQLAlchemyDocument).filter(SQLAlchemyDocument.id == doc_id).first()
+        doc = (
+            db.query(SQLAlchemyDocument).filter(SQLAlchemyDocument.id == doc_id).first()
+        )
 
         if not doc:
             return ToolResult(

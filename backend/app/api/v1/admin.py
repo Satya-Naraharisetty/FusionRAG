@@ -14,7 +14,7 @@ router = APIRouter(prefix="/admin", tags=["Admin Operations"])
 
 
 def check_admin_user(
-    user_context: dict[str, Any] = Depends(get_current_user_context)
+    user_context: dict[str, Any] = Depends(get_current_user_context),
 ) -> dict[str, Any]:
     """Dependency to restrict admin endpoints to users with the 'admin' role."""
     if user_context.get("role") != "admin":
@@ -29,6 +29,7 @@ def check_admin_user(
 def get_cache_provider() -> BaseCache:
     # Resolve get_cache dynamically from dependencies to avoid circular imports
     from app.api.dependencies import get_cache
+
     return get_cache()
 
 
@@ -85,6 +86,8 @@ async def get_operational_status(
                     "failure_threshold": breaker.failure_threshold,
                 }
     else:
-        status_report["circuit_breakers"]["general"] = "Not configured (fallback active)"
+        status_report["circuit_breakers"]["general"] = (
+            "Not configured (fallback active)"
+        )
 
     return status_report

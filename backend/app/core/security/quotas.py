@@ -15,7 +15,9 @@ class ResourceQuotaService:
         self.db = db
         self._redis = redis_client
 
-    async def verify_upload_quota(self, user_id: UUID, new_file_size_bytes: int) -> bool:
+    async def verify_upload_quota(
+        self, user_id: UUID, new_file_size_bytes: int
+    ) -> bool:
         """
         Verify if the user is within their document upload quotas.
         Checks total uploaded document count and aggregate storage size limits.
@@ -28,7 +30,9 @@ class ResourceQuotaService:
                 .count()
             )
             if doc_count >= 50:
-                logger.warning(f"User {user_id} upload rejected: document limit (50) reached.")
+                logger.warning(
+                    f"User {user_id} upload rejected: document limit (50) reached."
+                )
                 return False
 
             # 2. Enforce max storage size limit (e.g., 500 MB limit)
@@ -81,4 +85,6 @@ class ResourceQuotaService:
                 pipe.expire(key, 86400)
                 pipe.execute()
             except Exception as e:
-                logger.error(f"Error incrementing request count for user {user_id}: {e}")
+                logger.error(
+                    f"Error incrementing request count for user {user_id}: {e}"
+                )

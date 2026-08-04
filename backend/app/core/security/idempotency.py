@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 class IdempotencyConflictError(Exception):
     """Exception raised when an operation with the same key is already in progress."""
+
     pass
 
 

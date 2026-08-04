@@ -25,20 +25,37 @@ class TokenEstimator(ABC):
 
 
 class ProviderResponse(tuple):
-    def __new__(cls, content: str | None, usage: Usage, tool_calls: list[ToolCall] | None = None):
+    def __new__(
+        cls, content: str | None, usage: Usage, tool_calls: list[ToolCall] | None = None
+    ):
         return super().__new__(cls, (content or "", usage))
 
-    def __init__(self, content: str | None, usage: Usage, tool_calls: list[ToolCall] | None = None):
+    def __init__(
+        self,
+        content: str | None,
+        usage: Usage,
+        tool_calls: list[ToolCall] | None = None,
+    ):
         self.content = content or ""
         self.usage = usage
         self.tool_calls = tool_calls or []
 
 
 class StreamChunk(tuple):
-    def __new__(cls, text_delta: str, usage: Usage | None = None, tool_calls: list[ToolCall] | None = None):
+    def __new__(
+        cls,
+        text_delta: str,
+        usage: Usage | None = None,
+        tool_calls: list[ToolCall] | None = None,
+    ):
         return super().__new__(cls, (text_delta, usage))
 
-    def __init__(self, text_delta: str, usage: Usage | None = None, tool_calls: list[ToolCall] | None = None):
+    def __init__(
+        self,
+        text_delta: str,
+        usage: Usage | None = None,
+        tool_calls: list[ToolCall] | None = None,
+    ):
         self.text_delta = text_delta
         self.usage = usage
         self.tool_calls = tool_calls or []
@@ -88,7 +105,9 @@ class ConversationRepository(ABC):
         pass
 
     @abstractmethod
-    async def list_conversations(self, user_id: UUID, limit: int = 20, offset: int = 0) -> list[Conversation]:
+    async def list_conversations(
+        self, user_id: UUID, limit: int = 20, offset: int = 0
+    ) -> list[Conversation]:
         """List conversations belonging to a user with pagination."""
         pass
 
@@ -110,7 +129,9 @@ class MessageRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_recent_messages(self, conversation_id: UUID, limit: int, offset: int = 0) -> list[ConversationMessage]:
+    async def get_recent_messages(
+        self, conversation_id: UUID, limit: int, offset: int = 0
+    ) -> list[ConversationMessage]:
         """Retrieve the recent messages for a conversation with pagination."""
         pass
 
@@ -121,7 +142,11 @@ class MessageRepository(ABC):
 
     @abstractmethod
     async def create_assistant_message(
-        self, conversation_id: UUID, message_id: UUID, role: MessageRole, content: str = ""
+        self,
+        conversation_id: UUID,
+        message_id: UUID,
+        role: MessageRole,
+        content: str = "",
     ) -> ConversationMessage:
         """Initialize an assistant response in PENDING status."""
         pass
@@ -133,13 +158,19 @@ class MessageRepository(ABC):
 
     @abstractmethod
     async def complete_message(
-        self, message_id: UUID, prompt_tokens: int, completion_tokens: int, citations: list[dict[str, Any]] | None = None
+        self,
+        message_id: UUID,
+        prompt_tokens: int,
+        completion_tokens: int,
+        citations: list[dict[str, Any]] | None = None,
     ) -> ConversationMessage:
         """Transition an assistant message to COMPLETED status and set tokens & citations."""
         pass
 
     @abstractmethod
-    async def fail_message(self, message_id: UUID, error_message: str | None = None) -> ConversationMessage:
+    async def fail_message(
+        self, message_id: UUID, error_message: str | None = None
+    ) -> ConversationMessage:
         """Transition a message to FAILED status and attach error metadata."""
         pass
 
@@ -158,28 +189,36 @@ class SummaryRepository(ABC):
 
 class ConversationMemory(ABC):
     @abstractmethod
-    async def load_memory(self, conversation_id: UUID) -> tuple[list[ConversationMessage], ConversationSummary | None]:
+    async def load_memory(
+        self, conversation_id: UUID
+    ) -> tuple[list[ConversationMessage], ConversationSummary | None]:
         """Retrieve active memory (the latest summary plus messages created after it)."""
         pass
 
 
 class HistoryRewriter(ABC):
     @abstractmethod
-    async def rewrite(self, question: str, history: list[ConversationMessage]) -> HistoryRewriteResult:
+    async def rewrite(
+        self, question: str, history: list[ConversationMessage]
+    ) -> HistoryRewriteResult:
         """Rewrite follow-up question to standalone form based on conversational context."""
         pass
 
 
 class ConversationSummarizer(ABC):
     @abstractmethod
-    async def summarize(self, conversation_id: UUID, up_to_message_id: UUID) -> ConversationSummary:
+    async def summarize(
+        self, conversation_id: UUID, up_to_message_id: UUID
+    ) -> ConversationSummary:
         """Summarize conversation history up to a specific message ID."""
         pass
 
 
 class ConversationTitleGenerator(ABC):
     @abstractmethod
-    async def generate_title(self, first_user_message: str, assistant_answer: str | None = None) -> str:
+    async def generate_title(
+        self, first_user_message: str, assistant_answer: str | None = None
+    ) -> str:
         """Generate a title based on the first turn of conversation."""
         pass
 
@@ -194,4 +233,3 @@ class HistoryRewriteCache(ABC):
     async def set(self, key: str, value: str, ttl_seconds: int) -> None:
         """Store a rewritten query with a TTL."""
         pass
-

@@ -77,7 +77,7 @@ def test_users(chat_test_db):
     Registers two test users in the database to satisfy foreign keys.
     """
     db = chat_test_db()
-    
+
     user1 = SQLAlchemyUser(
         id=uuid4(),
         email=f"test_1_{uuid4()}@example.com",
@@ -95,14 +95,16 @@ def test_users(chat_test_db):
     db.add(user1)
     db.add(user2)
     db.commit()
-    
+
     user1_id, user2_id = user1.id, user2.id
     db.close()
     return user1_id, user2_id
 
 
 # Helper function to register and authenticate a user
-def get_user_token_and_id(client, email="chat_user@example.com", password="SecurePassword123!"):
+def get_user_token_and_id(
+    client, email="chat_user@example.com", password="SecurePassword123!"
+):
     # Register
     reg_resp = client.post(
         "/api/v1/auth/register",
@@ -120,7 +122,9 @@ def get_user_token_and_id(client, email="chat_user@example.com", password="Secur
 class MockLLMProvider:
     def __init__(self, response_text="Mocked Answer", usage=None):
         self.response_text = response_text
-        self.usage = usage or Usage(prompt_tokens=10, completion_tokens=5, total_tokens=15)
+        self.usage = usage or Usage(
+            prompt_tokens=10, completion_tokens=5, total_tokens=15
+        )
         self.last_messages = []
 
     async def generate(self, messages, model, temperature, max_tokens):
@@ -137,7 +141,16 @@ class MockRetrievalService:
     def __init__(self, chunks):
         self.chunks = chunks
 
-    async def retrieve(self, query, user_id, top_k, document_ids=None, filter_metadata=None, tags=None, retrieval_mode=None):
+    async def retrieve(
+        self,
+        query,
+        user_id,
+        top_k,
+        document_ids=None,
+        filter_metadata=None,
+        tags=None,
+        retrieval_mode=None,
+    ):
         return SearchResult(
             original_query=query,
             retrieval_time=0.01,
@@ -149,6 +162,7 @@ class MockRetrievalService:
 
 
 # --- 1. Repository & Access Control Unit Tests ---
+
 
 @pytest.mark.asyncio
 async def test_conversation_repository_crud(chat_test_db, test_users):
@@ -187,16 +201,18 @@ async def test_conversation_repository_crud(chat_test_db, test_users):
 
     # Concurrent update check
     fetched_stale = await repo.get_conversation(conv_id)
-    
+
     # Simulate concurrent update in a separate database connection transaction
     engine = db.bind
     with engine.connect() as conn:
         conn.execute(
-            text("UPDATE conversations SET version = 3, title = 'External Update' WHERE id = :id"),
-            {"id": conv_id}
+            text(
+                "UPDATE conversations SET version = 3, title = 'External Update' WHERE id = :id"
+            ),
+            {"id": conv_id},
         )
         conn.commit()
-        
+
     # Since fetched_stale has version=2, trying to update it will fail because DB has version=3
     fetched_stale.title = "Stale Update Attempt"
     with pytest.raises(ConversationConcurrentUpdateException):
@@ -264,6 +280,7 @@ async def test_conversation_access_service(chat_test_db, test_users):
 
 # --- 2. Message Repository Unit Tests ---
 
+
 @pytest.mark.asyncio
 async def test_message_repository_lifecycle(chat_test_db, test_users):
     db = chat_test_db()
@@ -298,7 +315,9 @@ async def test_message_repository_lifecycle(chat_test_db, test_users):
 
     # Assistant streaming message lifecycle
     assistant_msg_id = uuid4()
-    await msg_repo.create_assistant_message(conv_id, assistant_msg_id, MessageRole.ASSISTANT)
+    await msg_repo.create_assistant_message(
+        conv_id, assistant_msg_id, MessageRole.ASSISTANT
+    )
 
     # Verify PENDING status
     messages = await msg_repo.get_recent_messages(conv_id, limit=10)
@@ -316,7 +335,9 @@ async def test_message_repository_lifecycle(chat_test_db, test_users):
 
     # Complete message
     citations = [{"chunk_id": str(uuid4())}]
-    await msg_repo.complete_message(assistant_msg_id, prompt_tokens=10, completion_tokens=20, citations=citations)
+    await msg_repo.complete_message(
+        assistant_msg_id, prompt_tokens=10, completion_tokens=20, citations=citations
+    )
 
     messages = await msg_repo.get_recent_messages(conv_id, limit=10)
     assistant_loaded = next(m for m in messages if m.id == assistant_msg_id)
@@ -327,7 +348,9 @@ async def test_message_repository_lifecycle(chat_test_db, test_users):
 
     # Fail message test
     failed_msg_id = uuid4()
-    await msg_repo.create_assistant_message(conv_id, failed_msg_id, MessageRole.ASSISTANT)
+    await msg_repo.create_assistant_message(
+        conv_id, failed_msg_id, MessageRole.ASSISTANT
+    )
     await msg_repo.fail_message(failed_msg_id, "Network timeout error")
 
     messages = await msg_repo.get_recent_messages(conv_id, limit=10)
@@ -343,6 +366,7 @@ async def test_message_repository_lifecycle(chat_test_db, test_users):
 
 
 # --- 3. Memory Pruning & Summarization Tests ---
+
 
 @pytest.mark.asyncio
 async def test_rolling_conversation_memory(chat_test_db, test_users):
@@ -472,6 +496,7 @@ async def test_conversation_summarizer(chat_test_db, test_users):
 
 # --- 4. Query Rewriter Caching & Heuristics ---
 
+
 @pytest.mark.asyncio
 async def test_query_rewriter_heuristics_and_caching():
     llm = MockLLMProvider("Standalone rewritten question")
@@ -509,10 +534,13 @@ async def test_query_rewriter_heuristics_and_caching():
     llm.response_text = "Different query rewrite that should NOT be returned"
     res3 = await rewriter.rewrite("What about Java?", history)
     assert res3.rewrite_applied is True
-    assert res3.rewritten_query == "Standalone rewritten question"  # Returned from cache!
+    assert (
+        res3.rewritten_query == "Standalone rewritten question"
+    )  # Returned from cache!
 
 
 # --- 5. Token Budgeting Hierarchy ---
+
 
 def test_prompt_builder_budgeting():
     builder = PromptBuilder("")
@@ -575,6 +603,7 @@ def test_prompt_builder_budgeting():
     ]
 
     from app.chat.domain.models import ConversationContext
+
     context_obj = ConversationContext(
         conversation=conversation,
         recent_messages=recent_messages,
@@ -605,8 +634,11 @@ def test_prompt_builder_budgeting():
 
 # --- 6. End-to-End RAG Answer Generation Tests ---
 
+
 @pytest.mark.asyncio
-@pytest.mark.filterwarnings("ignore:AnswerGenerationService is deprecated:DeprecationWarning")
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
 async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
     db = chat_test_db()
     conv_repo = SQLAlchemyConversationRepository(db)
@@ -649,10 +681,12 @@ async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
 
     # Stub Title Generator
     from app.chat.services.title_generator import FallbackConversationTitleGenerator
+
     title_generator = FallbackConversationTitleGenerator()
 
     # Stub event dispatcher
     from app.documents.infrastructure.event_dispatcher import SimpleEventDispatcher
+
     dispatcher = SimpleEventDispatcher()
 
     access_service = ConversationAccessService(conv_repo)
@@ -729,12 +763,16 @@ async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
 
 # --- 7. API Router Endpoint Integration Tests ---
 
-@pytest.mark.filterwarnings("ignore:AnswerGenerationService is deprecated:DeprecationWarning")
+
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
 def test_conversations_api_flow(client, chat_test_db):
     # 1. Setup mock services and configure overrides at start
     db_session = chat_test_db()
 
     from app.documents.infrastructure.event_dispatcher import SimpleEventDispatcher
+
     dispatcher = SimpleEventDispatcher()
 
     llm = MockLLMProvider("AI Response Title generator")
@@ -765,6 +803,7 @@ def test_conversations_api_flow(client, chat_test_db):
 
     # Title generator
     from app.chat.services.title_generator import FallbackConversationTitleGenerator
+
     title_generator = FallbackConversationTitleGenerator()
 
     manager = ConversationManager(
@@ -794,7 +833,9 @@ def test_conversations_api_flow(client, chat_test_db):
         enable_conversation_memory=True,
     )
 
-    client.app.dependency_overrides[get_answer_generation_service] = lambda: real_service
+    client.app.dependency_overrides[get_answer_generation_service] = lambda: (
+        real_service
+    )
     client.app.dependency_overrides[get_conversation_manager] = lambda: manager
 
     # Setup token & user
@@ -828,8 +869,8 @@ def test_conversations_api_flow(client, chat_test_db):
         headers=headers,
         json={
             "title": "Renamed Chat Session",
-            "settings": {"temperature": 0.7, "model": "gemini-1.5-pro"}
-        }
+            "settings": {"temperature": 0.7, "model": "gemini-1.5-pro"},
+        },
     )
     assert patch_resp.status_code == status.HTTP_200_OK
     patched_data = patch_resp.json()
@@ -847,11 +888,17 @@ def test_conversations_api_flow(client, chat_test_db):
     client.post(
         "/api/v1/chat",
         headers=headers,
-        json={"question": "What is Python?", "conversation_id": conv_id, "stream": False},
+        json={
+            "question": "What is Python?",
+            "conversation_id": conv_id,
+            "stream": False,
+        },
     )
     db_session.commit()
-    
-    msgs_resp = client.get(f"/api/v1/conversations/{conv_id}/messages?limit=10&offset=0", headers=headers)
+
+    msgs_resp = client.get(
+        f"/api/v1/conversations/{conv_id}/messages?limit=10&offset=0", headers=headers
+    )
     assert msgs_resp.status_code == status.HTTP_200_OK
     msgs_data = msgs_resp.json()
     # Should have 4 messages (First User + Assistant, Second User + Assistant)

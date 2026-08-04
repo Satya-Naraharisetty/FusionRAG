@@ -20,7 +20,7 @@ class RegressionRunner:
         db: Session,
         candidate_run_id: uuid.UUID,
         baseline_run_id: uuid.UUID,
-        delta_thresholds: dict[str, float] = None
+        delta_thresholds: dict[str, float] = None,
     ) -> RegressionRun:
         """
         Compare candidate run scores with baseline run scores.
@@ -35,16 +35,28 @@ class RegressionRunner:
             "precision_at_k": -0.02,
             "hit_rate": 0.0,
             "tool_correctness": 0.0,
-            "conversation_quality": -0.05
+            "conversation_quality": -0.05,
         }
 
-        candidate = db.query(SQLAlchemyEvaluationRun).filter(SQLAlchemyEvaluationRun.id == candidate_run_id).first()
-        baseline = db.query(SQLAlchemyEvaluationRun).filter(SQLAlchemyEvaluationRun.id == baseline_run_id).first()
+        candidate = (
+            db.query(SQLAlchemyEvaluationRun)
+            .filter(SQLAlchemyEvaluationRun.id == candidate_run_id)
+            .first()
+        )
+        baseline = (
+            db.query(SQLAlchemyEvaluationRun)
+            .filter(SQLAlchemyEvaluationRun.id == baseline_run_id)
+            .first()
+        )
 
         if not candidate:
-            raise ValueError(f"Candidate run ID {candidate_run_id} not found in database.")
+            raise ValueError(
+                f"Candidate run ID {candidate_run_id} not found in database."
+            )
         if not baseline:
-            raise ValueError(f"Baseline run ID {baseline_run_id} not found in database.")
+            raise ValueError(
+                f"Baseline run ID {baseline_run_id} not found in database."
+            )
 
         # Compute average metrics for both runs
         candidate_averages = self._calculate_average_metrics(candidate)
@@ -56,7 +68,7 @@ class RegressionRunner:
             "candidate_metrics": candidate_averages,
             "baseline_metrics": baseline_averages,
             "regressions": [],
-            "improvements": []
+            "improvements": [],
         }
 
         for metric, c_score in candidate_averages.items():
@@ -69,20 +81,24 @@ class RegressionRunner:
                 threshold = delta_thresholds.get(metric, -0.05)
                 if delta < threshold:
                     passed = False
-                    details["regressions"].append({
-                        "metric": metric,
-                        "candidate": c_score,
-                        "baseline": b_score,
-                        "delta": round(delta, 3),
-                        "threshold": threshold
-                    })
+                    details["regressions"].append(
+                        {
+                            "metric": metric,
+                            "candidate": c_score,
+                            "baseline": b_score,
+                            "delta": round(delta, 3),
+                            "threshold": threshold,
+                        }
+                    )
                 elif delta > 0.02:
-                    details["improvements"].append({
-                        "metric": metric,
-                        "candidate": c_score,
-                        "baseline": b_score,
-                        "delta": round(delta, 3)
-                    })
+                    details["improvements"].append(
+                        {
+                            "metric": metric,
+                            "candidate": c_score,
+                            "baseline": b_score,
+                            "delta": round(delta, 3),
+                        }
+                    )
 
         # Save regression run ORM details if needed or return domain model
         return RegressionRun(
@@ -90,10 +106,12 @@ class RegressionRunner:
             candidate_run_id=candidate_run_id,
             metric_deltas=metric_deltas,
             passed=passed,
-            details=details
+            details=details,
         )
 
-    def _calculate_average_metrics(self, run: SQLAlchemyEvaluationRun) -> dict[str, float]:
+    def _calculate_average_metrics(
+        self, run: SQLAlchemyEvaluationRun
+    ) -> dict[str, float]:
         """
         Averages metric scores from all sample results inside an evaluation run.
         """

@@ -12,7 +12,9 @@ class InMemoryDomainEventDispatcher(BaseDomainEventDispatcher):
     def __init__(self) -> None:
         self._handlers: dict[type[DomainEvent], list[Callable[[Any], Any]]] = {}
 
-    def register(self, event_type: type[DomainEvent], handler: Callable[[Any], Any]) -> None:
+    def register(
+        self, event_type: type[DomainEvent], handler: Callable[[Any], Any]
+    ) -> None:
         if event_type not in self._handlers:
             self._handlers[event_type] = []
         self._handlers[event_type].append(handler)

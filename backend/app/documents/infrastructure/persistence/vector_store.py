@@ -139,6 +139,7 @@ class QdrantVectorStore(VectorStore):
 
         if document_ids:
             from qdrant_client.models import MatchAny
+
             must_conditions.append(
                 FieldCondition(
                     key="document_id",
@@ -148,6 +149,7 @@ class QdrantVectorStore(VectorStore):
 
         if tags:
             from qdrant_client.models import MatchAny
+
             must_conditions.append(
                 FieldCondition(
                     key="tags",

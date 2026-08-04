@@ -47,7 +47,9 @@ class SafeCalculator:
                     raise ZeroDivisionError("Division by zero.")
                 if op_type == ast.Pow:
                     if abs(left) > 10000 or right > 15 or right < -15:
-                        raise ValueError("Exponentiation base or power exceeds safety limits.")
+                        raise ValueError(
+                            "Exponentiation base or power exceeds safety limits."
+                        )
                 return cls._OPERATORS[op_type](left, right)
             raise TypeError(f"Unsupported mathematical operator: {op_type.__name__}")
         elif isinstance(node, ast.UnaryOp):
@@ -57,4 +59,6 @@ class SafeCalculator:
                 return cls._OPERATORS[op_type](operand)
             raise TypeError(f"Unsupported unary operator: {op_type.__name__}")
         else:
-            raise TypeError(f"Node execution blocked for safety reasons: {type(node).__name__}")
+            raise TypeError(
+                f"Node execution blocked for safety reasons: {type(node).__name__}"
+            )

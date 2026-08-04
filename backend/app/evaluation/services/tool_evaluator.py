@@ -17,9 +17,7 @@ class ToolEvaluator:
     """
 
     async def evaluate_samples(
-        self,
-        samples: list[EvaluationSample],
-        mock: bool = False
+        self, samples: list[EvaluationSample], mock: bool = False
     ) -> list[EvaluationResult]:
         results = []
 
@@ -38,9 +36,11 @@ class ToolEvaluator:
             # 1. Run tool metrics from registry
             m_success = MetricRegistry.get_metric("tool_success_rate").evaluate(
                 sample,
-                {"total_tool_calls": total_tool_calls, "tool_failures": failures}
+                {"total_tool_calls": total_tool_calls, "tool_failures": failures},
             )
-            m_choice = MetricRegistry.get_metric("tool_choice_correctness").evaluate(sample, actual_tools)
+            m_choice = MetricRegistry.get_metric("tool_choice_correctness").evaluate(
+                sample, actual_tools
+            )
 
             metric_results.extend([m_success, m_choice])
 
@@ -58,23 +58,25 @@ class ToolEvaluator:
                 retries=retries,
                 latency=latency,
                 correct_tool_chosen=m_choice.passed,
-                passed=m_success.passed and m_choice.passed and (timeouts == 0)
+                passed=m_success.passed and m_choice.passed and (timeouts == 0),
             )
 
             sample_metadata = dict(sample.metadata)
             sample_metadata["tool_evaluation"] = tool_details.model_dump()
             sample_metadata["error_category"] = error_category
 
-            results.append(EvaluationResult(
-                sample_id=sample.id,
-                question=sample.question,
-                expected_answer=sample.expected_answer,
-                actual_answer=sample.metadata.get("actual_answer"),
-                latency=sample.metadata.get("latency", 0.0),
-                error_category=error_category,
-                metrics=metric_results,
-                retrieved_contexts=[],
-                metadata=sample_metadata
-            ))
+            results.append(
+                EvaluationResult(
+                    sample_id=sample.id,
+                    question=sample.question,
+                    expected_answer=sample.expected_answer,
+                    actual_answer=sample.metadata.get("actual_answer"),
+                    latency=sample.metadata.get("latency", 0.0),
+                    error_category=error_category,
+                    metrics=metric_results,
+                    retrieved_contexts=[],
+                    metadata=sample_metadata,
+                )
+            )
 
         return results

@@ -28,13 +28,26 @@ from sqlalchemy.orm import sessionmaker
 
 
 async def main() -> None:
-    parser = argparse.ArgumentParser(description="Run full RAG pipeline benchmark suite.")
+    parser = argparse.ArgumentParser(
+        description="Run full RAG pipeline benchmark suite."
+    )
     parser.add_argument("--dataset", required=True, help="Path to dataset file.")
     parser.add_argument("--dataset-id", default="benchmark-dataset", help="Dataset ID.")
     parser.add_argument("--version", default="1.0.0", help="Dataset version.")
-    parser.add_argument("--profile", default="quick", choices=["quick", "standard", "full", "nightly"], help="Evaluation profile.")
-    parser.add_argument("--mock", action="store_true", help="Run in mock/stub mode without LLM calls.")
-    parser.add_argument("--pipelines", default="retrieval,generation,agent,conversation", help="Comma-separated pipelines.")
+    parser.add_argument(
+        "--profile",
+        default="quick",
+        choices=["quick", "standard", "full", "nightly"],
+        help="Evaluation profile.",
+    )
+    parser.add_argument(
+        "--mock", action="store_true", help="Run in mock/stub mode without LLM calls."
+    )
+    parser.add_argument(
+        "--pipelines",
+        default="retrieval,generation,agent,conversation",
+        help="Comma-separated pipelines.",
+    )
     args = parser.parse_args()
 
     # 1. Establish DB session
@@ -53,7 +66,7 @@ async def main() -> None:
             generator=generator,
             vector_store=vector_store,
             chunk_repo=chunk_repo,
-            index_cache=index_cache
+            index_cache=index_cache,
         )
 
         retrieval_eval = RetrievalEvaluator(retrieval_service)
@@ -72,7 +85,7 @@ async def main() -> None:
             tool_evaluator=tool_eval,
             conversation_evaluator=conversation_eval,
             ragas_provider=ragas_prov,
-            deepeval_provider=deepeval_prov
+            deepeval_provider=deepeval_prov,
         )
 
         runner = BenchmarkRunner(evaluation_runner=eval_runner)
@@ -83,13 +96,15 @@ async def main() -> None:
 
         pipelines_list = [p.strip() for p in args.pipelines.split(",") if p.strip()]
 
-        print(f"Starting benchmark execution for dataset '{dataset.dataset_id}' (v{dataset.version})...")
+        print(
+            f"Starting benchmark execution for dataset '{dataset.dataset_id}' (v{dataset.version})..."
+        )
         run_record = await runner.run_benchmark(
             db=db,
             dataset=dataset,
             profile=args.profile,
             pipelines=pipelines_list,
-            mock=args.mock
+            mock=args.mock,
         )
 
         # 4. Generate Reports
@@ -102,7 +117,9 @@ async def main() -> None:
         print(f"Run ID: {run_record.id}")
         print(f"Total Samples: {run_record.total_samples}")
         print(f"Average Latency: {run_record.avg_latency:.2f}s")
-        print(f"Total Input/Output Tokens: {run_record.total_input_tokens} / {run_record.total_output_tokens}")
+        print(
+            f"Total Input/Output Tokens: {run_record.total_input_tokens} / {run_record.total_output_tokens}"
+        )
         print(f"Estimated Cost: ${run_record.total_cost:.5f}")
         print(f"Markdown Report Saved to: {report_paths['markdown']}")
         print(f"HTML Report Saved to: {report_paths['html']}")
@@ -111,6 +128,7 @@ async def main() -> None:
     except Exception as e:
         print(f"Benchmark execution crashed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
     finally:

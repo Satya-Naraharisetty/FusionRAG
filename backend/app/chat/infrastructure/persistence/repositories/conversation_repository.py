@@ -61,7 +61,9 @@ class SQLAlchemyConversationRepository(ConversationRepository):
             return None
         return self._to_domain(orm)
 
-    async def list_conversations(self, user_id: UUID, limit: int = 20, offset: int = 0) -> list[Conversation]:
+    async def list_conversations(
+        self, user_id: UUID, limit: int = 20, offset: int = 0
+    ) -> list[Conversation]:
         orms = (
             self._db.query(ConversationORM)
             .filter(

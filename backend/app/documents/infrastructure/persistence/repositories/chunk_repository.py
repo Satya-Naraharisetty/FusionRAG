@@ -125,7 +125,9 @@ class SQLAlchemyChunkRepository(ChunkRepository):
 
         return chunks
 
-    async def verify_document_ownership(self, document_ids: list[UUID], user_id: UUID) -> bool:
+    async def verify_document_ownership(
+        self, document_ids: list[UUID], user_id: UUID
+    ) -> bool:
         """
         Verifies that all specified document_ids belong to the user_id.
         """
@@ -201,6 +203,7 @@ class SQLAlchemyChunkRepository(ChunkRepository):
 
     async def get_chunks_metadata_stats(self, user_id: UUID) -> dict[str, Any]:
         from sqlalchemy import func
+
         result = (
             self._db.query(
                 func.count(SQLAlchemyChunk.id).label("count"),

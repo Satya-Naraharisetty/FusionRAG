@@ -167,7 +167,9 @@ class ChunkRepository(ABC):
         pass
 
     @abstractmethod
-    async def verify_document_ownership(self, document_ids: list[UUID], user_id: UUID) -> bool:
+    async def verify_document_ownership(
+        self, document_ids: list[UUID], user_id: UUID
+    ) -> bool:
         """
         Verifies that all specified document_ids belong to the user_id.
         """

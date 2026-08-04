@@ -40,6 +40,7 @@ def validate_arguments(schema: dict[str, Any], arguments: dict[str, Any]) -> Non
                 )
             if prop_schema.get("format") == "uuid":
                 import uuid
+
                 try:
                     uuid.UUID(val)
                 except ValueError:
@@ -47,7 +48,11 @@ def validate_arguments(schema: dict[str, Any], arguments: dict[str, Any]) -> Non
                         f"Parameter '{field}' must be a valid UUID, got '{val}'."
                     )
         elif expected_type in ("number", "integer"):
-            if expected_type == "integer" and not isinstance(val, int) and not (isinstance(val, float) and val.is_integer()):
+            if (
+                expected_type == "integer"
+                and not isinstance(val, int)
+                and not (isinstance(val, float) and val.is_integer())
+            ):
                 raise ToolValidationError(
                     f"Parameter '{field}' must be an integer, got {type(val).__name__}."
                 )
@@ -76,6 +81,7 @@ def validate_arguments(schema: dict[str, Any], arguments: dict[str, Any]) -> Non
                             )
                         if item_schema.get("format") == "uuid":
                             import uuid
+
                             try:
                                 uuid.UUID(item)
                             except ValueError:

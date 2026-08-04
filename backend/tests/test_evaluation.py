@@ -32,7 +32,12 @@ def db_session():
     evaluation persistence models.
     """
     from sqlalchemy.pool import StaticPool
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(bind=engine)
     session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = session_factory()
@@ -43,7 +48,7 @@ def db_session():
 
 def test_dataset_loader():
     loader = DatasetLoader()
-    
+
     # Check loading
     dataset = loader.load_dataset(_DATASET_PATH, "test-ds", "1.0.0")
     assert dataset.dataset_id == "test-ds"
@@ -79,9 +84,7 @@ async def test_ragas_and_deepeval_mock_providers():
 
     # Ragas Mock run
     ragas_results = await ragas.evaluate(
-        dataset.samples,
-        metrics=["faithfulness", "answer_relevancy"],
-        mock=True
+        dataset.samples, metrics=["faithfulness", "answer_relevancy"], mock=True
     )
     assert len(ragas_results) == 2
     assert ragas_results[0].sample_id == "rag-01"
@@ -90,9 +93,7 @@ async def test_ragas_and_deepeval_mock_providers():
 
     # DeepEval Mock run
     deepeval_results = await deepeval.evaluate(
-        dataset.samples,
-        metrics=["hallucination", "tool_correctness"],
-        mock=True
+        dataset.samples, metrics=["hallucination", "tool_correctness"], mock=True
     )
     assert len(deepeval_results) == 2
     assert deepeval_results[0].sample_id == "rag-01"
@@ -103,10 +104,11 @@ async def test_ragas_and_deepeval_mock_providers():
 async def test_retrieval_evaluator_math():
     # Instantiate retrieval evaluator with a mock service
     from unittest.mock import MagicMock
+
     retrieval_service_mock = MagicMock()
-    
+
     evaluator = RetrievalEvaluator(retrieval_service_mock)
-    
+
     loader = DatasetLoader()
     dataset = loader.load_dataset(_DATASET_PATH, "test-ds", "1.0.0")
 
@@ -114,7 +116,7 @@ async def test_retrieval_evaluator_math():
     results = await evaluator.evaluate_samples(dataset.samples, mock=True)
     assert len(results) == 2
     assert results[0].error_category == "None"
-    
+
     # Verify Recall and Precision are computed
     metrics_dict = {m.name: m.score for m in results[0].metrics}
     assert "precision_at_k" in metrics_dict
@@ -158,13 +160,14 @@ async def test_agent_tool_conversation_evaluators():
 @pytest.mark.asyncio
 async def test_benchmark_runner_and_regression_checks(db_session):
     from unittest.mock import MagicMock
+
     retrieval_service_mock = MagicMock()
-    
+
     retrieval_eval = RetrievalEvaluator(retrieval_service_mock)
     agent_eval = AgentEvaluator()
     tool_eval = ToolEvaluator()
     conv_eval = ConversationEvaluator()
-    
+
     ragas_prov = RagasProvider()
     deepeval_prov = DeepEvalProvider()
 
@@ -176,7 +179,7 @@ async def test_benchmark_runner_and_regression_checks(db_session):
         tool_evaluator=tool_eval,
         conversation_evaluator=conv_eval,
         ragas_provider=ragas_prov,
-        deepeval_provider=deepeval_prov
+        deepeval_provider=deepeval_prov,
     )
 
     runner = BenchmarkRunner(evaluation_runner=eval_runner)
@@ -186,10 +189,7 @@ async def test_benchmark_runner_and_regression_checks(db_session):
 
     # Run Benchmark (Baseline Run)
     baseline_run = await runner.run_benchmark(
-        db=db_session,
-        dataset=dataset,
-        profile="quick",
-        mock=True
+        db=db_session, dataset=dataset, profile="quick", mock=True
     )
     assert baseline_run.status == "COMPLETED"
     assert baseline_run.total_samples == 2
@@ -197,10 +197,7 @@ async def test_benchmark_runner_and_regression_checks(db_session):
 
     # Run Benchmark again (Candidate Run)
     candidate_run = await runner.run_benchmark(
-        db=db_session,
-        dataset=dataset,
-        profile="quick",
-        mock=True
+        db=db_session, dataset=dataset, profile="quick", mock=True
     )
     assert candidate_run.status == "COMPLETED"
 
@@ -209,9 +206,9 @@ async def test_benchmark_runner_and_regression_checks(db_session):
     regression_result = regression_runner.compare_runs(
         db=db_session,
         candidate_run_id=candidate_run.id,
-        baseline_run_id=baseline_run.id
+        baseline_run_id=baseline_run.id,
     )
-    
+
     assert regression_result.passed is True
     assert regression_result.baseline_run_id == baseline_run.id
     assert regression_result.candidate_run_id == candidate_run.id
@@ -238,7 +235,7 @@ def test_report_generation(db_session):
         status="COMPLETED",
         total_samples=1,
         completed_samples=1,
-        created_at=datetime.now(UTC)
+        created_at=datetime.now(UTC),
     )
     db_session.add(run_record)
     db_session.commit()
@@ -257,7 +254,7 @@ def test_report_generation(db_session):
         error_category="None",
         metrics={"faithfulness": {"score": 0.95, "passed": True, "reason": "Good"}},
         retrieved_contexts=[],
-        metadata_json={}
+        metadata_json={},
     )
     db_session.add(result_record)
     db_session.commit()
@@ -293,7 +290,10 @@ async def test_api_routes(client, db_session):
     # Override get_db with the in-memory SQLite session used by other evaluation tests
     app.dependency_overrides[get_db] = lambda: db_session
     # Mock admin override
-    app.dependency_overrides[check_admin_user] = lambda: {"user_id": str(uuid.uuid4()), "role": "admin"}
+    app.dependency_overrides[check_admin_user] = lambda: {
+        "user_id": str(uuid.uuid4()),
+        "role": "admin",
+    }
 
     # Test listing runs (returns empty or list)
     response = client.get("/api/v1/evaluation/runs")

@@ -33,9 +33,13 @@ class RedisEventBus(BaseEventBus):
                 approximate=True,
             )
         except Exception as e:
-            logger.error(f"Failed to publish integration event {event_name} to Redis Stream: {e}")
+            logger.error(
+                f"Failed to publish integration event {event_name} to Redis Stream: {e}"
+            )
 
-    async def subscribe(self, event_type: type[IntegrationEvent], handler: Callable[[Any], Any]) -> None:
+    async def subscribe(
+        self, event_type: type[IntegrationEvent], handler: Callable[[Any], Any]
+    ) -> None:
         event_name = self._get_event_name(event_type)
         if event_name not in self._handlers:
             self._handlers[event_name] = []

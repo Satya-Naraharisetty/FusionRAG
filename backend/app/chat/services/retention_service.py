@@ -10,6 +10,7 @@ class ConversationRetentionService:
     Manages archival, soft-deleted conversation purging, and summary cleanup.
     Can be run via cron jobs, Celery tasks, or background services.
     """
+
     def __init__(
         self,
         conversation_repo: ConversationRepository,
@@ -24,7 +25,9 @@ class ConversationRetentionService:
         and transition them to ARCHIVED state.
         Returns the count of archived sessions.
         """
-        logger.info(f"Scanning for conversations older than {max_age_days} days to archive...")
+        logger.info(
+            f"Scanning for conversations older than {max_age_days} days to archive..."
+        )
         # Stubbed: In production, this would execute a bulk SQL update via Repository/SQLAlchemy
         return 0
 

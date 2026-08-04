@@ -37,10 +37,14 @@ class ChatRequest(BaseModel):
     filters: dict[str, Any] | None = Field(
         default_factory=dict, description="Optional metadata filters."
     )
-    stream: bool = Field(default=False, description="Whether to stream response using SSE.")
+    stream: bool = Field(
+        default=False, description="Whether to stream response using SSE."
+    )
 
 
-@router.post("/chat", response_model=AnswerResponse | None, status_code=status.HTTP_200_OK)
+@router.post(
+    "/chat", response_model=AnswerResponse | None, status_code=status.HTTP_200_OK
+)
 async def chat(
     request: Request,
     chat_req: ChatRequest,
@@ -78,7 +82,9 @@ async def chat(
                 ):
                     # Check if client closed connection
                     if await request.is_disconnected():
-                        logger.warning("Streaming client disconnected. Raising StreamingCancelled.")
+                        logger.warning(
+                            "Streaming client disconnected. Raising StreamingCancelled."
+                        )
                         raise StreamingCancelled("Client disconnected.")
 
                     yield f"event: {event['event']}\ndata: {json.dumps(event['data'])}\n\n"
@@ -89,7 +95,9 @@ async def chat(
             except LLMProviderError as e:
                 yield f"event: error\ndata: {json.dumps({'code': 'LLM_PROVIDER_ERROR', 'message': str(e)})}\n\n"
             except StreamingCancelled:
-                logger.info("Streaming connection closed gracefully after client disconnect.")
+                logger.info(
+                    "Streaming connection closed gracefully after client disconnect."
+                )
             except Exception as e:
                 logger.exception("Unhandled error during chat streaming.")
                 yield f"event: error\ndata: {json.dumps({'code': 'INTERNAL_ERROR', 'message': str(e)})}\n\n"

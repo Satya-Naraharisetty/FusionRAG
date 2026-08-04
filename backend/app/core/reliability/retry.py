@@ -26,7 +26,7 @@ async def retry_with_backoff(
             if attempt == max_attempts - 1:
                 raise e
             # Apply Full Jitter: sleep = random.uniform(0, min(max_delay, base_delay * (factor ** attempt)))
-            delay = random.uniform(0, min(max_delay, base_delay * (factor ** attempt)))
+            delay = random.uniform(0, min(max_delay, base_delay * (factor**attempt)))
             await asyncio.sleep(delay)
 
 
@@ -38,6 +38,7 @@ def retry(
     retry_on_exceptions: type[Exception] | tuple[type[Exception], ...] = Exception,
 ):
     """Decorator to retry a function with exponential backoff and full jitter."""
+
     def decorator(func: Callable):
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -51,5 +52,7 @@ def retry(
                 retry_on_exceptions=retry_on_exceptions,
                 **kwargs,
             )
+
         return wrapper
+
     return decorator

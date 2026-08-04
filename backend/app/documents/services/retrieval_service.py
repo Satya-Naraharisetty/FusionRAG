@@ -59,13 +59,17 @@ class RetrievalService:
         from app.core.config import settings
 
         # Detect if we are running in legacy/backwards-compatible fallback mode
-        is_legacy = (embedding_generator is not None or vector_store is not None) and (query_processor is None)
+        is_legacy = (embedding_generator is not None or vector_store is not None) and (
+            query_processor is None
+        )
 
         # Load configurations with settings fallback
         self._enable_hybrid_search = (
             enable_hybrid_search
             if enable_hybrid_search is not None
-            else (False if is_legacy else getattr(settings, "ENABLE_HYBRID_SEARCH", True))
+            else (
+                False if is_legacy else getattr(settings, "ENABLE_HYBRID_SEARCH", True)
+            )
         )
         self._enable_mmr = (
             enable_mmr
@@ -78,16 +82,24 @@ class RetrievalService:
             else (False if is_legacy else getattr(settings, "ENABLE_RERANKER", True))
         )
         self._vector_top_k = (
-            vector_top_k if vector_top_k is not None else getattr(settings, "VECTOR_TOP_K", 20)
+            vector_top_k
+            if vector_top_k is not None
+            else getattr(settings, "VECTOR_TOP_K", 20)
         )
         self._bm25_top_k = (
-            bm25_top_k if bm25_top_k is not None else getattr(settings, "BM25_TOP_K", 20)
+            bm25_top_k
+            if bm25_top_k is not None
+            else getattr(settings, "BM25_TOP_K", 20)
         )
         self._mmr_lambda = (
-            mmr_lambda if mmr_lambda is not None else getattr(settings, "MMR_LAMBDA", 0.5)
+            mmr_lambda
+            if mmr_lambda is not None
+            else getattr(settings, "MMR_LAMBDA", 0.5)
         )
         self._rerank_top_k = (
-            rerank_top_k if rerank_top_k is not None else getattr(settings, "RERANK_TOP_K", 5)
+            rerank_top_k
+            if rerank_top_k is not None
+            else getattr(settings, "RERANK_TOP_K", 5)
         )
 
         # 1. Chunk Repository
@@ -98,6 +110,7 @@ class RetrievalService:
             self._query_processor = query_processor
         else:
             from app.documents.services.query_processor import DefaultQueryProcessor
+
             self._query_processor = DefaultQueryProcessor()
 
         # 3. Dense Retriever
@@ -105,6 +118,7 @@ class RetrievalService:
             self._dense_retriever = dense_retriever
         elif embedding_generator and vector_store and chunk_repo:
             from app.documents.services.dense_retriever import QdrantDenseRetriever
+
             self._dense_retriever = QdrantDenseRetriever(
                 embedding_generator=embedding_generator,
                 vector_store=vector_store,
@@ -135,6 +149,7 @@ class RetrievalService:
             self._fusion_engine = fusion_engine
         else:
             from app.documents.services.fusion import ReciprocalRankFusionEngine
+
             self._fusion_engine = ReciprocalRankFusionEngine(
                 rrf_k=getattr(settings, "RRF_K", 60)
             )
@@ -144,6 +159,7 @@ class RetrievalService:
             self._mmr_selector = mmr_selector
         else:
             from app.documents.services.mmr import DefaultMMRSelector
+
             self._mmr_selector = DefaultMMRSelector()
 
         # 7. Reranker
@@ -151,6 +167,7 @@ class RetrievalService:
             self._reranker = reranker
         else:
             from app.documents.services.reranker import IdentityReranker
+
             self._reranker = IdentityReranker()
 
         # Backwards compatible ranker fallback if someone calls self._ranker (or tests mock it)
@@ -187,21 +204,27 @@ class RetrievalService:
         # Determine retrieval mode: "semantic", "sparse", "hybrid", "auto"
         if not retrieval_mode:
             retrieval_mode = (
-                RetrievalMode.HYBRID if self._enable_hybrid_search else RetrievalMode.SEMANTIC
+                RetrievalMode.HYBRID
+                if self._enable_hybrid_search
+                else RetrievalMode.SEMANTIC
             )
         elif isinstance(retrieval_mode, str):
             try:
                 retrieval_mode = RetrievalMode(retrieval_mode.lower())
             except ValueError:
                 retrieval_mode = (
-                    RetrievalMode.HYBRID if self._enable_hybrid_search else RetrievalMode.SEMANTIC
+                    RetrievalMode.HYBRID
+                    if self._enable_hybrid_search
+                    else RetrievalMode.SEMANTIC
                 )
 
         # Auto Mode Strategy:
         # Default to hybrid if hybrid search is enabled, else semantic.
         if retrieval_mode == RetrievalMode.AUTO:
             retrieval_mode = (
-                RetrievalMode.HYBRID if self._enable_hybrid_search else RetrievalMode.SEMANTIC
+                RetrievalMode.HYBRID
+                if self._enable_hybrid_search
+                else RetrievalMode.SEMANTIC
             )
 
         # 3. Concurrent Retrieval
@@ -212,12 +235,17 @@ class RetrievalService:
         sparse_latency = 0.0
 
         # Adjust top_k values for retrievers
-        v_top_k = self._vector_top_k if retrieval_mode == RetrievalMode.HYBRID else top_k
+        v_top_k = (
+            self._vector_top_k if retrieval_mode == RetrievalMode.HYBRID else top_k
+        )
         s_top_k = self._bm25_top_k if retrieval_mode == RetrievalMode.HYBRID else top_k
 
         async def run_dense():
             nonlocal dense_latency, dense_results
-            if retrieval_mode in (RetrievalMode.SEMANTIC, RetrievalMode.HYBRID) and self._dense_retriever:
+            if (
+                retrieval_mode in (RetrievalMode.SEMANTIC, RetrievalMode.HYBRID)
+                and self._dense_retriever
+            ):
                 t0 = time.perf_counter()
                 dense_results = await self._dense_retriever.retrieve(
                     query=processed_query_obj.cleaned_query,
@@ -231,7 +259,10 @@ class RetrievalService:
 
         async def run_sparse():
             nonlocal sparse_latency, sparse_results
-            if retrieval_mode in (RetrievalMode.SPARSE, RetrievalMode.HYBRID) and self._sparse_retriever:
+            if (
+                retrieval_mode in (RetrievalMode.SPARSE, RetrievalMode.HYBRID)
+                and self._sparse_retriever
+            ):
                 t0 = time.perf_counter()
                 sparse_results = await self._sparse_retriever.retrieve(
                     query=processed_query_obj.expanded_query,
@@ -281,10 +312,14 @@ class RetrievalService:
             # If a custom legacy ranker was supplied in constructor, use it for backwards compatibility,
             # otherwise use Reranker
             if self._ranker:
-                reranked_results = self._ranker.rank(processed_query_obj.cleaned_query, final_results)
+                reranked_results = self._ranker.rank(
+                    processed_query_obj.cleaned_query, final_results
+                )
             else:
-                reranked_results = self._reranker.rerank(processed_query_obj.cleaned_query, final_results)
-            reranked_results = reranked_results[:self._rerank_top_k]
+                reranked_results = self._reranker.rerank(
+                    processed_query_obj.cleaned_query, final_results
+                )
+            reranked_results = reranked_results[: self._rerank_top_k]
             rerank_latency = time.perf_counter() - t0
 
         end_time = time.perf_counter()
@@ -312,7 +347,8 @@ class RetrievalService:
             fusion_method=fusion_method,
             reranker=(
                 RerankerName(type(self._reranker).__name__)
-                if self._enable_reranker and type(self._reranker).__name__ in RerankerName._value2member_map_
+                if self._enable_reranker
+                and type(self._reranker).__name__ in RerankerName._value2member_map_
                 else None
             ),
         )

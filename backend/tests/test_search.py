@@ -35,9 +35,7 @@ def search_test_db():
     session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     db = session_factory()
     try:
-        db.execute(
-            Base.metadata.tables["document_chunks"].delete()
-        )  # clean chunks
+        db.execute(Base.metadata.tables["document_chunks"].delete())  # clean chunks
         db.execute(Base.metadata.tables["documents"].delete())  # clean docs
         db.execute(Base.metadata.tables["users"].delete())  # clean users
         db.commit()
@@ -153,14 +151,10 @@ async def test_chunk_repository_operations(search_test_db):
         ownership_valid = await repo.verify_document_ownership([doc_id], u_id)
         assert ownership_valid is True
 
-        ownership_invalid_user = await repo.verify_document_ownership(
-            [doc_id], uuid4()
-        )
+        ownership_invalid_user = await repo.verify_document_ownership([doc_id], uuid4())
         assert ownership_invalid_user is False
 
-        ownership_invalid_doc = await repo.verify_document_ownership(
-            [uuid4()], u_id
-        )
+        ownership_invalid_doc = await repo.verify_document_ownership([uuid4()], u_id)
         assert ownership_invalid_doc is False
 
         # Empty ownership verification list should return True
@@ -240,18 +234,14 @@ async def test_retrieval_service_success(mocker):
         search_timeout=3.0,
     )
 
-    result = await service.retrieve(
-        query="test query", user_id=uuid4(), top_k=10
-    )
+    result = await service.retrieve(query="test query", user_id=uuid4(), top_k=10)
 
     assert result.original_query == "test query"
     assert result.total_matches == 2
     assert result.search_strategy == "semantic"
     assert len(result.retrieved_chunks) == 2
     assert result.retrieved_chunks[0].similarity_score == 0.8
-    assert (
-        result.retrieved_chunks[0].normalized_score == 0.9
-    )  # (0.8 + 1) / 2 = 0.9
+    assert result.retrieved_chunks[0].normalized_score == 0.9  # (0.8 + 1) / 2 = 0.9
     assert result.retrieved_chunks[0].document_name == "document_1.txt"
 
 
@@ -260,9 +250,7 @@ async def test_retrieval_service_ownership_violation(mocker):
     gen = mocker.MagicMock()
     store = mocker.MagicMock()
     repo = mocker.MagicMock()
-    repo.verify_document_ownership = mocker.AsyncMock(
-        return_value=False
-    )  # Violation!
+    repo.verify_document_ownership = mocker.AsyncMock(return_value=False)  # Violation!
     ranker = mocker.MagicMock()
 
     service = RetrievalService(
@@ -387,7 +375,9 @@ def test_api_search_validation_and_capping(client, mocker):
         last_message_at=datetime.now(UTC),
     )
     mock_conv_manager = mocker.MagicMock()
-    mock_conv_manager.get_or_create_conversation = mocker.AsyncMock(return_value=mock_conv)
+    mock_conv_manager.get_or_create_conversation = mocker.AsyncMock(
+        return_value=mock_conv
+    )
     mock_conv_manager._memory.load_memory = mocker.AsyncMock(return_value=([], None))
     mock_conv_manager._rewriter.rewrite = mocker.AsyncMock(
         return_value=HistoryRewriteResult(
@@ -397,7 +387,9 @@ def test_api_search_validation_and_capping(client, mocker):
             rewrite_applied=False,
         )
     )
-    client.app.dependency_overrides[get_conversation_manager] = lambda: mock_conv_manager
+    client.app.dependency_overrides[get_conversation_manager] = lambda: (
+        mock_conv_manager
+    )
 
     # Mock the RetrievalService dependency
     mock_retrieval_service = mocker.MagicMock()
@@ -410,8 +402,8 @@ def test_api_search_validation_and_capping(client, mocker):
         )
     )
 
-    client.app.dependency_overrides[get_retrieval_service] = (
-        lambda: mock_retrieval_service
+    client.app.dependency_overrides[get_retrieval_service] = lambda: (
+        mock_retrieval_service
     )
 
     # Scenario A: Test top_k <= 0 returns validation error (422)
@@ -447,6 +439,7 @@ def test_api_search_unauthorized_document(client, mocker):
         ConversationState,
         HistoryRewriteResult,
     )
+
     mock_conv = Conversation(
         id=uuid4(),
         user_id=user_id,
@@ -458,7 +451,9 @@ def test_api_search_unauthorized_document(client, mocker):
         last_message_at=datetime.now(UTC),
     )
     mock_conv_manager = mocker.MagicMock()
-    mock_conv_manager.get_or_create_conversation = mocker.AsyncMock(return_value=mock_conv)
+    mock_conv_manager.get_or_create_conversation = mocker.AsyncMock(
+        return_value=mock_conv
+    )
     mock_conv_manager._memory.load_memory = mocker.AsyncMock(return_value=([], None))
     mock_conv_manager._rewriter.rewrite = mocker.AsyncMock(
         return_value=HistoryRewriteResult(
@@ -468,7 +463,9 @@ def test_api_search_unauthorized_document(client, mocker):
             rewrite_applied=False,
         )
     )
-    client.app.dependency_overrides[get_conversation_manager] = lambda: mock_conv_manager
+    client.app.dependency_overrides[get_conversation_manager] = lambda: (
+        mock_conv_manager
+    )
 
     # Mock retrieval service to raise UnauthorizedDocumentAccess
     mock_retrieval_service = mocker.MagicMock()
@@ -476,8 +473,8 @@ def test_api_search_unauthorized_document(client, mocker):
         side_effect=UnauthorizedDocumentAccess("Unauthorized access")
     )
 
-    client.app.dependency_overrides[get_retrieval_service] = (
-        lambda: mock_retrieval_service
+    client.app.dependency_overrides[get_retrieval_service] = lambda: (
+        mock_retrieval_service
     )
 
     response = client.post(

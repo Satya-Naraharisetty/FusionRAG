@@ -42,9 +42,11 @@ class Tool(ABC):
 
 class BuiltinTool(Tool, ABC):
     """Base class for native in-app tools."""
+
     pass
 
 
 class ExternalTool(Tool, ABC):
     """Base class for future remote plugins and Model Context Protocol (MCP) tools."""
+
     pass

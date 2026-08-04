@@ -89,7 +89,9 @@ class LLMProviderRouter(LLMProvider):
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
     ) -> ProviderResponse:
-        provider_key = self._policy.select_provider_key(model, self._providers, self._breakers)
+        provider_key = self._policy.select_provider_key(
+            model, self._providers, self._breakers
+        )
         provider = self._providers[provider_key]
         breaker = self._breakers[provider_key]
 
@@ -100,8 +102,10 @@ class LLMProviderRouter(LLMProvider):
         elif provider_key == "gemini" and "gpt" in model:
             actual_model = "gemini-1.5-flash"  # Default backup model
 
-        logger.info(f"Routing generate request to provider: {provider_key} (Model: {actual_model})")
-        
+        logger.info(
+            f"Routing generate request to provider: {provider_key} (Model: {actual_model})"
+        )
+
         try:
             return await breaker.call(
                 provider.generate,
@@ -118,7 +122,9 @@ class LLMProviderRouter(LLMProvider):
             fallback_key = "openai" if provider_key == "gemini" else "gemini"
             if fallback_key in self._providers:
                 fallback_provider = self._providers[fallback_key]
-                fallback_model = "gpt-4o-mini" if fallback_key == "openai" else "gemini-1.5-flash"
+                fallback_model = (
+                    "gpt-4o-mini" if fallback_key == "openai" else "gemini-1.5-flash"
+                )
                 logger.warning(f"Attempting immediate fallback to: {fallback_key}")
                 try:
                     return await fallback_provider.generate(
@@ -130,7 +136,9 @@ class LLMProviderRouter(LLMProvider):
                         tool_choice=tool_choice,
                     )
                 except Exception as ex:
-                    logger.critical(f"Fallback provider {fallback_key} also failed: {ex}")
+                    logger.critical(
+                        f"Fallback provider {fallback_key} also failed: {ex}"
+                    )
                     raise ex
             raise e
 
@@ -143,7 +151,9 @@ class LLMProviderRouter(LLMProvider):
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
     ) -> AsyncIterator[StreamChunk]:
-        provider_key = self._policy.select_provider_key(model, self._providers, self._breakers)
+        provider_key = self._policy.select_provider_key(
+            model, self._providers, self._breakers
+        )
         provider = self._providers[provider_key]
         breaker = self._breakers[provider_key]
 
@@ -153,7 +163,9 @@ class LLMProviderRouter(LLMProvider):
         elif provider_key == "gemini" and "gpt" in model:
             actual_model = "gemini-1.5-flash"
 
-        logger.info(f"Routing stream request to provider: {provider_key} (Model: {actual_model})")
+        logger.info(
+            f"Routing stream request to provider: {provider_key} (Model: {actual_model})"
+        )
 
         # Verify circuit status before stream starts
         await breaker.check_state()

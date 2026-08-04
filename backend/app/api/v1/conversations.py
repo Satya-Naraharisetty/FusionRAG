@@ -23,8 +23,12 @@ router = APIRouter(tags=["Conversations"])
 
 
 class ConversationPatchRequest(BaseModel):
-    title: str | None = Field(default=None, description="The title of the conversation.")
-    settings: ConversationSettings | None = Field(default=None, description="Per-conversation settings.")
+    title: str | None = Field(
+        default=None, description="The title of the conversation."
+    )
+    settings: ConversationSettings | None = Field(
+        default=None, description="Per-conversation settings."
+    )
 
 
 class ConversationsListResponse(BaseModel):
@@ -39,7 +43,9 @@ class MessagesListResponse(BaseModel):
     offset: int
 
 
-@router.get("", response_model=ConversationsListResponse, status_code=status.HTTP_200_OK)
+@router.get(
+    "", response_model=ConversationsListResponse, status_code=status.HTTP_200_OK
+)
 async def list_conversations(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -156,7 +162,11 @@ async def delete_conversation(
         )
 
 
-@router.get("/{id}/messages", response_model=MessagesListResponse, status_code=status.HTTP_200_OK)
+@router.get(
+    "/{id}/messages",
+    response_model=MessagesListResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def list_messages(
     id: UUID,
     limit: int = Query(default=50, ge=1, le=100),

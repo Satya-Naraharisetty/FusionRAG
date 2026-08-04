@@ -28,7 +28,9 @@ def test_query_processor_normalization_and_stats():
     # Cleaned query (dense): typos corrected, punctuation removed, lowercased, NO acronym expansion
     assert processed.cleaned_query == "my retrieval rag search"
     # Expanded query (sparse): typos corrected, lowercased, AND acronyms expanded
-    assert processed.expanded_query == "my retrieval retrieval augmented generation search"
+    assert (
+        processed.expanded_query == "my retrieval retrieval augmented generation search"
+    )
     assert processed.original_query == query
 
     # Statistics check
@@ -80,7 +82,11 @@ async def test_sparse_index_build_and_search():
         character_start=0,
         character_end=43,
         token_estimate=10,
-        metadata={"tags": ["animals", "quick"], "category": "nature", "document_name": "fox.txt"},
+        metadata={
+            "tags": ["animals", "quick"],
+            "category": "nature",
+            "document_name": "fox.txt",
+        },
         created_at=datetime.now(UTC),
     )
     chunk2 = Chunk(
@@ -91,7 +97,11 @@ async def test_sparse_index_build_and_search():
         character_start=0,
         character_end=70,
         token_estimate=12,
-        metadata={"tags": ["search", "systems"], "category": "tech", "document_name": "rag.txt"},
+        metadata={
+            "tags": ["search", "systems"],
+            "category": "tech",
+            "document_name": "rag.txt",
+        },
         created_at=datetime.now(UTC),
     )
 
@@ -128,7 +138,9 @@ async def test_sparse_index_build_and_search():
     )
     assert len(results2) == 1
     assert results2[0].chunk_id == chunk1.id
-    assert chunk_repo.get_filtered_chunks.call_count == 1  # Still 1, did not call DB again!
+    assert (
+        chunk_repo.get_filtered_chunks.call_count == 1
+    )  # Still 1, did not call DB again!
 
     # 4. Test filtering by tags
     results_tag = await retriever.retrieve(
@@ -317,7 +329,9 @@ def test_mmr_selector_pluggable_similarity():
     # Custom mock cosine similarity function returning high overlap (1.0)
     mock_similarity_fn = MagicMock(return_value=1.0)
 
-    selected = selector.select([c1, c2], top_k=2, mmr_lambda=0.5, similarity_fn=mock_similarity_fn)
+    selected = selector.select(
+        [c1, c2], top_k=2, mmr_lambda=0.5, similarity_fn=mock_similarity_fn
+    )
     assert len(selected) == 2
     mock_similarity_fn.assert_called_once_with(c2, c1)
 

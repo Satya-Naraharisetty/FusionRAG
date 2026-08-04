@@ -40,7 +40,7 @@ class RedisCache(BaseCache):
         serialized = json.dumps(value)
         try:
             pipe = self._redis.pipeline()
-            
+
             # Save actual value
             if ttl is not None:
                 pipe.setex(full_key, ttl, serialized)
@@ -58,6 +58,7 @@ class RedisCache(BaseCache):
             if not user_id:
                 try:
                     from app.core.context.request_context import current_request_context
+
                     ctx = current_request_context.get()
                     user_id = ctx.user_id
                 except Exception:

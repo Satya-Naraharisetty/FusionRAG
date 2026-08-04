@@ -61,7 +61,9 @@ class RateLimiter:
                 t for t in self._memory_db[identifier] if t > window_start
             ]
 
-            if len(self._memory_db[identifier]) >= (self.requests_per_minute + self.burst):
+            if len(self._memory_db[identifier]) >= (
+                self.requests_per_minute + self.burst
+            ):
                 return True
 
             self._memory_db[identifier].append(now)

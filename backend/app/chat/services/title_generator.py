@@ -17,7 +17,9 @@ class LLMConversationTitleGenerator(ConversationTitleGenerator):
             return trimmed[:37] + "..."
         return trimmed or "New Conversation"
 
-    async def generate_title(self, first_user_message: str, assistant_answer: str | None = None) -> str:
+    async def generate_title(
+        self, first_user_message: str, assistant_answer: str | None = None
+    ) -> str:
         """
         Generate a concise title for a conversation based on the first turn (user + optional assistant).
         Falls back to a truncated version of the user query on errors.
@@ -51,7 +53,9 @@ class LLMConversationTitleGenerator(ConversationTitleGenerator):
             )
             title = title.strip()
             # Remove any wrapping double or single quotes
-            if (title.startswith('"') and title.endswith('"')) or (title.startswith("'") and title.endswith("'")):
+            if (title.startswith('"') and title.endswith('"')) or (
+                title.startswith("'") and title.endswith("'")
+            ):
                 title = title[1:-1].strip()
             # Remove trailing period if generated
             if title.endswith("."):
@@ -60,13 +64,20 @@ class LLMConversationTitleGenerator(ConversationTitleGenerator):
             return title or self._fallback_title(first_user_message)
 
         except Exception as e:
-            logger.warning(f"Failed to generate AI conversation title: {e}. Falling back to text slice.")
+            logger.warning(
+                f"Failed to generate AI conversation title: {e}. Falling back to text slice."
+            )
             return self._fallback_title(first_user_message)
+
+
 class FallbackConversationTitleGenerator(ConversationTitleGenerator):
     """
     Fallback implementation that quickly produces a title without calling the LLM.
     """
-    async def generate_title(self, first_user_message: str, assistant_answer: str | None = None) -> str:
+
+    async def generate_title(
+        self, first_user_message: str, assistant_answer: str | None = None
+    ) -> str:
         trimmed = first_user_message.strip()
         if len(trimmed) > 40:
             return trimmed[:37] + "..."

@@ -7,8 +7,9 @@ from app.documents.domain.models import RetrievedChunk
 
 def tokenize(text: str) -> list[str]:
     text = text.lower()
-    text = re.sub(r'[^\w\s]', ' ', text)
+    text = re.sub(r"[^\w\s]", " ", text)
     return text.split()
+
 
 def jaccard_similarity(chunk1: RetrievedChunk, chunk2: RetrievedChunk) -> float:
     set1 = set(tokenize(chunk1.text))
@@ -16,6 +17,7 @@ def jaccard_similarity(chunk1: RetrievedChunk, chunk2: RetrievedChunk) -> float:
     if not set1 or not set2:
         return 0.0
     return len(set1.intersection(set2)) / len(set1.union(set2))
+
 
 class DefaultMMRSelector(MMRSelector):
     def select(
@@ -38,12 +40,16 @@ class DefaultMMRSelector(MMRSelector):
         limit = min(top_k, len(chunks))
 
         while len(selected) < limit and remaining:
-            best_score = -float('inf')
+            best_score = -float("inf")
             best_chunk_idx = -1
 
             for idx, r_chunk in enumerate(remaining):
                 # Sim1 is the score of the chunk. Use normalized_score if available, otherwise similarity_score.
-                sim1 = r_chunk.normalized_score if r_chunk.normalized_score is not None else r_chunk.similarity_score
+                sim1 = (
+                    r_chunk.normalized_score
+                    if r_chunk.normalized_score is not None
+                    else r_chunk.similarity_score
+                )
 
                 # Sim2 is the max similarity between r_chunk and any selected chunk
                 max_sim2 = 0.0

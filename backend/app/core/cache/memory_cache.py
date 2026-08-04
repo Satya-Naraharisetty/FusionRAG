@@ -57,6 +57,7 @@ class InMemoryCache(BaseCache):
                 # Try context var lookup
                 try:
                     from app.core.context.request_context import current_request_context
+
                     ctx = current_request_context.get()
                     user_id = ctx.user_id
                 except Exception:

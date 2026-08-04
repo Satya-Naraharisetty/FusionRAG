@@ -4,6 +4,7 @@ from typing import Any
 
 class BulkheadFullException(Exception):
     """Exception raised when a bulkhead resource queue is full."""
+
     pass
 
 
@@ -37,7 +38,9 @@ class BulkheadManager:
     def get_semaphore(self, resource_name: str) -> asyncio.Semaphore:
         normalized_name = resource_name.lower()
         if normalized_name not in self._semaphores:
-            self._semaphores[normalized_name] = asyncio.Semaphore(10)  # Default fallback
+            self._semaphores[normalized_name] = asyncio.Semaphore(
+                10
+            )  # Default fallback
         return self._semaphores[normalized_name]
 
     def acquire_bulkhead(self, resource_name: str) -> Bulkhead:

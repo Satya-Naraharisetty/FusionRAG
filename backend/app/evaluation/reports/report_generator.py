@@ -19,9 +19,7 @@ class ReportGenerator:
         os.makedirs(output_dir, exist_ok=True)
 
     def generate_all_reports(
-        self,
-        run: SQLAlchemyEvaluationRun,
-        regression: RegressionRun | None = None
+        self, run: SQLAlchemyEvaluationRun, regression: RegressionRun | None = None
     ) -> dict[str, str]:
         """
         Generates and saves Markdown, JSON, CSV, and HTML reports for a given evaluation run.
@@ -32,7 +30,7 @@ class ReportGenerator:
             "markdown": os.path.join(self.output_dir, f"report_{run_id_str}.md"),
             "json": os.path.join(self.output_dir, f"report_{run_id_str}.json"),
             "csv": os.path.join(self.output_dir, f"report_{run_id_str}.csv"),
-            "html": os.path.join(self.output_dir, f"report_{run_id_str}.html")
+            "html": os.path.join(self.output_dir, f"report_{run_id_str}.html"),
         }
 
         # Generate JSON Report
@@ -55,25 +53,29 @@ class ReportGenerator:
 
         return paths
 
-    def _build_json_report(self, run: SQLAlchemyEvaluationRun, regression: RegressionRun | None) -> dict[str, Any]:
+    def _build_json_report(
+        self, run: SQLAlchemyEvaluationRun, regression: RegressionRun | None
+    ) -> dict[str, Any]:
         """
         Builds the canonical JSON dict representation of the run and results.
         """
         results_list = []
         for r in run.results:
-            results_list.append({
-                "sample_id": r.sample_id,
-                "question": r.question,
-                "expected_answer": r.expected_answer,
-                "actual_answer": r.actual_answer,
-                "latency": r.latency,
-                "input_tokens": r.input_tokens,
-                "output_tokens": r.output_tokens,
-                "cost": r.cost,
-                "error_category": r.error_category,
-                "metrics": r.metrics,
-                "retrieved_contexts": r.retrieved_contexts
-            })
+            results_list.append(
+                {
+                    "sample_id": r.sample_id,
+                    "question": r.question,
+                    "expected_answer": r.expected_answer,
+                    "actual_answer": r.actual_answer,
+                    "latency": r.latency,
+                    "input_tokens": r.input_tokens,
+                    "output_tokens": r.output_tokens,
+                    "cost": r.cost,
+                    "error_category": r.error_category,
+                    "metrics": r.metrics,
+                    "retrieved_contexts": r.retrieved_contexts,
+                }
+            )
 
         averages = {}
         if results_list:
@@ -113,7 +115,7 @@ class ReportGenerator:
             "max_latency": run.max_latency,
             "created_at": run.created_at,
             "metric_averages": averages,
-            "results": results_list
+            "results": results_list,
         }
 
         if regression:
@@ -121,7 +123,7 @@ class ReportGenerator:
                 "baseline_run_id": str(regression.baseline_run_id),
                 "passed": regression.passed,
                 "metric_deltas": regression.metric_deltas,
-                "details": regression.details
+                "details": regression.details,
             }
 
         return report
@@ -132,18 +134,41 @@ class ReportGenerator:
         """
         with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow([
-                "sample_id", "question", "error_category", "latency",
-                "input_tokens", "output_tokens", "cost", "metrics"
-            ])
+            writer.writerow(
+                [
+                    "sample_id",
+                    "question",
+                    "error_category",
+                    "latency",
+                    "input_tokens",
+                    "output_tokens",
+                    "cost",
+                    "metrics",
+                ]
+            )
             for r in run.results:
-                metrics_str = "; ".join(f"{k}:{v.get('score')}" for k, v in r.metrics.items())
-                writer.writerow([
-                    r.sample_id, r.question, r.error_category, r.latency,
-                    r.input_tokens, r.output_tokens, r.cost, metrics_str
-                ])
+                metrics_str = "; ".join(
+                    f"{k}:{v.get('score')}" for k, v in r.metrics.items()
+                )
+                writer.writerow(
+                    [
+                        r.sample_id,
+                        r.question,
+                        r.error_category,
+                        r.latency,
+                        r.input_tokens,
+                        r.output_tokens,
+                        r.cost,
+                        metrics_str,
+                    ]
+                )
 
-    def _build_markdown_report(self, run: SQLAlchemyEvaluationRun, regression: RegressionRun | None, data: dict[str, Any]) -> str:
+    def _build_markdown_report(
+        self,
+        run: SQLAlchemyEvaluationRun,
+        regression: RegressionRun | None,
+        data: dict[str, Any],
+    ) -> str:
         """
         Constructs a structured Markdown summary report.
         """
@@ -159,12 +184,18 @@ class ReportGenerator:
         md.append(f"- **Chat Model:** `{run.model}` (temp: {run.temperature})")
         md.append(f"- **Embedding Model:** `{run.embedding_model}`")
         md.append(f"- **Search Mode:** `{run.retrieval_mode}`")
-        md.append(f"- **Git Commit:** `{run.git_commit}` (branch: `{run.git_branch}`)\n")
+        md.append(
+            f"- **Git Commit:** `{run.git_commit}` (branch: `{run.git_branch}`)\n"
+        )
 
         md.append("## Cost & Latency Metrics")
         md.append(f"- **Total Samples:** {run.total_samples}")
-        md.append(f"- **Average Latency:** {run.avg_latency:.2f}s (Max: {run.max_latency:.2f}s)")
-        md.append(f"- **Tokens Used:** {run.total_input_tokens} Input / {run.total_output_tokens} Output")
+        md.append(
+            f"- **Average Latency:** {run.avg_latency:.2f}s (Max: {run.max_latency:.2f}s)"
+        )
+        md.append(
+            f"- **Tokens Used:** {run.total_input_tokens} Input / {run.total_output_tokens} Output"
+        )
         md.append(f"- **Estimated Run Cost:** `${run.total_cost:.5f}`\n")
 
         md.append("## Average Quality Scores")
@@ -176,9 +207,15 @@ class ReportGenerator:
 
         if regression:
             md.append("## Regression Check Status")
-            status_text = "🟢 **PASSED**" if regression.passed else "🔴 **FAILED (REGRESSION DETECTED)**"
-            md.append(f"**Comparison Status:** {status_text} (compared to baseline run `{regression.baseline_run_id}`)\n")
-            
+            status_text = (
+                "🟢 **PASSED**"
+                if regression.passed
+                else "🔴 **FAILED (REGRESSION DETECTED)**"
+            )
+            md.append(
+                f"**Comparison Status:** {status_text} (compared to baseline run `{regression.baseline_run_id}`)\n"
+            )
+
             md.append("| Metric | Delta | Status |")
             md.append("| --- | --- | --- |")
             for metric, delta in regression.metric_deltas.items():
@@ -201,7 +238,12 @@ class ReportGenerator:
 
         return "\n".join(md)
 
-    def _build_html_report(self, run: SQLAlchemyEvaluationRun, regression: RegressionRun | None, data: dict[str, Any]) -> str:
+    def _build_html_report(
+        self,
+        run: SQLAlchemyEvaluationRun,
+        regression: RegressionRun | None,
+        data: dict[str, Any],
+    ) -> str:
         """
         Builds a styled HTML representation of the results.
         """
@@ -212,7 +254,9 @@ class ReportGenerator:
 
         regression_block = ""
         if regression:
-            reg_status = "PASSED" if regression.passed else "FAILED (REGRESSION DETECTED)"
+            reg_status = (
+                "PASSED" if regression.passed else "FAILED (REGRESSION DETECTED)"
+            )
             color = "#10B981" if regression.passed else "#EF4444"
             delta_rows = "".join(
                 f"<tr><td>{m}</td><td>{d:+.3f}</td></tr>"
@@ -239,8 +283,7 @@ class ReportGenerator:
         for r in run.results:
             errors[r.error_category] = errors.get(r.error_category, 0) + 1
         error_rows = "".join(
-            f"<tr><td>{k}</td><td>{v}</td></tr>"
-            for k, v in errors.items()
+            f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in errors.items()
         )
 
         html = f"""<!DOCTYPE html>

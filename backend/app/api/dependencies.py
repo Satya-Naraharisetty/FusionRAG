@@ -142,6 +142,7 @@ def get_checksum_generator() -> SHA256ChecksumGenerator:
 
 def get_storage_provider(db: Session = Depends(get_db)) -> Any:
     from app.documents.infrastructure.storage import DatabaseStorageProvider
+
     return DatabaseStorageProvider(db)
 
 
@@ -305,11 +306,13 @@ def get_chunk_repository(db: Session = Depends(get_db)) -> ChunkRepository:
     from app.documents.infrastructure.persistence.repositories.chunk_repository import (
         SQLAlchemyChunkRepository,
     )
+
     return SQLAlchemyChunkRepository(db)
 
 
 def get_search_ranker() -> SearchRanker:
     from app.documents.services.ranking import SemanticSearchRanker
+
     return SemanticSearchRanker()
 
 
@@ -321,6 +324,7 @@ def get_index_cache():
     @lru_cache
     def _get_cache():
         return InMemoryIndexCache()
+
     return _get_cache()
 
 
@@ -382,8 +386,10 @@ def get_retrieval_service(
 
 # --- Chat & LLM Orchestration Component Dependency Injection ---
 
+
 def get_token_estimator():
     from app.chat.services.token_estimator import CharacterTokenEstimator
+
     return CharacterTokenEstimator()
 
 
@@ -394,13 +400,13 @@ def get_llm_provider():
 
     primary = GeminiProvider(api_key=settings.GEMINI_API_KEY)
     backup = OpenAIProvider(api_key=settings.OPENAI_API_KEY)
-    
+
     # ProviderFailoverProxy coordinates fallback policies
     return ProviderFailoverProxy(
         primary=primary,
         backup=backup,
         failure_threshold=settings.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
-        recovery_timeout=settings.CIRCUIT_BREAKER_RECOVERY_TIMEOUT
+        recovery_timeout=settings.CIRCUIT_BREAKER_RECOVERY_TIMEOUT,
     )
 
 
@@ -412,7 +418,10 @@ def get_prompt_builder():
     global _prompt_builder_instance
     if _prompt_builder_instance is None:
         from app.chat.services.prompt_builder import PromptBuilder
-        _prompt_builder_instance = PromptBuilder(system_prompt_path=settings.SYSTEM_PROMPT_PATH)
+
+        _prompt_builder_instance = PromptBuilder(
+            system_prompt_path=settings.SYSTEM_PROMPT_PATH
+        )
     return _prompt_builder_instance
 
 
@@ -420,6 +429,7 @@ def get_context_builder(
     token_estimator=Depends(get_token_estimator),
 ) -> Any:
     from app.chat.services.context_builder import ContextBuilder
+
     return ContextBuilder(
         token_estimator=token_estimator,
         max_context_tokens=settings.MAX_CONTEXT_TOKENS,
@@ -430,6 +440,7 @@ def get_conversation_repository(db: Session = Depends(get_db)) -> Any:
     from app.chat.infrastructure.persistence.repositories import (
         SQLAlchemyConversationRepository,
     )
+
     return SQLAlchemyConversationRepository(db)
 
 
@@ -437,6 +448,7 @@ def get_message_repository(db: Session = Depends(get_db)) -> Any:
     from app.chat.infrastructure.persistence.repositories import (
         SQLAlchemyMessageRepository,
     )
+
     return SQLAlchemyMessageRepository(db)
 
 
@@ -444,6 +456,7 @@ def get_summary_repository(db: Session = Depends(get_db)) -> Any:
     from app.chat.infrastructure.persistence.repositories import (
         SQLAlchemySummaryRepository,
     )
+
     return SQLAlchemySummaryRepository(db)
 
 
@@ -451,6 +464,7 @@ def get_conversation_access_service(
     conversation_repo=Depends(get_conversation_repository),
 ) -> Any:
     from app.chat.services.access_service import ConversationAccessService
+
     return ConversationAccessService(conversation_repo)
 
 
@@ -459,6 +473,7 @@ def get_conversation_memory(
     summary_repo=Depends(get_summary_repository),
 ) -> Any:
     from app.chat.services.rolling_memory import RollingConversationMemory
+
     return RollingConversationMemory(
         message_repo=message_repo,
         summary_repo=summary_repo,
@@ -468,6 +483,7 @@ def get_conversation_memory(
 
 def get_history_rewrite_cache(request: Request = None) -> Any:
     from app.chat.infrastructure.cache import MemoryRewriteCache, RedisRewriteCache
+
     redis_client = None
     if request:
         try:
@@ -484,18 +500,22 @@ def get_history_rewriter(
     cache=Depends(get_history_rewrite_cache),
 ) -> Any:
     from app.chat.services.history_rewriter import LLMHistoryRewriter
+
     model = (
         settings.GEMINI_CHAT_MODEL
         if settings.LLM_PROVIDER == "gemini"
         else settings.OPENAI_CHAT_MODEL
     )
-    return LLMHistoryRewriter(llm_provider, model=model, cache=cache, cache_ttl_seconds=3600)
+    return LLMHistoryRewriter(
+        llm_provider, model=model, cache=cache, cache_ttl_seconds=3600
+    )
 
 
 def get_conversation_title_generator(
     llm_provider=Depends(get_llm_provider),
 ) -> Any:
     from app.chat.services.title_generator import LLMConversationTitleGenerator
+
     model = (
         settings.GEMINI_CHAT_MODEL
         if settings.LLM_PROVIDER == "gemini"
@@ -508,6 +528,7 @@ def get_conversation_context_builder() -> Any:
     from app.chat.services.conversation_context_builder import (
         ConversationContextBuilder,
     )
+
     return ConversationContextBuilder()
 
 
@@ -522,6 +543,7 @@ async def run_background_summarization(
     llm_provider_instance: Any,
 ) -> None:
     import logging
+
     logger = logging.getLogger(__name__)
     db = db_session_factory()
     try:
@@ -550,7 +572,9 @@ async def run_background_summarization(
             )
 
             # Fetch all messages in chronological order
-            messages = await message_repo.get_recent_messages(conversation_id, limit=1000)
+            messages = await message_repo.get_recent_messages(
+                conversation_id, limit=1000
+            )
             up_to_idx = count - settings.MAX_MESSAGES_PER_CONTEXT - 1
             if up_to_idx >= 0:
                 up_to_msg = messages[up_to_idx]
@@ -580,13 +604,19 @@ def get_event_dispatcher(
                 task_queue = FastAPIBackgroundTasksQueue(request.background_tasks)
             else:
                 from app.documents.infrastructure.tasks import SyncTaskQueue
+
                 task_queue = SyncTaskQueue()
 
-            session_factory = getattr(request.app.state, "db_session_factory", None) if request else None
+            session_factory = (
+                getattr(request.app.state, "db_session_factory", None)
+                if request
+                else None
+            )
             if not session_factory:
                 from sqlalchemy.orm import sessionmaker
 
                 from app.db.session import init_postgres_engine
+
                 engine = init_postgres_engine(settings.DATABASE_URL)
                 session_factory = sessionmaker(bind=engine)
 
@@ -614,6 +644,7 @@ def get_conversation_manager(
     event_dispatcher=Depends(get_event_dispatcher),
 ) -> Any:
     from app.chat.services.conversation_manager import ConversationManager
+
     return ConversationManager(
         conversation_repo=conversation_repo,
         message_repo=message_repo,
@@ -635,6 +666,7 @@ def get_answer_generation_service(
     conversation_context_builder=Depends(get_conversation_context_builder),
 ) -> Any:
     from app.chat.services.answer_generation_service import AnswerGenerationService
+
     model = (
         settings.GEMINI_CHAT_MODEL
         if settings.LLM_PROVIDER == "gemini"
@@ -658,9 +690,7 @@ def get_answer_generation_service(
     )
 
 
-def get_tool_registry(
-    retrieval_service=Depends(get_retrieval_service)
-) -> Any:
+def get_tool_registry(retrieval_service=Depends(get_retrieval_service)) -> Any:
     from app.chat.services.tool_registry import ToolRegistry
     from app.chat.services.tools.calculator import CalculatorTool
     from app.chat.services.tools.chunk_retrieval import RetrieveChunkTool
@@ -683,15 +713,15 @@ def get_tool_registry(
     return registry
 
 
-def get_tool_discovery_service(
-    registry=Depends(get_tool_registry)
-) -> Any:
+def get_tool_discovery_service(registry=Depends(get_tool_registry)) -> Any:
     from app.chat.services.tool_discovery import ToolDiscoveryService
+
     return ToolDiscoveryService(registry)
 
 
 def get_tool_executor() -> Any:
     from app.chat.services.tool_executor import ToolExecutor
+
     return ToolExecutor(
         timeout=settings.TOOL_EXECUTION_TIMEOUT,
         result_size_limit=settings.TOOL_RESULT_SIZE_LIMIT,
@@ -707,6 +737,7 @@ def get_agent_executor(
     token_estimator=Depends(get_token_estimator),
 ) -> Any:
     from app.chat.services.agent_executor import AgentExecutor
+
     return AgentExecutor(
         llm_provider=llm_provider,
         tool_registry=registry,
@@ -758,18 +789,22 @@ def get_chat_orchestrator(
 
 # --- Evaluation Component Dependency Injection ---
 
+
 def get_dataset_loader():
     from app.evaluation.datasets.dataset_loader import DatasetLoader
+
     return DatasetLoader()
 
 
 def get_ragas_provider():
     from app.evaluation.runners.ragas_provider import RagasProvider
+
     return RagasProvider()
 
 
 def get_deepeval_provider():
     from app.evaluation.runners.deepeval_provider import DeepEvalProvider
+
     return DeepEvalProvider()
 
 
@@ -777,21 +812,25 @@ def get_retrieval_evaluator(
     retrieval_service=Depends(get_retrieval_service),
 ):
     from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
+
     return RetrievalEvaluator(retrieval_service)
 
 
 def get_agent_evaluator():
     from app.evaluation.services.agent_evaluator import AgentEvaluator
+
     return AgentEvaluator()
 
 
 def get_tool_evaluator():
     from app.evaluation.services.tool_evaluator import ToolEvaluator
+
     return ToolEvaluator()
 
 
 def get_conversation_evaluator():
     from app.evaluation.services.conversation_evaluator import ConversationEvaluator
+
     return ConversationEvaluator()
 
 
@@ -801,39 +840,42 @@ def get_evaluation_runner(
     tool_evaluator=Depends(get_tool_evaluator),
     conversation_evaluator=Depends(get_conversation_evaluator),
     ragas_provider=Depends(get_ragas_provider),
-    deepeval_provider=Depends(get_deepeval_provider)
+    deepeval_provider=Depends(get_deepeval_provider),
 ):
     from app.evaluation.runners.evaluation_runner import EvaluationRunner
+
     return EvaluationRunner(
         retrieval_evaluator=retrieval_evaluator,
         agent_evaluator=agent_evaluator,
         tool_evaluator=tool_evaluator,
         conversation_evaluator=conversation_evaluator,
         ragas_provider=ragas_provider,
-        deepeval_provider=deepeval_provider
+        deepeval_provider=deepeval_provider,
     )
 
 
-def get_benchmark_runner(
-    evaluation_runner=Depends(get_evaluation_runner)
-):
+def get_benchmark_runner(evaluation_runner=Depends(get_evaluation_runner)):
     from app.evaluation.runners.benchmark_runner import BenchmarkRunner
+
     return BenchmarkRunner(evaluation_runner=evaluation_runner)
 
 
 def get_regression_runner():
     from app.evaluation.runners.regression_runner import RegressionRunner
+
     return RegressionRunner()
 
 
 def get_report_generator():
     from app.evaluation.reports.report_generator import ReportGenerator
+
     return ReportGenerator(output_dir=settings.EVALUATION_RESULTS_DIR)
 
 
 # --- Production Backend Layer Dependency Providers ---
 
 _cache_instance = None
+
 
 def get_cache(request: Request = None) -> Any:
     global _cache_instance
@@ -848,7 +890,7 @@ def get_cache(request: Request = None) -> Any:
                 redis_client = getattr(request.app.state, "redis", None)
             except Exception:
                 pass
-        
+
         l1 = InMemoryCache()
         if redis_client:
             l2 = RedisCache(redis_client)
@@ -860,6 +902,7 @@ def get_cache(request: Request = None) -> Any:
 
 def get_distributed_lock(request: Request = None) -> Any:
     from app.core.cache.lock import InMemoryDistributedLock, RedisDistributedLock
+
     redis_client = None
     if request:
         try:
@@ -873,6 +916,7 @@ def get_distributed_lock(request: Request = None) -> Any:
 
 def get_rate_limiter(request: Request = None) -> Any:
     from app.core.security.rate_limiter import RateLimiter
+
     redis_client = None
     if request:
         try:
@@ -882,12 +926,13 @@ def get_rate_limiter(request: Request = None) -> Any:
     return RateLimiter(
         redis_client=redis_client,
         requests_per_minute=settings.RATE_LIMIT_REQUESTS_PER_MINUTE,
-        burst=settings.RATE_LIMIT_BURST
+        burst=settings.RATE_LIMIT_BURST,
     )
 
 
 def get_idempotency_manager(request: Request = None) -> Any:
     from app.core.security.idempotency import IdempotencyManager
+
     redis_client = None
     if request:
         try:
@@ -899,8 +944,11 @@ def get_idempotency_manager(request: Request = None) -> Any:
     return None
 
 
-def get_resource_quota_service(db: Session = Depends(get_db), request: Request = None) -> Any:
+def get_resource_quota_service(
+    db: Session = Depends(get_db), request: Request = None
+) -> Any:
     from app.core.security.quotas import ResourceQuotaService
+
     redis_client = None
     if request:
         try:
@@ -912,21 +960,23 @@ def get_resource_quota_service(db: Session = Depends(get_db), request: Request =
 
 _pricing_provider = None
 
+
 def get_pricing_provider() -> Any:
     global _pricing_provider
     if _pricing_provider is None:
         import os
 
         from app.core.cost.pricing_provider import YAMLPricingProvider
+
         yaml_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "core", "cost", "pricing.yaml"
+            os.path.dirname(os.path.dirname(__file__)), "core", "cost", "pricing.yaml"
         )
         _pricing_provider = YAMLPricingProvider(yaml_path)
     return _pricing_provider
 
 
 _feature_flag_service = None
+
 
 def get_feature_flag_service() -> Any:
     global _feature_flag_service
@@ -935,6 +985,7 @@ def get_feature_flag_service() -> Any:
             FeatureFlagService,
             SettingsFeatureFlagProvider,
         )
+
         provider = SettingsFeatureFlagProvider()
         _feature_flag_service = FeatureFlagService(provider)
     return _feature_flag_service
@@ -942,10 +993,12 @@ def get_feature_flag_service() -> Any:
 
 _event_bus_instance = None
 
+
 def get_event_bus(request: Request = None) -> Any:
     global _event_bus_instance
     if _event_bus_instance is None:
         from app.core.events.redis_bus import RedisEventBus
+
         redis_client = None
         if request:
             try:
@@ -959,9 +1012,9 @@ def get_event_bus(request: Request = None) -> Any:
             class InProcessEventBus:
                 async def publish(self, event):
                     pass
+
                 async def subscribe(self, event_type, handler):
                     pass
+
             _event_bus_instance = InProcessEventBus()
     return _event_bus_instance
-
-

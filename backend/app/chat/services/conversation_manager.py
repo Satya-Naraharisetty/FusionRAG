@@ -50,16 +50,23 @@ class ConversationManager:
         self._event_dispatcher = event_dispatcher
 
     async def get_or_create_conversation(
-        self, conversation_id: UUID | None, user_id: UUID, settings: ConversationSettings | None = None
+        self,
+        conversation_id: UUID | None,
+        user_id: UUID,
+        settings: ConversationSettings | None = None,
     ) -> Conversation:
         """
         Retrieves an existing conversation (verifying ownership) or creates a new one.
         """
         if conversation_id:
             await self._access_service.verify_owner(conversation_id, user_id)
-            conversation = await self._conversation_repo.get_conversation(conversation_id)
+            conversation = await self._conversation_repo.get_conversation(
+                conversation_id
+            )
             if not conversation:
-                raise ConversationNotFoundException(f"Conversation {conversation_id} not found.")
+                raise ConversationNotFoundException(
+                    f"Conversation {conversation_id} not found."
+                )
             return conversation
 
         # Create new conversation
@@ -109,7 +116,9 @@ class ConversationManager:
         conversation = await self._conversation_repo.get_conversation(conversation_id)
         if conversation:
             conversation.last_message_at = datetime.now(UTC)
-            conversation.metadata.message_count = await self._message_repo.count_messages(conversation_id)
+            conversation.metadata.message_count = (
+                await self._message_repo.count_messages(conversation_id)
+            )
             await self._conversation_repo.update_conversation(conversation)
 
         # Build Context containing loaded memory
@@ -122,7 +131,13 @@ class ConversationManager:
         return context, rewrite_result
 
     async def finalize_message(
-        self, conversation_id: UUID, message_id: UUID, assistant_content: str, prompt_tokens: int, completion_tokens: int, citations: list[dict] | None = None
+        self,
+        conversation_id: UUID,
+        message_id: UUID,
+        assistant_content: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        citations: list[dict] | None = None,
     ) -> None:
         """
         Completes the assistant's message in the DB and dispatches domain events to trigger background summarization.
@@ -143,22 +158,30 @@ class ConversationManager:
             count = await self._message_repo.count_messages(conversation_id)
             if count == 2:
                 # Retrieve the messages
-                messages = await self._message_repo.get_recent_messages(conversation_id, limit=2)
-                user_msg = next((m.content for m in messages if m.role == MessageRole.USER), None)
+                messages = await self._message_repo.get_recent_messages(
+                    conversation_id, limit=2
+                )
+                user_msg = next(
+                    (m.content for m in messages if m.role == MessageRole.USER), None
+                )
                 if user_msg:
                     new_title = await self._title_generator.generate_title(
                         first_user_message=user_msg,
                         assistant_answer=assistant_content,
                     )
                     conversation.title = new_title
-                    conversation = await self._conversation_repo.update_conversation(conversation)
+                    conversation = await self._conversation_repo.update_conversation(
+                        conversation
+                    )
 
         # 3. Update last message metadata
         if conversation:
             conversation.metadata.last_model = conversation.settings.model
             conversation.metadata.last_provider = conversation.settings.provider
             conversation.metadata.last_tokens = prompt_tokens + completion_tokens
-            conversation.metadata.message_count = await self._message_repo.count_messages(conversation_id)
+            conversation.metadata.message_count = (
+                await self._message_repo.count_messages(conversation_id)
+            )
             await self._conversation_repo.update_conversation(conversation)
 
         # 4. Dispatch domain event to handle background tasks (like summarization)

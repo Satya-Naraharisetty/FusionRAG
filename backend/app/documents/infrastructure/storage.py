@@ -82,11 +82,11 @@ class DatabaseStorageProvider(StorageProvider):
     ) -> str:
         ext = pathlib.Path(filename).suffix.lower()
         key = f"user_{user_id}/{document_id}{ext}"
-        
+
         doc_file = SQLAlchemyDocumentFile(key=key, content=content)
         self.db.add(doc_file)
         self.db.commit()
-        
+
         return key
 
     def get(self, key: str) -> bytes:

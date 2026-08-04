@@ -25,15 +25,19 @@ class MetricRegistry:
         """
         Decorator to register a Metric class.
         """
+
         def decorator(metric_cls: type[Metric]) -> type[Metric]:
             cls._registry[name] = metric_cls
             return metric_cls
+
         return decorator
 
     @classmethod
     def get_metric(cls, name: str, **kwargs: Any) -> Metric:
         if name not in cls._registry:
-            raise KeyError(f"Metric '{name}' is not registered. Available: {list(cls._registry.keys())}")
+            raise KeyError(
+                f"Metric '{name}' is not registered. Available: {list(cls._registry.keys())}"
+            )
         return cls._registry[name](name=name, **kwargs)
 
     @classmethod
@@ -56,7 +60,9 @@ def compute_word_overlap(text1: str, text2: str) -> float:
 
 
 # Helper to determine relevance of retrieved contexts
-def calculate_relevance(retrieved: list[RetrievedContext], sample: EvaluationSample) -> list[float]:
+def calculate_relevance(
+    retrieved: list[RetrievedContext], sample: EvaluationSample
+) -> list[float]:
     relevance = []
     expected_docs = sample.expected_documents or []
     gts = sample.ground_truth_context or []
@@ -71,7 +77,9 @@ def calculate_relevance(retrieved: list[RetrievedContext], sample: EvaluationSam
 
         is_relevant = False
         for gt in gts:
-            if len(gt) > 10 and (gt.lower() in c.text.lower() or c.text.lower() in gt.lower()):
+            if len(gt) > 10 and (
+                gt.lower() in c.text.lower() or c.text.lower() in gt.lower()
+            ):
                 is_relevant = True
                 break
             overlap = compute_word_overlap(c.text, gt)
@@ -86,6 +94,7 @@ def calculate_relevance(retrieved: list[RetrievedContext], sample: EvaluationSam
 
 # --- REGISTRATION OF STANDARD METRICS ---
 
+
 @MetricRegistry.register("hit_rate")
 class HitRateMetric(Metric):
     def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
@@ -96,7 +105,9 @@ class HitRateMetric(Metric):
             name=self.name,
             score=hit,
             passed=hit > 0.0,
-            reason=f"Hit found in top {len(retrieved_contexts)} retrieved chunks." if hit > 0 else "No ground truth context retrieved."
+            reason=f"Hit found in top {len(retrieved_contexts)} retrieved chunks."
+            if hit > 0
+            else "No ground truth context retrieved.",
         )
 
 
@@ -111,7 +122,7 @@ class PrecisionAtKMetric(Metric):
             name=self.name,
             score=round(precision, 3),
             passed=passed,
-            reason=f"{sum(relevance)} out of {len(relevance)} retrieved chunks are relevant."
+            reason=f"{sum(relevance)} out of {len(relevance)} retrieved chunks are relevant.",
         )
 
 
@@ -120,14 +131,18 @@ class RecallAtKMetric(Metric):
     def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
         retrieved_contexts = actual_output if isinstance(actual_output, list) else []
         relevance = calculate_relevance(retrieved_contexts, sample)
-        total_relevant = len(sample.ground_truth_context or []) or len(sample.expected_documents or []) or 1
+        total_relevant = (
+            len(sample.ground_truth_context or [])
+            or len(sample.expected_documents or [])
+            or 1
+        )
         recall = sum(relevance) / total_relevant
         passed = recall >= settings.THRESHOLD_CONTEXT_RECALL
         return MetricResult(
             name=self.name,
             score=round(recall, 3),
             passed=passed,
-            reason=f"Retrieved {sum(relevance)} out of {total_relevant} expected relevant items."
+            reason=f"Retrieved {sum(relevance)} out of {total_relevant} expected relevant items.",
         )
 
 
@@ -146,7 +161,9 @@ class MRRMetric(Metric):
             name=self.name,
             score=round(mrr, 3),
             passed=mrr >= 0.5,
-            reason=f"First relevant item found at rank {idx + 1}." if mrr > 0 else "No relevant items found."
+            reason=f"First relevant item found at rank {idx + 1}."
+            if mrr > 0
+            else "No relevant items found.",
         )
 
 
@@ -155,15 +172,21 @@ class NDCGMetric(Metric):
     def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
         retrieved_contexts = actual_output if isinstance(actual_output, list) else []
         relevance = calculate_relevance(retrieved_contexts, sample)
-        total_relevant = len(sample.ground_truth_context or []) or len(sample.expected_documents or []) or 1
+        total_relevant = (
+            len(sample.ground_truth_context or [])
+            or len(sample.expected_documents or [])
+            or 1
+        )
         dcg = sum(1.0 / math.log2(idx + 2) for idx, rel in enumerate(relevance) if rel)
-        idcg = sum(1.0 / math.log2(i + 2) for i in range(min(len(relevance), total_relevant)))
+        idcg = sum(
+            1.0 / math.log2(i + 2) for i in range(min(len(relevance), total_relevant))
+        )
         ndcg = dcg / idcg if idcg > 0 else 0.0
         return MetricResult(
             name=self.name,
             score=round(ndcg, 3),
             passed=ndcg >= 0.70,
-            reason=f"Normalized Discounted Cumulative Gain: {ndcg:.3f}."
+            reason=f"Normalized Discounted Cumulative Gain: {ndcg:.3f}.",
         )
 
 
@@ -180,7 +203,7 @@ class ReasoningStepsMetric(Metric):
             name=self.name,
             score=float(steps),
             passed=passed,
-            reason=f"Executed {steps} reasoning steps. Limit: {settings.MAX_TOOL_ITERATIONS}."
+            reason=f"Executed {steps} reasoning steps. Limit: {settings.MAX_TOOL_ITERATIONS}.",
         )
 
 
@@ -196,12 +219,7 @@ class ToolNecessityMetric(Metric):
         else:
             passed = True
             reason = "Tool necessity is correct."
-        return MetricResult(
-            name=self.name,
-            score=score,
-            passed=passed,
-            reason=reason
-        )
+        return MetricResult(name=self.name, score=score, passed=passed, reason=reason)
 
 
 @MetricRegistry.register("tool_ordering")
@@ -211,7 +229,11 @@ class ToolOrderingMetric(Metric):
         expected_tools = sample.expected_tools or []
         score = 1.0
         if expected_tools and actual_tools:
-            matches = sum(1 for idx, tool in enumerate(actual_tools) if idx < len(expected_tools) and tool == expected_tools[idx])
+            matches = sum(
+                1
+                for idx, tool in enumerate(actual_tools)
+                if idx < len(expected_tools) and tool == expected_tools[idx]
+            )
             score = matches / max(len(expected_tools), len(actual_tools))
         elif expected_tools and not actual_tools:
             score = 0.0
@@ -219,7 +241,7 @@ class ToolOrderingMetric(Metric):
             name=self.name,
             score=round(score, 3),
             passed=score >= 0.70,
-            reason=f"Tool calling order similarity: {score * 100:.1f}%."
+            reason=f"Tool calling order similarity: {score * 100:.1f}%.",
         )
 
 
@@ -234,7 +256,7 @@ class ReasoningEfficiencyMetric(Metric):
             name=self.name,
             score=round(efficiency, 3),
             passed=efficiency >= 0.40,
-            reason=f"Reasoning efficiency score based on steps: {efficiency:.2f}."
+            reason=f"Reasoning efficiency score based on steps: {efficiency:.2f}.",
         )
 
 
@@ -251,7 +273,7 @@ class ToolSuccessRateMetric(Metric):
             name=self.name,
             score=round(rate, 3),
             passed=rate >= 0.90,
-            reason=f"Tool success rate: {rate*100:.1f}% ({failures} failures out of {total} calls)."
+            reason=f"Tool success rate: {rate * 100:.1f}% ({failures} failures out of {total} calls).",
         )
 
 
@@ -267,7 +289,9 @@ class ToolChoiceCorrectnessMetric(Metric):
             name=self.name,
             score=1.0 if correct else 0.0,
             passed=correct,
-            reason="Correct tool was executed." if correct else f"Expected tools: {expected_tools}, but got: {actual_tools}."
+            reason="Correct tool was executed."
+            if correct
+            else f"Expected tools: {expected_tools}, but got: {actual_tools}.",
         )
 
 
@@ -279,7 +303,10 @@ class HistoryRewritingMetric(Metric):
         score = 1.0
         passed = True
         if history and sample.conversation_required:
-            if not rewritten_query or rewritten_query.lower() == sample.question.lower():
+            if (
+                not rewritten_query
+                or rewritten_query.lower() == sample.question.lower()
+            ):
                 score = 0.0
                 passed = False
             else:
@@ -290,7 +317,7 @@ class HistoryRewritingMetric(Metric):
             name=self.name,
             score=round(score, 3),
             passed=passed,
-            reason=f"History rewrite quality score: {score:.3f}."
+            reason=f"History rewrite quality score: {score:.3f}.",
         )
 
 
@@ -304,5 +331,5 @@ class ContextBudgetMetric(Metric):
             name=self.name,
             score=round(ratio, 3),
             passed=ratio <= 1.0,
-            reason=f"Used {tokens_used} tokens out of max {max_tokens} limit ({ratio*100:.1f}%)."
+            reason=f"Used {tokens_used} tokens out of max {max_tokens} limit ({ratio * 100:.1f}%).",
         )

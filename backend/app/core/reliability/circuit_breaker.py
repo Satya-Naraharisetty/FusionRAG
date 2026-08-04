@@ -6,11 +6,14 @@ from typing import Any
 
 class CircuitBreakerOpenException(Exception):
     """Exception raised when the circuit breaker is in the OPEN state."""
+
     pass
 
 
 class CircuitBreaker:
-    def __init__(self, failure_threshold: int = 5, recovery_timeout: float = 30.0) -> None:
+    def __init__(
+        self, failure_threshold: int = 5, recovery_timeout: float = 30.0
+    ) -> None:
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
         self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
@@ -37,7 +40,9 @@ class CircuitBreaker:
                     self.state = "HALF_OPEN"
                     self.last_state_change = time.time()
                 else:
-                    raise CircuitBreakerOpenException("Circuit breaker is currently OPEN.")
+                    raise CircuitBreakerOpenException(
+                        "Circuit breaker is currently OPEN."
+                    )
 
     async def call(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
         await self.check_state()
