@@ -24,7 +24,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd backend
           uv pip install --system .
           uv pip install --system -e ".[dev]"
           uv pip install --system ragas deepeval langchain-google-vertexai

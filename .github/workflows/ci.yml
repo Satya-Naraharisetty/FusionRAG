@@ -23,7 +23,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd backend
           uv pip install --system .
           uv pip install --system -e ".[dev]"
 

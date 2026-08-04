@@ -91,9 +91,10 @@ function Dashboard() {
         "All services online. Backend RAG foundation fully operational.",
         "success"
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
       const errMsg =
-        err.response?.data?.message || err.message || String(err);
+        e.response?.data?.message || e.message || String(err);
       addLog(`Failed to communicate with API server: ${errMsg}`, "error");
 
       setStatuses({

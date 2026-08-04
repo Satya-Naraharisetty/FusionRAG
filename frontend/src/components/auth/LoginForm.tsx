@@ -23,8 +23,9 @@ export const LoginForm: React.FC = () => {
     setIsSubmitting(true);
     try {
       await login(email, password);
-    } catch (err: any) {
-      const msg = err.response?.data?.message || "Invalid email or password.";
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      const msg = e.response?.data?.message || "Invalid email or password.";
       setError(msg);
     } finally {
       setIsSubmitting(false);
