@@ -35,8 +35,8 @@ TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
 def search_test_db():
     engine = create_engine(TEST_DATABASE_URL)
     Base.metadata.create_all(bind=engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    db = SessionLocal()
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    db = session_factory()
     try:
         db.execute(
             Base.metadata.tables["document_chunks"].delete()
@@ -46,7 +46,7 @@ def search_test_db():
         db.commit()
     finally:
         db.close()
-    return SessionLocal
+    return session_factory
 
 
 # --- 1. SearchRanker Unit Tests ---
