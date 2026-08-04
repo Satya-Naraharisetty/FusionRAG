@@ -52,6 +52,11 @@ async def main() -> None:
 
     # 1. Establish DB session
     engine = init_postgres_engine(settings.DATABASE_URL)
+    
+    # Ensure all evaluation models are created (since they might be missing from alembic migrations)
+    from app.evaluation.infrastructure.persistence.models import Base
+    Base.metadata.create_all(bind=engine)
+
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
 
