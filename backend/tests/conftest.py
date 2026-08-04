@@ -11,6 +11,7 @@ os.environ["POSTGRES_DB"] = "mock_db"
 os.environ["REDIS_HOST"] = "mock_redis"
 os.environ["QDRANT_HOST"] = "mock_qdrant"
 os.environ["OPENAI_API_KEY"] = "mock-key"
+os.environ["JWT_SECRET"] = "mock_secret"
 
 
 # 2. Patch database connection helper functions before app.main imports them
