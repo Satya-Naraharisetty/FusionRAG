@@ -439,8 +439,8 @@ def test_concurrent_processing_guard(mock_extract, client, doc_test_db):
         from unittest.mock import MagicMock
 
         engine = create_engine(TEST_DATABASE_URL)
-        SessionLocal = sessionmaker(bind=engine)
-        db = SessionLocal()
+        session_local = sessionmaker(bind=engine)
+        db = session_local()
         try:
             from app.auth.infrastructure.providers import (
                 SQLAlchemyUnitOfWork,
