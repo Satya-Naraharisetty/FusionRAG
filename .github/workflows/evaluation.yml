@@ -7,6 +7,11 @@ on:
 jobs:
   quick-evaluation:
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_SERVER: localhost
+      POSTGRES_DB: hybrid_rag
     services:
       postgres:
         image: postgres:15
