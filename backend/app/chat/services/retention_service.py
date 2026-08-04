@@ -1,4 +1,5 @@
 import logging
+
 from app.chat.domain.interfaces import ConversationRepository, SummaryRepository
 
 logger = logging.getLogger(__name__)

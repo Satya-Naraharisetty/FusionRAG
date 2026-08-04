@@ -1,3 +1,9 @@
+from app.core.reliability.bulkhead import (
+    Bulkhead,
+    BulkheadFullException,
+    BulkheadManager,
+    bulkhead_manager,
+)
 from app.core.reliability.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerOpenException,
@@ -7,12 +13,6 @@ from app.core.reliability.timeout import (
     TimeoutException,
     timeout_policy,
     with_timeout,
-)
-from app.core.reliability.bulkhead import (
-    Bulkhead,
-    BulkheadFullException,
-    BulkheadManager,
-    bulkhead_manager,
 )
 
 __all__ = [

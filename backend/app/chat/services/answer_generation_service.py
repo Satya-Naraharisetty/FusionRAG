@@ -1,11 +1,11 @@
 import warnings
 from typing import Any
 
+from app.chat.services.agent_executor import AgentExecutor
 from app.chat.services.chat_orchestrator import ChatOrchestrator
 from app.chat.services.llm_generation_service import LLMGenerationService
-from app.chat.services.tool_registry import ToolRegistry
 from app.chat.services.tool_executor import ToolExecutor
-from app.chat.services.agent_executor import AgentExecutor
+from app.chat.services.tool_registry import ToolRegistry
 
 
 class AnswerGenerationService(ChatOrchestrator):

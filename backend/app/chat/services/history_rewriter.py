@@ -2,7 +2,7 @@ import hashlib
 import logging
 from uuid import UUID
 
-from app.chat.domain.interfaces import HistoryRewriter, LLMProvider, HistoryRewriteCache
+from app.chat.domain.interfaces import HistoryRewriteCache, HistoryRewriter, LLMProvider
 from app.chat.domain.models import (
     ChatMessage,
     ChatRole,

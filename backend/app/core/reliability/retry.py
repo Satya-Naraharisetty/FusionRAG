@@ -1,7 +1,8 @@
 import asyncio
 import functools
 import random
-from typing import Any, Callable, Tuple, Type, Union
+from collections.abc import Callable
+from typing import Any
 
 
 async def retry_with_backoff(
@@ -11,7 +12,7 @@ async def retry_with_backoff(
     base_delay: float = 1.0,
     max_delay: float = 10.0,
     factor: float = 2.0,
-    retry_on_exceptions: Union[Type[Exception], Tuple[Type[Exception], ...]] = Exception,
+    retry_on_exceptions: type[Exception] | tuple[type[Exception], ...] = Exception,
     **kwargs: Any,
 ) -> Any:
     """Execute a function with exponential backoff retry and full jitter."""
@@ -34,7 +35,7 @@ def retry(
     base_delay: float = 1.0,
     max_delay: float = 10.0,
     factor: float = 2.0,
-    retry_on_exceptions: Union[Type[Exception], Tuple[Type[Exception], ...]] = Exception,
+    retry_on_exceptions: type[Exception] | tuple[type[Exception], ...] = Exception,
 ):
     """Decorator to retry a function with exponential backoff and full jitter."""
     def decorator(func: Callable):

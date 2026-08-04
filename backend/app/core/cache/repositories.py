@@ -1,4 +1,5 @@
-from typing import Any, Optional
+from typing import Any
+
 from app.core.cache.interfaces import BaseCache
 
 
@@ -11,7 +12,7 @@ class BaseCacheRepository:
     async def get(self, key: str) -> Any:
         return await self._cache.get(key, namespace=self._namespace)
 
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None, **kwargs: Any) -> None:
+    async def set(self, key: str, value: Any, ttl: int | None = None, **kwargs: Any) -> None:
         expiration = ttl if ttl is not None else self._default_ttl
         await self._cache.set(key, value, ttl=expiration, namespace=self._namespace, **kwargs)
 

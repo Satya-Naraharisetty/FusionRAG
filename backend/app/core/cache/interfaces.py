@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 
 class BaseCache(ABC):
     @abstractmethod
-    async def get(self, key: str, namespace: Optional[str] = None) -> Any:
+    async def get(self, key: str, namespace: str | None = None) -> Any:
         """Retrieve a value from the cache."""
         pass
 
@@ -13,15 +13,15 @@ class BaseCache(ABC):
         self,
         key: str,
         value: Any,
-        ttl: Optional[int] = None,
-        namespace: Optional[str] = None,
+        ttl: int | None = None,
+        namespace: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Store a value in the cache with an optional TTL in seconds."""
         pass
 
     @abstractmethod
-    async def delete(self, key: str, namespace: Optional[str] = None) -> None:
+    async def delete(self, key: str, namespace: str | None = None) -> None:
         """Delete a key from the cache."""
         pass
 

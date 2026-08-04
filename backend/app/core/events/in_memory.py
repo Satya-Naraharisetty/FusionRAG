@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from typing import Any, Callable, Dict, List, Type
+from collections.abc import Callable
+from typing import Any
 
 from app.core.events.interfaces import BaseDomainEventDispatcher, DomainEvent
 
@@ -9,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 class InMemoryDomainEventDispatcher(BaseDomainEventDispatcher):
     def __init__(self) -> None:
-        self._handlers: Dict[Type[DomainEvent], List[Callable[[Any], Any]]] = {}
+        self._handlers: dict[type[DomainEvent], list[Callable[[Any], Any]]] = {}
 
-    def register(self, event_type: Type[DomainEvent], handler: Callable[[Any], Any]) -> None:
+    def register(self, event_type: type[DomainEvent], handler: Callable[[Any], Any]) -> None:
         if event_type not in self._handlers:
             self._handlers[event_type] = []
         self._handlers[event_type].append(handler)

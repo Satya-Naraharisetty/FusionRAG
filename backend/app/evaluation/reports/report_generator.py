@@ -1,11 +1,11 @@
 import csv
 import json
 import os
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
-from app.evaluation.infrastructure.persistence.models import SQLAlchemyEvaluationRun
 from app.evaluation.domain.models import RegressionRun
+from app.evaluation.infrastructure.persistence.models import SQLAlchemyEvaluationRun
 
 
 class ReportGenerator:

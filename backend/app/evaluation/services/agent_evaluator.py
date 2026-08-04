@@ -1,7 +1,10 @@
 import logging
-from typing import Any
 
-from app.evaluation.domain.models import EvaluationSample, EvaluationResult, AgentEvaluation
+from app.evaluation.domain.models import (
+    AgentEvaluation,
+    EvaluationResult,
+    EvaluationSample,
+)
 from app.evaluation.metrics.registry import MetricRegistry
 
 logger = logging.getLogger(__name__)

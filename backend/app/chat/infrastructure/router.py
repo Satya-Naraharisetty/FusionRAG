@@ -1,10 +1,17 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import AsyncIterator, Dict, List, Optional
+from collections.abc import AsyncIterator
 
-from app.chat.domain.interfaces import LLMProvider, ChatMessage, ProviderResponse, StreamChunk
 from app.chat.domain.agents import ToolDefinition
-from app.core.reliability.circuit_breaker import CircuitBreaker, CircuitBreakerOpenException
+from app.chat.domain.interfaces import (
+    ChatMessage,
+    LLMProvider,
+    ProviderResponse,
+    StreamChunk,
+)
+from app.core.reliability.circuit_breaker import (
+    CircuitBreaker,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +21,8 @@ class RoutingPolicy(ABC):
     def select_provider_key(
         self,
         model_name: str,
-        providers: Dict[str, LLMProvider],
-        breakers: Dict[str, CircuitBreaker],
+        providers: dict[str, LLMProvider],
+        breakers: dict[str, CircuitBreaker],
     ) -> str:
         """Select the target provider key for the given model name."""
         pass
@@ -29,8 +36,8 @@ class SettingsRoutingPolicy(RoutingPolicy):
     def select_provider_key(
         self,
         model_name: str,
-        providers: Dict[str, LLMProvider],
-        breakers: Dict[str, CircuitBreaker],
+        providers: dict[str, LLMProvider],
+        breakers: dict[str, CircuitBreaker],
     ) -> str:
         # Determine based on model name prefix first
         model_lower = model_name.lower()
@@ -56,7 +63,7 @@ class SettingsRoutingPolicy(RoutingPolicy):
 class LLMProviderRouter(LLMProvider):
     def __init__(
         self,
-        providers: Dict[str, LLMProvider],
+        providers: dict[str, LLMProvider],
         policy: RoutingPolicy,
         failure_threshold: int = 5,
         recovery_timeout: float = 30.0,
@@ -70,17 +77,17 @@ class LLMProviderRouter(LLMProvider):
             for k in providers.keys()
         }
 
-    def get_circuit_breaker(self, provider_key: str) -> Optional[CircuitBreaker]:
+    def get_circuit_breaker(self, provider_key: str) -> CircuitBreaker | None:
         return self._breakers.get(provider_key)
 
     async def generate(
         self,
-        messages: List[ChatMessage],
+        messages: list[ChatMessage],
         model: str,
         temperature: float,
         max_tokens: int,
-        tools: Optional[List[ToolDefinition]] = None,
-        tool_choice: Optional[str] = None,
+        tools: list[ToolDefinition] | None = None,
+        tool_choice: str | None = None,
     ) -> ProviderResponse:
         provider_key = self._policy.select_provider_key(model, self._providers, self._breakers)
         provider = self._providers[provider_key]
@@ -129,12 +136,12 @@ class LLMProviderRouter(LLMProvider):
 
     async def stream(
         self,
-        messages: List[ChatMessage],
+        messages: list[ChatMessage],
         model: str,
         temperature: float,
         max_tokens: int,
-        tools: Optional[List[ToolDefinition]] = None,
-        tool_choice: Optional[str] = None,
+        tools: list[ToolDefinition] | None = None,
+        tool_choice: str | None = None,
     ) -> AsyncIterator[StreamChunk]:
         provider_key = self._policy.select_provider_key(model, self._providers, self._breakers)
         provider = self._providers[provider_key]

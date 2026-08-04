@@ -1,12 +1,11 @@
 from unittest.mock import patch
 
 import pytest
+from app.auth.infrastructure.persistence.models import Base
+from app.documents.domain.models import ExtractionResult
 from fastapi import status
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-
-from app.auth.infrastructure.persistence.models import Base
-from app.documents.domain.models import ExtractionResult
 
 TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
 

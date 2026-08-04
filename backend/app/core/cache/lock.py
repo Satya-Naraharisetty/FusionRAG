@@ -2,7 +2,6 @@ import asyncio
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
 
 import redis
 
@@ -63,8 +62,8 @@ class RedisDistributedLock(BaseDistributedLock):
 
 class InMemoryDistributedLock(BaseDistributedLock):
     def __init__(self) -> None:
-        self._locks: Dict[str, asyncio.Lock] = {}
-        self._lock_owners: Dict[str, str] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
+        self._lock_owners: dict[str, str] = {}
         self._global_lock = asyncio.Lock()
         self._lock_id = str(uuid.uuid4())
 
@@ -81,7 +80,7 @@ class InMemoryDistributedLock(BaseDistributedLock):
             await asyncio.wait_for(lock.acquire(), timeout=timeout)
             self._lock_owners[lock_name] = self._lock_id
             return True
-        except (asyncio.TimeoutError, Exception):
+        except (TimeoutError, Exception):
             return False
 
     async def release(self, lock_name: str) -> None:

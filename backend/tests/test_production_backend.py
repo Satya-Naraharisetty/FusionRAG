@@ -1,21 +1,25 @@
 import asyncio
-import time
-import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+from app.chat.domain.interfaces import ChatMessage, LLMProvider, ProviderResponse, Usage
+from app.chat.infrastructure.router import LLMProviderRouter, SettingsRoutingPolicy
 from app.core.cache.memory_cache import InMemoryCache
 from app.core.cache.multi_tier import MultiTierCache
 from app.core.cache.redis_cache import RedisCache
-from app.core.reliability.circuit_breaker import CircuitBreaker, CircuitBreakerOpenException
+from app.core.reliability.bulkhead import BulkheadFullException, BulkheadManager
+from app.core.reliability.circuit_breaker import (
+    CircuitBreaker,
+    CircuitBreakerOpenException,
+)
 from app.core.reliability.retry import retry_with_backoff
-from app.core.reliability.timeout import timeout_policy, TimeoutException
-from app.core.reliability.bulkhead import BulkheadManager, BulkheadFullException
-from app.core.security.sandboxing import SafeCalculator
+from app.core.reliability.timeout import TimeoutException, timeout_policy
+from app.core.security.prompt_injection import (
+    PromptInjectionError,
+    PromptInjectionScanner,
+)
 from app.core.security.rate_limiter import RateLimiter
-from app.core.security.prompt_injection import PromptInjectionScanner, PromptInjectionError
-from app.chat.infrastructure.router import LLMProviderRouter, SettingsRoutingPolicy
-from app.chat.domain.interfaces import LLMProvider, ChatMessage, ProviderResponse, Usage
-
+from app.core.security.sandboxing import SafeCalculator
 
 # --- Caching Layer Tests ---
 
@@ -145,7 +149,6 @@ async def test_timeout_policy():
 async def test_bulkhead_isolation():
     manager = BulkheadManager()
     # Concurrency limit for evaluation is 5.
-    sem = manager.get_semaphore("evaluation")
     
     # Mock locking the semaphore by running 5 tasks
     locks = []

@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import redis
 
@@ -13,12 +13,12 @@ class RedisCache(BaseCache):
     def __init__(self, redis_client: redis.Redis) -> None:
         self._redis = redis_client
 
-    def _get_namespaced_key(self, key: str, namespace: Optional[str] = None) -> str:
+    def _get_namespaced_key(self, key: str, namespace: str | None = None) -> str:
         if namespace:
             return f"ns:{namespace}:{key}"
         return key
 
-    async def get(self, key: str, namespace: Optional[str] = None) -> Any:
+    async def get(self, key: str, namespace: str | None = None) -> Any:
         full_key = self._get_namespaced_key(key, namespace)
         try:
             val = self._redis.get(full_key)
@@ -32,8 +32,8 @@ class RedisCache(BaseCache):
         self,
         key: str,
         value: Any,
-        ttl: Optional[int] = None,
-        namespace: Optional[str] = None,
+        ttl: int | None = None,
+        namespace: str | None = None,
         **kwargs: Any,
     ) -> None:
         full_key = self._get_namespaced_key(key, namespace)
@@ -81,7 +81,7 @@ class RedisCache(BaseCache):
         except Exception as e:
             logger.error(f"Redis set failed for key {full_key}: {e}")
 
-    async def delete(self, key: str, namespace: Optional[str] = None) -> None:
+    async def delete(self, key: str, namespace: str | None = None) -> None:
         full_key = self._get_namespaced_key(key, namespace)
         try:
             self._redis.delete(full_key)

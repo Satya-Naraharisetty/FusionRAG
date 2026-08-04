@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from uuid import UUID
 
 from app.chat.domain.events import ConversationCreated, ConversationMessageCreated

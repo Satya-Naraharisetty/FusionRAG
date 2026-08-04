@@ -1,6 +1,7 @@
 from app.documents.domain.interfaces import FusionEngine
 from app.documents.domain.models import RetrievedChunk
 
+
 class ReciprocalRankFusionEngine(FusionEngine):
     def __init__(self, rrf_k: int = 60) -> None:
         self.rrf_k = rrf_k

@@ -1,10 +1,9 @@
 from uuid import UUID
 
-from sqlalchemy.orm import Session
-
 from app.auth.domain.interfaces import UserRepository
 from app.auth.domain.schemas import UserDomain
 from app.auth.infrastructure.persistence.models import SQLAlchemyUser
+from sqlalchemy.orm import Session
 
 
 class SQLAlchemyUserRepository(UserRepository):

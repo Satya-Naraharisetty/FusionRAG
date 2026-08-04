@@ -1,21 +1,28 @@
 import asyncio
-import uuid
-import pytest
 import time
-from datetime import datetime
-from typing import Any
+import uuid
 
-from app.chat.domain.agents import ToolContext, ToolDefinition, ToolCall, ToolResult, AgentState, ToolCategory, ToolPermission
-from app.chat.domain.exceptions import ToolValidationError, ToolNotFoundError, AgentIterationLimitExceeded
+import pytest
+from app.chat.domain.agents import (
+    AgentState,
+    ToolCall,
+    ToolCategory,
+    ToolContext,
+    ToolDefinition,
+    ToolPermission,
+    ToolResult,
+)
+from app.chat.domain.exceptions import (
+    ToolNotFoundError,
+    ToolValidationError,
+)
 from app.chat.domain.models import ChatMessage, ChatRole, Usage
-from app.chat.services.tool_registry import ToolRegistry
+from app.chat.services.agent_executor import AgentExecutor
 from app.chat.services.tool_discovery import ToolDiscoveryService
 from app.chat.services.tool_executor import ToolExecutor, validate_arguments
-from app.chat.services.tools.calculator import CalculatorTool, SafeCalculator
-from app.chat.services.tools.datetime import DateTimeTool
-from app.chat.services.agent_executor import AgentExecutor
+from app.chat.services.tool_registry import ToolRegistry
 from app.chat.services.tools.base import BuiltinTool
-
+from app.chat.services.tools.calculator import CalculatorTool, SafeCalculator
 
 # --- 1. AST Calculator Tests ---
 

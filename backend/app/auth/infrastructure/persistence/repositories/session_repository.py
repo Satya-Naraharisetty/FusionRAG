@@ -2,11 +2,10 @@ import hashlib
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy.orm import Session
-
 from app.auth.domain.interfaces import SessionRepository
 from app.auth.domain.schemas import SessionDomain
 from app.auth.infrastructure.persistence.models import SQLAlchemySession
+from sqlalchemy.orm import Session
 
 
 class SQLAlchemySessionRepository(SessionRepository):

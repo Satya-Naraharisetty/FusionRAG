@@ -2,10 +2,9 @@ import logging
 import pathlib
 import uuid
 
-from sqlalchemy.orm import Session
-
 from app.documents.domain.interfaces import StorageProvider
 from app.documents.infrastructure.persistence.models import SQLAlchemyDocumentFile
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 

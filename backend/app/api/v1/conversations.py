@@ -1,11 +1,10 @@
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
-    get_conversation_access_service,
     get_conversation_manager,
     get_current_user_context,
 )
@@ -18,15 +17,14 @@ from app.chat.domain.models import (
     ConversationMessage,
     ConversationSettings,
 )
-from app.chat.services.access_service import ConversationAccessService
 from app.chat.services.conversation_manager import ConversationManager
 
 router = APIRouter(tags=["Conversations"])
 
 
 class ConversationPatchRequest(BaseModel):
-    title: Optional[str] = Field(default=None, description="The title of the conversation.")
-    settings: Optional[ConversationSettings] = Field(default=None, description="Per-conversation settings.")
+    title: str | None = Field(default=None, description="The title of the conversation.")
+    settings: ConversationSettings | None = Field(default=None, description="Per-conversation settings.")
 
 
 class ConversationsListResponse(BaseModel):

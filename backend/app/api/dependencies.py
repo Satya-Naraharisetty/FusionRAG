@@ -24,11 +24,11 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.documents.domain.events import DocumentProcessingCompleted
 from app.documents.domain.interfaces import (
+    ChunkRepository,
     EmbeddingGenerator,
     EmbeddingRepository,
-    VectorStore,
-    ChunkRepository,
     SearchRanker,
+    VectorStore,
 )
 from app.documents.infrastructure.checksum import SHA256ChecksumGenerator
 from app.documents.infrastructure.event_dispatcher import SimpleEventDispatcher
@@ -42,7 +42,6 @@ from app.documents.infrastructure.persistence.repositories.document_repository i
 from app.documents.infrastructure.persistence.repositories.embedding_repository import (
     SQLAlchemyEmbeddingRepository,
 )
-from app.documents.infrastructure.storage import LocalStorageProvider
 from app.documents.infrastructure.tasks import (
     FastAPIBackgroundTasksQueue,
 )
@@ -316,6 +315,7 @@ def get_search_ranker() -> SearchRanker:
 
 def get_index_cache():
     from functools import lru_cache
+
     from app.documents.services.index_cache import InMemoryIndexCache
 
     @lru_cache
@@ -329,15 +329,15 @@ def get_retrieval_service(
     vector_store: VectorStore = Depends(get_vector_store),
     chunk_repo: ChunkRepository = Depends(get_chunk_repository),
     index_cache=Depends(get_index_cache),
-) -> "RetrievalService":
-    from app.documents.services.retrieval_service import RetrievalService
-    from app.documents.services.query_processor import DefaultQueryProcessor
+) -> Any:
     from app.documents.services.dense_retriever import QdrantDenseRetriever
-    from app.documents.services.sparse_index import InMemoryBM25Index
-    from app.documents.services.sparse_retriever import BM25Retriever
     from app.documents.services.fusion import ReciprocalRankFusionEngine
     from app.documents.services.mmr import DefaultMMRSelector
+    from app.documents.services.query_processor import DefaultQueryProcessor
     from app.documents.services.reranker import IdentityReranker
+    from app.documents.services.retrieval_service import RetrievalService
+    from app.documents.services.sparse_index import InMemoryBM25Index
+    from app.documents.services.sparse_retriever import BM25Retriever
 
     acronyms = {"rag": "retrieval augmented generation", "llm": "large language model"}
     typos = {"searc": "search", "retreival": "retrieval", "embeding": "embedding"}
@@ -388,9 +388,9 @@ def get_token_estimator():
 
 
 def get_llm_provider():
-    from app.chat.infrastructure.openai_provider import OpenAIProvider
-    from app.chat.infrastructure.gemini_provider import GeminiProvider
     from app.chat.infrastructure.failover_proxy import ProviderFailoverProxy
+    from app.chat.infrastructure.gemini_provider import GeminiProvider
+    from app.chat.infrastructure.openai_provider import OpenAIProvider
 
     primary = GeminiProvider(api_key=settings.GEMINI_API_KEY)
     backup = OpenAIProvider(api_key=settings.OPENAI_API_KEY)
@@ -427,17 +427,23 @@ def get_context_builder(
 
 
 def get_conversation_repository(db: Session = Depends(get_db)) -> Any:
-    from app.chat.infrastructure.persistence.repositories import SQLAlchemyConversationRepository
+    from app.chat.infrastructure.persistence.repositories import (
+        SQLAlchemyConversationRepository,
+    )
     return SQLAlchemyConversationRepository(db)
 
 
 def get_message_repository(db: Session = Depends(get_db)) -> Any:
-    from app.chat.infrastructure.persistence.repositories import SQLAlchemyMessageRepository
+    from app.chat.infrastructure.persistence.repositories import (
+        SQLAlchemyMessageRepository,
+    )
     return SQLAlchemyMessageRepository(db)
 
 
 def get_summary_repository(db: Session = Depends(get_db)) -> Any:
-    from app.chat.infrastructure.persistence.repositories import SQLAlchemySummaryRepository
+    from app.chat.infrastructure.persistence.repositories import (
+        SQLAlchemySummaryRepository,
+    )
     return SQLAlchemySummaryRepository(db)
 
 
@@ -499,7 +505,9 @@ def get_conversation_title_generator(
 
 
 def get_conversation_context_builder() -> Any:
-    from app.chat.services.conversation_context_builder import ConversationContextBuilder
+    from app.chat.services.conversation_context_builder import (
+        ConversationContextBuilder,
+    )
     return ConversationContextBuilder()
 
 
@@ -577,6 +585,7 @@ def get_event_dispatcher(
             session_factory = getattr(request.app.state, "db_session_factory", None) if request else None
             if not session_factory:
                 from sqlalchemy.orm import sessionmaker
+
                 from app.db.session import init_postgres_engine
                 engine = init_postgres_engine(settings.DATABASE_URL)
                 session_factory = sessionmaker(bind=engine)
@@ -653,12 +662,12 @@ def get_tool_registry(
     retrieval_service=Depends(get_retrieval_service)
 ) -> Any:
     from app.chat.services.tool_registry import ToolRegistry
-    from app.chat.services.tools.semantic_search import SearchKnowledgeTool
-    from app.chat.services.tools.document_retrieval import RetrieveDocumentTool
+    from app.chat.services.tools.calculator import CalculatorTool
     from app.chat.services.tools.chunk_retrieval import RetrieveChunkTool
     from app.chat.services.tools.citation_lookup import CitationLookupTool
-    from app.chat.services.tools.calculator import CalculatorTool
     from app.chat.services.tools.datetime import DateTimeTool
+    from app.chat.services.tools.document_retrieval import RetrieveDocumentTool
+    from app.chat.services.tools.semantic_search import SearchKnowledgeTool
 
     tools = [
         SearchKnowledgeTool(retrieval_service),
@@ -830,8 +839,8 @@ def get_cache(request: Request = None) -> Any:
     global _cache_instance
     if _cache_instance is None:
         from app.core.cache.memory_cache import InMemoryCache
-        from app.core.cache.redis_cache import RedisCache
         from app.core.cache.multi_tier import MultiTierCache
+        from app.core.cache.redis_cache import RedisCache
 
         redis_client = None
         if request:
@@ -850,7 +859,7 @@ def get_cache(request: Request = None) -> Any:
 
 
 def get_distributed_lock(request: Request = None) -> Any:
-    from app.core.cache.lock import RedisDistributedLock, InMemoryDistributedLock
+    from app.core.cache.lock import InMemoryDistributedLock, RedisDistributedLock
     redis_client = None
     if request:
         try:
@@ -906,8 +915,9 @@ _pricing_provider = None
 def get_pricing_provider() -> Any:
     global _pricing_provider
     if _pricing_provider is None:
-        from app.core.cost.pricing_provider import YAMLPricingProvider
         import os
+
+        from app.core.cost.pricing_provider import YAMLPricingProvider
         yaml_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
             "core", "cost", "pricing.yaml"
@@ -921,7 +931,10 @@ _feature_flag_service = None
 def get_feature_flag_service() -> Any:
     global _feature_flag_service
     if _feature_flag_service is None:
-        from app.core.feature_flags.flags import FeatureFlagService, SettingsFeatureFlagProvider
+        from app.core.feature_flags.flags import (
+            FeatureFlagService,
+            SettingsFeatureFlagProvider,
+        )
         provider = SettingsFeatureFlagProvider()
         _feature_flag_service = FeatureFlagService(provider)
     return _feature_flag_service

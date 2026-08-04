@@ -1,7 +1,9 @@
 import re
 import time
+
 from app.documents.domain.interfaces import QueryProcessor
 from app.documents.domain.models import ProcessedQuery, QueryStats
+
 
 class DefaultQueryProcessor(QueryProcessor):
     def __init__(

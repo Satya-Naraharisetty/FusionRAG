@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from app.core.cache.interfaces import BaseCache
 from app.core.cache.memory_cache import InMemoryCache
@@ -10,7 +10,7 @@ class MultiTierCache(BaseCache):
         self.l1 = l1_cache
         self.l2 = l2_cache
 
-    async def get(self, key: str, namespace: Optional[str] = None) -> Any:
+    async def get(self, key: str, namespace: str | None = None) -> Any:
         # 1. Probe L1 Memory Cache
         val = await self.l1.get(key, namespace)
         if val is not None:
@@ -29,15 +29,15 @@ class MultiTierCache(BaseCache):
         self,
         key: str,
         value: Any,
-        ttl: Optional[int] = None,
-        namespace: Optional[str] = None,
+        ttl: int | None = None,
+        namespace: str | None = None,
         **kwargs: Any,
     ) -> None:
         # Write to both L1 and L2
         await self.l1.set(key, value, ttl=ttl, namespace=namespace, **kwargs)
         await self.l2.set(key, value, ttl=ttl, namespace=namespace, **kwargs)
 
-    async def delete(self, key: str, namespace: Optional[str] = None) -> None:
+    async def delete(self, key: str, namespace: str | None = None) -> None:
         # Delete from both L1 and L2
         await self.l1.delete(key, namespace)
         await self.l2.delete(key, namespace)

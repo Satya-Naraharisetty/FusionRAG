@@ -1,6 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
-import pytest
 
+import pytest
 from app.chat.domain.exceptions import LLMProviderError
 from app.chat.domain.models import ChatMessage, ChatRole
 from app.chat.infrastructure.openai_provider import OpenAIProvider

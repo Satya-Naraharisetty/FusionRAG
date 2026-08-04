@@ -1,11 +1,10 @@
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.dependencies import get_current_user_context
 # Lazily import DI dependency providers
-from app.api.dependencies import get_llm_provider
+from app.api.dependencies import get_current_user_context, get_llm_provider
 from app.chat.infrastructure.router import LLMProviderRouter
 from app.core.cache.interfaces import BaseCache
 
@@ -35,10 +34,10 @@ def get_cache_provider() -> BaseCache:
 
 @router.post("/cache/clear", status_code=status.HTTP_200_OK)
 async def clear_cache(
-    namespace: Optional[str] = None,
+    namespace: str | None = None,
     cache: BaseCache = Depends(get_cache_provider),
     _admin: dict[str, Any] = Depends(check_admin_user),
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Clear specific cache namespace or all namespaces if empty."""
     try:
         if namespace:
@@ -68,7 +67,7 @@ async def clear_cache(
 async def get_operational_status(
     llm_provider: Any = Depends(get_llm_provider),
     _admin: dict[str, Any] = Depends(check_admin_user),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Retrieve operational metrics including circuit breaker states and system health."""
     status_report = {
         "status": "operational",

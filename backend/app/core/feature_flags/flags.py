@@ -1,18 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from app.core.config import settings
 
 
 class BaseFeatureFlagProvider(ABC):
     @abstractmethod
-    def is_enabled(self, flag_name: str, context: Optional[dict] = None) -> bool:
+    def is_enabled(self, flag_name: str, context: dict | None = None) -> bool:
         """Check if a feature flag is enabled."""
         pass
 
 
 class SettingsFeatureFlagProvider(BaseFeatureFlagProvider):
-    def is_enabled(self, flag_name: str, context: Optional[dict] = None) -> bool:
+    def is_enabled(self, flag_name: str, context: dict | None = None) -> bool:
         # Convert flags like "semantic_cache" or "ENABLE_SEMANTIC_CACHE" to settings matching fields
         name = flag_name.upper()
         if not name.startswith("ENABLE_"):
@@ -29,5 +28,5 @@ class FeatureFlagService:
     def __init__(self, provider: BaseFeatureFlagProvider) -> None:
         self._provider = provider
 
-    def is_enabled(self, flag_name: str, context: Optional[dict] = None) -> bool:
+    def is_enabled(self, flag_name: str, context: dict | None = None) -> bool:
         return self._provider.is_enabled(flag_name, context)

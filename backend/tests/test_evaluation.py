@@ -1,26 +1,28 @@
-import os
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
-import pytest
-from datetime import datetime, UTC
 
-# Absolute path to the evaluation dataset fixtures, independent of CWD
-_DATASET_PATH = str(Path(__file__).parent / "evaluation" / "simple_rag_dataset.json")
+import pytest
+from app.db.session import Base
+from app.evaluation.datasets.dataset_loader import DatasetLoader
+from app.evaluation.infrastructure.persistence.models import (
+    SQLAlchemyEvaluationResult,
+    SQLAlchemyEvaluationRun,
+)
+from app.evaluation.reports.report_generator import ReportGenerator
+from app.evaluation.runners.benchmark_runner import BenchmarkRunner
+from app.evaluation.runners.deepeval_provider import DeepEvalProvider
+from app.evaluation.runners.ragas_provider import RagasProvider
+from app.evaluation.runners.regression_runner import RegressionRunner
+from app.evaluation.services.agent_evaluator import AgentEvaluator
+from app.evaluation.services.conversation_evaluator import ConversationEvaluator
+from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
+from app.evaluation.services.tool_evaluator import ToolEvaluator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.db.session import Base
-from app.evaluation.datasets.dataset_loader import DatasetLoader
-from app.evaluation.runners.ragas_provider import RagasProvider
-from app.evaluation.runners.deepeval_provider import DeepEvalProvider
-from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
-from app.evaluation.services.agent_evaluator import AgentEvaluator
-from app.evaluation.services.tool_evaluator import ToolEvaluator
-from app.evaluation.services.conversation_evaluator import ConversationEvaluator
-from app.evaluation.runners.benchmark_runner import BenchmarkRunner
-from app.evaluation.runners.regression_runner import RegressionRunner
-from app.evaluation.reports.report_generator import ReportGenerator
-from app.evaluation.infrastructure.persistence.models import SQLAlchemyEvaluationRun, SQLAlchemyEvaluationResult
+# Absolute path to the evaluation dataset fixtures, independent of CWD
+_DATASET_PATH = str(Path(__file__).parent / "evaluation" / "simple_rag_dataset.json")
 
 
 @pytest.fixture
@@ -265,17 +267,17 @@ def test_report_generation(db_session):
     report_gen = ReportGenerator(output_dir=output_dir)
     paths = report_gen.generate_all_reports(run_record)
 
-    assert os.path.exists(paths["markdown"])
-    assert os.path.exists(paths["json"])
-    assert os.path.exists(paths["csv"])
-    assert os.path.exists(paths["html"])
+    assert Path(paths["markdown"]).exists()
+    assert Path(paths["json"]).exists()
+    assert Path(paths["csv"]).exists()
+    assert Path(paths["html"]).exists()
 
     # Clean up generated files
     for p in paths.values():
-        if os.path.exists(p):
-            os.remove(p)
-    if os.path.exists(output_dir):
-        os.rmdir(output_dir)
+        if Path(p).exists():
+            Path(p).unlink()
+    if Path(output_dir).exists():
+        Path(output_dir).rmdir()
 
 
 @pytest.mark.asyncio
@@ -284,9 +286,9 @@ async def test_api_routes(client, db_session):
     # In tests, get_current_user_context returns mock context of a user.
     # Let's verify route access or validation check.
     # To test admin route, we mock the dependency override
-    from app.main import app
     from app.api.v1.evaluation import check_admin_user
     from app.db.session import get_db
+    from app.main import app
 
     # Override get_db with the in-memory SQLite session used by other evaluation tests
     app.dependency_overrides[get_db] = lambda: db_session

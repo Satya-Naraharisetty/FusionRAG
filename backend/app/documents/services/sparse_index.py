@@ -1,13 +1,13 @@
-import math
-import re
 import asyncio
 import logging
+import math
+import re
 from collections import Counter
 from typing import Any
 from uuid import UUID
 
-from app.documents.domain.interfaces import SparseIndex, ChunkRepository, IndexCache
-from app.documents.domain.models import RetrievedChunk, Chunk
+from app.documents.domain.interfaces import ChunkRepository, IndexCache, SparseIndex
+from app.documents.domain.models import Chunk, RetrievedChunk
 
 logger = logging.getLogger(__name__)
 

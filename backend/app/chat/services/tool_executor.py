@@ -8,7 +8,6 @@ from app.chat.domain.agents import ToolContext, ToolResult
 from app.chat.domain.exceptions import ToolValidationError
 from app.chat.services.tools.base import Tool
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -181,7 +180,7 @@ class ToolExecutor:
                 result.execution_time_ms = (time.perf_counter() - start_time) * 1000
                 return result
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 if retries > 0:
                     retries -= 1
                     logger.warning(

@@ -1,16 +1,9 @@
-import asyncio
-from datetime import datetime, timedelta, UTC
-import json
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
-import pytest
-from fastapi import status
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 
+import pytest
 from app.api.dependencies import (
     get_answer_generation_service,
-    get_current_user_context,
-    get_event_dispatcher,
     get_conversation_manager,
 )
 from app.auth.infrastructure.persistence.models import Base, SQLAlchemyUser
@@ -20,11 +13,9 @@ from app.chat.domain.exceptions import (
     UnauthorizedConversationAccessException,
 )
 from app.chat.domain.models import (
-    AnswerResponse,
     ChatRole,
     Conversation,
     ConversationMessage,
-    ConversationSettings,
     ConversationState,
     ConversationSummary,
     MessageRole,
@@ -32,24 +23,25 @@ from app.chat.domain.models import (
     RetrievalDiagnostics,
     Usage,
 )
+from app.chat.infrastructure.cache import MemoryRewriteCache
 from app.chat.infrastructure.persistence.repositories import (
     SQLAlchemyConversationRepository,
     SQLAlchemyMessageRepository,
     SQLAlchemySummaryRepository,
 )
 from app.chat.services.access_service import ConversationAccessService
+from app.chat.services.answer_generation_service import AnswerGenerationService
 from app.chat.services.conversation_context_builder import ConversationContextBuilder
 from app.chat.services.conversation_manager import ConversationManager
+from app.chat.services.conversation_summarizer import LLMConversationSummarizer
 from app.chat.services.history_rewriter import LLMHistoryRewriter
-from app.chat.infrastructure.cache import MemoryRewriteCache
 from app.chat.services.prompt_builder import PromptBuilder
 from app.chat.services.rolling_memory import RollingConversationMemory
-from app.chat.services.title_generator import LLMConversationTitleGenerator
-from app.chat.services.conversation_summarizer import LLMConversationSummarizer
-from app.documents.domain.models import RetrievedChunk
-from app.chat.services.answer_generation_service import AnswerGenerationService
 from app.chat.services.token_estimator import CharacterTokenEstimator
-from app.documents.domain.models import SearchResult
+from app.documents.domain.models import RetrievedChunk, SearchResult
+from fastapi import status
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
 
@@ -582,7 +574,7 @@ def test_prompt_builder_budgeting():
         ),
     ]
 
-    from app.chat.domain.models import ConversationContext, RetrievalDiagnostics
+    from app.chat.domain.models import ConversationContext
     context_obj = ConversationContext(
         conversation=conversation,
         recent_messages=recent_messages,

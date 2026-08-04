@@ -2,15 +2,14 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime
+
+from app.auth.infrastructure.persistence.models import Base, SQLAlchemyUser
+from app.chat.domain.models import Conversation, ConversationSettings, ConversationState
+from app.chat.infrastructure.persistence.repositories import (
+    SQLAlchemyConversationRepository,
+)
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-
-from app.core.config import settings
-from app.auth.infrastructure.persistence.models import Base, SQLAlchemyUser
-from app.chat.infrastructure.persistence.models import ConversationORM
-from app.chat.infrastructure.persistence.repositories import SQLAlchemyConversationRepository
-from app.chat.domain.models import Conversation, ConversationSettings, ConversationState
-from app.chat.domain.exceptions import ConversationConcurrentUpdateException
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)

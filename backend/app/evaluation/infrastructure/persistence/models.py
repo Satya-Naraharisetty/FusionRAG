@@ -1,11 +1,10 @@
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, JSON, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-
 from app.db.session import Base
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class SQLAlchemyEvaluationRun(Base):

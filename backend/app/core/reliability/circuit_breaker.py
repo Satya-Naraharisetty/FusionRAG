@@ -1,6 +1,7 @@
 import asyncio
 import time
-from typing import Callable, Any, Optional
+from collections.abc import Callable
+from typing import Any
 
 
 class CircuitBreakerOpenException(Exception):

@@ -1,5 +1,4 @@
 import httpx
-
 from app.documents.domain.interfaces import EmbeddingGenerator
 
 

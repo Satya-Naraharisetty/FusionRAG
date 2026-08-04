@@ -1,10 +1,13 @@
 import logging
-import time
-from typing import Any
 
-from app.evaluation.domain.interfaces import EvaluationProvider
-from app.evaluation.domain.models import EvaluationSample, EvaluationResult, MetricResult, RetrievedContext
 from app.core.config import settings
+from app.evaluation.domain.interfaces import EvaluationProvider
+from app.evaluation.domain.models import (
+    EvaluationResult,
+    EvaluationSample,
+    MetricResult,
+    RetrievedContext,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +15,12 @@ RAGAS_AVAILABLE = False
 try:
     from datasets import Dataset
     from ragas import evaluate as ragas_evaluate
-    from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
+    from ragas.metrics import (
+        answer_relevancy,
+        context_precision,
+        context_recall,
+        faithfulness,
+    )
     RAGAS_AVAILABLE = True
 except ImportError as e:
     logger.warning(

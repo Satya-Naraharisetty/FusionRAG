@@ -1,22 +1,18 @@
-import asyncio
-import logging
-from datetime import datetime, UTC
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
-
 from app.documents.domain.interfaces import ChunkRepository
-from app.documents.domain.models import Chunk, RetrievedChunk, RetrievalMode
-from app.documents.services.query_processor import DefaultQueryProcessor
-from app.documents.services.index_cache import InMemoryIndexCache
-from app.documents.services.sparse_index import InMemoryBM25Index, tokenize, BM25
-from app.documents.services.sparse_retriever import BM25Retriever
-from app.documents.services.dense_retriever import QdrantDenseRetriever
+from app.documents.domain.models import Chunk, RetrievalMode, RetrievedChunk
 from app.documents.services.fusion import ReciprocalRankFusionEngine
-from app.documents.services.mmr import DefaultMMRSelector, jaccard_similarity
+from app.documents.services.index_cache import InMemoryIndexCache
+from app.documents.services.mmr import DefaultMMRSelector
+from app.documents.services.query_processor import DefaultQueryProcessor
 from app.documents.services.reranker import IdentityReranker
 from app.documents.services.retrieval_service import RetrievalService
+from app.documents.services.sparse_index import InMemoryBM25Index
+from app.documents.services.sparse_retriever import BM25Retriever
 
 
 # --- 1. QueryProcessor Tests ---
@@ -403,10 +399,10 @@ async def test_retrieval_orchestrator_integration(mocker):
     fusion_engine.fuse.return_value = [fused_chunk]
 
     mmr_selector = MagicMock()
-    mmr_selector.select.side_effect = lambda chunks, top_k, mmr_lambda: chunks[:top_k]
+    mmr_selector.select.side_effect = lambda chunks, top_k, _mmr_lambda: chunks[:top_k]
 
     reranker = MagicMock()
-    reranker.rerank.side_effect = lambda query, chunks: chunks
+    reranker.rerank.side_effect = lambda _query, chunks: chunks
 
     chunk_repo = MagicMock()
     chunk_repo.verify_document_ownership = AsyncMock(return_value=True)

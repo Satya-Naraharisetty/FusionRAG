@@ -1,8 +1,5 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from uuid import UUID
-
-from sqlalchemy.orm import Session
-from sqlalchemy.orm.exc import StaleDataError
 
 from app.chat.domain.exceptions import ConversationConcurrentUpdateException
 from app.chat.domain.interfaces import ConversationRepository
@@ -13,6 +10,8 @@ from app.chat.domain.models import (
     ConversationState,
 )
 from app.chat.infrastructure.persistence.models import ConversationORM
+from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import StaleDataError
 
 
 class SQLAlchemyConversationRepository(ConversationRepository):

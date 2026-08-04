@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from app.documents.infrastructure.embedding_generator import OpenAIEmbeddingGenerator
 
 

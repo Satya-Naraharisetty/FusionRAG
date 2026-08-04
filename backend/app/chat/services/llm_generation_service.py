@@ -1,4 +1,4 @@
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 from app.chat.domain.interfaces import LLMProvider, ProviderResponse, StreamChunk
 from app.chat.domain.models import ChatMessage

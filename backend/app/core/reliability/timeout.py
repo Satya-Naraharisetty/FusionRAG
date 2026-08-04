@@ -1,6 +1,7 @@
 import asyncio
 import functools
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 
 class TimeoutException(Exception):
@@ -19,7 +20,7 @@ async def timeout_policy(
             return await asyncio.wait_for(
                 asyncio.to_thread(func, *args, **kwargs), timeout=timeout_seconds
             )
-    except asyncio.TimeoutError as e:
+    except TimeoutError as e:
         raise TimeoutException(
             f"Operation timed out after {timeout_seconds} seconds."
         ) from e

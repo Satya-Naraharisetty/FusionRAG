@@ -1,9 +1,10 @@
 import logging
+
 from app.chat.domain.models import (
     Conversation,
+    ConversationContext,
     ConversationMessage,
     ConversationSummary,
-    ConversationContext,
     RetrievalDiagnostics,
 )
 from app.documents.domain.models import RetrievedChunk

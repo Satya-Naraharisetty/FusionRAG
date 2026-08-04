@@ -1,6 +1,7 @@
 import logging
 import os
 from typing import Any
+
 from app.chat.domain.models import ChatMessage, ChatRole
 from app.documents.domain.models import RetrievedChunk
 

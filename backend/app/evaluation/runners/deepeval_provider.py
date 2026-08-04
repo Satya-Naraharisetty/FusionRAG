@@ -1,17 +1,20 @@
 import logging
-import time
-from typing import Any
 
-from app.evaluation.domain.interfaces import EvaluationProvider
-from app.evaluation.domain.models import EvaluationSample, EvaluationResult, MetricResult, RetrievedContext
 from app.core.config import settings
+from app.evaluation.domain.interfaces import EvaluationProvider
+from app.evaluation.domain.models import (
+    EvaluationResult,
+    EvaluationSample,
+    MetricResult,
+    RetrievedContext,
+)
 
 logger = logging.getLogger(__name__)
 
 DEEPEVAL_AVAILABLE = False
 try:
-    from deepeval.test_case import LLMTestCase, ConversationalTestCase
-    from deepeval.metrics import HallucinationMetric, AnswerRelevancyMetric
+    from deepeval.metrics import AnswerRelevancyMetric, HallucinationMetric
+    from deepeval.test_case import ConversationalTestCase, LLMTestCase
     DEEPEVAL_AVAILABLE = True
 except ImportError as e:
     logger.warning(
@@ -212,7 +215,7 @@ class DeepEvalProvider(EvaluationProvider):
                         score = len(correct) / max(len(expected_tools), len(actual_tools))
                     
                     passed = score >= 0.80
-                    reason = f"Simulated tool correctness. Matched expected tools list."
+                    reason = "Simulated tool correctness. Matched expected tools list."
 
                 elif metric == "conversation_quality":
                     history = sample.conversation_history or []
@@ -222,7 +225,7 @@ class DeepEvalProvider(EvaluationProvider):
                         score = 0.90 if sample.metadata.get("rewritten_query") else 0.50
                     
                     passed = score >= 0.80
-                    reason = f"Simulated conversation quality checking context retention."
+                    reason = "Simulated conversation quality checking context retention."
 
                 elif metric == "task_completion":
                     # Simple heuristic
@@ -243,7 +246,7 @@ class DeepEvalProvider(EvaluationProvider):
                     else:
                         score = 0.90
                     passed = score >= 0.80
-                    reason = f"Simulated agent correctness based on steps execution."
+                    reason = "Simulated agent correctness based on steps execution."
 
                 metric_results.append(MetricResult(
                     name=metric,

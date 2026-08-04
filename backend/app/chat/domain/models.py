@@ -2,8 +2,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 from uuid import UUID
+
+from app.documents.domain.models import RetrievalMode, RetrievedChunk
 from pydantic import BaseModel, ConfigDict, Field
-from app.documents.domain.models import RetrievedChunk, RetrievalMode
 
 
 class ChatRole(str, Enum):

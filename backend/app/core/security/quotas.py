@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class ResourceQuotaService:
-    def __init__(self, db: Session, redis_client: Optional[Any] = None) -> None:
+    def __init__(self, db: Session, redis_client: Any | None = None) -> None:
         self.db = db
         self._redis = redis_client
 

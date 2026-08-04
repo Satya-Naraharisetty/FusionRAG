@@ -3,7 +3,7 @@ import hashlib
 import json
 import os
 import random
-from typing import Any
+
 import yaml
 
 from app.evaluation.domain.models import EvaluationDataset, EvaluationSample
@@ -23,7 +23,7 @@ class DatasetLoader:
         raw_samples = []
 
         if ext == ".json":
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, list):
                     raw_samples = data
@@ -35,13 +35,13 @@ class DatasetLoader:
                     raise ValueError("JSON dataset must be a list of samples or a dict with a 'samples' key.")
 
         elif ext == ".jsonl":
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 for line in f:
                     if line.strip():
                         raw_samples.append(json.loads(line))
 
         elif ext in (".yaml", ".yml"):
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
                 if isinstance(data, list):
                     raw_samples = data
@@ -53,7 +53,7 @@ class DatasetLoader:
                     raise ValueError("YAML dataset must be a list of samples or a dict with a 'samples' key.")
 
         elif ext == ".csv":
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     # Parse CSV fields into appropriate structures

@@ -1,4 +1,5 @@
 import logging
+import time
 
 import redis
 from fastapi import APIRouter, Depends, Response, status
@@ -149,8 +150,9 @@ def deep_check(
 
     # 4. Storage check: test write permissions on the upload dir
     try:
-        from app.core.config import settings
         import pathlib
+
+        from app.core.config import settings
         path = pathlib.Path(settings.UPLOAD_DIR)
         path.mkdir(parents=True, exist_ok=True)
         test_file = path / f"health_check_{int(time.time())}.txt"

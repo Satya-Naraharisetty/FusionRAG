@@ -5,15 +5,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
+    get_conversation_manager,
     get_current_user_context,
     get_retrieval_service,
-    get_conversation_manager,
 )
+from app.chat.services.conversation_manager import ConversationManager
 from app.core.config import settings
 from app.documents.domain.exceptions import UnauthorizedDocumentAccess
 from app.documents.domain.models import RetrievalMode, RetrievedChunk
 from app.documents.services.retrieval_service import RetrievalService
-from app.chat.services.conversation_manager import ConversationManager
 
 router = APIRouter(tags=["Search"])
 

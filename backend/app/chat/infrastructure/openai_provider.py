@@ -1,15 +1,13 @@
 import json
 import logging
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 from enum import Enum
 
 import httpx
-
+from app.chat.domain.agents import ToolCall, ToolDefinition
 from app.chat.domain.exceptions import LLMProviderError
 from app.chat.domain.interfaces import LLMProvider, ProviderResponse, StreamChunk
 from app.chat.domain.models import ChatMessage, Usage
-from app.chat.domain.agents import ToolDefinition, ToolCall
-
 
 logger = logging.getLogger(__name__)
 

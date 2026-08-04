@@ -1,14 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import AsyncIterator, Any
+from collections.abc import AsyncIterator
+from typing import Any
 from uuid import UUID
+
+from app.chat.domain.agents import ToolCall, ToolDefinition
 from app.chat.domain.models import (
     ChatMessage,
-    Usage,
     Conversation,
     ConversationMessage,
     ConversationSummary,
     HistoryRewriteResult,
     MessageRole,
+    Usage,
 )
 
 
@@ -19,9 +22,6 @@ class TokenEstimator(ABC):
         Estimate the number of tokens in the given text.
         """
         pass
-
-
-from app.chat.domain.agents import ToolCall, ToolDefinition
 
 
 class ProviderResponse(tuple):

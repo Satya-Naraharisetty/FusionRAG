@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Dict
+from typing import Any
 
 
 class BulkheadFullException(Exception):
@@ -26,7 +26,7 @@ class Bulkhead:
 
 class BulkheadManager:
     def __init__(self) -> None:
-        self._semaphores: Dict[str, asyncio.Semaphore] = {
+        self._semaphores: dict[str, asyncio.Semaphore] = {
             "llm": asyncio.Semaphore(50),
             "embedding": asyncio.Semaphore(30),
             "evaluation": asyncio.Semaphore(5),  # CPU/heavy benchmark limit

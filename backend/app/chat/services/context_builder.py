@@ -1,4 +1,5 @@
 import logging
+
 from app.chat.domain.interfaces import TokenEstimator
 from app.chat.domain.models import GroundedContext
 from app.documents.domain.models import RetrievedChunk

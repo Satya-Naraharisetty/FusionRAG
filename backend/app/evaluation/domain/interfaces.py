@@ -1,5 +1,6 @@
-from typing import Any, Protocol
-from app.evaluation.domain.models import EvaluationSample, EvaluationResult
+from typing import Protocol
+
+from app.evaluation.domain.models import EvaluationResult, EvaluationSample
 
 
 class EvaluationProvider(Protocol):

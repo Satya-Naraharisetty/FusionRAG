@@ -1,10 +1,14 @@
 import logging
 import math
-from typing import Any, Dict, List, Type
+from typing import Any
 
-from app.evaluation.domain.models import EvaluationSample, MetricResult, RetrievedContext
-from app.evaluation.metrics.base import Metric
 from app.core.config import settings
+from app.evaluation.domain.models import (
+    EvaluationSample,
+    MetricResult,
+    RetrievedContext,
+)
+from app.evaluation.metrics.base import Metric
 
 logger = logging.getLogger(__name__)
 
@@ -14,14 +18,14 @@ class MetricRegistry:
     Registry for evaluation metrics to decouple metric calculations from evaluators.
     """
 
-    _registry: Dict[str, Type[Metric]] = {}
+    _registry: dict[str, type[Metric]] = {}
 
     @classmethod
     def register(cls, name: str) -> Any:
         """
         Decorator to register a Metric class.
         """
-        def decorator(metric_cls: Type[Metric]) -> Type[Metric]:
+        def decorator(metric_cls: type[Metric]) -> type[Metric]:
             cls._registry[name] = metric_cls
             return metric_cls
         return decorator
@@ -33,7 +37,7 @@ class MetricRegistry:
         return cls._registry[name](name=name, **kwargs)
 
     @classmethod
-    def list_metrics(cls) -> List[str]:
+    def list_metrics(cls) -> list[str]:
         return list(cls._registry.keys())
 
 
@@ -52,7 +56,7 @@ def compute_word_overlap(text1: str, text2: str) -> float:
 
 
 # Helper to determine relevance of retrieved contexts
-def calculate_relevance(retrieved: List[RetrievedContext], sample: EvaluationSample) -> List[float]:
+def calculate_relevance(retrieved: list[RetrievedContext], sample: EvaluationSample) -> list[float]:
     relevance = []
     expected_docs = sample.expected_documents or []
     gts = sample.ground_truth_context or []

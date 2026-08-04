@@ -1,7 +1,8 @@
 import asyncio
 import json
 import logging
-from typing import Any, Callable, Dict, List, Optional, Type
+from collections.abc import Callable
+from typing import Any
 
 import redis
 
@@ -13,11 +14,11 @@ logger = logging.getLogger(__name__)
 class RedisEventBus(BaseEventBus):
     def __init__(self, redis_client: redis.Redis) -> None:
         self._redis = redis_client
-        self._handlers: Dict[str, List[Callable[[Any], Any]]] = {}
-        self._consumer_task: Optional[asyncio.Task] = None
+        self._handlers: dict[str, list[Callable[[Any], Any]]] = {}
+        self._consumer_task: asyncio.Task | None = None
         self._is_running = False
 
-    def _get_event_name(self, event_type: Type[IntegrationEvent]) -> str:
+    def _get_event_name(self, event_type: type[IntegrationEvent]) -> str:
         return event_type.__name__
 
     async def publish(self, event: IntegrationEvent) -> None:
@@ -34,7 +35,7 @@ class RedisEventBus(BaseEventBus):
         except Exception as e:
             logger.error(f"Failed to publish integration event {event_name} to Redis Stream: {e}")
 
-    async def subscribe(self, event_type: Type[IntegrationEvent], handler: Callable[[Any], Any]) -> None:
+    async def subscribe(self, event_type: type[IntegrationEvent], handler: Callable[[Any], Any]) -> None:
         event_name = self._get_event_name(event_type)
         if event_name not in self._handlers:
             self._handlers[event_name] = []

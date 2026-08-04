@@ -1,8 +1,7 @@
 import logging
 
-from langdetect import detect
-
 from app.documents.domain.models import DocumentMetadata
+from langdetect import detect
 
 logger = logging.getLogger(__name__)
 

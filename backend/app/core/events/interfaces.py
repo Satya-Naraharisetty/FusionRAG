@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Type
+from collections.abc import Callable
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -26,7 +27,7 @@ class BaseEventBus(ABC):
         pass
 
     @abstractmethod
-    async def subscribe(self, event_type: Type[IntegrationEvent], handler: Callable[[Any], Any]) -> None:
+    async def subscribe(self, event_type: type[IntegrationEvent], handler: Callable[[Any], Any]) -> None:
         """Subscribe a background worker to an integration event stream."""
         pass
 
@@ -38,6 +39,6 @@ class BaseDomainEventDispatcher(ABC):
         pass
 
     @abstractmethod
-    def register(self, event_type: Type[DomainEvent], handler: Callable[[Any], Any]) -> None:
+    def register(self, event_type: type[DomainEvent], handler: Callable[[Any], Any]) -> None:
         """Register an in-process handler for a domain event."""
         pass

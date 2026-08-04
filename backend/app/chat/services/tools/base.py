@@ -1,6 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import Any
-from app.chat.domain.agents import ToolDefinition, ToolResult, ToolContext, ToolCategory, ToolPermission
+
+from app.chat.domain.agents import (
+    ToolCategory,
+    ToolContext,
+    ToolDefinition,
+    ToolPermission,
+    ToolResult,
+)
 
 
 class Tool(ABC):

@@ -1,24 +1,24 @@
 import asyncio
 import time
-from typing import Any, Dict, Optional, Set, Tuple
+from typing import Any
 
 from app.core.cache.interfaces import BaseCache
 
 
 class InMemoryCache(BaseCache):
     def __init__(self) -> None:
-        self._cache: Dict[str, Tuple[Optional[float], Any]] = {}
-        self._namespace_keys: Dict[str, Set[str]] = {}
-        self._user_keys: Dict[str, Set[str]] = {}
-        self._document_keys: Dict[str, Set[str]] = {}
+        self._cache: dict[str, tuple[float | None, Any]] = {}
+        self._namespace_keys: dict[str, set[str]] = {}
+        self._user_keys: dict[str, set[str]] = {}
+        self._document_keys: dict[str, set[str]] = {}
         self._lock = asyncio.Lock()
 
-    def _get_namespaced_key(self, key: str, namespace: Optional[str] = None) -> str:
+    def _get_namespaced_key(self, key: str, namespace: str | None = None) -> str:
         if namespace:
             return f"{namespace}:{key}"
         return key
 
-    async def get(self, key: str, namespace: Optional[str] = None) -> Any:
+    async def get(self, key: str, namespace: str | None = None) -> Any:
         async with self._lock:
             full_key = self._get_namespaced_key(key, namespace)
             if full_key not in self._cache:
@@ -36,8 +36,8 @@ class InMemoryCache(BaseCache):
         self,
         key: str,
         value: Any,
-        ttl: Optional[int] = None,
-        namespace: Optional[str] = None,
+        ttl: int | None = None,
+        namespace: str | None = None,
         **kwargs: Any,
     ) -> None:
         async with self._lock:
@@ -76,12 +76,12 @@ class InMemoryCache(BaseCache):
                     self._document_keys[doc_str] = set()
                 self._document_keys[doc_str].add(full_key)
 
-    async def delete(self, key: str, namespace: Optional[str] = None) -> None:
+    async def delete(self, key: str, namespace: str | None = None) -> None:
         async with self._lock:
             full_key = self._get_namespaced_key(key, namespace)
             await self._delete_no_lock(full_key, namespace)
 
-    async def _delete_no_lock(self, full_key: str, namespace: Optional[str]) -> None:
+    async def _delete_no_lock(self, full_key: str, namespace: str | None) -> None:
         if full_key in self._cache:
             del self._cache[full_key]
 

@@ -1,9 +1,12 @@
 import logging
 import time
-from typing import Any
 
-from app.evaluation.domain.models import EvaluationSample, EvaluationResult, RetrievedContext
 from app.documents.services.retrieval_service import RetrievalService
+from app.evaluation.domain.models import (
+    EvaluationResult,
+    EvaluationSample,
+    RetrievedContext,
+)
 from app.evaluation.metrics.registry import MetricRegistry
 
 logger = logging.getLogger(__name__)

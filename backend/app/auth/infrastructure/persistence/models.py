@@ -1,10 +1,9 @@
 import uuid
 from datetime import datetime
 
+from app.db.session import Base
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.db.session import Base
 
 
 class SQLAlchemyUser(Base):

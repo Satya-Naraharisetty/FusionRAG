@@ -1,11 +1,11 @@
 import ast
 import operator
-from typing import Any, Dict, Type, Union
+from typing import Any
 
 
 class SafeCalculator:
     # Map AST operators to standard python operator functions
-    _OPERATORS: Dict[Type[ast.operator], Any] = {
+    _OPERATORS: dict[type[ast.operator], Any] = {
         ast.Add: operator.add,
         ast.Sub: operator.sub,
         ast.Mult: operator.mul,
@@ -16,7 +16,7 @@ class SafeCalculator:
     }
 
     @classmethod
-    def evaluate(cls, expression: str) -> Union[int, float]:
+    def evaluate(cls, expression: str) -> int | float:
         """
         Safely parse and evaluate a mathematical expression using python AST.
         Only numeric constants and basic mathematical operations are allowed.
@@ -32,7 +32,7 @@ class SafeCalculator:
             raise ValueError(f"Invalid or unsafe mathematical expression: {e}")
 
     @classmethod
-    def _eval_node(cls, node: ast.AST) -> Union[int, float]:
+    def _eval_node(cls, node: ast.AST) -> int | float:
         if isinstance(node, ast.Constant):
             if isinstance(node.value, (int, float)):
                 return node.value

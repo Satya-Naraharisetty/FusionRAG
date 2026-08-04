@@ -1,7 +1,6 @@
 import logging
 import threading
 import time
-from typing import Dict, List, Optional
 
 import redis
 
@@ -11,14 +10,14 @@ logger = logging.getLogger(__name__)
 class RateLimiter:
     def __init__(
         self,
-        redis_client: Optional[redis.Redis] = None,
+        redis_client: redis.Redis | None = None,
         requests_per_minute: int = 60,
         burst: int = 10,
     ) -> None:
         self._redis = redis_client
         self.requests_per_minute = requests_per_minute
         self.burst = burst
-        self._memory_db: Dict[str, List[float]] = {}
+        self._memory_db: dict[str, list[float]] = {}
         self._lock = threading.Lock()
 
     async def is_rate_limited(self, identifier: str) -> bool:

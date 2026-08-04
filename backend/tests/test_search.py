@@ -1,17 +1,11 @@
-import asyncio
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
-from fastapi import status
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from app.api.dependencies import (
+    get_conversation_manager,
     get_current_user_context,
     get_retrieval_service,
-    get_conversation_manager,
 )
 from app.auth.infrastructure.persistence.models import Base, SQLAlchemyUser
 from app.core.config import settings
@@ -26,6 +20,9 @@ from app.documents.infrastructure.persistence.repositories.chunk_repository impo
 )
 from app.documents.services.ranking import SemanticSearchRanker
 from app.documents.services.retrieval_service import RetrievalService
+from fastapi import status
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
 
@@ -232,7 +229,7 @@ async def test_retrieval_service_success(mocker):
     repo.batch_lookup = mocker.AsyncMock(return_value=[c1, c2])
 
     ranker = mocker.MagicMock()
-    ranker.rank.side_effect = lambda q, chunks: chunks
+    ranker.rank.side_effect = lambda _q, chunks: chunks
 
     service = RetrievalService(
         embedding_generator=gen,
@@ -322,7 +319,7 @@ async def test_retrieval_service_similarity_threshold(mocker):
     repo.batch_lookup = mocker.AsyncMock(return_value=[c1, c2])
 
     ranker = mocker.MagicMock()
-    ranker.rank.side_effect = lambda q, chunks: chunks
+    ranker.rank.side_effect = lambda _q, chunks: chunks
 
     # Set SIMILARITY_THRESHOLD = 0.5
     service = RetrievalService(
@@ -373,8 +370,11 @@ def test_api_search_validation_and_capping(client, mocker):
     }
 
     # Mock ConversationManager
-    from app.chat.domain.models import Conversation, ConversationState, HistoryRewriteResult
-    from app.chat.services.conversation_manager import ConversationManager
+    from app.chat.domain.models import (
+        Conversation,
+        ConversationState,
+        HistoryRewriteResult,
+    )
 
     mock_conv = Conversation(
         id=uuid4(),
@@ -442,7 +442,11 @@ def test_api_search_unauthorized_document(client, mocker):
     }
 
     # Mock ConversationManager
-    from app.chat.domain.models import Conversation, ConversationState, HistoryRewriteResult
+    from app.chat.domain.models import (
+        Conversation,
+        ConversationState,
+        HistoryRewriteResult,
+    )
     mock_conv = Conversation(
         id=uuid4(),
         user_id=user_id,

@@ -1,12 +1,12 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from app.chat.domain.agents import (
     ToolCategory,
+    ToolContext,
     ToolDefinition,
     ToolPermission,
     ToolResult,
-    ToolContext,
 )
 from app.chat.services.tools.base import BuiltinTool
 

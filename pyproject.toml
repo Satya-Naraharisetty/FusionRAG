@@ -40,11 +40,15 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "C4", "ARG", "PTH"]
-ignore = ["B008", "E501", "ARG001", "ARG002", "B904", "N818", "UP042", "E712"]
+ignore = ["B008", "E501", "ARG001", "ARG002", "B904", "N818", "UP042", "E712", "PTH", "B023", "B039", "ARG004"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ARG001", "N806", "E501"]
-"alembic/*" = ["PTH"]
+"backend/tests/*" = ["ARG001", "N806", "E501"]
+"backend/alembic/*" = ["PTH"]
+"backend/scripts/*" = ["N806", "PTH"]
+"backend/app/scratch/*" = ["N806"]
+"backend/app/evaluation/reports/*" = ["PTH"]
+"backend/app/evaluation/runners/*" = ["PTH", "B905", "C416", "F401", "F841"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"

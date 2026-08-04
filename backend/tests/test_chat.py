@@ -1,23 +1,20 @@
-import json
 from uuid import uuid4
 
 import pytest
-from fastapi import status
-
 from app.api.dependencies import get_answer_generation_service, get_current_user_context
 from app.chat.domain.exceptions import (
-    LLMProviderError,
     NoRelevantContext,
     PromptTooLarge,
     TokenBudgetExceeded,
 )
-from app.chat.domain.models import AnswerResponse, ChatMessage, Citation, Usage
+from app.chat.domain.models import AnswerResponse, Citation, Usage
+from app.chat.services.answer_generation_service import AnswerGenerationService
 from app.chat.services.context_builder import ContextBuilder
 from app.chat.services.prompt_builder import PromptBuilder
 from app.chat.services.token_estimator import CharacterTokenEstimator
-from app.chat.services.answer_generation_service import AnswerGenerationService
 from app.documents.domain.models import RetrievedChunk, SearchResult
 from app.main import app
+from fastapi import status
 
 
 # --- 1. TokenEstimator Tests ---
@@ -162,8 +159,12 @@ class MockLLMProvider:
 
 class MockMessageRepository:
     async def create_assistant_message(self, conversation_id, message_id, role, content=""):
-        from app.chat.domain.models import ConversationMessage, MessageRole, MessageStatus
-        from datetime import datetime, UTC
+        from datetime import UTC, datetime
+
+        from app.chat.domain.models import (
+            ConversationMessage,
+            MessageStatus,
+        )
         return ConversationMessage(
             id=message_id,
             conversation_id=conversation_id,
@@ -182,9 +183,10 @@ class MockConversationManager:
         self._message_repo = MockMessageRepository()
 
     async def get_or_create_conversation(self, conversation_id, user_id):
-        from app.chat.domain.models import Conversation, ConversationState
-        from datetime import datetime, UTC
+        from datetime import UTC, datetime
         from uuid import uuid4
+
+        from app.chat.domain.models import Conversation, ConversationState
         return Conversation(
             id=conversation_id or uuid4(),
             user_id=user_id,
@@ -219,7 +221,9 @@ async def test_answer_generation_service_success():
 
     retrieval_service = MockRetrievalService(chunks)
     estimator = CharacterTokenEstimator()
-    from app.chat.services.conversation_context_builder import ConversationContextBuilder
+    from app.chat.services.conversation_context_builder import (
+        ConversationContextBuilder,
+    )
     context_builder = ConversationContextBuilder()
     prompt_builder = PromptBuilder("")
     llm_provider = MockLLMProvider()
@@ -254,7 +258,9 @@ async def test_answer_generation_service_success():
 async def test_answer_generation_service_empty_retrieval():
     retrieval_service = MockRetrievalService([])
     estimator = CharacterTokenEstimator()
-    from app.chat.services.conversation_context_builder import ConversationContextBuilder
+    from app.chat.services.conversation_context_builder import (
+        ConversationContextBuilder,
+    )
     context_builder = ConversationContextBuilder()
     prompt_builder = PromptBuilder("")
     llm_provider = MockLLMProvider()
@@ -295,7 +301,9 @@ async def test_answer_generation_service_budget_violations():
     ]
     retrieval_service = MockRetrievalService(chunks)
     estimator = CharacterTokenEstimator()
-    from app.chat.services.conversation_context_builder import ConversationContextBuilder
+    from app.chat.services.conversation_context_builder import (
+        ConversationContextBuilder,
+    )
     context_builder = ConversationContextBuilder()
     prompt_builder = PromptBuilder("")
     llm_provider = MockLLMProvider()

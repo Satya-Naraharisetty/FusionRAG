@@ -2,13 +2,12 @@ from unittest.mock import MagicMock, patch
 from uuid import UUID
 
 import pytest
-from fastapi import status
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
-
 from app.api.dependencies import get_embedding_generator, get_vector_store
 from app.auth.infrastructure.persistence.models import Base
 from app.documents.domain.models import ExtractionResult
+from fastapi import status
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
 

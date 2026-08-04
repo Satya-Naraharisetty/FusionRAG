@@ -1,7 +1,9 @@
 import re
-from typing import Callable
+from collections.abc import Callable
+
 from app.documents.domain.interfaces import MMRSelector
 from app.documents.domain.models import RetrievedChunk
+
 
 def tokenize(text: str) -> list[str]:
     text = text.lower()

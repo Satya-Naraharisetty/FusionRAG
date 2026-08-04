@@ -1,6 +1,5 @@
 import os
 from abc import ABC, abstractmethod
-from typing import Dict
 
 import yaml
 from pydantic import BaseModel
@@ -21,7 +20,7 @@ class BasePricingProvider(ABC):
 class YAMLPricingProvider(BasePricingProvider):
     def __init__(self, file_path: str) -> None:
         self._file_path = file_path
-        self._pricing_cache: Dict[str, ModelPricing] = {}
+        self._pricing_cache: dict[str, ModelPricing] = {}
         self._load_pricing()
 
     def _load_pricing(self) -> None:
@@ -30,7 +29,7 @@ class YAMLPricingProvider(BasePricingProvider):
             return
 
         try:
-            with open(self._file_path, "r", encoding="utf-8") as f:
+            with open(self._file_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
                 models_data = data.get("models", {})
                 for model, costs in models_data.items():

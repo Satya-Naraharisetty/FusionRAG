@@ -1,8 +1,15 @@
 import asyncio
-from uuid import UUID
 from typing import Any
-from app.documents.domain.interfaces import DenseRetriever, EmbeddingGenerator, VectorStore, ChunkRepository
+from uuid import UUID
+
+from app.documents.domain.interfaces import (
+    ChunkRepository,
+    DenseRetriever,
+    EmbeddingGenerator,
+    VectorStore,
+)
 from app.documents.domain.models import RetrievedChunk
+
 
 class QdrantDenseRetriever(DenseRetriever):
     def __init__(

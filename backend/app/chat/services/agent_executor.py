@@ -1,9 +1,11 @@
 import asyncio
+import json
 import logging
 import time
 import uuid
-from datetime import datetime, UTC
-from typing import Any, AsyncIterator, Callable, Coroutine
+from collections.abc import AsyncIterator, Callable, Coroutine
+from datetime import UTC, datetime
+from typing import Any
 
 from app.chat.domain.agents import (
     AgentIteration,
@@ -14,11 +16,17 @@ from app.chat.domain.agents import (
     ToolResult,
 )
 from app.chat.domain.exceptions import AgentIterationLimitExceeded
-from app.chat.domain.models import ChatMessage, ChatRole, MessageRole, MessageStatus, ConversationMessage, Usage
 from app.chat.domain.interfaces import LLMProvider, TokenEstimator
+from app.chat.domain.models import (
+    ChatMessage,
+    ChatRole,
+    ConversationMessage,
+    MessageRole,
+    MessageStatus,
+    Usage,
+)
 from app.chat.services.tool_executor import ToolExecutor
 from app.chat.services.tool_registry import ToolRegistry
-
 
 logger = logging.getLogger(__name__)
 

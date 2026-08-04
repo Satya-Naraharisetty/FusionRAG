@@ -2,7 +2,6 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from app.documents.domain.exceptions import (
     DocumentCorrupted,
     InvalidStateTransitionException,

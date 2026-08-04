@@ -1,30 +1,32 @@
 import logging
 import time
 import uuid
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 from uuid import UUID
 
-from app.chat.domain.exceptions import NoRelevantContext, PromptTooLarge, TokenBudgetExceeded
+from app.chat.domain.agents import ToolContext
+from app.chat.domain.exceptions import (
+    NoRelevantContext,
+    PromptTooLarge,
+    TokenBudgetExceeded,
+)
 from app.chat.domain.models import (
     AnswerResponse,
     Citation,
     ConversationContext,
     HistoryRewriteResult,
     MessageRole,
-    MessageStatus,
     RetrievalDiagnostics,
     Usage,
 )
-from app.chat.domain.agents import ToolContext
+from app.chat.services.agent_executor import AgentExecutor
 from app.chat.services.conversation_context_builder import ConversationContextBuilder
 from app.chat.services.conversation_manager import ConversationManager
-from app.chat.services.prompt_builder import PromptBuilder
-from app.chat.services.agent_executor import AgentExecutor
 from app.chat.services.llm_generation_service import LLMGenerationService
+from app.chat.services.prompt_builder import PromptBuilder
 from app.core.logger import request_id_ctx
 from app.documents.services.retrieval_service import RetrievalService
-from app.core.config import settings
-
 
 logger = logging.getLogger(__name__)
 

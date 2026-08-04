@@ -1,19 +1,21 @@
 import os
-from typing import Any, List
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_db, get_current_user_context
+from app.api.dependencies import get_benchmark_runner, get_current_user_context, get_db
 from app.core.config import settings
-from app.evaluation.domain.models import RegressionRun
 from app.evaluation.datasets.dataset_loader import DatasetLoader
+from app.evaluation.infrastructure.persistence.models import (
+    SQLAlchemyEvaluationRun,
+)
+from app.evaluation.reports.report_generator import ReportGenerator
 from app.evaluation.runners.benchmark_runner import BenchmarkRunner
 from app.evaluation.runners.regression_runner import RegressionRunner
-from app.evaluation.reports.report_generator import ReportGenerator
-from app.evaluation.infrastructure.persistence.models import SQLAlchemyEvaluationRun, SQLAlchemyEvaluationResult
 
 router = APIRouter(prefix="/evaluation", tags=["Evaluation"])
 
@@ -44,22 +46,18 @@ def get_report_generator() -> ReportGenerator:
 
 
 # We will fetch BenchmarkRunner directly from dependencies.py DI
-from app.api.dependencies import get_benchmark_runner
 
 
 class BenchmarkRequest(Any):
     pass
 
 
-# Define schemas locally to avoid export errors
-from pydantic import BaseModel, Field
-
 class RunBenchmarkRequest(BaseModel):
     dataset_path: str = Field(..., description="Absolute or relative path to the dataset file.")
     dataset_id: str = Field(..., description="Unique dataset identifier.")
     version: str = Field("1.0.0", description="Dataset version.")
     profile: str = Field("quick", description="Evaluation profile: quick, standard, full, nightly.")
-    pipelines: List[str] | None = Field(default=None, description="Pipelines to execute: retrieval, generation, agent, conversation.")
+    pipelines: list[str] | None = Field(default=None, description="Pipelines to execute: retrieval, generation, agent, conversation.")
     mock: bool = Field(False, description="Whether to simulate metrics outputs without external model execution.")
 
 
@@ -168,7 +166,7 @@ async def run_regression_check(
 def list_evaluation_runs(
     db: Session = Depends(get_db),
     _admin: dict[str, Any] = Depends(check_admin_user)
-) -> List[dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Retrieve all historical evaluation runs from database.
     """

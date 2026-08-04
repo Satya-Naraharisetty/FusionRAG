@@ -1,7 +1,9 @@
 import threading
 from typing import Any
 from uuid import UUID
+
 from app.documents.domain.interfaces import IndexCache
+
 
 class InMemoryIndexCache(IndexCache):
     def __init__(self) -> None:

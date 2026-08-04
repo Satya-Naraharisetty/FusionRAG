@@ -2,20 +2,20 @@ import asyncio
 import logging
 import os
 import subprocess
-import time
 import uuid
-import yaml
-from datetime import datetime, UTC
-from typing import Any, Callable, List
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
+import yaml
 from sqlalchemy.orm import Session
 
 from app.evaluation.domain.models import EvaluationDataset, EvaluationSample
-from app.evaluation.runners.evaluation_runner import EvaluationRunner
 from app.evaluation.infrastructure.persistence.models import (
+    SQLAlchemyBenchmarkRun,
     SQLAlchemyEvaluationRun,
-    SQLAlchemyBenchmarkRun
 )
+from app.evaluation.runners.evaluation_runner import EvaluationRunner
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,8 @@ class BenchmarkRunner:
         self.evaluation_runner = evaluation_runner
 
         # Lifecycle hooks
-        self._before_hooks: List[Callable[[], Any]] = []
-        self._after_hooks: List[Callable[[SQLAlchemyEvaluationRun], Any]] = []
+        self._before_hooks: list[Callable[[], Any]] = []
+        self._after_hooks: list[Callable[[SQLAlchemyEvaluationRun], Any]] = []
 
         # Load profiles manifest
         self.profiles = self._load_profiles()
@@ -46,7 +46,7 @@ class BenchmarkRunner:
                 "benchmark_profiles.yaml"
             )
             if os.path.exists(profile_path):
-                with open(profile_path, "r", encoding="utf-8") as f:
+                with open(profile_path, encoding="utf-8") as f:
                     return yaml.safe_load(f)
         except Exception as e:
             logger.error(f"Failed to load benchmark_profiles.yaml manifest: {e}")

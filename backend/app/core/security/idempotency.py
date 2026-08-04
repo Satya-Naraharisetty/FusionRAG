@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 import redis
 
@@ -22,7 +22,7 @@ class IdempotencyManager:
     def _get_response_key(self, key: str) -> str:
         return f"response:idem:{key}"
 
-    async def check_idempotency(self, key: str) -> Optional[Any]:
+    async def check_idempotency(self, key: str) -> Any | None:
         """
         Check if an idempotency key has a cached response, or acquire an in-progress lock.
         Returns the cached response if available.

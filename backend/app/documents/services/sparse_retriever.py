@@ -1,7 +1,9 @@
-from uuid import UUID
 from typing import Any
-from app.documents.domain.interfaces import SparseRetriever, SparseIndex
+from uuid import UUID
+
+from app.documents.domain.interfaces import SparseIndex, SparseRetriever
 from app.documents.domain.models import RetrievedChunk
+
 
 class BM25Retriever(SparseRetriever):
     def __init__(self, sparse_index: SparseIndex) -> None:

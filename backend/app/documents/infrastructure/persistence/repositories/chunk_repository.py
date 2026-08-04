@@ -1,11 +1,13 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy.orm import Session, joinedload
-
 from app.documents.domain.interfaces import ChunkRepository
 from app.documents.domain.models import Chunk
-from app.documents.infrastructure.persistence.models import SQLAlchemyChunk, SQLAlchemyDocument
+from app.documents.infrastructure.persistence.models import (
+    SQLAlchemyChunk,
+    SQLAlchemyDocument,
+)
+from sqlalchemy.orm import Session, joinedload
 
 
 class SQLAlchemyChunkRepository(ChunkRepository):

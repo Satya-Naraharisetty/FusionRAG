@@ -3,6 +3,7 @@ import logging
 from typing import Any
 from uuid import UUID
 
+from app.documents.domain.interfaces import VectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -13,8 +14,6 @@ from qdrant_client.models import (
     PointStruct,
     VectorParams,
 )
-
-from app.documents.domain.interfaces import VectorStore
 
 logger = logging.getLogger(__name__)
 

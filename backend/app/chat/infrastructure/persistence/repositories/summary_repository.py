@@ -1,10 +1,9 @@
 from uuid import UUID
 
-from sqlalchemy.orm import Session
-
 from app.chat.domain.interfaces import SummaryRepository
 from app.chat.domain.models import ConversationSummary
 from app.chat.infrastructure.persistence.models import ConversationSummaryORM
+from sqlalchemy.orm import Session
 
 
 class SQLAlchemySummaryRepository(SummaryRepository):

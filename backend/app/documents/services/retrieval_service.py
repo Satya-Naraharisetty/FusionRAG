@@ -1,6 +1,6 @@
 import asyncio
-import time
 import logging
+import time
 from typing import Any
 from uuid import UUID
 
@@ -15,12 +15,10 @@ from app.documents.domain.interfaces import (
     SparseRetriever,
 )
 from app.documents.domain.models import (
-    ProcessedQuery,
-    RetrievalMode,
-    RetrievedChunk,
-    SearchResult,
     FusionMethod,
     RerankerName,
+    RetrievalMode,
+    SearchResult,
 )
 
 logger = logging.getLogger(__name__)

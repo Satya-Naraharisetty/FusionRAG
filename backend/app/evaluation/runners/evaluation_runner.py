@@ -1,24 +1,22 @@
-import asyncio
 import logging
 import time
 import uuid
-from datetime import datetime, UTC
-from typing import Any, List
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.evaluation.domain.models import EvaluationDataset, EvaluationSample, EvaluationResult
-from app.evaluation.runners.ragas_provider import RagasProvider
-from app.evaluation.runners.deepeval_provider import DeepEvalProvider
-from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
-from app.evaluation.services.agent_evaluator import AgentEvaluator
-from app.evaluation.services.tool_evaluator import ToolEvaluator
-from app.evaluation.services.conversation_evaluator import ConversationEvaluator
+from app.evaluation.domain.models import EvaluationDataset
 from app.evaluation.infrastructure.persistence.models import (
+    SQLAlchemyEvaluationResult,
     SQLAlchemyEvaluationRun,
-    SQLAlchemyEvaluationResult
 )
+from app.evaluation.runners.deepeval_provider import DeepEvalProvider
+from app.evaluation.runners.ragas_provider import RagasProvider
+from app.evaluation.services.agent_evaluator import AgentEvaluator
+from app.evaluation.services.conversation_evaluator import ConversationEvaluator
+from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
+from app.evaluation.services.tool_evaluator import ToolEvaluator
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,7 @@
 from uuid import UUID
-from app.documents.domain.events import DomainEvent
+
 from app.chat.domain.models import MessageRole
+from app.documents.domain.events import DomainEvent
 
 
 class ConversationCreated(DomainEvent):

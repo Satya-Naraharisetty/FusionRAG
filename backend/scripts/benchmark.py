@@ -6,26 +6,25 @@ import sys
 # Ensure backend directory is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from sqlalchemy.orm import sessionmaker
+from app.api.dependencies import (
+    get_chunk_repository,
+    get_embedding_generator,
+    get_index_cache,
+    get_retrieval_service,
+    get_vector_store,
+)
 from app.core.config import settings
 from app.db.session import init_postgres_engine
 from app.evaluation.datasets.dataset_loader import DatasetLoader
-from app.evaluation.runners.ragas_provider import RagasProvider
-from app.evaluation.runners.deepeval_provider import DeepEvalProvider
-from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
-from app.evaluation.services.agent_evaluator import AgentEvaluator
-from app.evaluation.services.tool_evaluator import ToolEvaluator
-from app.evaluation.services.conversation_evaluator import ConversationEvaluator
-from app.evaluation.runners.benchmark_runner import BenchmarkRunner
 from app.evaluation.reports.report_generator import ReportGenerator
-
-from app.api.dependencies import (
-    get_embedding_generator,
-    get_vector_store,
-    get_chunk_repository,
-    get_index_cache,
-    get_retrieval_service
-)
+from app.evaluation.runners.benchmark_runner import BenchmarkRunner
+from app.evaluation.runners.deepeval_provider import DeepEvalProvider
+from app.evaluation.runners.ragas_provider import RagasProvider
+from app.evaluation.services.agent_evaluator import AgentEvaluator
+from app.evaluation.services.conversation_evaluator import ConversationEvaluator
+from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
+from app.evaluation.services.tool_evaluator import ToolEvaluator
+from sqlalchemy.orm import sessionmaker
 
 
 async def main() -> None:
