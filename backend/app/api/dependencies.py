@@ -170,7 +170,9 @@ async def check_rate_limit(
             auth_header = request.headers.get("Authorization")
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
-                claims = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+                claims = jwt.decode(
+                    token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
+                )
                 sub = claims.get("sub")
                 if sub:
                     identifier = f"user:{sub}"

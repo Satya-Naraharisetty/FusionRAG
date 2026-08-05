@@ -84,7 +84,10 @@ def run_startup_validations() -> None:
     }
 
     # Dynamically validate API keys based on configured providers
-    active_providers = {settings.LLM_PROVIDER.lower(), settings.LLM_PROVIDER_BACKUP.lower()}
+    active_providers = {
+        settings.LLM_PROVIDER.lower(),
+        settings.LLM_PROVIDER_BACKUP.lower(),
+    }
     if "gemini" in active_providers:
         required_vars["GEMINI_API_KEY"] = settings.GEMINI_API_KEY
     if "openai" in active_providers or settings.EMBEDDING_PROVIDER.lower() == "openai":
@@ -107,7 +110,12 @@ def verify_postgres_connectivity(engine) -> None:
     Verifies that the PostgreSQL database container is online and accepting connections.
     """
     import os
-    if "PYTEST_CURRENT_TEST" in os.environ or settings.ENV == "testing" or type(engine).__name__ in ("MagicMock", "Mock"):
+
+    if (
+        "PYTEST_CURRENT_TEST" in os.environ
+        or settings.ENV == "testing"
+        or type(engine).__name__ in ("MagicMock", "Mock")
+    ):
         logger.info("Skipping PostgreSQL connectivity check in testing environment.")
         return
 
@@ -135,7 +143,12 @@ def verify_alembic_migrations(engine) -> None:
     Fails startup if it isn't.
     """
     import os
-    if "PYTEST_CURRENT_TEST" in os.environ or settings.ENV == "testing" or type(engine).__name__ in ("MagicMock", "Mock"):
+
+    if (
+        "PYTEST_CURRENT_TEST" in os.environ
+        or settings.ENV == "testing"
+        or type(engine).__name__ in ("MagicMock", "Mock")
+    ):
         logger.info("Skipping database migration check in testing environment.")
         return
 
@@ -150,18 +163,22 @@ def verify_alembic_migrations(engine) -> None:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         ini_path = os.path.join(base_dir, "alembic.ini")
         if not os.path.exists(ini_path):
-            logger.warning(f"Alembic config not found at {ini_path}. Skipping migration check.")
+            logger.warning(
+                f"Alembic config not found at {ini_path}. Skipping migration check."
+            )
             return
-        
+
         config = Config(ini_path)
         script = ScriptDirectory.from_config(config)
         head_revision = script.get_current_head()
-        
+
         if not head_revision:
             logger.info("No migrations defined. Skipping migration check.")
             return
     except Exception as e:
-        logger.warning(f"Could not load Alembic config or migrations: {e}. Skipping check.")
+        logger.warning(
+            f"Could not load Alembic config or migrations: {e}. Skipping check."
+        )
         return
 
     try:
@@ -169,9 +186,13 @@ def verify_alembic_migrations(engine) -> None:
             context = MigrationContext.configure(conn)
             current_revision = context.get_current_revision()
     except Exception as e:
-        raise ConfigurationError(f"Database migrations check failed. Unable to read current revision: {e}") from e
+        raise ConfigurationError(
+            f"Database migrations check failed. Unable to read current revision: {e}"
+        ) from e
 
-    logger.info(f"Database migration check: DB revision={current_revision}, Code head revision={head_revision}")
+    logger.info(
+        f"Database migration check: DB revision={current_revision}, Code head revision={head_revision}"
+    )
     if current_revision != head_revision:
         raise ConfigurationError(
             f"Database schema is out of date. Current DB revision: {current_revision}, "
@@ -215,6 +236,7 @@ async def lifespan(app: FastAPI):
         # Verify S3 connection if using S3
         if settings.STORAGE_PROVIDER.lower() == "s3":
             from app.api.dependencies import get_storage_provider
+
             logger.info("Verifying S3 storage connectivity...")
             storage_provider = get_storage_provider(db=None)
             storage_provider.verify_connection()

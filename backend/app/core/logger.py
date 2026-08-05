@@ -23,6 +23,7 @@ class StructuredJsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         try:
             from app.core.context.request_context import current_request_context
+
             ctx = current_request_context.get()
             user_id = ctx.user_id if ctx else None
             trace_id = ctx.trace_id if ctx else None

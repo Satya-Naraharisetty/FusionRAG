@@ -91,14 +91,17 @@ class DocumentService:
         if self._malware_scanner:
             import os
             import tempfile
+
             with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
                 tmp_file.write(file_bytes)
                 tmp_path = tmp_file.name
-            
+
             try:
                 is_clean = await self._malware_scanner.scan(tmp_path)
                 if not is_clean:
-                    raise DocumentCorrupted(f"Malware or virus signature detected in file: {safe_original_name}")
+                    raise DocumentCorrupted(
+                        f"Malware or virus signature detected in file: {safe_original_name}"
+                    )
             finally:
                 try:
                     os.unlink(tmp_path)

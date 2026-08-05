@@ -9,16 +9,23 @@ import httpx
 from sqlalchemy import create_engine, text
 
 # Configure logger
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("smoke_test")
+
 
 def get_env_or_default(key, default):
     # Check if loaded or fallback
     return os.getenv(key) or default
 
+
 # Config variables
 API_URL = get_env_or_default("VITE_API_URL", "http://localhost:8000")
-POSTGRES_URL = get_env_or_default("DATABASE_URL", "postgresql://postgres:postgres_secure_password_123@db:5432/hybrid_rag")
+POSTGRES_URL = get_env_or_default(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres_secure_password_123@db:5432/hybrid_rag",
+)
 REDIS_HOST = get_env_or_default("REDIS_HOST", "redis")
 REDIS_PORT = int(get_env_or_default("REDIS_PORT", "6379"))
 QDRANT_HOST = get_env_or_default("QDRANT_HOST", "qdrant")
@@ -45,6 +52,7 @@ async def run_quick_checks():
     logger.info("Verifying Redis connectivity...")
     try:
         import redis
+
         r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, socket_timeout=3.0)
         if r.ping():
             logger.info("Redis is ONLINE.")
@@ -75,7 +83,9 @@ async def run_quick_checks():
             if res.status_code == 200:
                 logger.info("API readiness health endpoint is GREEN.")
             else:
-                errors.append(f"API health returned status {res.status_code}: {res.text}")
+                errors.append(
+                    f"API health returned status {res.status_code}: {res.text}"
+                )
     except Exception as e:
         logger.error(f"API health connection failed: {e}")
         errors.append("API Offline")
@@ -85,6 +95,7 @@ async def run_quick_checks():
         logger.info("Verifying S3 storage connection (read-only checks)...")
         try:
             import boto3
+
             s3_bucket = get_env_or_default("S3_BUCKET", "hybrid-rag-documents")
             s3_endpoint = os.getenv("S3_ENDPOINT_URL")
             s3_access = os.getenv("S3_ACCESS_KEY_ID")
@@ -112,14 +123,14 @@ async def run_quick_checks():
     if errors:
         logger.error(f"Quick checks completed with ERRORS: {', '.join(errors)}")
         return False
-    
+
     logger.info("All quick checks PASSED successfully.")
     return True
 
 
 async def run_full_e2e_checks():
     logger.info("=== RUNNING FULL E2E SMOKE CHECKS ===")
-    
+
     # Run quick checks first
     quick_passed = await run_quick_checks()
     if not quick_passed:
@@ -130,17 +141,19 @@ async def run_full_e2e_checks():
     headers = {}
     temp_user_id = None
     uploaded_doc_id = None
-    
+
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             # 1. Register temporary user
             logger.info(f"Registering temporary user: {temp_username}...")
             register_payload = {"email": temp_username, "password": temp_password}
-            res = await client.post(f"{API_URL}/api/v1/auth/register", json=register_payload)
+            res = await client.post(
+                f"{API_URL}/api/v1/auth/register", json=register_payload
+            )
             if res.status_code != 201:
                 logger.error(f"Registration failed: {res.status_code} - {res.text}")
                 return False
-            
+
             user_data = res.json()
             temp_user_id = user_data["id"]
             logger.info(f"Temporary user registered successfully (ID: {temp_user_id}).")
@@ -152,7 +165,7 @@ async def run_full_e2e_checks():
             if res.status_code != 200:
                 logger.error(f"Login failed: {res.status_code} - {res.text}")
                 return False
-            
+
             token_data = res.json()
             access_token = token_data["access_token"]
             headers = {"Authorization": f"Bearer {access_token}"}
@@ -162,11 +175,13 @@ async def run_full_e2e_checks():
             logger.info("Uploading test document chunk...")
             test_content = b"This is a smoke test content for Hybrid RAG Chatbot validation. We are checking full flow."
             files = {"file": ("smoketest.txt", test_content, "text/plain")}
-            res = await client.post(f"{API_URL}/api/v1/documents/upload", files=files, headers=headers)
+            res = await client.post(
+                f"{API_URL}/api/v1/documents/upload", files=files, headers=headers
+            )
             if res.status_code != 201:
                 logger.error(f"Upload failed: {res.status_code} - {res.text}")
                 return False
-            
+
             doc_data = res.json()
             uploaded_doc_id = doc_data["id"]
             logger.info(f"Document uploaded successfully (ID: {uploaded_doc_id}).")
@@ -175,20 +190,29 @@ async def run_full_e2e_checks():
             logger.info("Waiting for document parsing and embedding completion...")
             max_attempts = 15
             for attempt in range(1, max_attempts + 1):
-                res = await client.get(f"{API_URL}/api/v1/documents/{uploaded_doc_id}/embeddings/status", headers=headers)
+                res = await client.get(
+                    f"{API_URL}/api/v1/documents/{uploaded_doc_id}/embeddings/status",
+                    headers=headers,
+                )
                 if res.status_code == 200:
                     status_data = res.json()
                     status_str = status_data.get("status")
-                    logger.info(f"Checking status (attempt {attempt}/{max_attempts}): {status_str}")
+                    logger.info(
+                        f"Checking status (attempt {attempt}/{max_attempts}): {status_str}"
+                    )
                     if status_str == "COMPLETED":
-                        logger.info("Document ingestion and embedding processing COMPLETED.")
+                        logger.info(
+                            "Document ingestion and embedding processing COMPLETED."
+                        )
                         break
                     elif status_str == "FAILED":
-                        logger.error(f"Document processing FAILED: {status_data.get('failure_reason')}")
+                        logger.error(
+                            f"Document processing FAILED: {status_data.get('failure_reason')}"
+                        )
                         return False
                 else:
                     logger.warning(f"Failed to fetch status: {res.status_code}")
-                
+
                 await asyncio.sleep(2.0)
             else:
                 logger.error("Timeout waiting for document processing to complete.")
@@ -201,7 +225,7 @@ async def run_full_e2e_checks():
             if res.status_code != 200:
                 logger.error(f"Hybrid search failed: {res.status_code} - {res.text}")
                 return False
-            
+
             search_results = res.json()
             logger.info(f"Hybrid search returned {len(search_results)} results.")
 
@@ -209,14 +233,16 @@ async def run_full_e2e_checks():
             logger.info("Testing Chat Streaming (SSE) response flow...")
             chat_payload = {
                 "question": "What is the content of the uploaded smoketest document?",
-                "stream": True
+                "stream": True,
             }
-            
-            async with client.stream("POST", f"{API_URL}/api/v1/chat", json=chat_payload, headers=headers) as response:
+
+            async with client.stream(
+                "POST", f"{API_URL}/api/v1/chat", json=chat_payload, headers=headers
+            ) as response:
                 if response.status_code != 200:
                     logger.error(f"Chat stream request failed: {response.status_code}")
                     return False
-                
+
                 event_count = 0
                 async for line in response.aiter_lines():
                     if line.strip():
@@ -226,23 +252,27 @@ async def run_full_e2e_checks():
                         if "event: error" in line:
                             logger.error(f"Error returned in SSE stream event: {line}")
                             return False
-                
-                logger.info(f"Chat stream completed successfully. Received {event_count} stream data lines.")
+
+                logger.info(
+                    f"Chat stream completed successfully. Received {event_count} stream data lines."
+                )
 
     except Exception as e:
         logger.exception(f"Unhandled error occurred during E2E checks: {e}")
         return False
-        
+
     finally:
         # Clean up resources to keep the tests idempotent
         logger.info("Initiating E2E teardown cleanup...")
         engine = create_engine(POSTGRES_URL)
-        
+
         if uploaded_doc_id:
             logger.info(f"Deleting test document: {uploaded_doc_id}...")
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
-                    await client.delete(f"{API_URL}/api/v1/documents/{uploaded_doc_id}", headers=headers)
+                    await client.delete(
+                        f"{API_URL}/api/v1/documents/{uploaded_doc_id}", headers=headers
+                    )
                 logger.info("Document deleted.")
             except Exception as e:
                 logger.error(f"Failed to delete test document: {e}")
@@ -257,7 +287,7 @@ async def run_full_e2e_checks():
                         # Delete user
                         conn.execute(
                             text("DELETE FROM users WHERE id = :user_id"),
-                            {"user_id": temp_user_id}
+                            {"user_id": temp_user_id},
                         )
                         trans.commit()
                         logger.info("User records purged successfully.")
@@ -276,16 +306,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--quick",
         action="store_true",
-        help="Run only quick connection checks for backing services"
+        help="Run only quick connection checks for backing services",
     )
     parser.add_argument(
         "--full",
         action="store_true",
-        help="Run quick connection checks and full idempotent E2E validations"
+        help="Run quick connection checks and full idempotent E2E validations",
     )
-    
+
     args = parser.parse_args()
-    
+
     # If no flag is provided, run quick checks by default
     if not args.quick and not args.full:
         args.quick = True

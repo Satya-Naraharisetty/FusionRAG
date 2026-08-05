@@ -36,7 +36,11 @@ def register(
     return user
 
 
-@router.post("/login", response_model=TokenResponseSchema, dependencies=[Depends(check_rate_limit)])
+@router.post(
+    "/login",
+    response_model=TokenResponseSchema,
+    dependencies=[Depends(check_rate_limit)],
+)
 def login(
     response: Response,
     request: Request,

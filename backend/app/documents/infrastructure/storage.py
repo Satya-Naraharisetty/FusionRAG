@@ -122,7 +122,7 @@ class S3StorageProvider(StorageProvider):
         endpoint_url: str | None = None,
     ) -> None:
         self.bucket_name = bucket_name
-        
+
         # Build client arguments dict dynamically to omit None/empty values
         client_kwargs = {}
         if aws_access_key_id:
@@ -133,7 +133,7 @@ class S3StorageProvider(StorageProvider):
             client_kwargs["region_name"] = region_name
         if endpoint_url:
             client_kwargs["endpoint_url"] = endpoint_url
-            
+
         self.s3_client = boto3.client("s3", **client_kwargs)
 
     def verify_connection(self) -> None:
@@ -177,9 +177,7 @@ class S3StorageProvider(StorageProvider):
         ext = pathlib.Path(filename).suffix.lower()
         key = f"user_{user_id}/{document_id}{ext}"
         try:
-            self.s3_client.put_object(
-                Bucket=self.bucket_name, Key=key, Body=content
-            )
+            self.s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=content)
             return key
         except ClientError as e:
             logger.error(f"S3 save failed for key {key}: {e}")
@@ -224,4 +222,3 @@ class S3StorageProvider(StorageProvider):
         except ClientError as e:
             logger.error(f"Failed to generate presigned download URL: {e}")
             raise OSError(f"Presigned URL generation failed: {e}") from e
-

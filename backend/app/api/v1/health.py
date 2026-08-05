@@ -151,6 +151,7 @@ def deep_check(
     # 4. Storage check: test local upload dir permissions or S3 connectivity
     try:
         from app.api.dependencies import get_storage_provider
+
         storage_prov = get_storage_provider(db)
         from app.documents.infrastructure.storage import S3StorageProvider
 
@@ -160,6 +161,7 @@ def deep_check(
             import pathlib
 
             from app.core.config import settings
+
             path = pathlib.Path(settings.UPLOAD_DIR)
             path.mkdir(parents=True, exist_ok=True)
             test_file = path / f"health_check_{int(time.time())}.txt"

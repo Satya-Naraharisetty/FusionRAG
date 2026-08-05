@@ -260,10 +260,7 @@ def test_s3_storage_provider():
     s3.create_bucket(Bucket="test-bucket")
 
     # Verify connection
-    storage = S3StorageProvider(
-        bucket_name="test-bucket",
-        region_name="us-east-1"
-    )
+    storage = S3StorageProvider(bucket_name="test-bucket", region_name="us-east-1")
     storage.verify_connection()
     storage.verify_write_access()
 
@@ -292,4 +289,3 @@ def test_s3_storage_provider():
     storage.delete(key)
     with pytest.raises(FileNotFoundError):
         storage.get(key)
-
