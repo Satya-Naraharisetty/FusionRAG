@@ -1,0 +1,124 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { conversationsApi, ConversationsListResponse } from "../api/conversations";
+import { QUERY_KEYS } from "../lib/constants";
+import { Conversation } from "../types";
+import toast from "react-hot-toast";
+
+export const useConversations = (limit = 100, offset = 0) => {
+  return useQuery({
+    queryKey: [QUERY_KEYS.CONVERSATIONS, limit, offset],
+    queryFn: () => conversationsApi.listConversations(limit, offset),
+  });
+};
+
+export const useConversation = (id: string | null) => {
+  return useQuery({
+    queryKey: [QUERY_KEYS.CONVERSATIONS, id],
+    queryFn: () => (id ? conversationsApi.getConversation(id) : Promise.reject("No ID provided")),
+    enabled: !!id,
+  });
+};
+
+export const useRenameConversation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) =>
+      conversationsApi.patchConversation(id, { title }),
+    onMutate: async ({ id, title }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: [QUERY_KEYS.CONVERSATIONS] });
+
+      // Snapshot the previous value
+      const previousLists = queryClient.getQueriesData<ConversationsListResponse>({
+        queryKey: [QUERY_KEYS.CONVERSATIONS],
+      });
+
+      // Optimistically update to the new value in all matched conversation list caches
+      queryClient.setQueriesData<ConversationsListResponse>(
+        { queryKey: [QUERY_KEYS.CONVERSATIONS] },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            conversations: old.conversations.map((c) =>
+              c.id === id ? { ...c, title, updated_at: new Date().toISOString() } : c
+            ),
+          };
+        }
+      );
+
+      // Also update single conversation cache
+      const previousConv = queryClient.getQueryData<Conversation>([QUERY_KEYS.CONVERSATIONS, id]);
+      if (previousConv) {
+        queryClient.setQueryData<Conversation>([QUERY_KEYS.CONVERSATIONS, id], {
+          ...previousConv,
+          title,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      return { previousLists, previousConv };
+    },
+    onError: (_err, variables, context) => {
+      // Rollback list cache
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, oldData]) => {
+          queryClient.setQueryData(queryKey, oldData);
+        });
+      }
+      // Rollback single conversation cache
+      if (context?.previousConv) {
+        queryClient.setQueryData(
+          [QUERY_KEYS.CONVERSATIONS, variables.id],
+          context.previousConv
+        );
+      }
+      toast.error("Failed to rename conversation.");
+    },
+    onSettled: (_data, _error, variables) => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CONVERSATIONS] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CONVERSATIONS, variables.id] });
+    },
+  });
+};
+
+export const useDeleteConversation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => conversationsApi.deleteConversation(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: [QUERY_KEYS.CONVERSATIONS] });
+
+      const previousLists = queryClient.getQueriesData<ConversationsListResponse>({
+        queryKey: [QUERY_KEYS.CONVERSATIONS],
+      });
+
+      // Optimistically delete from conversation lists
+      queryClient.setQueriesData<ConversationsListResponse>(
+        { queryKey: [QUERY_KEYS.CONVERSATIONS] },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            conversations: old.conversations.filter((c) => c.id !== id),
+          };
+        }
+      );
+
+      return { previousLists };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, oldData]) => {
+          queryClient.setQueryData(queryKey, oldData);
+        });
+      }
+      toast.error("Failed to delete conversation.");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CONVERSATIONS] });
+    },
+  });
+};
