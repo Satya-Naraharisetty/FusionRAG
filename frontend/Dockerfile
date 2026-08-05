@@ -1,11 +1,11 @@
-# Use official Node.js Alpine image
-FROM node:18-alpine
+# Use official Node.js Slim image
+FROM node:20-slim
 
 # Set working directory
 WORKDIR /app
 
 # Copy package configurations and change ownership to node user
-COPY --chown=node:node package*.json /app/
+COPY --chown=node:node package.json /app/
 
 # Install application dependencies
 RUN npm install
