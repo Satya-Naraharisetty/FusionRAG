@@ -68,8 +68,8 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: hybrid_rag_backend_dev
     restart: always
     volumes:

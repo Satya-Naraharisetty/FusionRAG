@@ -25,14 +25,17 @@ WORKDIR /app
 RUN groupadd -g 1000 appuser && \
     useradd -r -u 1000 -g appuser -d /app -s /sbin/nologin appuser
 
-# Copy dependency configs
-COPY pyproject.toml /app/
+# Copy dependency configs and readme
+COPY pyproject.toml uv.lock* README.md /app/
+
+# Copy backend app code for package installation
+COPY backend/app /app/backend/app
 
 # Install application dependencies using uv
-RUN uv pip install --system .
+RUN uv pip install --system . && rm -rf /app/backend
 
-# Copy application source
-COPY . /app
+# Copy the rest of the backend files
+COPY backend /app
 
 # Grant execution rights to our non-root user
 RUN chown -R appuser:appuser /app
