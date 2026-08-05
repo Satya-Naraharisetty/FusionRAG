@@ -158,6 +158,7 @@ def deep_check(
             storage_prov.verify_connection()
         else:
             import pathlib
+
             from app.core.config import settings
             path = pathlib.Path(settings.UPLOAD_DIR)
             path.mkdir(parents=True, exist_ok=True)

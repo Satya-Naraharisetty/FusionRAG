@@ -1,6 +1,7 @@
 import uuid
 from unittest.mock import MagicMock, patch
 
+import boto3
 import pytest
 from app.documents.domain.exceptions import (
     DocumentCorrupted,
@@ -20,11 +21,10 @@ from app.documents.infrastructure.extractors import (
     TXTExtractor,
 )
 from app.documents.infrastructure.storage import LocalStorageProvider, S3StorageProvider
-from moto import mock_aws
-import boto3
 from app.documents.services.chunking import ChunkingService
 from app.documents.services.metadata_extractor import MetadataExtractor
 from app.documents.services.text_cleaner import TextCleaner
+from moto import mock_aws
 
 # --- State Machine Tests ---
 

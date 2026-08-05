@@ -1,10 +1,11 @@
 import logging
 import pathlib
 import uuid
+
 import boto3
-from botocore.exceptions import ClientError
 from app.documents.domain.interfaces import StorageProvider
 from app.documents.infrastructure.persistence.models import SQLAlchemyDocumentFile
+from botocore.exceptions import ClientError
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -182,7 +183,7 @@ class S3StorageProvider(StorageProvider):
             return key
         except ClientError as e:
             logger.error(f"S3 save failed for key {key}: {e}")
-            raise IOError(f"Failed to save file to S3: {e}") from e
+            raise OSError(f"Failed to save file to S3: {e}") from e
 
     def get(self, key: str) -> bytes:
         try:
@@ -192,7 +193,7 @@ class S3StorageProvider(StorageProvider):
             if e.response["Error"]["Code"] == "NoSuchKey":
                 raise FileNotFoundError(f"File not found in S3: {key}")
             logger.error(f"S3 get failed for key {key}: {e}")
-            raise IOError(f"Failed to retrieve file from S3: {e}") from e
+            raise OSError(f"Failed to retrieve file from S3: {e}") from e
 
     def delete(self, key: str) -> None:
         try:
@@ -210,7 +211,7 @@ class S3StorageProvider(StorageProvider):
             return url
         except ClientError as e:
             logger.error(f"Failed to generate presigned upload URL: {e}")
-            raise IOError(f"Presigned URL generation failed: {e}") from e
+            raise OSError(f"Presigned URL generation failed: {e}") from e
 
     def generate_presigned_download_url(self, key: str, expires_in: int = 3600) -> str:
         try:
@@ -222,5 +223,5 @@ class S3StorageProvider(StorageProvider):
             return url
         except ClientError as e:
             logger.error(f"Failed to generate presigned download URL: {e}")
-            raise IOError(f"Presigned URL generation failed: {e}") from e
+            raise OSError(f"Presigned URL generation failed: {e}") from e
 

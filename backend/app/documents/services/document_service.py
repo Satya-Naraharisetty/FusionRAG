@@ -6,12 +6,12 @@ from uuid import UUID
 
 from app.auth.domain.interfaces import TimeProvider, UnitOfWork, UUIDGenerator
 from app.documents.domain.exceptions import (
+    DocumentCorrupted,
     DocumentNotFound,
     DocumentTooLarge,
     DuplicateDocumentException,
     UnauthorizedDocumentAccess,
     UnsupportedDocumentType,
-    DocumentCorrupted,
 )
 from app.documents.domain.interfaces import (
     ChecksumGenerator,
@@ -89,8 +89,8 @@ class DocumentService:
 
         # 4b. Scan for malware if scanner is present
         if self._malware_scanner:
-            import tempfile
             import os
+            import tempfile
             with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
                 tmp_file.write(file_bytes)
                 tmp_path = tmp_file.name

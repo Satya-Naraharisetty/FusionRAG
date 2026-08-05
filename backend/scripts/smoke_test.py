@@ -1,11 +1,10 @@
 import argparse
 import asyncio
-import json
 import logging
 import os
 import sys
-import time
 import uuid
+
 import httpx
 from sqlalchemy import create_engine, text
 
@@ -93,10 +92,14 @@ async def run_quick_checks():
             s3_region = os.getenv("S3_REGION_NAME")
 
             client_kwargs = {}
-            if s3_access: client_kwargs["aws_access_key_id"] = s3_access
-            if s3_secret: client_kwargs["aws_secret_access_key"] = s3_secret
-            if s3_region: client_kwargs["region_name"] = s3_region
-            if s3_endpoint: client_kwargs["endpoint_url"] = s3_endpoint
+            if s3_access:
+                client_kwargs["aws_access_key_id"] = s3_access
+            if s3_secret:
+                client_kwargs["aws_secret_access_key"] = s3_secret
+            if s3_region:
+                client_kwargs["region_name"] = s3_region
+            if s3_endpoint:
+                client_kwargs["endpoint_url"] = s3_endpoint
 
             s3 = boto3.client("s3", **client_kwargs)
             s3.head_bucket(Bucket=s3_bucket)

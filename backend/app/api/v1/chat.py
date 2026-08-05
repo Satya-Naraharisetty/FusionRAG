@@ -7,8 +7,11 @@ from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.api.dependencies import get_answer_generation_service, get_current_user_context, check_rate_limit
-from app.core.security import PromptInjectionScanner
+from app.api.dependencies import (
+    check_rate_limit,
+    get_answer_generation_service,
+    get_current_user_context,
+)
 from app.chat.domain.exceptions import (
     LLMProviderError,
     NoRelevantContext,
@@ -18,6 +21,7 @@ from app.chat.domain.exceptions import (
 )
 from app.chat.domain.models import AnswerResponse
 from app.chat.services.chat_orchestrator import ChatOrchestrator
+from app.core.security import PromptInjectionScanner
 
 logger = logging.getLogger(__name__)
 

@@ -3,7 +3,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
-from app.api.dependencies import get_auth_service, get_current_user_context, check_rate_limit
+from app.api.dependencies import (
+    check_rate_limit,
+    get_auth_service,
+    get_current_user_context,
+)
 from app.auth.domain.schemas import (
     TokenResponseSchema,
     UserCreateSchema,

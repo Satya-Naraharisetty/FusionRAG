@@ -40,7 +40,6 @@ from app.chat.domain.exceptions import (
     TokenBudgetExceeded,
 )
 from app.core.config import ConfigurationError, settings
-from app.core.security import PromptInjectionError
 from app.core.context.request_context import RequestContext, current_request_context
 
 # Run centralized logging configuration setup before other imports
@@ -53,6 +52,7 @@ from app.core.logger import (
     request_status_ctx,
     setup_logging,
 )
+from app.core.security import PromptInjectionError
 from app.documents.domain.exceptions import (
     DocumentCorrupted,
     DocumentExtractionFailed,
@@ -140,10 +140,11 @@ def verify_alembic_migrations(engine) -> None:
         return
 
     logger.info("Verifying database schema migrations are up-to-date...")
-    from alembic.config import Config
-    from alembic.script import ScriptDirectory
-    from alembic.runtime.migration import MigrationContext
     import os
+
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
 
     try:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
