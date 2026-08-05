@@ -147,9 +147,10 @@ def verify_alembic_migrations(engine) -> None:
     if (
         "PYTEST_CURRENT_TEST" in os.environ
         or settings.ENV == "testing"
+        or os.getenv("SKIP_DB_MIGRATION_CHECK", "false").lower() in ("true", "1", "yes")
         or type(engine).__name__ in ("MagicMock", "Mock")
     ):
-        logger.info("Skipping database migration check in testing environment.")
+        logger.info("Skipping database migration check.")
         return
 
     logger.info("Verifying database schema migrations are up-to-date...")

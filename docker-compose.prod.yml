@@ -67,7 +67,7 @@ services:
           cpus: "${QDRANT_CPU_RESERVE:-0.2}"
           memory: "${QDRANT_MEM_RESERVE:-256M}"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      test: ["CMD", "/bin/bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -90,6 +90,7 @@ services:
       - /tmp
     environment:
       - ENV=production
+      - SKIP_DB_MIGRATION_CHECK=${SKIP_DB_MIGRATION_CHECK:-False}
       - PROJECT_NAME=${PROJECT_NAME:-Hybrid RAG Chatbot}
       - API_V1_STR=${API_V1_STR:-/api/v1}
       - POSTGRES_SERVER=db

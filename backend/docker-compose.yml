@@ -42,7 +42,7 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      test: ["CMD", "/bin/bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -58,6 +58,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - SKIP_DB_MIGRATION_CHECK=${SKIP_DB_MIGRATION_CHECK:-False}
       - PROJECT_NAME=${PROJECT_NAME:-Hybrid RAG Chatbot}
       - API_V1_STR=${API_V1_STR:-/api/v1}
       - POSTGRES_SERVER=db
