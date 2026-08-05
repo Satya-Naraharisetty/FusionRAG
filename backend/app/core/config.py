@@ -108,6 +108,12 @@ class Settings(BaseSettings):
     # Ingestion & Upload Configurations
     UPLOAD_DIR: str = "data/uploads"
     MAX_UPLOAD_SIZE: int = 25 * 1024 * 1024  # 25 MB default
+    STORAGE_PROVIDER: str = "database"  # database | local | s3
+    S3_BUCKET: str = "hybrid-rag-documents"
+    S3_ENDPOINT_URL: str | None = None
+    S3_ACCESS_KEY_ID: str | None = None
+    S3_SECRET_ACCESS_KEY: str | None = None
+    S3_REGION_NAME: str | None = None
 
     # Chunking Configurations
     CHUNK_SIZE: int = 500

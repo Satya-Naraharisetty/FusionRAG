@@ -21,15 +21,31 @@ class StructuredJsonFormatter(logging.Formatter):
     """
 
     def format(self, record: logging.LogRecord) -> str:
+        try:
+            from app.core.context.request_context import current_request_context
+            ctx = current_request_context.get()
+            user_id = ctx.user_id if ctx else None
+            trace_id = ctx.trace_id if ctx else None
+            req_id = ctx.request_id if ctx else request_id_ctx.get()
+            ip = ctx.client_ip if ctx else client_ip_ctx.get()
+        except Exception:
+            user_id = None
+            trace_id = None
+            req_id = request_id_ctx.get()
+            ip = client_ip_ctx.get()
+
         log_payload = {
             "timestamp": datetime.now(UTC).isoformat(),
+            "severity": record.levelname,
             "level": record.levelname,
-            "request_id": request_id_ctx.get(),
+            "request_id": req_id,
+            "trace_id": trace_id or req_id,
+            "user_id": user_id,
             "method": request_method_ctx.get(),
             "path": request_path_ctx.get(),
             "status_code": request_status_ctx.get(),
             "duration_ms": request_duration_ctx.get(),
-            "client_ip": client_ip_ctx.get(),
+            "client_ip": ip,
             "logger": record.name,
             "message": record.getMessage(),
         }

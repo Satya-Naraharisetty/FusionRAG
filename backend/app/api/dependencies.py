@@ -133,6 +133,61 @@ async def get_current_user_context(
     return {"user_id": user_id, "role": role}
 
 
+# --- Security & Rate Limiting ---
+
+
+def get_rate_limiter(request: Request) -> Any:
+    from app.core.security.rate_limiter import RateLimiter
+    from app.db.session import get_redis
+
+    if not settings.ENABLE_RATE_LIMITER:
+        return RateLimiter(redis_client=None, requests_per_minute=999999, burst=999999)
+
+    try:
+        redis_client = get_redis(request)
+    except Exception:
+        redis_client = None
+
+    return RateLimiter(
+        redis_client=redis_client,
+        requests_per_minute=settings.RATE_LIMIT_REQUESTS_PER_MINUTE,
+        burst=settings.RATE_LIMIT_BURST,
+    )
+
+
+async def check_rate_limit(
+    request: Request,
+    rate_limiter: Any = Depends(get_rate_limiter),
+) -> None:
+    from app.core.context.request_context import current_request_context
+
+    ctx = current_request_context.get()
+    identifier = None
+    if ctx and ctx.user_id:
+        identifier = f"user:{ctx.user_id}"
+    else:
+        try:
+            auth_header = request.headers.get("Authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                token = auth_header.split(" ")[1]
+                claims = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+                sub = claims.get("sub")
+                if sub:
+                    identifier = f"user:{sub}"
+        except Exception:
+            pass
+
+    if not identifier:
+        ip = request.client.host if request.client else "unknown"
+        identifier = f"ip:{ip}"
+
+    if await rate_limiter.is_rate_limited(identifier):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests. Please try again later.",
+        )
+
+
 # --- Document Component Dependency Injection ---
 
 
@@ -141,9 +196,26 @@ def get_checksum_generator() -> SHA256ChecksumGenerator:
 
 
 def get_storage_provider(db: Session = Depends(get_db)) -> Any:
-    from app.documents.infrastructure.storage import DatabaseStorageProvider
+    from app.core.config import settings
+    from app.documents.infrastructure.storage import (
+        DatabaseStorageProvider,
+        LocalStorageProvider,
+        S3StorageProvider,
+    )
 
-    return DatabaseStorageProvider(db)
+    provider_type = settings.STORAGE_PROVIDER.lower()
+    if provider_type == "s3":
+        return S3StorageProvider(
+            bucket_name=settings.S3_BUCKET,
+            aws_access_key_id=settings.S3_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.S3_SECRET_ACCESS_KEY,
+            region_name=settings.S3_REGION_NAME,
+            endpoint_url=settings.S3_ENDPOINT_URL,
+        )
+    elif provider_type == "local":
+        return LocalStorageProvider(upload_dir=settings.UPLOAD_DIR)
+    else:
+        return DatabaseStorageProvider(db)
 
 
 def get_extractor_factory() -> ExtractorFactory:
@@ -266,6 +338,12 @@ def get_document_processing_service(
     )
 
 
+def get_malware_scanner() -> Any:
+    from app.core.security.malware import StubMalwareScanner
+
+    return StubMalwareScanner()
+
+
 def get_document_service(
     background_tasks: BackgroundTasks,
     request: Request,
@@ -299,6 +377,7 @@ def get_document_service(
         uuid_generator=SystemUUIDGenerator(),
         time_provider=SystemTimeProvider(),
         max_upload_size=settings.MAX_UPLOAD_SIZE,
+        malware_scanner=get_malware_scanner(),
     )
 
 

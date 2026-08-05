@@ -148,17 +148,22 @@ def deep_check(
         qdrant_status = f"unhealthy: {str(e)}"
         is_healthy = False
 
-    # 4. Storage check: test write permissions on the upload dir
+    # 4. Storage check: test local upload dir permissions or S3 connectivity
     try:
-        import pathlib
+        from app.api.dependencies import get_storage_provider
+        storage_prov = get_storage_provider(db)
+        from app.documents.infrastructure.storage import S3StorageProvider
 
-        from app.core.config import settings
-
-        path = pathlib.Path(settings.UPLOAD_DIR)
-        path.mkdir(parents=True, exist_ok=True)
-        test_file = path / f"health_check_{int(time.time())}.txt"
-        test_file.write_text("health check")
-        test_file.unlink()
+        if isinstance(storage_prov, S3StorageProvider):
+            storage_prov.verify_connection()
+        else:
+            import pathlib
+            from app.core.config import settings
+            path = pathlib.Path(settings.UPLOAD_DIR)
+            path.mkdir(parents=True, exist_ok=True)
+            test_file = path / f"health_check_{int(time.time())}.txt"
+            test_file.write_text("health check")
+            test_file.unlink()
     except Exception as e:
         logger.error(f"Deep health Storage check failed: {e}")
         storage_status = f"unhealthy: {str(e)}"

@@ -10,55 +10,7 @@ from app.chat.domain.agents import (
     ToolResult,
 )
 from app.chat.services.tools.base import BuiltinTool
-
-
-class SafeCalculator:
-    _operators = {
-        ast.Add: operator.add,
-        ast.Sub: operator.sub,
-        ast.Mult: operator.mul,
-        ast.Div: operator.truediv,
-        ast.FloorDiv: operator.floordiv,
-        ast.Mod: operator.mod,
-        ast.Pow: operator.pow,
-        ast.USub: operator.neg,
-        ast.UAdd: lambda x: x,
-    }
-
-    def evaluate(self, expression: str) -> float:
-        expression = expression.strip()
-        if not expression:
-            raise ValueError("Expression is empty")
-
-        try:
-            node = ast.parse(expression, mode="eval")
-            return self._eval_node(node.body)
-        except Exception as e:
-            raise ValueError(f"Invalid math syntax: {e}")
-
-    def _eval_node(self, node):
-        if isinstance(node, ast.Constant):  # Python >= 3.8
-            if isinstance(node.value, (int, float)):
-                return node.value
-            raise TypeError(f"Constant must be numeric, got {type(node.value)}")
-        elif isinstance(node, ast.BinOp):
-            left = self._eval_node(node.left)
-            right = self._eval_node(node.right)
-            op_type = type(node.op)
-            if op_type in self._operators:
-                if op_type == ast.Pow:
-                    if right > 1000:
-                        raise ValueError("Exponent too large. Max power is 1000.")
-                return self._operators[op_type](left, right)
-            raise TypeError(f"Unsupported binary operator: {op_type.__name__}")
-        elif isinstance(node, ast.UnaryOp):
-            operand = self._eval_node(node.operand)
-            op_type = type(node.op)
-            if op_type in self._operators:
-                return self._operators[op_type](operand)
-            raise TypeError(f"Unsupported unary operator: {op_type.__name__}")
-        else:
-            raise TypeError(f"Unsupported syntax: {type(node).__name__}")
+from app.core.security.sandboxing import SafeCalculator
 
 
 class CalculatorTool(BuiltinTool):

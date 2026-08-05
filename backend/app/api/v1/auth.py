@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
-from app.api.dependencies import get_auth_service, get_current_user_context
+from app.api.dependencies import get_auth_service, get_current_user_context, check_rate_limit
 from app.auth.domain.schemas import (
     TokenResponseSchema,
     UserCreateSchema,
@@ -17,7 +17,10 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post(
-    "/register", response_model=UserResponseSchema, status_code=status.HTTP_201_CREATED
+    "/register",
+    response_model=UserResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(check_rate_limit)],
 )
 def register(
     payload: UserCreateSchema, auth_service: AuthService = Depends(get_auth_service)
@@ -29,7 +32,7 @@ def register(
     return user
 
 
-@router.post("/login", response_model=TokenResponseSchema)
+@router.post("/login", response_model=TokenResponseSchema, dependencies=[Depends(check_rate_limit)])
 def login(
     response: Response,
     request: Request,

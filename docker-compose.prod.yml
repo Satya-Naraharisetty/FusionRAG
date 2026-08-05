@@ -1,0 +1,159 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: hybrid_rag_db_prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_secure_password_123}
+      POSTGRES_DB: ${POSTGRES_DB:-hybrid_rag}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: "${POSTGRES_CPU_LIMIT:-1.0}"
+          memory: "${POSTGRES_MEM_LIMIT:-1G}"
+        reservations:
+          cpus: "${POSTGRES_CPU_RESERVE:-0.2}"
+          memory: "${POSTGRES_MEM_RESERVE:-256M}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-hybrid_rag}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: hybrid_rag_redis_prod
+    restart: always
+    command: redis-server --save "" --appendonly no
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data_prod:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "${REDIS_CPU_LIMIT:-0.5}"
+          memory: "${REDIS_MEM_LIMIT:-256M}"
+        reservations:
+          cpus: "${REDIS_CPU_RESERVE:-0.1}"
+          memory: "${REDIS_MEM_RESERVE:-64M}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:v1.9.0
+    container_name: hybrid_rag_qdrant_prod
+    restart: always
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+    volumes:
+      - qdrant_data_prod:/qdrant/storage
+    deploy:
+      resources:
+        limits:
+          cpus: "${QDRANT_CPU_LIMIT:-1.0}"
+          memory: "${QDRANT_MEM_LIMIT:-1G}"
+        reservations:
+          cpus: "${QDRANT_CPU_RESERVE:-0.2}"
+          memory: "${QDRANT_MEM_RESERVE:-256M}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hybrid_rag_backend_prod
+    restart: always
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    expose:
+      - "8000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      - ENV=production
+      - PROJECT_NAME=${PROJECT_NAME:-Hybrid RAG Chatbot}
+      - API_V1_STR=${API_V1_STR:-/api/v1}
+      - POSTGRES_SERVER=db
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres_secure_password_123}
+      - POSTGRES_DB=${POSTGRES_DB:-hybrid_rag}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - STORAGE_PROVIDER=${STORAGE_PROVIDER:-database}
+      - S3_BUCKET=${S3_BUCKET:-hybrid-rag-documents}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - S3_REGION_NAME=${S3_REGION_NAME}
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+      - LLM_PROVIDER_BACKUP=${LLM_PROVIDER_BACKUP:-openai}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - JWT_SECRET=${JWT_SECRET:-super_secure_random_development_signing_key_32_bytes_at_least}
+      - ENABLE_RATE_LIMITER=${ENABLE_RATE_LIMITER:-True}
+      - RATE_LIMIT_REQUESTS_PER_MINUTE=${RATE_LIMIT_REQUESTS_PER_MINUTE:-60}
+      - RATE_LIMIT_BURST=${RATE_LIMIT_BURST:-10}
+    deploy:
+      resources:
+        limits:
+          cpus: "${BACKEND_CPU_LIMIT:-0.5}"
+          memory: "${BACKEND_MEM_LIMIT:-512M}"
+        reservations:
+          cpus: "${BACKEND_CPU_RESERVE:-0.1}"
+          memory: "${BACKEND_MEM_RESERVE:-128M}"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/health/liveness || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: hybrid_rag_frontend_prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx-ssl:/etc/nginx/ssl:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data_prod:
+  redis_data_prod:
+  qdrant_data_prod:

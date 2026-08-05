@@ -40,6 +40,7 @@ from app.chat.domain.exceptions import (
     TokenBudgetExceeded,
 )
 from app.core.config import ConfigurationError, settings
+from app.core.security import PromptInjectionError
 from app.core.context.request_context import RequestContext, current_request_context
 
 # Run centralized logging configuration setup before other imports
@@ -82,6 +83,17 @@ def run_startup_validations() -> None:
         "JWT_SECRET": settings.JWT_SECRET,
     }
 
+    # Dynamically validate API keys based on configured providers
+    active_providers = {settings.LLM_PROVIDER.lower(), settings.LLM_PROVIDER_BACKUP.lower()}
+    if "gemini" in active_providers:
+        required_vars["GEMINI_API_KEY"] = settings.GEMINI_API_KEY
+    if "openai" in active_providers or settings.EMBEDDING_PROVIDER.lower() == "openai":
+        required_vars["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
+
+    # Dynamically validate S3 settings if storage provider is S3
+    if settings.STORAGE_PROVIDER.lower() == "s3":
+        required_vars["S3_BUCKET"] = settings.S3_BUCKET
+
     empty_vars = [k for k, v in required_vars.items() if not v or not str(v).strip()]
     if empty_vars:
         raise ConfigurationError(
@@ -94,6 +106,11 @@ def verify_postgres_connectivity(engine) -> None:
     """
     Verifies that the PostgreSQL database container is online and accepting connections.
     """
+    import os
+    if "PYTEST_CURRENT_TEST" in os.environ or settings.ENV == "testing" or type(engine).__name__ in ("MagicMock", "Mock"):
+        logger.info("Skipping PostgreSQL connectivity check in testing environment.")
+        return
+
     logger.info("Testing PostgreSQL connection readiness...")
     for attempt in range(1, 6):
         try:
@@ -110,6 +127,56 @@ def verify_postgres_connectivity(engine) -> None:
                 time.sleep(2.0)
 
     raise ConfigurationError("PostgreSQL database connection could not be established.")
+
+
+def verify_alembic_migrations(engine) -> None:
+    """
+    Verifies that the database schema is up-to-date with the latest Alembic migration.
+    Fails startup if it isn't.
+    """
+    import os
+    if "PYTEST_CURRENT_TEST" in os.environ or settings.ENV == "testing" or type(engine).__name__ in ("MagicMock", "Mock"):
+        logger.info("Skipping database migration check in testing environment.")
+        return
+
+    logger.info("Verifying database schema migrations are up-to-date...")
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    from alembic.runtime.migration import MigrationContext
+    import os
+
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        ini_path = os.path.join(base_dir, "alembic.ini")
+        if not os.path.exists(ini_path):
+            logger.warning(f"Alembic config not found at {ini_path}. Skipping migration check.")
+            return
+        
+        config = Config(ini_path)
+        script = ScriptDirectory.from_config(config)
+        head_revision = script.get_current_head()
+        
+        if not head_revision:
+            logger.info("No migrations defined. Skipping migration check.")
+            return
+    except Exception as e:
+        logger.warning(f"Could not load Alembic config or migrations: {e}. Skipping check.")
+        return
+
+    try:
+        with engine.connect() as conn:
+            context = MigrationContext.configure(conn)
+            current_revision = context.get_current_revision()
+    except Exception as e:
+        raise ConfigurationError(f"Database migrations check failed. Unable to read current revision: {e}") from e
+
+    logger.info(f"Database migration check: DB revision={current_revision}, Code head revision={head_revision}")
+    if current_revision != head_revision:
+        raise ConfigurationError(
+            f"Database schema is out of date. Current DB revision: {current_revision}, "
+            f"Latest application migration head: {head_revision}. "
+            "Please run migrations using scripts/migrate.sh."
+        )
 
 
 # 2. Lifespan context manager
@@ -133,6 +200,7 @@ async def lifespan(app: FastAPI):
 
         engine = init_postgres_engine(settings.DATABASE_URL)
         verify_postgres_connectivity(engine)
+        verify_alembic_migrations(engine)
 
         app.state.db_engine = engine
         app.state.db_session_factory = sessionmaker(
@@ -142,6 +210,14 @@ async def lifespan(app: FastAPI):
         app.state.qdrant = init_qdrant_client(
             settings.QDRANT_HOST, settings.QDRANT_PORT
         )
+
+        # Verify S3 connection if using S3
+        if settings.STORAGE_PROVIDER.lower() == "s3":
+            from app.api.dependencies import get_storage_provider
+            logger.info("Verifying S3 storage connectivity...")
+            storage_provider = get_storage_provider(db=None)
+            storage_provider.verify_connection()
+            logger.info("S3 storage connection verified.")
 
         logger.info(
             "Application lifespan initialization completed. Web service online."
@@ -529,6 +605,15 @@ async def streaming_cancelled_handler(_request: Request, exc: StreamingCancelled
         code="STREAMING_CANCELLED",
         message=str(exc),
         status_code=499,
+    )
+
+
+@app.exception_handler(PromptInjectionError)
+async def prompt_injection_handler(_request: Request, exc: PromptInjectionError):
+    return format_error_response(
+        code="PROMPT_INJECTION_DETECTED",
+        message=str(exc),
+        status_code=status.HTTP_400_BAD_REQUEST,
     )
 
 

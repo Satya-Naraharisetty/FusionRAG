@@ -54,7 +54,7 @@ async def upload_document(
     file_bytes = await file.read()
 
     # Delegate orchestration to DocumentService
-    document = document_service.upload_document(
+    document = await document_service.upload_document(
         original_filename=file.filename or "unnamed",
         content_type=file.content_type or "application/octet-stream",
         file_bytes=file_bytes,

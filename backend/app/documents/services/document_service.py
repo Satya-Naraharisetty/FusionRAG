@@ -1,6 +1,7 @@
 import logging
 import pathlib
 import re
+from typing import Any
 from uuid import UUID
 
 from app.auth.domain.interfaces import TimeProvider, UnitOfWork, UUIDGenerator
@@ -10,6 +11,7 @@ from app.documents.domain.exceptions import (
     DuplicateDocumentException,
     UnauthorizedDocumentAccess,
     UnsupportedDocumentType,
+    DocumentCorrupted,
 )
 from app.documents.domain.interfaces import (
     ChecksumGenerator,
@@ -39,6 +41,7 @@ class DocumentService:
         uuid_generator: UUIDGenerator,
         time_provider: TimeProvider,
         max_upload_size: int,
+        malware_scanner: Any = None,
     ) -> None:
         self._document_repo = document_repo
         self._storage_provider = storage_provider
@@ -51,8 +54,9 @@ class DocumentService:
         self._uuid_generator = uuid_generator
         self._time_provider = time_provider
         self._max_upload_size = max_upload_size
+        self._malware_scanner = malware_scanner
 
-    def upload_document(
+    async def upload_document(
         self,
         original_filename: str,
         content_type: str,
@@ -82,6 +86,24 @@ class DocumentService:
             raise
         except Exception as e:
             raise UnsupportedDocumentType(f"Validation failed: {e}") from e
+
+        # 4b. Scan for malware if scanner is present
+        if self._malware_scanner:
+            import tempfile
+            import os
+            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                tmp_file.write(file_bytes)
+                tmp_path = tmp_file.name
+            
+            try:
+                is_clean = await self._malware_scanner.scan(tmp_path)
+                if not is_clean:
+                    raise DocumentCorrupted(f"Malware or virus signature detected in file: {safe_original_name}")
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
 
         # 5. Generate checksum & check for duplicate for THIS user
         checksum = self._checksum_generator.generate(file_bytes)

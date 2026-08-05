@@ -55,6 +55,58 @@ jobs:
           cd backend
           pytest
 
+      - name: Start Docker Compose Production Services
+        run: |
+          echo "PROJECT_NAME=Hybrid RAG Chatbot" > .env
+          echo "API_V1_STR=/api/v1" >> .env
+          echo "POSTGRES_SERVER=db" >> .env
+          echo "POSTGRES_USER=postgres" >> .env
+          echo "POSTGRES_PASSWORD=postgres_secure_password_123" >> .env
+          echo "POSTGRES_PORT=5432" >> .env
+          echo "POSTGRES_DB=hybrid_rag" >> .env
+          echo "REDIS_HOST=redis" >> .env
+          echo "REDIS_PORT=6379" >> .env
+          echo "QDRANT_HOST=qdrant" >> .env
+          echo "QDRANT_PORT=6333" >> .env
+          echo "STORAGE_PROVIDER=database" >> .env
+          echo "LLM_PROVIDER=gemini" >> .env
+          echo "LLM_PROVIDER_BACKUP=openai" >> .env
+          echo "GEMINI_API_KEY=mock_key" >> .env
+          echo "OPENAI_API_KEY=mock_key" >> .env
+          echo "JWT_SECRET=super_secure_random_development_signing_key_32_bytes_at_least" >> .env
+          
+          mkdir -p nginx-ssl/live/localhost
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout nginx-ssl/live/localhost/privkey.pem \
+            -out nginx-ssl/live/localhost/fullchain.pem \
+            -subj "/CN=localhost"
+          
+          docker compose -f docker-compose.prod.yml up --build -d
+
+      - name: Wait for services to be healthy
+        run: |
+          for i in {1..30}; do
+            if docker compose -f docker-compose.prod.yml exec -T backend curl -f http://localhost:8000/api/v1/health/liveness; then
+              echo "Backend is healthy!"
+              break
+            fi
+            echo "Waiting for backend..."
+            sleep 2
+          done
+
+      - name: Run Alembic Migrations
+        run: |
+          docker compose -f docker-compose.prod.yml exec -T backend alembic upgrade head
+
+      - name: Run Smoke Tests (--quick)
+        run: |
+          docker compose -f docker-compose.prod.yml exec -T backend python scripts/smoke_test.py --quick
+
+      - name: Stop Docker Compose Production Services
+        if: always()
+        run: |
+          docker compose -f docker-compose.prod.yml down -v
+
   frontend-checks:
     runs-on: ubuntu-latest
     steps:

@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.api.dependencies import get_answer_generation_service, get_current_user_context
+from app.api.dependencies import get_answer_generation_service, get_current_user_context, check_rate_limit
+from app.core.security import PromptInjectionScanner
 from app.chat.domain.exceptions import (
     LLMProviderError,
     NoRelevantContext,
@@ -43,7 +44,10 @@ class ChatRequest(BaseModel):
 
 
 @router.post(
-    "/chat", response_model=AnswerResponse | None, status_code=status.HTTP_200_OK
+    "/chat",
+    response_model=AnswerResponse | None,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(check_rate_limit)],
 )
 async def chat(
     request: Request,
@@ -54,6 +58,9 @@ async def chat(
     """
     Orchestration endpoint that retrieves documents and generates a grounded response.
     """
+    # Scan prompt for injection before processing
+    PromptInjectionScanner.scan_prompt(chat_req.question)
+
     user_id = UUID(user_context["user_id"])
     top_k = chat_req.top_k or 10
 

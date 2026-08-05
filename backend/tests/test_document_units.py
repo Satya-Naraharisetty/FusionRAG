@@ -19,7 +19,9 @@ from app.documents.infrastructure.extractors import (
     PDFExtractor,
     TXTExtractor,
 )
-from app.documents.infrastructure.storage import LocalStorageProvider
+from app.documents.infrastructure.storage import LocalStorageProvider, S3StorageProvider
+from moto import mock_aws
+import boto3
 from app.documents.services.chunking import ChunkingService
 from app.documents.services.metadata_extractor import MetadataExtractor
 from app.documents.services.text_cleaner import TextCleaner
@@ -249,3 +251,45 @@ def test_extractor_factory():
 
     with pytest.raises(UnsupportedDocumentType):
         factory.get_extractor("application/unknown", "doc.unknown")
+
+
+@mock_aws
+def test_s3_storage_provider():
+    # Setup mock S3 environment
+    s3 = boto3.client("s3", region_name="us-east-1")
+    s3.create_bucket(Bucket="test-bucket")
+
+    # Verify connection
+    storage = S3StorageProvider(
+        bucket_name="test-bucket",
+        region_name="us-east-1"
+    )
+    storage.verify_connection()
+    storage.verify_write_access()
+
+    user_id = uuid.uuid4()
+    doc_id = uuid.uuid4()
+    filename = "test.txt"
+    content = b"Hello S3"
+
+    # Save
+    key = storage.save(filename, content, user_id, doc_id)
+    assert key == f"user_{user_id}/{doc_id}.txt"
+
+    # Get
+    assert storage.get(key) == content
+
+    # Generate presigned URLs
+    upload_url = storage.generate_presigned_upload_url(key)
+    assert "test-bucket" in upload_url
+    assert key in upload_url
+
+    download_url = storage.generate_presigned_download_url(key)
+    assert "test-bucket" in download_url
+    assert key in download_url
+
+    # Delete
+    storage.delete(key)
+    with pytest.raises(FileNotFoundError):
+        storage.get(key)
+

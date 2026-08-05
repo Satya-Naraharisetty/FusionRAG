@@ -10,6 +10,8 @@ class SafeCalculator:
         ast.Sub: operator.sub,
         ast.Mult: operator.mul,
         ast.Div: operator.truediv,
+        ast.FloorDiv: operator.floordiv,
+        ast.Mod: operator.mod,
         ast.Pow: operator.pow,
         ast.USub: operator.neg,
         ast.UAdd: lambda x: x,
@@ -29,7 +31,7 @@ class SafeCalculator:
             tree = ast.parse(expression.strip(), mode="eval")
             return cls._eval_node(tree.body)
         except Exception as e:
-            raise ValueError(f"Invalid or unsafe mathematical expression: {e}")
+            raise ValueError(f"Invalid math syntax: {e}")
 
     @classmethod
     def _eval_node(cls, node: ast.AST) -> int | float:
@@ -48,7 +50,7 @@ class SafeCalculator:
                 if op_type == ast.Pow:
                     if abs(left) > 10000 or right > 15 or right < -15:
                         raise ValueError(
-                            "Exponentiation base or power exceeds safety limits."
+                            "Exponent too large: Exponentiation base or power exceeds safety limits."
                         )
                 return cls._OPERATORS[op_type](left, right)
             raise TypeError(f"Unsupported mathematical operator: {op_type.__name__}")
