@@ -100,6 +100,23 @@ class Settings(BaseSettings):
             return [str(x) for x in v]
         return ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+    @field_validator("COOKIE_DOMAIN", mode="before")
+    @classmethod
+    def assemble_cookie_domain(cls, v: Any) -> str | None:
+        if isinstance(v, str):
+            val = v.strip()
+            return val if val else None
+        return v
+
+    @field_validator("COOKIE_SAMESITE", mode="before")
+    @classmethod
+    def assemble_cookie_samesite(cls, v: Any) -> str:
+        if isinstance(v, str):
+            val = v.strip().lower()
+            if val in ("lax", "strict", "none"):
+                return val
+        return "lax"
+
     # JWT & Cookie Configurations
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
@@ -258,10 +275,18 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         case_sensitive=True,
-        env_file=os.path.join(
-            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")),
-            ".env.testing" if os.getenv("ENV", "").lower() == "testing" else ".env",
-        ),
+        env_file=[
+            os.path.join(
+                os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")),
+                ".env.testing" if os.getenv("ENV", "").lower() == "testing" else ".env",
+            ),
+            os.path.join(
+                os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), "..", "..", "..")
+                ),
+                ".env.testing" if os.getenv("ENV", "").lower() == "testing" else ".env",
+            ),
+        ],
         env_file_encoding="utf-8",
         extra="ignore",
     )
