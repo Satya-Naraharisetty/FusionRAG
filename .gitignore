@@ -233,3 +233,12 @@ node_modules/
 .env*.local
 *.local
 
+# SSL certificates and keys
+nginx-ssl/
+*.pem
+
+# Environment files with secrets
+.env.production
+.env.production.local
+
+
