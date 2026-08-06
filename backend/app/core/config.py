@@ -19,10 +19,10 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     # PostgreSQL Configurations
-    POSTGRES_SERVER: str
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
+    POSTGRES_SERVER: str | None = None
+    POSTGRES_USER: str | None = None
+    POSTGRES_PASSWORD: str | None = None
+    POSTGRES_DB: str | None = None
     POSTGRES_PORT: int = 5432
     DATABASE_URL: str | None = None
 
@@ -30,7 +30,18 @@ class Settings(BaseSettings):
     @classmethod
     def assemble_db_connection(cls, v: str | None, info: ValidationInfo) -> Any:
         if isinstance(v, str) and v.strip():
-            return v
+            db_url = v.strip()
+            if "pgbouncer=" in db_url.lower():
+                from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
+                parsed = urlparse(db_url)
+                qsl = [
+                    (k, v)
+                    for k, v in parse_qsl(parsed.query)
+                    if k.lower() != "pgbouncer"
+                ]
+                db_url = urlunparse(parsed._replace(query=urlencode(qsl)))
+            return db_url
         data = info.data
 
         # Verify required database connection credentials are provided
@@ -48,7 +59,7 @@ class Settings(BaseSettings):
             missing_str = ", ".join(missing_fields)
             raise ConfigurationError(
                 f"Cannot assemble DATABASE_URL due to missing "
-                f"PostgreSQL configurations: {missing_str}"
+                f"PostgreSQL configurations (either set DATABASE_URL or set individual POSTGRES_* config): {missing_str}"
             )
 
         return f"postgresql://{data.get('POSTGRES_USER')}:{data.get('POSTGRES_PASSWORD')}@{data.get('POSTGRES_SERVER')}:{data.get('POSTGRES_PORT')}/{data.get('POSTGRES_DB')}"

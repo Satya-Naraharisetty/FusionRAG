@@ -62,12 +62,21 @@ def init_postgres_engine(database_url: str) -> Engine:
     """
     Instantiates a database engine with connection pooling parameters.
     """
-    return create_engine(
-        database_url,
-        pool_pre_ping=True,  # Validates connection health before handing it to a worker
-        pool_size=10,
-        max_overflow=20,
-    )
+    engine_kwargs = {
+        "pool_pre_ping": True,
+        "pool_size": 10,
+        "max_overflow": 20,
+    }
+
+    # Strip pgbouncer query parameter as psycopg2 doesn't support it
+    if database_url and "pgbouncer=" in database_url.lower():
+        from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
+        parsed = urlparse(database_url)
+        qsl = [(k, v) for k, v in parse_qsl(parsed.query) if k.lower() != "pgbouncer"]
+        database_url = urlunparse(parsed._replace(query=urlencode(qsl)))
+
+    return create_engine(database_url, **engine_kwargs)
 
 
 _redis_pool = None

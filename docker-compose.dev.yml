@@ -80,6 +80,7 @@ services:
       - SKIP_DB_MIGRATION_CHECK=${SKIP_DB_MIGRATION_CHECK:-False}
       - PROJECT_NAME=${PROJECT_NAME:-Hybrid RAG Chatbot}
       - API_V1_STR=${API_V1_STR:-/api/v1}
+      - DATABASE_URL=${DATABASE_URL:-}
       - POSTGRES_SERVER=db
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres_secure_password_123}

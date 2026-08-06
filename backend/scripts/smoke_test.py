@@ -21,6 +21,17 @@ def get_env_or_default(key, default):
 
 
 # Config variables
+def create_smoke_engine(url: str):
+    if url and "pgbouncer=" in url.lower():
+        from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
+        parsed = urlparse(url)
+        qsl = [(k, v) for k, v in parse_qsl(parsed.query) if k.lower() != "pgbouncer"]
+        url = urlunparse(parsed._replace(query=urlencode(qsl)))
+
+    return create_engine(url)
+
+
 API_URL = get_env_or_default("VITE_API_URL", "http://localhost:8000")
 POSTGRES_URL = get_env_or_default(
     "DATABASE_URL",
@@ -40,7 +51,7 @@ async def run_quick_checks():
     # 1. Test PostgreSQL connectivity
     logger.info("Verifying PostgreSQL connectivity...")
     try:
-        engine = create_engine(POSTGRES_URL)
+        engine = create_smoke_engine(POSTGRES_URL)
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         logger.info("PostgreSQL is ONLINE.")
@@ -264,7 +275,7 @@ async def run_full_e2e_checks():
     finally:
         # Clean up resources to keep the tests idempotent
         logger.info("Initiating E2E teardown cleanup...")
-        engine = create_engine(POSTGRES_URL)
+        engine = create_smoke_engine(POSTGRES_URL)
 
         if uploaded_doc_id:
             logger.info(f"Deleting test document: {uploaded_doc_id}...")

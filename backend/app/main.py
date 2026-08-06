@@ -76,12 +76,13 @@ def run_startup_validations() -> None:
     """
     logger.info("Auditing environment settings configurations...")
     required_vars = {
-        "POSTGRES_SERVER": settings.POSTGRES_SERVER,
-        "POSTGRES_DB": settings.POSTGRES_DB,
         "REDIS_HOST": settings.REDIS_HOST,
         "QDRANT_HOST": settings.QDRANT_HOST,
         "JWT_SECRET": settings.JWT_SECRET,
     }
+    if not settings.DATABASE_URL:
+        required_vars["POSTGRES_SERVER"] = settings.POSTGRES_SERVER
+        required_vars["POSTGRES_DB"] = settings.POSTGRES_DB
 
     # Dynamically validate API keys based on configured providers
     active_providers = {
