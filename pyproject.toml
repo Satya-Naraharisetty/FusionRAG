@@ -12,7 +12,7 @@ dependencies = [
     "psycopg2-binary>=2.9.9",
     "sqlalchemy>=2.0.28",
     "redis>=5.0.3",
-    "qdrant-client>=1.8.0",
+    "qdrant-client>=1.8.0,<1.10.0",
     "httpx>=0.27.0",
     "httpx2",
     "pyjwt>=2.8.0",

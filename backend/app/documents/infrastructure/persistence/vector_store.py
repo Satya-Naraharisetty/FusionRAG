@@ -171,7 +171,7 @@ class QdrantVectorStore(VectorStore):
             query_vector=query_vector,
             query_filter=Filter(must=must_conditions),
             limit=top_k,
-            timeout=timeout,
+            timeout=int(timeout) if timeout is not None else None,
         )
 
         return [

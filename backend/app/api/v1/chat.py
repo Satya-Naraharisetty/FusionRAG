@@ -4,6 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -98,7 +99,7 @@ async def chat(
                         )
                         raise StreamingCancelled("Client disconnected.")
 
-                    yield f"event: {event['event']}\ndata: {json.dumps(event['data'])}\n\n"
+                    yield f"event: {event['event']}\ndata: {json.dumps(jsonable_encoder(event['data']))}\n\n"
             except NoRelevantContext as e:
                 yield f"event: error\ndata: {json.dumps({'code': 'NO_RELEVANT_CONTEXT', 'message': str(e)})}\n\n"
             except (PromptTooLarge, TokenBudgetExceeded) as e:

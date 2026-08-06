@@ -231,14 +231,19 @@ async def run_full_e2e_checks():
 
             # 5. Perform a hybrid search query
             logger.info("Executing hybrid search query...")
-            search_url = f"{API_URL}/api/v1/search?query=hybrid+chatbot&limit=5"
-            res = await client.get(search_url, headers=headers)
+            search_url = f"{API_URL}/api/v1/search"
+            res = await client.post(
+                search_url,
+                json={"query": "hybrid chatbot", "top_k": 5},
+                headers=headers,
+            )
             if res.status_code != 200:
                 logger.error(f"Hybrid search failed: {res.status_code} - {res.text}")
                 return False
 
             search_results = res.json()
-            logger.info(f"Hybrid search returned {len(search_results)} results.")
+            results_list = search_results.get("results", [])
+            logger.info(f"Hybrid search returned {len(results_list)} results.")
 
             # 6. Call Chat Streaming endpoint (SSE)
             logger.info("Testing Chat Streaming (SSE) response flow...")

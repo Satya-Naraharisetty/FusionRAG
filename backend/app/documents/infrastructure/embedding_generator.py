@@ -80,3 +80,84 @@ class OpenAIEmbeddingGenerator(EmbeddingGenerator):
                     time.sleep(sleep_time)
                     continue
                 raise
+
+
+class GeminiEmbeddingGenerator(EmbeddingGenerator):
+    """
+    Gemini implementation of the EmbeddingGenerator.
+    Queries the Google Generative Language API via HTTP POST using httpx.
+    """
+
+    def __init__(self, api_key: str, model: str, dimension: int) -> None:
+        self._api_key = api_key
+        # Ensure the model name format is correct (models/text-embedding-004)
+        if not model.startswith("models/"):
+            self._model = f"models/{model}"
+        else:
+            self._model = model
+        self._dimension = dimension
+
+    def generate(self, text: str) -> list[float]:
+        results = self.batch_generate([text])
+        if not results:
+            raise RuntimeError("Gemini API failed to return embeddings.")
+        return results[0]
+
+    def batch_generate(self, texts: list[str]) -> list[list[float]]:
+        import time
+
+        if not texts:
+            return []
+
+        # Gemini batch embedding endpoint
+        url = f"https://generativelanguage.googleapis.com/v1beta/{self._model}:batchEmbedContents?key={self._api_key}"
+
+        requests_payload = []
+        for text in texts:
+            requests_payload.append(
+                {"model": self._model, "content": {"parts": [{"text": text}]}}
+            )
+
+        payload = {"requests": requests_payload}
+
+        max_retries = 3
+        backoff_factor = 2.0
+
+        for attempt in range(max_retries):
+            try:
+                with httpx.Client() as client:
+                    response = client.post(
+                        url,
+                        json=payload,
+                        headers={"Content-Type": "application/json"},
+                        timeout=30.0,
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+
+                    embeddings = [item["values"] for item in data["embeddings"]]
+
+                    for i, emb in enumerate(embeddings):
+                        if len(emb) != self._dimension:
+                            raise ValueError(
+                                f"Embedding dimension mismatch at index {i}: "
+                                f"expected {self._dimension}, got {len(emb)}"
+                            )
+
+                    return embeddings
+            except httpx.HTTPStatusError as e:
+                status_code = e.response.status_code
+                if (
+                    status_code in (429, 500, 502, 503, 504)
+                    and attempt < max_retries - 1
+                ):
+                    sleep_time = backoff_factor**attempt
+                    time.sleep(sleep_time)
+                    continue
+                raise
+            except httpx.RequestError:
+                if attempt < max_retries - 1:
+                    sleep_time = backoff_factor**attempt
+                    time.sleep(sleep_time)
+                    continue
+                raise

@@ -242,15 +242,26 @@ def get_chunking_service() -> ChunkingService:
 
 
 def get_embedding_generator() -> EmbeddingGenerator:
-    from app.documents.infrastructure.embedding_generator import (
-        OpenAIEmbeddingGenerator,
-    )
+    if settings.EMBEDDING_PROVIDER.lower() == "gemini":
+        from app.documents.infrastructure.embedding_generator import (
+            GeminiEmbeddingGenerator,
+        )
 
-    return OpenAIEmbeddingGenerator(
-        api_key=settings.OPENAI_API_KEY,
-        model=settings.EMBEDDING_MODEL,
-        dimension=settings.EMBEDDING_DIMENSION,
-    )
+        return GeminiEmbeddingGenerator(
+            api_key=settings.GEMINI_API_KEY,
+            model=settings.EMBEDDING_MODEL,
+            dimension=settings.EMBEDDING_DIMENSION,
+        )
+    else:
+        from app.documents.infrastructure.embedding_generator import (
+            OpenAIEmbeddingGenerator,
+        )
+
+        return OpenAIEmbeddingGenerator(
+            api_key=settings.OPENAI_API_KEY,
+            model=settings.EMBEDDING_MODEL,
+            dimension=settings.EMBEDDING_DIMENSION,
+        )
 
 
 def get_vector_store(request: Request = None) -> VectorStore:
