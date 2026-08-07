@@ -7,6 +7,12 @@ import {
   Database,
   Calendar,
   Layers,
+  CheckSquare,
+  Square,
+  GripVertical,
+  Copy,
+  Download,
+  FolderOpen,
 } from "lucide-react";
 import { Document } from "../../types";
 import { formatBytes, relativeTime, cn } from "../../lib/utils";
@@ -15,6 +21,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuSeparator,
 } from "../ui/dropdown-menu";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
@@ -33,6 +43,17 @@ interface DocumentCardProps {
   onDelete: (id: string) => Promise<unknown>;
   onReprocess: (id: string) => Promise<unknown>;
   onRegenerateEmbeddings: (id: string) => Promise<unknown>;
+  // Phase 5 requirements:
+  isSelected: boolean;
+  onSelectToggle: () => void;
+  documentFolders: { id: string; name: string }[];
+  currentFolderId?: string;
+  onMoveToFolder: (folderId: string | null) => void;
+  onDuplicate: () => void;
+  onExport: () => void;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent) => void;
 }
 
 export const DocumentCard: React.FC<DocumentCardProps> = ({
@@ -40,6 +61,16 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
   onDelete,
   onReprocess,
   onRegenerateEmbeddings,
+  isSelected,
+  onSelectToggle,
+  documentFolders,
+  currentFolderId,
+  onMoveToFolder,
+  onDuplicate,
+  onExport,
+  onDragStart,
+  onDragOver,
+  onDrop,
 }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -63,17 +94,74 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
     failed: "bg-red-950/40 text-red-400 border-red-900/30",
   };
 
+  // Thumbnail file type visual stylings
+  const fileExt = document.original_filename.split(".").pop()?.toLowerCase() || "";
+  const getThumbnailConfig = () => {
+    switch (fileExt) {
+      case "pdf":
+        return { label: "PDF", bg: "bg-red-950/40", border: "border-red-900/30", text: "text-red-400" };
+      case "md":
+        return { label: "MD", bg: "bg-fuchsia-950/40", border: "border-fuchsia-900/30", text: "text-fuchsia-400" };
+      case "docx":
+      case "doc":
+        return { label: "DOCX", bg: "bg-blue-950/40", border: "border-blue-900/30", text: "text-blue-400" };
+      default:
+        return { label: "TXT", bg: "bg-zinc-900/60", border: "border-zinc-800", text: "text-zinc-400" };
+    }
+  };
+
+  const thumb = getThumbnailConfig();
+
   return (
     <>
-      <Card className="group bg-zinc-900/10 backdrop-blur-md border border-zinc-900/80 overflow-hidden hover:border-zinc-800 hover:bg-zinc-900/20 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-all duration-300">
+      <Card
+        draggable="true"
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        className={cn(
+          "group bg-zinc-900/10 backdrop-blur-md border overflow-hidden hover:border-zinc-800 hover:bg-zinc-900/20 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-all duration-300",
+          isSelected ? "border-violet-600/80 bg-violet-950/5" : "border-zinc-900/80"
+        )}
+      >
         <CardContent className="p-4 flex flex-col justify-between h-full gap-4">
           {/* Header Row */}
-          <div className="flex items-start justify-between gap-2.5">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900/60 border border-zinc-850 text-zinc-400 group-hover:text-zinc-200 group-hover:border-zinc-700 transition-all duration-300 flex-shrink-0">
-                <FileText size={15} />
+          <div className="flex items-start justify-between gap-1">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              {/* Drag Handle & Checkbox */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <div className="cursor-grab active:cursor-grabbing text-zinc-650 hover:text-zinc-400 p-0.5" title="Drag to reorder">
+                  <GripVertical size={14} />
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectToggle();
+                  }}
+                  className="text-zinc-500 hover:text-violet-400 cursor-pointer p-0.5"
+                  aria-label={isSelected ? "Deselect file" : "Select file"}
+                >
+                  {isSelected ? (
+                    <CheckSquare size={15} className="text-violet-500 fill-violet-950/20" />
+                  ) : (
+                    <Square size={15} />
+                  )}
+                </button>
               </div>
-              <div className="min-w-0">
+
+              {/* PDF/Text Thumbnail preview */}
+              <div className={cn(
+                "flex h-9 w-9 flex-col items-center justify-center rounded-lg border font-mono font-bold text-[9px] flex-shrink-0 transition-all duration-300 shadow-sm",
+                thumb.bg,
+                thumb.border,
+                thumb.text
+              )}>
+                <FileText size={12} className="mb-0.5" />
+                <span>{thumb.label}</span>
+              </div>
+
+              <div className="min-w-0 flex-1">
                 <h4
                   className="text-xs font-bold text-zinc-200 truncate"
                   title={document.original_filename}
@@ -100,8 +188,55 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-48 bg-zinc-950 border-zinc-800 text-zinc-300"
+                className="w-52 bg-zinc-950 border-zinc-800 text-zinc-300"
               >
+                {/* Move to Folder submenu */}
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="gap-2 text-xs cursor-pointer focus:bg-zinc-900">
+                    <FolderOpen size={12} />
+                    <span>Move to Folder</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="bg-zinc-950 border-zinc-850 text-zinc-300 w-44">
+                    <DropdownMenuItem
+                      onClick={() => onMoveToFolder(null)}
+                      className="text-xs cursor-pointer focus:bg-zinc-900"
+                    >
+                      <span className={!currentFolderId ? "font-bold text-violet-400" : ""}>
+                        No Folder
+                      </span>
+                    </DropdownMenuItem>
+                    {documentFolders.map((folder) => (
+                      <DropdownMenuItem
+                        key={folder.id}
+                        onClick={() => onMoveToFolder(folder.id)}
+                        className="text-xs cursor-pointer focus:bg-zinc-900"
+                      >
+                        <span className={currentFolderId === folder.id ? "font-bold text-violet-400" : ""}>
+                          {folder.name}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+
+                <DropdownMenuItem
+                  onClick={onDuplicate}
+                  className="gap-2 focus:bg-zinc-900 focus:text-zinc-100 cursor-pointer text-xs"
+                >
+                  <Copy size={12} />
+                  <span>Duplicate</span>
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={onExport}
+                  className="gap-2 focus:bg-zinc-900 focus:text-zinc-100 cursor-pointer text-xs"
+                >
+                  <Download size={12} />
+                  <span>Export</span>
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator className="bg-zinc-850" />
+
                 <DropdownMenuItem
                   onClick={() => onReprocess(document.id)}
                   className="gap-2 focus:bg-zinc-900 focus:text-zinc-100 cursor-pointer text-xs"
@@ -161,6 +296,19 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               {document.status}
             </Badge>
 
+            {document.status === "processing" && (
+              <div className="flex items-center gap-1.5 text-blue-400">
+                {/* SVG inline progress ring */}
+                <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span className="text-[9px] font-bold uppercase tracking-wider animate-pulse">
+                  Processing...
+                </span>
+              </div>
+            )}
+
             {document.status === "failed" && document.failure_reason && (
               <span
                 className="text-[9px] text-red-400 max-w-[150px] truncate"
@@ -198,7 +346,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             <Button
               variant="destructive"
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white text-xs"
+              className="bg-red-650 hover:bg-red-750 text-white text-xs"
               disabled={isDeleting}
             >
               {isDeleting ? "Deleting..." : "Delete"}

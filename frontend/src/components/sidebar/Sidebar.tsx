@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import {
@@ -7,6 +7,7 @@ import {
   useDeleteConversation,
 } from "../../hooks/useConversations";
 import { useSidebarState } from "../../hooks/useSidebarState";
+import { useLocalConversationMetadata } from "../../hooks/useLocalConversationMetadata";
 import { SidebarSearch } from "./SidebarSearch";
 import { ConversationList } from "./ConversationList";
 import {
@@ -44,6 +45,74 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
   const renameMutation = useRenameConversation();
   const deleteMutation = useDeleteConversation();
 
+  // Local metadata hook
+  const {
+    pinnedIds,
+    folders,
+    tags,
+    togglePin,
+    createFolder,
+    renameFolder,
+    deleteFolder,
+    moveConversationToFolder,
+    addTag,
+    removeTag,
+  } = useLocalConversationMetadata();
+
+  // Touch gesture swipe handling
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStart.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStart.current) return;
+    const touch = e.touches[0];
+    const diffX = touch.clientX - touchStart.current.x;
+    const diffY = touch.clientY - touchStart.current.y;
+
+    // Detect swiping
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+      if (diffX > 0 && collapsed) {
+        // swipe right -> expand
+        setCollapsed(false);
+        touchStart.current = null;
+      } else if (diffX < 0 && !collapsed) {
+        // swipe left -> collapse
+        setCollapsed(true);
+        touchStart.current = null;
+      }
+    }
+  };
+
+  // Keyboard shortcut for focusing search
+  useEffect(() => {
+    const handleGlobalKeys = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable;
+
+      if (e.key === "/" && !isInput) {
+        e.preventDefault();
+        const searchInput = document.getElementById("sidebar-search-input");
+        if (searchInput) {
+          searchInput.focus();
+        }
+      } else if (e.key === "Escape" && document.activeElement?.id === "sidebar-search-input") {
+        const searchInput = document.getElementById("sidebar-search-input");
+        if (searchInput) {
+          searchInput.blur();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeys);
+    return () => window.removeEventListener("keydown", handleGlobalKeys);
+  }, []);
+
   const handleNewChat = () => {
     navigate("/chat");
   };
@@ -60,8 +129,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
 
   return (
     <aside
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
       className={cn(
-        "flex flex-col bg-zinc-950 border-r border-zinc-800/80 h-full transition-all duration-300 relative z-20",
+        "flex flex-col bg-zinc-950 border-r border-zinc-800/80 h-full transition-all duration-300 relative z-20 select-none",
         collapsed ? "w-16" : "w-[260px]",
         className
       )}
@@ -76,7 +147,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
             <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white font-extrabold text-xs shadow-md">
               H
             </div>
-            <span className="bg-gradient-to-r from-zinc-100 to-zinc-350 bg-clip-text text-transparent">Hybrid RAG</span>
+            <span className="bg-gradient-to-r from-zinc-100 to-zinc-350 bg-clip-text text-transparent">
+              Hybrid RAG
+            </span>
           </div>
         )}
         <Button
@@ -105,7 +178,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           <Plus size={15} />
           {!collapsed && <span>New Chat</span>}
         </Button>
-        
+
         <Button
           onClick={() => navigate("/documents")}
           variant="outline"
@@ -120,9 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       </div>
 
       {/* Search Bar */}
-      {!collapsed && (
-        <SidebarSearch onSearch={(q) => setSearchQuery(q)} />
-      )}
+      {!collapsed && <SidebarSearch onSearch={(q) => setSearchQuery(q)} />}
 
       {/* Conversations Scroll Area */}
       {collapsed ? (
@@ -146,6 +217,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           onRename={async (id, title) => renameMutation.mutateAsync({ id, title })}
           onDelete={async (id) => deleteMutation.mutateAsync(id)}
           searchQuery={searchQuery}
+          pinnedIds={pinnedIds}
+          folders={folders}
+          tags={tags}
+          togglePin={togglePin}
+          createFolder={createFolder}
+          renameFolder={renameFolder}
+          deleteFolder={deleteFolder}
+          moveConversationToFolder={moveConversationToFolder}
+          addTag={addTag}
+          removeTag={removeTag}
         />
       )}
 

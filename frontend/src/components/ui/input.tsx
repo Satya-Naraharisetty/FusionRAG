@@ -1,19 +1,86 @@
 import * as React from "react"
-
 import { cn } from "@/lib/utils"
 
-const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: string
+  labelClassName?: string
+  error?: string
+  helperText?: string
+  leftIcon?: React.ReactNode
+  rightIcon?: React.ReactNode
+}
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, label, labelClassName, error, helperText, leftIcon, rightIcon, id, disabled, required, "aria-describedby": ariaDescribedBy, ...props }, ref) => {
+    const fallbackId = React.useId()
+    const inputId = id || fallbackId
+    const errorId = error ? `${inputId}-error` : undefined
+    const helperId = helperText ? `${inputId}-helper` : undefined
+    const describedBy = [errorId, helperId, ariaDescribedBy].filter(Boolean).join(" ") || undefined
+
     return (
-      <input
-        type={type}
-        className={cn(
-          "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-          className
+      <div className="w-full">
+        {label && (
+          <label
+            htmlFor={inputId}
+            className={cn("block text-sm font-medium text-zinc-200 mb-1.5", labelClassName)}
+          >
+            {label}
+            {required && <span className="text-red-400 ml-1" aria-hidden="true">*</span>}
+          </label>
         )}
-        ref={ref}
-        {...props}
-      />
+        <div className="relative">
+          {leftIcon && (
+            <div
+              className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-zinc-500"
+              aria-hidden="true"
+            >
+              {leftIcon}
+            </div>
+          )}
+          <input
+            type={type}
+            id={inputId}
+            disabled={disabled}
+            required={required}
+            aria-invalid={error ? "true" : "false"}
+            aria-describedby={describedBy}
+            className={cn(
+              "flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 ease-standard",
+              "border-zinc-800 bg-zinc-950/50 text-zinc-100",
+              "hover:border-zinc-700",
+              "focus-visible:border-primary focus-visible:ring-primary/20",
+              leftIcon && "pl-10",
+              rightIcon && "pr-10",
+              error && "border-red-500/50 focus-visible:border-red-500 focus-visible:ring-red-500/20",
+              className
+            )}
+            ref={ref}
+            {...props}
+          />
+          {rightIcon && (
+            <div
+              className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-zinc-500"
+              aria-hidden="true"
+            >
+              {rightIcon}
+            </div>
+          )}
+          {error && (
+            <p id={errorId} className="mt-1.5 text-sm text-red-400 flex items-center gap-1" role="alert">
+              <svg className="h-3.5 w-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              {error}
+            </p>
+          )}
+          {helperText && !error && (
+            <p id={helperId} className="mt-1.5 text-sm text-zinc-500">
+              {helperText}
+            </p>
+          )}
+        </div>
+      </div>
     )
   }
 )

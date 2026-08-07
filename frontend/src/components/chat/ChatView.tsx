@@ -91,9 +91,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ conversationId }) => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-zinc-950">
+    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-zinc-950 relative">
       {/* Messages / Welcome list */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="flex-1 overflow-hidden flex flex-col h-full w-full">
         {isLoading ? (
           <div className="flex-1 flex flex-col gap-6 p-6 max-w-3xl mx-auto w-full pt-16">
             <div className="flex items-center gap-3">
@@ -129,7 +129,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ conversationId }) => {
 
       {/* Connection recovery panel */}
       {connectionLost && (
-        <div className="px-4 md:px-6 max-w-3xl mx-auto w-full">
+        <div className="absolute bottom-28 left-0 right-0 px-4 md:px-6 max-w-3xl mx-auto w-full z-20">
           <StreamingRecovery
             onRetry={retry}
             onContinue={continueFromPartial}
@@ -138,13 +138,15 @@ export const ChatView: React.FC<ChatViewProps> = ({ conversationId }) => {
         </div>
       )}
 
-      {/* Input textbox bar */}
-      <ChatInput
-        conversationId={conversationId}
-        onSend={handleSend}
-        onStop={stop}
-        isStreaming={isStreaming}
-      />
+      {/* Input textbox bar - absolute floating with gradient fade behind */}
+      <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent pt-12 pb-4 px-4">
+        <ChatInput
+          conversationId={conversationId}
+          onSend={handleSend}
+          onStop={stop}
+          isStreaming={isStreaming}
+        />
+      </div>
     </div>
   );
 };

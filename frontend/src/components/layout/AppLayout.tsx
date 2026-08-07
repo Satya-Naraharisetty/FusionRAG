@@ -1,16 +1,27 @@
-import React, { useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Sidebar } from "../sidebar/Sidebar";
 import { MobileDrawer } from "./MobileDrawer";
 import { OfflineBanner } from "./OfflineBanner";
 import { useSidebarState } from "../../hooks/useSidebarState";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 import { CommandPalette } from "../command/CommandPalette";
+import { OnboardingTour } from "./OnboardingTour";
+
 export const AppLayout: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   useSidebarState();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // Focus main-content on page navigation for screen readers
+  useEffect(() => {
+    const mainEl = document.getElementById("main-content");
+    if (mainEl) {
+      mainEl.focus();
+    }
+  }, [location.pathname]);
 
   // Register global shortcuts
   useKeyboardShortcuts({
@@ -61,7 +72,8 @@ export const AppLayout: React.FC = () => {
         {/* Main Content Pane */}
         <main
           id="main-content"
-          className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative"
+          tabIndex={-1}
+          className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative focus:outline-none"
         >
           <Outlet />
         </main>
@@ -69,6 +81,9 @@ export const AppLayout: React.FC = () => {
 
       {/* Global Command Palette */}
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
+
+      {/* Onboarding Tour overlay */}
+      <OnboardingTour />
     </div>
   );
 };

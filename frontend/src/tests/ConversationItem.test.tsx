@@ -39,6 +39,13 @@ describe("ConversationItem", () => {
         onSelect={() => {}}
         onRename={async () => {}}
         onDelete={async () => {}}
+        isPinned={false}
+        onTogglePin={() => {}}
+        folders={[]}
+        onMoveToFolder={() => {}}
+        tags={[]}
+        onAddTag={() => {}}
+        onRemoveTag={() => {}}
       />
     );
     expect(screen.getByText("Mock Conversation")).toBeInTheDocument();
@@ -53,6 +60,13 @@ describe("ConversationItem", () => {
         onSelect={handleSelect}
         onRename={async () => {}}
         onDelete={async () => {}}
+        isPinned={false}
+        onTogglePin={() => {}}
+        folders={[]}
+        onMoveToFolder={() => {}}
+        tags={[]}
+        onAddTag={() => {}}
+        onRemoveTag={() => {}}
       />
     );
 

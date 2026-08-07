@@ -34,7 +34,7 @@ export const EmptyChat: React.FC<EmptyChatProps> = ({ onSelectPrompt }) => {
   ];
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-2xl mx-auto my-auto select-none">
+    <div className="flex-1 flex flex-col items-center justify-center p-6 pb-36 text-center max-w-2xl mx-auto my-auto select-none">
       {/* Decorative center logo with glowing ring */}
       <div className="relative mb-6 group">
         <div className="absolute inset-0 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-2xl blur-md opacity-70 group-hover:opacity-100 transition-opacity duration-500 animate-pulse" />
