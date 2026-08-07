@@ -230,7 +230,12 @@ async def lifespan(app: FastAPI):
         app.state.db_session_factory = sessionmaker(
             autocommit=False, autoflush=False, bind=engine
         )
-        app.state.redis = init_redis_client(settings.REDIS_HOST, settings.REDIS_PORT)
+        app.state.redis = init_redis_client(
+            settings.REDIS_HOST,
+            settings.REDIS_PORT,
+            settings.REDIS_PASSWORD,
+            settings.REDIS_SSL,
+        )
         app.state.qdrant = init_qdrant_client(
             settings.QDRANT_HOST, settings.QDRANT_PORT
         )

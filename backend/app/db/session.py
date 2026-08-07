@@ -82,7 +82,9 @@ def init_postgres_engine(database_url: str) -> Engine:
 _redis_pool = None
 
 
-def init_redis_client(host: str, port: int) -> redis.Redis:
+def init_redis_client(
+    host: str, port: int, password: str | None = None, ssl: bool = False
+) -> redis.Redis:
     """
     Instantiates the Redis key-value cache client connection pool.
     """
@@ -91,6 +93,8 @@ def init_redis_client(host: str, port: int) -> redis.Redis:
         _redis_pool = redis.ConnectionPool(
             host=host,
             port=port,
+            password=password,
+            ssl=ssl,
             decode_responses=True,
             socket_timeout=3.0,
             socket_connect_timeout=3.0,

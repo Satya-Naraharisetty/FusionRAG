@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     # Redis Configurations
     REDIS_HOST: str
     REDIS_PORT: int = 6379
+    REDIS_PASSWORD: str | None = None
+    REDIS_SSL: bool = False
 
     # Qdrant Vector DB Configurations
     QDRANT_HOST: str
