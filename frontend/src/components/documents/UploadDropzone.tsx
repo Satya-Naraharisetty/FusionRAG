@@ -78,20 +78,20 @@ export const UploadDropzone: React.FC = () => {
       {/* Drag Drop Area */}
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${
+        className={`group border border-dashed rounded-2xl p-8.5 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 ${
           isDragActive
-            ? "border-violet-500 bg-violet-950/10"
-            : "border-zinc-800 bg-zinc-950/20 hover:border-zinc-700 hover:bg-zinc-900/10"
+            ? "border-violet-500/80 bg-violet-950/20 shadow-[0_0_20px_rgba(139,92,246,0.15)]"
+            : "border-zinc-850 bg-zinc-900/10 hover:border-zinc-700/80 hover:bg-zinc-900/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.25)]"
         }`}
       >
         <input {...getInputProps()} />
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 mb-3">
-          <Upload size={18} />
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900/60 border border-zinc-800 text-zinc-400 mb-3 group-hover:text-zinc-200 group-hover:border-zinc-700 transition-all duration-300">
+          <Upload size={16} />
         </div>
         <p className="text-xs font-semibold text-zinc-200 mb-1">
           {isDragActive ? "Drop files here..." : "Drag & drop files here"}
         </p>
-        <p className="text-[10px] text-zinc-500">
+        <p className="text-[10px] text-zinc-500 leading-normal">
           Supports PDF, TXT, DOCX, MD (max 50MB)
         </p>
       </div>

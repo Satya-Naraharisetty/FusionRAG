@@ -74,7 +74,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   return (
     <form
       onSubmit={handleSubmit}
-      className="p-4 border-t border-zinc-900 bg-zinc-950/80 backdrop-blur-md relative"
+      className="p-4 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent relative border-t-0"
     >
       <div className="max-w-3xl mx-auto relative flex flex-col gap-2">
         {/* Warning messages */}
@@ -85,7 +85,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         )}
 
-        <div className="relative flex items-end bg-zinc-900 border border-zinc-800/80 focus-within:border-violet-600/80 rounded-xl overflow-hidden shadow-inner">
+        <div className="relative flex items-end bg-zinc-900/40 backdrop-blur-md border border-zinc-800/80 focus-within:border-violet-500/40 focus-within:shadow-[0_0_15px_rgba(139,92,246,0.15)] rounded-2xl overflow-hidden transition-all duration-300">
           <Textarea
             ref={textareaRef}
             value={text}
@@ -94,25 +94,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             placeholder="Ask anything... (Enter to send, Shift+Enter for new line)"
             rows={1}
             disabled={!isOnline}
-            className="flex-1 max-h-[200px] min-h-[44px] bg-transparent border-0 text-zinc-150 text-xs px-4 py-3 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-50 placeholder:text-zinc-500 leading-normal scrollbar-none"
+            className="flex-1 max-h-[200px] min-h-[44px] bg-transparent border-0 text-zinc-150 text-xs px-4 py-3.5 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-50 placeholder:text-zinc-500 leading-relaxed scrollbar-none"
             aria-label="Chat input query"
           />
           
-          <div className="flex items-center h-11 px-3">
+          <div className="flex items-center h-12 px-3">
             {isStreaming ? (
               <Button
                 type="button"
                 onClick={onStop}
-                className="h-8 w-8 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded-full flex items-center justify-center shadow-md cursor-pointer"
+                className="h-8 w-8 bg-zinc-800 hover:bg-zinc-700 text-zinc-150 rounded-full flex items-center justify-center shadow-md cursor-pointer transition-transform active:scale-95 duration-200"
                 aria-label="Stop generation"
               >
-                <Square size={12} fill="currentColor" />
+                <Square size={10} fill="currentColor" />
               </Button>
             ) : (
               <Button
                 type="submit"
                 disabled={!text.trim() || !isOnline}
-                className="h-8 w-8 bg-violet-650 hover:bg-violet-700 disabled:bg-zinc-800 text-white disabled:text-zinc-500 rounded-full flex items-center justify-center shadow-md cursor-pointer transition-all duration-200"
+                className="h-8 w-8 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:opacity-90 disabled:opacity-30 disabled:from-zinc-800 disabled:to-zinc-800 text-white disabled:text-zinc-500 rounded-full flex items-center justify-center shadow-md cursor-pointer transition-all active:scale-95 duration-200"
                 aria-label="Send message"
               >
                 <ArrowUp size={16} strokeWidth={2.5} />

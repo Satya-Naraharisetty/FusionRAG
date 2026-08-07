@@ -65,13 +65,13 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
 
   return (
     <>
-      <Card className="bg-zinc-950/40 border-zinc-900 overflow-hidden shadow-sm hover:border-zinc-800 transition-all duration-200">
+      <Card className="group bg-zinc-900/10 backdrop-blur-md border border-zinc-900/80 overflow-hidden hover:border-zinc-800 hover:bg-zinc-900/20 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-all duration-300">
         <CardContent className="p-4 flex flex-col justify-between h-full gap-4">
           {/* Header Row */}
           <div className="flex items-start justify-between gap-2.5">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 flex-shrink-0">
-                <FileText size={16} />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900/60 border border-zinc-850 text-zinc-400 group-hover:text-zinc-200 group-hover:border-zinc-700 transition-all duration-300 flex-shrink-0">
+                <FileText size={15} />
               </div>
               <div className="min-w-0">
                 <h4

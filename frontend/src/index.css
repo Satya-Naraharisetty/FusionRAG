@@ -54,6 +54,48 @@
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+@theme {
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
+
+  --color-card: var(--bg-secondary);
+  --color-card-foreground: var(--text-primary);
+
+  --color-popover: var(--bg-tertiary);
+  --color-popover-foreground: var(--text-primary);
+
+  --color-primary: var(--accent-primary);
+  --color-primary-foreground: var(--text-primary);
+
+  --color-secondary: var(--bg-secondary);
+  --color-secondary-foreground: var(--text-primary);
+
+  --color-muted: var(--bg-tertiary);
+  --color-muted-foreground: var(--text-muted);
+
+  --color-accent: var(--bg-tertiary);
+  --color-accent-foreground: var(--text-primary);
+
+  --color-destructive: var(--accent-error);
+  --color-destructive-foreground: var(--text-primary);
+
+  --color-border: var(--border-color);
+  --color-input: var(--border-color);
+  --color-ring: var(--accent-primary);
+
+  --radius-lg: var(--radius-lg);
+  --radius-md: var(--radius-md);
+  --radius-sm: var(--radius-sm);
+
+  --font-sans: var(--font-sans);
+  --font-title: var(--font-title);
+
+  --color-violet-650: hsl(250, 84%, 60%);
+  --color-violet-550: hsl(250, 84%, 65%);
+  --color-zinc-150: hsl(210, 40%, 93%);
+  --color-zinc-650: hsl(215, 16%, 37%);
+}
+
 /* Global Reset & Base Layout */
 *,
 *::before,

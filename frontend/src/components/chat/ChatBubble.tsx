@@ -29,8 +29,8 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onRetry }) => {
   return (
     <div
       className={cn(
-        "flex w-full gap-3 py-6 px-4 md:px-6 select-none",
-        isUser ? "bg-transparent flex-row-reverse" : "bg-zinc-900/30 border-y border-zinc-900/40"
+        "flex w-full gap-3 py-6 px-4 md:px-6 select-none group",
+        isUser ? "bg-transparent flex-row-reverse" : "bg-zinc-900/10 border-y border-zinc-900/40 backdrop-blur-xs border-l-2 border-l-violet-600/30"
       )}
       role="article"
       aria-label={isUser ? "User message" : "Assistant response"}

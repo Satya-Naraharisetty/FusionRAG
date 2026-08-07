@@ -86,10 +86,10 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
       <div
         onClick={isEditing ? undefined : onSelect}
         className={cn(
-          "group relative flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-xs font-medium cursor-pointer transition-all duration-200 select-none",
+          "group relative flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-xs font-semibold cursor-pointer transition-all duration-300 select-none border-l-2",
           isActive
-            ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/50"
-            : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent"
+            ? "bg-violet-950/20 text-zinc-100 shadow-sm border-violet-900/30 border-l-violet-500"
+            : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40 border-transparent hover:border-l-zinc-800"
         )}
         role="button"
         aria-current={isActive ? "page" : undefined}
@@ -97,7 +97,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <MessageSquare
             size={14}
-            className={cn("flex-shrink-0", isActive ? "text-violet-500" : "text-zinc-500")}
+            className={cn("flex-shrink-0 transition-colors duration-300", isActive ? "text-violet-400" : "text-zinc-500 group-hover:text-zinc-400")}
           />
           {isEditing ? (
             <Input
@@ -106,11 +106,11 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
               onChange={(e) => setEditTitle(e.target.value)}
               onBlur={handleSaveRename}
               onKeyDown={handleKeyDown}
-              className="h-6 w-full bg-zinc-900 border-zinc-700 text-zinc-200 text-xs px-1.5 py-0.5 rounded focus-visible:ring-1 focus-visible:ring-violet-600"
+              className="h-6 w-full bg-zinc-900 border-zinc-800 text-zinc-200 text-xs px-1.5 py-0.5 rounded-md focus-visible:ring-1 focus-visible:ring-violet-600"
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <span className="truncate pr-4">{conversation.title}</span>
+            <span className="truncate pr-4 transition-colors duration-300">{conversation.title}</span>
           )}
         </div>
 

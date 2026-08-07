@@ -67,16 +67,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       )}
     >
       {/* Top Header */}
-      <div className="flex h-14 items-center justify-between px-3 border-b border-zinc-900/60">
+      <div className="flex h-14 items-center justify-between px-3 border-b border-zinc-900/40">
         {!collapsed && (
           <div
             onClick={handleNewChat}
-            className="flex items-center gap-2 cursor-pointer font-title font-bold text-zinc-100 text-sm pl-1.5"
+            className="flex items-center gap-2 cursor-pointer font-title font-bold text-zinc-100 text-sm pl-1.5 transition-transform duration-200 hover:scale-[1.02]"
           >
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white font-extrabold text-xs">
+            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white font-extrabold text-xs shadow-md">
               H
             </div>
-            <span>Hybrid RAG</span>
+            <span className="bg-gradient-to-r from-zinc-100 to-zinc-350 bg-clip-text text-transparent">Hybrid RAG</span>
           </div>
         )}
         <Button
@@ -84,12 +84,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           size="icon"
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "h-8 w-8 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200",
+            "h-8 w-8 hover:bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors duration-200",
             collapsed && "mx-auto"
           )}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
         </Button>
       </div>
 
@@ -98,11 +98,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
         <Button
           onClick={handleNewChat}
           className={cn(
-            "w-full bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold h-9 rounded-md transition-all duration-200 shadow-md",
+            "w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:shadow-[0_0_15px_rgba(139,92,246,0.25)] border-0 text-white text-xs font-semibold h-9 rounded-lg transition-all duration-300 shadow-md cursor-pointer",
             collapsed ? "px-0 justify-center" : "px-3 justify-start gap-2"
           )}
         >
-          <Plus size={16} />
+          <Plus size={15} />
           {!collapsed && <span>New Chat</span>}
         </Button>
         
@@ -110,11 +110,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           onClick={() => navigate("/documents")}
           variant="outline"
           className={cn(
-            "w-full bg-zinc-900/50 border-zinc-800 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 text-xs font-semibold h-9 rounded-md transition-all duration-200",
+            "w-full bg-zinc-900/20 border-zinc-900 hover:border-zinc-800 text-zinc-300 hover:text-zinc-150 hover:bg-zinc-900/60 text-xs font-semibold h-9 rounded-lg transition-all duration-300 cursor-pointer",
             collapsed ? "px-0 justify-center" : "px-3 justify-start gap-2"
           )}
         >
-          <LayoutGrid size={16} />
+          <LayoutGrid size={15} />
           {!collapsed && <span>Documents</span>}
         </Button>
       </div>
@@ -150,27 +150,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       )}
 
       {/* Bottom User Menu */}
-      <div className="p-3 border-t border-zinc-900/60 mt-auto bg-zinc-950/80">
+      <div className="p-3 border-t border-zinc-900/40 mt-auto bg-zinc-950/40 backdrop-blur-md">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               className={cn(
-                "flex items-center w-full rounded-lg hover:bg-zinc-900 transition-all duration-200 focus:outline-none p-1.5",
+                "flex items-center w-full rounded-xl hover:bg-zinc-900/60 border border-transparent hover:border-zinc-850/40 transition-all duration-300 focus:outline-none p-1.5 cursor-pointer",
                 collapsed ? "justify-center" : "justify-between"
               )}
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <Avatar className="h-7 w-7 bg-violet-650/40 border border-violet-550/30 text-violet-300">
-                  <AvatarFallback className="text-[10px] font-bold bg-transparent">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Avatar className="h-8 w-8 bg-violet-950/40 border border-violet-800/30 text-violet-300 shadow-[0_0_10px_rgba(139,92,246,0.15)] flex-shrink-0">
+                  <AvatarFallback className="text-[11px] font-bold bg-transparent">
                     {userInitials}
                   </AvatarFallback>
                 </Avatar>
                 {!collapsed && user && (
                   <div className="text-left min-w-0">
-                    <p className="text-[11px] font-semibold text-zinc-300 truncate">
+                    <p className="text-[11px] font-bold text-zinc-200 truncate leading-tight">
                       {user.email}
                     </p>
-                    <span className="inline-flex items-center px-1 text-[8px] font-extrabold uppercase rounded bg-zinc-800 text-zinc-400">
+                    <span className="inline-flex items-center px-1 py-0.5 mt-0.5 text-[8px] font-extrabold uppercase rounded bg-zinc-900 text-zinc-400 border border-zinc-800/30 tracking-wider">
                       {user.role}
                     </span>
                   </div>
@@ -178,10 +178,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
               </div>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[200px] bg-zinc-950 border-zinc-800 text-zinc-300">
+          <DropdownMenuContent align="end" className="w-[200px] bg-zinc-950 border-zinc-850 text-zinc-300">
             <DropdownMenuItem
               onClick={() => navigate("/settings")}
-              className="gap-2 focus:bg-zinc-900 focus:text-zinc-100 cursor-pointer"
+              className="gap-2 focus:bg-zinc-900 focus:text-zinc-100 cursor-pointer text-xs font-medium"
             >
               <Settings size={14} />
               <span>Settings</span>
@@ -189,7 +189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
             <DropdownMenuSeparator className="bg-zinc-900" />
             <DropdownMenuItem
               onClick={logout}
-              className="gap-2 text-red-400 focus:bg-red-950/20 focus:text-red-300 cursor-pointer"
+              className="gap-2 text-red-400 focus:bg-red-950/20 focus:text-red-300 cursor-pointer text-xs font-medium"
             >
               <LogOut size={14} />
               <span>Sign Out</span>
