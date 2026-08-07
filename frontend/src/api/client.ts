@@ -11,9 +11,15 @@ const api = axios.create({
   },
 });
 
+export interface TokenResponse {
+  access_token: string;
+  expires_in: number;
+}
+
 let accessToken: string | null = null;
 let onTokenRefreshed: ((token: string) => void) | null = null;
 let onAuthFailure: (() => void) | null = null;
+let activeRefreshPromise: Promise<TokenResponse> | null = null;
 
 export const setAccessToken = (token: string | null) => {
   accessToken = token;
@@ -27,6 +33,24 @@ export const registerTokenRefreshHandler = (handler: (token: string) => void) =>
 
 export const registerAuthFailureHandler = (handler: () => void) => {
   onAuthFailure = handler;
+};
+
+export const executeRefresh = async (): Promise<TokenResponse> => {
+  if (activeRefreshPromise) {
+    return activeRefreshPromise;
+  }
+
+  activeRefreshPromise = (async () => {
+    try {
+      const response = await api.post<TokenResponse>("/auth/refresh");
+      setAccessToken(response.data.access_token);
+      return response.data;
+    } finally {
+      activeRefreshPromise = null;
+    }
+  })();
+
+  return activeRefreshPromise;
 };
 
 // Request Interceptor to inject bearer token
@@ -86,10 +110,9 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const response = await api.post("/auth/refresh");
-        const { access_token } = response.data;
+        const tokenResponse = await executeRefresh();
+        const access_token = tokenResponse.access_token;
 
-        setAccessToken(access_token);
         originalRequest.headers.Authorization = `Bearer ${access_token}`;
 
         if (onTokenRefreshed) {

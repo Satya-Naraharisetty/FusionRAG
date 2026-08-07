@@ -1,4 +1,4 @@
-import api, { setAccessToken } from "./client";
+import api, { setAccessToken, executeRefresh } from "./client";
 
 export interface UserResponse {
   id: string;
@@ -34,9 +34,7 @@ export const authApi = {
   },
 
   async refresh(): Promise<TokenResponse> {
-    const response = await api.post<TokenResponse>("/auth/refresh");
-    setAccessToken(response.data.access_token);
-    return response.data;
+    return executeRefresh();
   },
 
   async logout(): Promise<void> {
