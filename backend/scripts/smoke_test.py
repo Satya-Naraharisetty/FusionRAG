@@ -5,8 +5,8 @@ import os
 import sys
 import uuid
 
-from dotenv import load_dotenv
 import httpx
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
 # Load environment variables from .env file
