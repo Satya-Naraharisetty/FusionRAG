@@ -76,8 +76,6 @@ def run_startup_validations() -> None:
     """
     logger.info("Auditing environment settings configurations...")
     required_vars = {
-        "REDIS_HOST": settings.REDIS_HOST,
-        "QDRANT_HOST": settings.QDRANT_HOST,
         "JWT_SECRET": settings.JWT_SECRET,
     }
     if not settings.DATABASE_URL:
@@ -99,6 +97,15 @@ def run_startup_validations() -> None:
         required_vars["S3_BUCKET"] = settings.S3_BUCKET
 
     empty_vars = [k for k, v in required_vars.items() if not v or not str(v).strip()]
+
+    # Validate Redis config
+    if not settings.REDIS_URL and not settings.REDIS_HOST:
+        empty_vars.append("REDIS_HOST or REDIS_URL")
+
+    # Validate Qdrant config
+    if not settings.QDRANT_URL and not settings.QDRANT_HOST:
+        empty_vars.append("QDRANT_HOST or QDRANT_URL")
+
     if empty_vars:
         raise ConfigurationError(
             f"Startup aborted due to empty required config parameters: "
@@ -231,10 +238,11 @@ async def lifespan(app: FastAPI):
             autocommit=False, autoflush=False, bind=engine
         )
         app.state.redis = init_redis_client(
-            settings.REDIS_HOST,
-            settings.REDIS_PORT,
-            settings.REDIS_PASSWORD,
-            settings.REDIS_SSL,
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            password=settings.REDIS_PASSWORD,
+            ssl=settings.REDIS_SSL,
+            url=settings.REDIS_URL,
         )
         app.state.qdrant = init_qdrant_client(
             settings.QDRANT_HOST,

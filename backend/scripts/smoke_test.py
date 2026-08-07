@@ -39,8 +39,11 @@ POSTGRES_URL = get_env_or_default(
 )
 REDIS_HOST = get_env_or_default("REDIS_HOST", "redis")
 REDIS_PORT = int(get_env_or_default("REDIS_PORT", "6379"))
+REDIS_URL = os.getenv("REDIS_URL")
 QDRANT_HOST = get_env_or_default("QDRANT_HOST", "qdrant")
 QDRANT_PORT = int(get_env_or_default("QDRANT_PORT", "6333"))
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 STORAGE_PROVIDER = get_env_or_default("STORAGE_PROVIDER", "database")
 
 
@@ -64,7 +67,10 @@ async def run_quick_checks():
     try:
         import redis
 
-        r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, socket_timeout=3.0)
+        if REDIS_URL:
+            r = redis.Redis.from_url(REDIS_URL, socket_timeout=3.0)
+        else:
+            r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, socket_timeout=3.0)
         if r.ping():
             logger.info("Redis is ONLINE.")
         else:
@@ -77,7 +83,14 @@ async def run_quick_checks():
     logger.info("Verifying Qdrant connectivity...")
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
-            res = await client.get(f"http://{QDRANT_HOST}:{QDRANT_PORT}/readyz")
+            if QDRANT_URL:
+                headers = {}
+                if QDRANT_API_KEY:
+                    headers["api-key"] = QDRANT_API_KEY
+                url = QDRANT_URL.rstrip("/") + "/readyz"
+                res = await client.get(url, headers=headers)
+            else:
+                res = await client.get(f"http://{QDRANT_HOST}:{QDRANT_PORT}/readyz")
             if res.status_code == 200:
                 logger.info("Qdrant is ONLINE.")
             else:

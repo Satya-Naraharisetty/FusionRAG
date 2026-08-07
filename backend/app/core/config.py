@@ -65,13 +65,14 @@ class Settings(BaseSettings):
         return f"postgresql://{data.get('POSTGRES_USER')}:{data.get('POSTGRES_PASSWORD')}@{data.get('POSTGRES_SERVER')}:{data.get('POSTGRES_PORT')}/{data.get('POSTGRES_DB')}"
 
     # Redis Configurations
-    REDIS_HOST: str
+    REDIS_HOST: str | None = None
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: str | None = None
     REDIS_SSL: bool = False
+    REDIS_URL: str | None = None
 
     # Qdrant Vector DB Configurations
-    QDRANT_HOST: str
+    QDRANT_HOST: str | None = None
     QDRANT_PORT: int = 6333
     QDRANT_COLLECTION: str = "documents"
     QDRANT_API_KEY: str | None = None

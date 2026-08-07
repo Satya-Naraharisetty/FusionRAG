@@ -83,29 +83,45 @@ _redis_pool = None
 
 
 def init_redis_client(
-    host: str, port: int, password: str | None = None, ssl: bool = False
+    host: str | None = None,
+    port: int | None = None,
+    password: str | None = None,
+    ssl: bool = False,
+    url: str | None = None,
 ) -> redis.Redis:
     """
-    Instantiates the Redis key-value cache client connection pool.
+    Instantiates the Redis key-value cache client connection pool or from a connection URL.
     """
     global _redis_pool
     if _redis_pool is None:
-        connection_class = redis.SSLConnection if ssl else redis.Connection
-        _redis_pool = redis.ConnectionPool(
-            host=host,
-            port=port,
-            password=password,
-            connection_class=connection_class,
-            decode_responses=True,
-            socket_timeout=3.0,
-            socket_connect_timeout=3.0,
-            max_connections=50,  # Optimized production size
-        )
+        if url:
+            _redis_pool = redis.ConnectionPool.from_url(
+                url,
+                decode_responses=True,
+                socket_timeout=3.0,
+                socket_connect_timeout=3.0,
+                max_connections=50,
+            )
+        else:
+            connection_class = redis.SSLConnection if ssl else redis.Connection
+            _redis_pool = redis.ConnectionPool(
+                host=host or "localhost",
+                port=port or 6379,
+                password=password,
+                connection_class=connection_class,
+                decode_responses=True,
+                socket_timeout=3.0,
+                socket_connect_timeout=3.0,
+                max_connections=50,  # Optimized production size
+            )
     return redis.Redis(connection_pool=_redis_pool)
 
 
 def init_qdrant_client(
-    host: str, port: int, api_key: str | None = None, url: str | None = None
+    host: str | None = None,
+    port: int | None = None,
+    api_key: str | None = None,
+    url: str | None = None,
 ) -> QdrantClient:
     """
     Instantiates the Qdrant approximate nearest neighbor client.
