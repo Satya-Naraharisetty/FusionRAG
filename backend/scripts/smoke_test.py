@@ -5,8 +5,12 @@ import os
 import sys
 import uuid
 
+from dotenv import load_dotenv
 import httpx
 from sqlalchemy import create_engine, text
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logger
 logging.basicConfig(
