@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://your-backend-vercel-url.vercel.app/api/:path*"
+      "destination": "https://hybrid-rag-gilt.vercel.app/api/:path*"
     },
     {
       "source": "/(.*)",
