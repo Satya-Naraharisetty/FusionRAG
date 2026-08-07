@@ -277,7 +277,12 @@ def get_vector_store(request: Request = None) -> VectorStore:
     else:
         from app.db.session import init_qdrant_client
 
-        qdrant_client = init_qdrant_client(settings.QDRANT_HOST, settings.QDRANT_PORT)
+        qdrant_client = init_qdrant_client(
+            settings.QDRANT_HOST,
+            settings.QDRANT_PORT,
+            settings.QDRANT_API_KEY,
+            settings.QDRANT_URL,
+        )
 
     return QdrantVectorStore(
         client=qdrant_client,

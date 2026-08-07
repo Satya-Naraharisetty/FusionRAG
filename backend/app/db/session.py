@@ -90,11 +90,12 @@ def init_redis_client(
     """
     global _redis_pool
     if _redis_pool is None:
+        connection_class = redis.SSLConnection if ssl else redis.Connection
         _redis_pool = redis.ConnectionPool(
             host=host,
             port=port,
             password=password,
-            ssl=ssl,
+            connection_class=connection_class,
             decode_responses=True,
             socket_timeout=3.0,
             socket_connect_timeout=3.0,
@@ -103,8 +104,14 @@ def init_redis_client(
     return redis.Redis(connection_pool=_redis_pool)
 
 
-def init_qdrant_client(host: str, port: int) -> QdrantClient:
+def init_qdrant_client(
+    host: str, port: int, api_key: str | None = None, url: str | None = None
+) -> QdrantClient:
     """
     Instantiates the Qdrant approximate nearest neighbor client.
     """
-    return QdrantClient(host=host, port=port, timeout=3.0)
+    if url:
+        return QdrantClient(url=url, api_key=api_key, timeout=3.0)
+    if host and (host.startswith("http://") or host.startswith("https://")):
+        return QdrantClient(url=host, api_key=api_key, timeout=3.0)
+    return QdrantClient(host=host, port=port, api_key=api_key, timeout=3.0)

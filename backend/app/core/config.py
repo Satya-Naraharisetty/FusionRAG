@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     QDRANT_HOST: str
     QDRANT_PORT: int = 6333
     QDRANT_COLLECTION: str = "documents"
+    QDRANT_API_KEY: str | None = None
+    QDRANT_URL: str | None = None
 
     # Embedding Configurations
     EMBEDDING_PROVIDER: str = "openai"

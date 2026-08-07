@@ -237,7 +237,10 @@ async def lifespan(app: FastAPI):
             settings.REDIS_SSL,
         )
         app.state.qdrant = init_qdrant_client(
-            settings.QDRANT_HOST, settings.QDRANT_PORT
+            settings.QDRANT_HOST,
+            settings.QDRANT_PORT,
+            settings.QDRANT_API_KEY,
+            settings.QDRANT_URL,
         )
 
         # Verify S3 connection if using S3
