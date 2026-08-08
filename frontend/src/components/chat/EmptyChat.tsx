@@ -9,46 +9,142 @@ export const EmptyChat: React.FC<EmptyChatProps> = ({ onSelectPrompt }) => {
     {
       label: "Summarize my documents",
       prompt: "Can you provide a comprehensive summary of my uploaded documents?",
+      icon: "📄",
     },
     {
       label: "Explain this concept",
       prompt: "Explain how our retrieval pipeline merges vector and sparse results.",
+      icon: "💡",
     },
     {
       label: "Search my knowledge base",
       prompt: "Find all key references to security policies inside the documents.",
+      icon: "🔍",
     },
     {
       label: "Compare these documents",
       prompt: "Compare the architecture guidelines in file A and file B.",
+      icon: "⚖️",
     },
   ];
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 pb-24 text-center max-w-2xl mx-auto my-auto select-none animate-in fade-in duration-300">
-      {/* Premium Minimal Logo */}
-      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black font-extrabold text-lg shadow-xs mb-5 transition-transform duration-300 hover:scale-105 select-none">
-        H
-      </div>
-
-      <h2 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 mb-2">
-        How can I help you today?
-      </h2>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-8 max-w-md leading-relaxed">
-        Upload PDF, TXT, DOCX, or MD files to your library, then ask questions to search and retrieve insights from your grounded knowledge base.
-      </p>
-
-      {/* Grid of subtle prompts */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-lg">
-        {examples.map((item, idx) => (
-          <button
-            key={idx}
-            onClick={() => onSelectPrompt(item.prompt)}
-            className="flex items-center justify-start px-4 py-3 bg-zinc-50 dark:bg-zinc-900/10 hover:bg-zinc-100 dark:hover:bg-zinc-900/40 border border-zinc-200/50 dark:border-[var(--border-color)] hover:border-zinc-300 dark:hover:border-[var(--border-hover)] text-zinc-700 dark:text-zinc-300 text-xs rounded-xl cursor-pointer transition-all duration-200 text-left font-medium"
+    <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8 select-none animate-in fade-in duration-300">
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "600px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          textAlign: "center",
+          gap: 0,
+        }}
+      >
+        {/* Logo Badge */}
+        <div
+          style={{
+            width: "48px",
+            height: "48px",
+            borderRadius: "14px",
+            background: "linear-gradient(135deg, hsl(250,84%,63%) 0%, hsl(282,84%,60%) 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: "24px",
+            boxShadow: "0 0 24px hsla(250,84%,63%,0.3)",
+            flexShrink: 0,
+            transition: "transform 0.2s ease",
+          }}
+          className="hover:scale-105"
+        >
+          <span
+            style={{
+              color: "white",
+              fontWeight: 800,
+              fontSize: "20px",
+              fontFamily: "var(--font-title, Outfit, Inter, sans-serif)",
+              lineHeight: 1,
+            }}
           >
-            <span>{item.label}</span>
-          </button>
-        ))}
+            H
+          </span>
+        </div>
+
+        {/* Main Heading */}
+        <h2
+          style={{
+            fontSize: "30px",
+            fontWeight: 700,
+            letterSpacing: "-0.02em",
+            color: "var(--text-primary, #F5F5F5)",
+            fontFamily: "var(--font-title, Outfit, Inter, sans-serif)",
+            lineHeight: 1.2,
+            marginBottom: "12px",
+          }}
+        >
+          How can I help you today?
+        </h2>
+
+        {/* Supporting text */}
+        <p
+          style={{
+            fontSize: "15px",
+            lineHeight: 1.65,
+            color: "var(--text-secondary, #A3A3A3)",
+            maxWidth: "480px",
+            marginBottom: "36px",
+          }}
+        >
+          Upload PDF, TXT, DOCX, or MD files to your library, then ask
+          questions to search and retrieve grounded insights.
+        </p>
+
+        {/* Prompt Grid */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, 1fr)",
+            gap: "10px",
+            width: "100%",
+          }}
+        >
+          {examples.map((item, idx) => (
+            <button
+              key={idx}
+              onClick={() => onSelectPrompt(item.prompt)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                padding: "14px 16px",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: "12px",
+                cursor: "pointer",
+                textAlign: "left",
+                transition: "all 0.18s ease",
+                minHeight: "52px",
+              }}
+              className="hover:bg-white/[0.07] hover:border-white/[0.12]"
+              aria-label={item.label}
+            >
+              <span style={{ fontSize: "16px", flexShrink: 0, lineHeight: 1 }}>
+                {item.icon}
+              </span>
+              <span
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  color: "var(--text-primary, #F5F5F5)",
+                  lineHeight: 1.35,
+                }}
+              >
+                {item.label}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

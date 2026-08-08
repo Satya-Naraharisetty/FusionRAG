@@ -97,7 +97,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
   const activeModel = activeConv?.settings?.model || "Hybrid RAG v1";
 
   return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-white dark:bg-[var(--bg-primary,#0D0D0D)] relative transition-colors">
+    <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative transition-colors" style={{ background: "var(--bg-primary, #0D0D0D)" }}>
       {/* Top Header toolbar */}
       <ChatToolbar
         title={activeTitle}
@@ -108,7 +108,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-hidden flex flex-col h-full w-full">
         {isLoading ? (
-          <div className="flex-1 flex flex-col gap-6 p-6 max-w-3xl mx-auto w-full pt-16 select-none">
+          <div className="flex-1 flex flex-col gap-6 p-8 max-w-[780px] mx-auto w-full pt-16 select-none">
             <div className="flex items-center gap-3">
               <Skeleton className="h-8 w-8 rounded-full bg-zinc-100 dark:bg-zinc-800" />
               <div className="space-y-2 flex-1">
@@ -152,7 +152,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
       )}
 
       {/* Fixed bottom input wrapper */}
-      <div className="w-full bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[var(--bg-primary,#0D0D0D)] dark:via-[var(--bg-primary,#0D0D0D)]/95 dark:to-transparent pt-12 pb-6 flex justify-center z-10 shrink-0">
+      <div
+        style={{
+          width: "100%",
+          background: "linear-gradient(to top, var(--bg-primary, #0D0D0D) 0%, var(--bg-primary, #0D0D0D) 65%, transparent 100%)",
+          paddingTop: "40px",
+          paddingBottom: "20px",
+          display: "flex",
+          justifyContent: "center",
+          zIndex: 10,
+          flexShrink: 0,
+        }}
+      >
         <ChatInput
           conversationId={conversationId}
           onSend={handleSend}

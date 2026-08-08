@@ -45,16 +45,31 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
           role="article"
           aria-label="User message"
         >
-          <div className="w-full max-w-3xl flex justify-end px-4 sm:px-6">
-            <div className="flex flex-col items-end gap-1.5 max-w-[75%]">
-              <div className="relative px-4 py-2.5 rounded-2xl bg-zinc-100/80 dark:bg-[var(--bg-tertiary,#1E1E1E)] text-zinc-900 dark:text-zinc-150 text-xs sm:text-[13px] sm:leading-relaxed font-sans shadow-xs border border-zinc-200/40 dark:border-[var(--border-color)] select-text">
+          <div className="w-full max-w-[780px] flex justify-end px-6">
+            <div className="flex flex-col items-end gap-1.5 max-w-[72%]">
+              <div
+                style={{
+                  padding: "12px 16px",
+                  borderRadius: "18px",
+                  background: "var(--bg-tertiary, #1E1E1E)",
+                  color: "var(--text-primary, #F5F5F5)",
+                  fontSize: "15px",
+                  lineHeight: 1.6,
+                  fontFamily: "inherit",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
+                className="select-text"
+              >
                 {message.content ? (
                   <MarkdownRenderer content={message.content} />
                 ) : null}
               </div>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="text-[10px] text-zinc-400 dark:text-zinc-550 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-default">
+                  <span
+                    style={{ fontSize: "11px", color: "var(--text-muted, #737373)", marginRight: "6px" }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-default"
+                  >
                     {formattedTimeStr}
                   </span>
                 </TooltipTrigger>
@@ -79,16 +94,28 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
         onMouseEnter={() => setShowActions(true)}
         onMouseLeave={() => setShowActions(false)}
       >
-        <div className="w-full max-w-3xl flex gap-4 px-4 sm:px-6 items-start">
+        <div className="w-full max-w-[780px] flex gap-4 px-6 items-start">
           {/* Avatar Icon */}
-          <Avatar className="h-8 w-8 flex-shrink-0 border bg-zinc-100 dark:bg-zinc-800 border-zinc-200/80 dark:border-zinc-700/60 text-zinc-700 dark:text-zinc-300 rounded-full flex items-center justify-center">
+          <Avatar
+            style={{
+              width: "32px",
+              height: "32px",
+              flexShrink: 0,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.09)",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             <AvatarFallback className="bg-transparent">
-              <Sparkles size={14} className="text-zinc-650 dark:text-zinc-300" />
+              <Sparkles size={14} className="text-zinc-300" />
             </AvatarFallback>
           </Avatar>
 
           {/* Message content area */}
-          <div className="flex-1 flex flex-col gap-2 min-w-0">
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "10px", minWidth: 0 }}>
             {/* Tool calls execution log */}
             {message.toolCalls && message.toolCalls.length > 0 && (
               <div className="flex flex-col gap-1.5 w-full">
@@ -99,7 +126,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
             )}
 
             {/* Markdown Text Content */}
-            <div className="flex flex-col gap-1.5 select-text text-zinc-800 dark:text-zinc-150 text-xs sm:text-[13px] sm:leading-relaxed font-sans">
+            <div className="flex flex-col gap-1.5 select-text" style={{ fontSize: "15px", lineHeight: 1.65, color: "var(--text-primary, #F5F5F5)", fontFamily: "inherit" }}>
               {message.content ? (
                 <MarkdownRenderer content={message.content} />
               ) : message.status === "pending" ? (

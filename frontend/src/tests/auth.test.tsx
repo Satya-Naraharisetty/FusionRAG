@@ -13,8 +13,8 @@ describe("Login Flow Integration", () => {
         </AuthProvider>
       </BrowserRouter>
     );
-    expect(screen.getByPlaceholderText("you@example.com")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("••••••••")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Sign In/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Email address/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Password/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Continue/i })).toBeInTheDocument();
   });
 });

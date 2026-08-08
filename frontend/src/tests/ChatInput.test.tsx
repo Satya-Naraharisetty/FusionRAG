@@ -12,7 +12,7 @@ describe("ChatInput", () => {
         isStreaming={false}
       />
     );
-    expect(screen.getByPlaceholderText(/Ask anything/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Message Hybrid RAG/i)).toBeInTheDocument();
   });
 
   it("triggers onSend when submitting text", () => {
@@ -26,7 +26,7 @@ describe("ChatInput", () => {
       />
     );
 
-    const textarea = screen.getByPlaceholderText(/Ask anything/i);
+    const textarea = screen.getByPlaceholderText(/Message Hybrid RAG/i);
     fireEvent.change(textarea, { target: { value: "Hello assistant" } });
     
     const form = textarea.closest("form");

@@ -3,7 +3,6 @@ import { Folder as FolderIcon, FolderPlus, ChevronRight, ChevronDown, Trash2, Ed
 import { Conversation } from "../../types";
 import { ConversationItem } from "../sidebar/ConversationItem";
 import { Folder, Tag } from "../../hooks/useLocalConversationMetadata";
-import { cn } from "../../lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -97,8 +96,21 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
   };
 
   return (
-    <div className="space-y-1.5 select-none">
-      <div className="px-3 flex items-center justify-between text-[10px] font-bold text-zinc-500 dark:text-zinc-550 uppercase tracking-widest">
+    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }} className="select-none">
+      {/* FOLDERS section header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "4px 4px 2px",
+          fontSize: "11px",
+          fontWeight: 600,
+          color: "var(--text-muted, #737373)",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+        }}
+      >
         <span>Folders</span>
         <button
           onClick={() => {
@@ -106,14 +118,27 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
             setNewFolderName("");
             setShowFolderModal(true);
           }}
-          className="text-zinc-500 hover:text-zinc-300 transition-colors duration-200 cursor-pointer"
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--text-muted, #737373)",
+            cursor: "pointer",
+            padding: "2px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "4px",
+            transition: "color 0.15s",
+          }}
+          className="hover:text-zinc-300"
           title="Create Folder"
         >
           <FolderPlus size={13} />
         </button>
       </div>
 
-      <div className="space-y-1 px-1">
+      {/* Folder list */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
         {folders.map((folder) => {
           const nestedDocs = folderConversations[folder.id] || [];
           const isExpanded = expandedFolders[folder.id];
@@ -125,27 +150,63 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
               onDragOver={(e) => handleDragOver(e, folder.id)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, folder.id)}
-              className={cn(
-                "rounded-lg border border-transparent transition-all duration-200",
-                isDraggedOver && "bg-zinc-800/40 border-zinc-700/30 shadow-sm"
-              )}
+              style={{
+                borderRadius: "8px",
+                border: isDraggedOver ? "1px solid rgba(255,255,255,0.10)" : "1px solid transparent",
+                background: isDraggedOver ? "rgba(255,255,255,0.04)" : "transparent",
+                transition: "all 0.15s ease",
+              }}
             >
               {/* Folder Row */}
               <div
-                className="flex items-center justify-between px-2.5 py-1.5 hover:bg-zinc-800/30 text-zinc-400 hover:text-zinc-250 rounded-md cursor-pointer transition-all duration-200 group"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "0 8px",
+                  height: "34px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  color: "var(--text-secondary, #A3A3A3)",
+                  transition: "all 0.15s ease",
+                }}
+                className="hover:bg-white/[0.05] hover:text-zinc-200 group"
                 onClick={() => toggleFolderExpand(folder.id)}
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                  <FolderIcon size={14} className="text-zinc-400" />
-                  <span className="text-xs font-medium truncate text-zinc-350">{folder.name}</span>
-                  <span className="text-[9px] bg-zinc-800 text-zinc-500 px-1 py-0.5 rounded font-mono font-bold">
-                    {nestedDocs.length}
+                <div style={{ display: "flex", alignItems: "center", gap: "7px", minWidth: 0 }}>
+                  <span style={{ color: "var(--text-muted, #737373)", flexShrink: 0 }}>
+                    {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                  </span>
+                  <FolderIcon size={13} style={{ color: "var(--text-muted, #737373)", flexShrink: 0 }} />
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 500,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {folder.name}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontFamily: "monospace",
+                      fontWeight: 600,
+                      color: "var(--text-muted, #737373)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {nestedDocs.length > 0 ? nestedDocs.length : ""}
                   </span>
                 </div>
 
-                {/* Folder actions */}
-                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                {/* Folder actions — shown on hover */}
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "4px" }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                >
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -153,7 +214,19 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
                       setNewFolderName(folder.name);
                       setShowFolderModal(true);
                     }}
-                    className="text-zinc-500 hover:text-zinc-350 p-0.5 cursor-pointer"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--text-muted, #737373)",
+                      cursor: "pointer",
+                      padding: "3px",
+                      borderRadius: "4px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      transition: "color 0.15s",
+                    }}
+                    className="hover:text-zinc-300"
                     title="Rename folder"
                   >
                     <Edit size={11} />
@@ -163,7 +236,19 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
                       e.stopPropagation();
                       deleteFolder(folder.id);
                     }}
-                    className="text-zinc-500 hover:text-red-400 p-0.5 cursor-pointer"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--text-muted, #737373)",
+                      cursor: "pointer",
+                      padding: "3px",
+                      borderRadius: "4px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      transition: "color 0.15s",
+                    }}
+                    className="hover:text-red-400"
                     title="Delete folder"
                   >
                     <Trash2 size={11} />
@@ -171,12 +256,29 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
                 </div>
               </div>
 
-              {/* Folder nested conversations */}
+              {/* Nested conversations */}
               {isExpanded && (
-                <div className="pl-3.5 mt-0.5 border-l border-zinc-800/60 ml-4.5 space-y-0.5">
+                <div
+                  style={{
+                    paddingLeft: "20px",
+                    marginTop: "2px",
+                    borderLeft: "1px solid rgba(255,255,255,0.06)",
+                    marginLeft: "20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "1px",
+                  }}
+                >
                   {nestedDocs.length === 0 ? (
-                    <div className="py-2 text-[10px] text-zinc-650 italic pl-2">
-                      Drag conversations here
+                    <div
+                      style={{
+                        padding: "10px 8px",
+                        fontSize: "12px",
+                        color: "var(--text-muted, #737373)",
+                        fontStyle: "italic",
+                      }}
+                    >
+                      No conversations yet
                     </div>
                   ) : (
                     nestedDocs.map((c) => {
@@ -223,7 +325,7 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               placeholder="Folder name"
-              className="text-xs h-10 rounded-xl"
+              className="text-sm h-10 rounded-xl"
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCreateFolderSubmit();
               }}
@@ -233,13 +335,13 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
             <Button
               variant="outline"
               onClick={() => setShowFolderModal(false)}
-              className="bg-transparent border-[var(--border-color)] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 text-xs h-10 rounded-xl"
+              className="bg-transparent border-[var(--border-color)] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 text-sm h-10 rounded-xl"
             >
               Cancel
             </Button>
             <Button
               onClick={handleCreateFolderSubmit}
-              className="bg-zinc-100 hover:bg-zinc-250 text-zinc-950 text-xs font-semibold h-10 rounded-xl"
+              className="bg-zinc-100 hover:bg-zinc-250 text-zinc-950 text-sm font-semibold h-10 rounded-xl"
             >
               {renamingFolderId ? "Rename" : "Create"}
             </Button>

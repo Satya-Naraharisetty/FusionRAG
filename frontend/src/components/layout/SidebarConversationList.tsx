@@ -175,15 +175,37 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
   }, [activeId, flatVisibleConversations]);
 
   return (
-    <div className="flex-1 w-full overflow-y-auto px-2 py-3 space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-      {/* Pinned Category */}
+    <div
+      style={{
+        flex: 1,
+        width: "100%",
+        overflowY: "auto",
+        padding: "12px 10px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "16px",
+        scrollbarWidth: "thin",
+      }}
+    >
       {pinnedConversations.length > 0 && (
-        <div className="space-y-1">
-          <div className="px-3 text-[10px] font-bold text-amber-500 uppercase tracking-widest flex items-center gap-1.5 select-none">
-            <Pin size={10} className="fill-current" />
+        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+          <div
+            style={{
+              padding: "2px 4px 4px",
+              fontSize: "11px",
+              fontWeight: 600,
+              color: "#f59e0b",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+            }}
+          >
+            <Pin size={10} style={{ fill: "currentColor" }} />
             <span>Pinned</span>
           </div>
-          <div className="space-y-0.5">
+          <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
             {pinnedConversations.map((c, index) => (
               <ConversationItem
                 key={`pinned-${c.id}`}
@@ -228,7 +250,7 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
       />
 
       {/* Date-grouped Un-foldered Category */}
-      <div className="space-y-4">
+      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         {Object.entries(unfolderedGroups).map(([groupKey, groupDocs]) => {
           if (groupDocs.length === 0) return null;
 
@@ -236,15 +258,24 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
             today: "Today",
             yesterday: "Yesterday",
             last7Days: "Previous 7 Days",
-            older: "Older Conversations",
+            older: "Older",
           };
 
           return (
-            <div key={groupKey} className="space-y-1">
-              <div className="px-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest select-none">
+            <div key={groupKey} style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+              <div
+                style={{
+                  padding: "2px 4px 4px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: "var(--text-muted, #737373)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                }}
+              >
                 {groupLabels[groupKey]}
               </div>
-              <div className="space-y-0.5">
+              <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
                 {groupDocs.map((c) => {
                   const globalIndex = flatVisibleConversations.findIndex((vis) => vis.id === c.id);
                   return (

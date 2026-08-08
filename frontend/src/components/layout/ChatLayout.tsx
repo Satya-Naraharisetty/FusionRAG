@@ -48,7 +48,7 @@ export const ChatLayout: React.FC = () => {
   });
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-white dark:bg-[var(--bg-primary,#0D0D0D)] text-zinc-900 dark:text-zinc-100 font-sans">
+    <div className="flex flex-col h-screen w-screen overflow-hidden font-sans" style={{ background: "var(--bg-primary, #0D0D0D)", color: "var(--text-primary, #F5F5F5)" }}>
       {/* Accessibility skip to main content link */}
       <a
         href="#main-content"
@@ -73,7 +73,8 @@ export const ChatLayout: React.FC = () => {
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative focus:outline-none bg-white dark:bg-[var(--bg-primary,#0D0D0D)]"
+          className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative focus:outline-none"
+          style={{ background: "var(--bg-primary, #0D0D0D)" }}
         >
           <Outlet />
         </main>
