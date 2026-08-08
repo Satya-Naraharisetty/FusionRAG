@@ -15,11 +15,15 @@ interface ChatMessageProps {
   onReact?: (messageId: string, reaction: "up" | "down" | "flag") => void;
 }
 
+/* Shared icon-button style used in action bar */
+const actionBtn =
+  "p-1.5 rounded-[var(--radius-md)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer";
+
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onReact }) => {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied]           = useState(false);
   const [showActions, setShowActions] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const isUser = message.role === "user";
+  const contentRef                    = useRef<HTMLDivElement>(null);
+  const isUser                        = message.role === "user";
 
   const handleCopy = () => {
     if (!message.content) return;
@@ -28,54 +32,34 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleReact = (reaction: "up" | "down" | "flag") => {
-    onReact?.(message.id || "", reaction);
-  };
+  const messageTime    = message.created_at ? new Date(message.created_at) : new Date();
+  const formattedTime  = messageTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const fullTime       = messageTime.toLocaleString();
 
-  const messageTime = message.created_at ? new Date(message.created_at) : new Date();
-  const formattedTimeStr = messageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const fullTimeStr = messageTime.toLocaleString();
-
+  /* ── User message ── */
   if (isUser) {
     return (
       <TooltipProvider>
         <div
           ref={contentRef}
-          className="flex w-full py-4 select-none group justify-center bg-transparent"
+          className="flex w-full py-4 group justify-center bg-transparent select-none"
           role="article"
           aria-label="User message"
         >
           <div className="w-full max-w-[780px] flex justify-end px-6">
             <div className="flex flex-col items-end gap-1.5 max-w-[72%]">
-              <div
-                style={{
-                  padding: "12px 16px",
-                  borderRadius: "18px",
-                  background: "var(--bg-tertiary, #1E1E1E)",
-                  color: "var(--text-primary, #F5F5F5)",
-                  fontSize: "15px",
-                  lineHeight: 1.6,
-                  fontFamily: "inherit",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}
-                className="select-text"
-              >
-                {message.content ? (
-                  <MarkdownRenderer content={message.content} />
-                ) : null}
+              {/* Bubble */}
+              <div className="px-4 py-3 rounded-[18px] bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-[var(--text-primary)] text-[15px] leading-relaxed select-text">
+                {message.content && <MarkdownRenderer content={message.content} />}
               </div>
+              {/* Timestamp */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span
-                    style={{ fontSize: "11px", color: "var(--text-muted, #737373)", marginRight: "6px" }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-default"
-                  >
-                    {formattedTimeStr}
+                  <span className="text-[11px] text-[var(--text-muted)] mr-1.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-default">
+                    {formattedTime}
                   </span>
                 </TooltipTrigger>
-                <TooltipContent side="top" align="center" className="text-xs bg-zinc-950 border-zinc-800 text-zinc-300">
-                  {fullTimeStr}
-                </TooltipContent>
+                <TooltipContent side="top" align="center">{fullTime}</TooltipContent>
               </Tooltip>
             </div>
           </div>
@@ -84,39 +68,28 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
     );
   }
 
+  /* ── Assistant message ── */
   return (
     <TooltipProvider>
       <div
         ref={contentRef}
-        className="flex w-full py-6 select-none group bg-transparent justify-center transition-colors"
+        className="flex w-full py-6 group bg-transparent justify-center transition-colors select-none"
         role="article"
         aria-label="Assistant response"
         onMouseEnter={() => setShowActions(true)}
         onMouseLeave={() => setShowActions(false)}
       >
         <div className="w-full max-w-[780px] flex gap-4 px-6 items-start">
-          {/* Avatar Icon */}
-          <Avatar
-            style={{
-              width: "32px",
-              height: "32px",
-              flexShrink: 0,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.09)",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+          {/* Avatar */}
+          <Avatar className="w-8 h-8 flex-shrink-0 bg-[var(--bg-tertiary)] border border-[var(--border-default)]">
             <AvatarFallback className="bg-transparent">
-              <Sparkles size={14} className="text-zinc-300" />
+              <Sparkles size={14} className="text-[var(--text-secondary)]" />
             </AvatarFallback>
           </Avatar>
 
-          {/* Message content area */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "10px", minWidth: 0 }}>
-            {/* Tool calls execution log */}
+          {/* Content */}
+          <div className="flex-1 flex flex-col gap-2.5 min-w-0">
+            {/* Tool calls */}
             {message.toolCalls && message.toolCalls.length > 0 && (
               <div className="flex flex-col gap-1.5 w-full">
                 {message.toolCalls.map((tc) => (
@@ -125,134 +98,130 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
               </div>
             )}
 
-            {/* Markdown Text Content */}
-            <div className="flex flex-col gap-1.5 select-text" style={{ fontSize: "15px", lineHeight: 1.65, color: "var(--text-primary, #F5F5F5)", fontFamily: "inherit" }}>
+            {/* Markdown content */}
+            <div
+              className="flex flex-col gap-1.5 select-text text-[var(--text-primary)] text-[15px] leading-[1.65]"
+            >
               {message.content ? (
                 <MarkdownRenderer content={message.content} />
               ) : message.status === "pending" ? (
-                <div className="flex items-center gap-1.5 text-zinc-400 dark:text-zinc-550 text-xs py-2 pl-0.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-600 animate-bounce" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-600 animate-bounce delay-150" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-600 animate-bounce delay-300" />
+                /* Typing indicator */
+                <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-xs py-2">
+                  {[0, 150, 300].map((delay) => (
+                    <span
+                      key={delay}
+                      className="h-1.5 w-1.5 rounded-full bg-[var(--text-muted)] animate-bounce"
+                      style={{ animationDelay: `${delay}ms` }}
+                    />
+                  ))}
                 </div>
               ) : message.status === "failed" && message.error ? (
-                <div className="text-red-650 dark:text-red-400 bg-red-50 dark:bg-red-950/15 border border-red-200/50 dark:border-red-900/30 rounded-xl p-3 text-xs flex flex-col gap-1 max-w-xl animate-fade-in font-sans">
-                  <span className="font-bold flex items-center gap-1.5">
-                    <span>⚠</span> Generation Failed
+                /* Error state */
+                <div className="bg-red-500/10 border border-red-500/20 rounded-[var(--radius-xl)] p-3 text-xs flex flex-col gap-1 max-w-xl animate-fade-in">
+                  <span className="font-semibold text-red-400 flex items-center gap-1.5">
+                    ⚠ Generation failed
                   </span>
-                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-normal">{message.error}</span>
+                  <span className="text-[var(--text-muted)] leading-normal">{message.error}</span>
                 </div>
               ) : null}
 
-              {/* Blink cursor during streaming */}
               {message.status === "streaming" && <StreamingCursor />}
             </div>
 
-            {/* Citations below assistant responses */}
+            {/* Citations */}
             {message.citations && message.citations.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2.5 select-text">
+              <div className="flex flex-wrap gap-1.5 mt-1 select-text">
                 {message.citations.map((c, idx) => (
                   <CitationCard key={c.chunk_id || idx} citation={c} index={idx} />
                 ))}
               </div>
             )}
 
-            {/* Actions Panel */}
+            {/* Action bar */}
             <div
               className={cn(
-                "flex items-center justify-between gap-2 mt-3 pt-1 border-t border-transparent",
-                "opacity-0 group-hover:opacity-100 transition-opacity duration-200",
-                showActions && "opacity-100"
+                "flex items-center justify-between gap-2 mt-2 pt-1 border-t border-transparent transition-opacity duration-200",
+                showActions ? "opacity-100" : "opacity-0 group-hover:opacity-100"
               )}
             >
-              {/* Left Actions - Time & Feedback */}
-              <div className="flex items-center gap-1">
+              {/* Left: timestamp + reactions */}
+              <div className="flex items-center gap-0.5">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button className="flex items-center gap-1 text-[10px] text-zinc-400 dark:text-zinc-550 mr-1.5 cursor-default">
+                    <button className="flex items-center gap-1 px-1.5 py-1 text-[10px] text-[var(--text-muted)] cursor-default rounded-[var(--radius-sm)] hover:bg-[var(--bg-tertiary)] transition-colors mr-1">
                       <Clock size={10} className="opacity-60" />
-                      <span>{formattedTimeStr}</span>
+                      {formattedTime}
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent side="top" align="center" className="text-xs bg-zinc-950 border-zinc-800 text-zinc-355">
-                    {fullTimeStr}
-                  </TooltipContent>
+                  <TooltipContent side="top" align="center">{fullTime}</TooltipContent>
                 </Tooltip>
 
-                {!isUser && message.status !== "streaming" && (
+                {message.status !== "streaming" && (
                   <>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
-                          onClick={() => handleReact("up")}
-                          className="p-1 rounded-lg text-zinc-400 dark:text-zinc-550 hover:text-emerald-500 dark:hover:text-emerald-450 hover:bg-zinc-100 dark:hover:bg-zinc-800/40 transition-colors"
+                          onClick={() => onReact?.(message.id || "", "up")}
+                          className={cn(actionBtn, "hover:text-emerald-400")}
                           aria-label="Helpful"
                         >
                           <ThumbsUp size={11} />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs bg-zinc-950 border-zinc-800 text-zinc-300">
-                        Helpful
-                      </TooltipContent>
+                      <TooltipContent side="top">Helpful</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
-                          onClick={() => handleReact("down")}
-                          className="p-1 rounded-lg text-zinc-400 dark:text-zinc-550 hover:text-red-500 dark:hover:text-red-450 hover:bg-zinc-100 dark:hover:bg-zinc-800/40 transition-colors"
+                          onClick={() => onReact?.(message.id || "", "down")}
+                          className={cn(actionBtn, "hover:text-red-400")}
                           aria-label="Not helpful"
                         >
                           <ThumbsDown size={11} />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs bg-zinc-950 border-zinc-800 text-zinc-300">
-                        Not helpful
-                      </TooltipContent>
+                      <TooltipContent side="top">Not helpful</TooltipContent>
                     </Tooltip>
                   </>
                 )}
               </div>
 
-              {/* Right Actions - Copy, Flag, Retry */}
-              <div className="flex items-center gap-1 ml-auto">
-                {message.content && !isUser && message.status !== "streaming" && (
+              {/* Right: copy, flag, retry */}
+              <div className="flex items-center gap-0.5">
+                {message.content && message.status !== "streaming" && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
                         onClick={handleCopy}
-                        className="flex items-center gap-1 p-1 rounded-lg text-zinc-400 dark:text-zinc-550 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/40 transition-colors"
-                        aria-label={copied ? "Copied" : "Copy message"}
+                        className={cn(actionBtn, copied && "text-emerald-400")}
+                        aria-label={copied ? "Copied" : "Copy response"}
                       >
                         {copied ? (
-                          <>
-                            <Check size={11} className="text-emerald-500" />
-                            <span className="text-[10px] text-emerald-555">Copied</span>
-                          </>
+                          <span className="flex items-center gap-1">
+                            <Check size={11} />
+                            <span className="text-[10px]">Copied</span>
+                          </span>
                         ) : (
                           <Copy size={11} />
                         )}
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs bg-zinc-950 border-zinc-800 text-zinc-300">
-                      {copied ? "Copied!" : "Copy response"}
-                    </TooltipContent>
+                    <TooltipContent side="top">{copied ? "Copied!" : "Copy response"}</TooltipContent>
                   </Tooltip>
                 )}
 
-                {!isUser && message.status !== "streaming" && (
+                {message.status !== "streaming" && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
-                        onClick={() => handleReact("flag")}
-                        className="p-1 rounded-lg text-zinc-400 dark:text-zinc-550 hover:text-amber-500 dark:hover:text-amber-450 hover:bg-zinc-100 dark:hover:bg-zinc-800/40 transition-colors"
+                        onClick={() => onReact?.(message.id || "", "flag")}
+                        className={cn(actionBtn, "hover:text-amber-400")}
                         aria-label="Report issue"
                       >
                         <Flag size={11} />
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs bg-zinc-950 border-zinc-800 text-zinc-300">
-                      Report issue
-                    </TooltipContent>
+                    <TooltipContent side="top">Report issue</TooltipContent>
                   </Tooltip>
                 )}
 
@@ -261,16 +230,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
                     <TooltipTrigger asChild>
                       <button
                         onClick={onRetry}
-                        className="flex items-center gap-1 p-1.5 rounded-lg text-red-500 hover:text-red-450 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all font-semibold"
+                        className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] text-red-400 hover:bg-red-500/10 transition-colors text-[10px] font-medium cursor-pointer"
                         aria-label="Retry query"
                       >
                         <RefreshCw size={11} />
-                        <span className="text-[10px]">Retry</span>
+                        Retry
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs bg-zinc-950 border-zinc-800 text-zinc-300">
-                      Retry query
-                    </TooltipContent>
+                    <TooltipContent side="top">Retry query</TooltipContent>
                   </Tooltip>
                 )}
               </div>
@@ -281,4 +248,5 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
     </TooltipProvider>
   );
 };
+
 export default ChatMessage;

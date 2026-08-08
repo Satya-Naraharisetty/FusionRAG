@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, LogOut } from "lucide-react";
+import { Settings, LogOut, ChevronUp } from "lucide-react";
 import { Avatar, AvatarFallback } from "../ui/Avatar";
 import {
   DropdownMenu,
@@ -17,113 +17,66 @@ interface SidebarProfileProps {
   collapsed: boolean;
 }
 
-export const SidebarProfile: React.FC<SidebarProfileProps> = ({
-  user,
-  logout,
-  collapsed,
-}) => {
+export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, collapsed }) => {
   const navigate = useNavigate();
-
-  const userInitials = user?.email
-    ? user.email.slice(0, 2).toUpperCase()
-    : "US";
+  const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : "US";
 
   return (
-    <div
-      style={{
-        padding: "10px 10px",
-        borderTop: "1px solid rgba(255,255,255,0.06)",
-        marginTop: "auto",
-        background: "transparent",
-      }}
-    >
+    <div className="p-2 border-t border-[var(--border-subtle)] mt-auto">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             className={cn(
-              "flex items-center w-full rounded-xl transition-all duration-200 focus:outline-none cursor-pointer text-left",
-              collapsed ? "justify-center p-2" : "justify-between p-2.5"
+              "flex items-center w-full rounded-[var(--radius-md)] px-2 py-2 hover:bg-[var(--bg-tertiary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 cursor-pointer text-left min-h-[44px]",
+              collapsed ? "justify-center" : "gap-2.5"
             )}
-            style={{
-              background: "transparent",
-              border: "none",
-              minHeight: "52px",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.05)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-            }}
             aria-label="User profile menu"
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
-              <Avatar
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  flexShrink: 0,
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.10)",
-                }}
-              >
-                <AvatarFallback
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    background: "transparent",
-                    color: "#d4d4d8",
-                  }}
-                >
-                  {userInitials}
-                </AvatarFallback>
-              </Avatar>
-              {!collapsed && user && (
-                <div style={{ textAlign: "left", minWidth: 0, flex: 1 }}>
-                  <p
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      color: "#e4e4e7",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      lineHeight: 1.3,
-                      marginBottom: "2px",
-                    }}
-                  >
+            <Avatar className="h-7 w-7 flex-shrink-0 bg-[var(--bg-tertiary)] border border-[var(--border-default)]">
+              <AvatarFallback className="text-[11px] font-semibold">{initials}</AvatarFallback>
+            </Avatar>
+
+            {!collapsed && user && (
+              <>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-[13px] font-medium text-[var(--text-primary)] truncate leading-snug">
                     {user.email}
                   </p>
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: 500,
-                      color: "var(--text-muted, #737373)",
-                      textTransform: "capitalize",
-                    }}
-                  >
+                  <span className="text-[11px] text-[var(--text-muted)] capitalize block leading-tight">
                     {user.role}
                   </span>
                 </div>
-              )}
-            </div>
+                <ChevronUp size={13} className="flex-shrink-0 text-[var(--text-muted)]" />
+              </>
+            )}
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[200px]">
+
+        <DropdownMenuContent side="top" align="start" className="w-52 mb-1">
+          {/* User info header */}
+          {user && (
+            <div className="px-2.5 py-2 border-b border-[var(--border-subtle)] mb-1">
+              <p className="text-xs font-medium text-[var(--text-primary)] truncate">{user.email}</p>
+              <p className="text-[11px] text-[var(--text-muted)] capitalize mt-0.5">{user.role}</p>
+            </div>
+          )}
+
           <DropdownMenuItem
             onClick={() => navigate("/settings")}
-            className="gap-2 focus:bg-zinc-900 focus:text-zinc-100 cursor-pointer text-sm font-medium"
+            className="gap-2 cursor-pointer"
           >
-            <Settings size={14} />
+            <Settings size={13} />
             <span>Settings</span>
           </DropdownMenuItem>
-          <DropdownMenuSeparator className="bg-zinc-900" />
+
+          <DropdownMenuSeparator />
+
           <DropdownMenuItem
             onClick={logout}
-            className="gap-2 text-red-400 focus:bg-red-950/20 focus:text-red-300 cursor-pointer text-sm font-medium"
+            className="gap-2 text-[var(--accent-error)] focus:bg-red-500/10 focus:text-red-400 cursor-pointer"
           >
-            <LogOut size={14} />
-            <span>Sign Out</span>
+            <LogOut size={13} />
+            <span>Sign out</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

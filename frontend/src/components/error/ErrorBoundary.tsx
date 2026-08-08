@@ -39,24 +39,25 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-zinc-950 text-zinc-350 min-h-[300px]">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-950/20 text-red-500 mb-4 border border-red-900/10">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-[var(--bg-primary)] text-[var(--text-primary)] min-h-[300px]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-400 mb-4 border border-red-500/20">
             <AlertTriangle size={20} />
           </div>
-          <h3 className="text-sm font-bold text-zinc-200 mb-1">
+          <h3 className="text-base font-semibold text-[var(--text-primary)] mb-1">
             Something went wrong
           </h3>
-          <p className="text-xs text-zinc-500 max-w-sm mb-4 leading-relaxed">
+          <p className="text-xs text-[var(--text-secondary)] max-w-sm mb-4 leading-relaxed">
             An unexpected error occurred rendering this component. Let's try reloading the interface.
           </p>
           {import.meta.env.DEV && this.state.error && (
-            <pre className="p-3 bg-zinc-900 border border-zinc-800 text-[10px] font-mono text-red-400 rounded-lg max-w-lg overflow-x-auto text-left mb-4 w-full">
+            <pre className="p-3 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[11px] font-mono text-red-400 rounded-[var(--radius-md)] max-w-lg overflow-x-auto text-left mb-4 w-full">
               {this.state.error.toString()}
             </pre>
           )}
           <Button
+            variant="secondary"
+            size="sm"
             onClick={this.handleReset}
-            className="bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-300 text-xs h-8 px-4"
           >
             Reload Interface
           </Button>

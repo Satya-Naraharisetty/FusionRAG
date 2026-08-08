@@ -35,10 +35,10 @@ function App() {
           <AuthProvider>
             <Suspense
               fallback={
-                <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-100">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="h-9 w-9 animate-spin rounded-full border-4 border-violet-600 border-t-transparent"></div>
-                    <p className="text-xs font-semibold text-zinc-500">Initializing RAG Console...</p>
+                <div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)] text-[var(--text-primary)]">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent-primary)] border-t-transparent"></div>
+                    <p className="text-xs text-[var(--text-secondary)] font-medium">Loading Hybrid RAG...</p>
                   </div>
                 </div>
               }
@@ -99,7 +99,7 @@ function App() {
             <Toaster
               position="bottom-right"
               toastOptions={{
-                className: "bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs font-semibold",
+                className: "bg-[var(--bg-elevated)] border border-[var(--border-default)] text-[var(--text-primary)] text-xs font-medium shadow-sm",
                 duration: 4000,
               }}
             />

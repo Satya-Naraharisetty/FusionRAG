@@ -3,49 +3,40 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const cardVariants = cva(
-  "rounded-lg border bg-card text-card-foreground",
+  "rounded-[var(--radius-xl)] text-[var(--text-primary)] transition-all duration-200",
   {
     variants: {
       variant: {
-        default: "border-zinc-800 bg-zinc-950/50",
-        glass: "border-glass-border bg-glass-bg/50 backdrop-blur-md",
-        glassStrong: "border-glass-border-strong bg-glass-bg-strong/50 backdrop-blur-lg",
-        outlined: "border-2 border-zinc-800 bg-transparent",
-        elevated: "border-zinc-800/50 bg-zinc-950 shadow-elevation-2",
+        default: "border border-[var(--border-subtle)] bg-[var(--bg-secondary)]",
+        subtle: "border border-[var(--border-subtle)] bg-[var(--bg-secondary)]",
+        open: "border-0 bg-transparent shadow-none",
+        glass: "border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/80 backdrop-blur-md",
+        glassStrong: "border border-[var(--border-default)] bg-[var(--bg-tertiary)]/90 backdrop-blur-md",
+        outlined: "border border-[var(--border-default)] bg-transparent",
+        elevated: "border border-[var(--border-subtle)] bg-[var(--bg-elevated)] shadow-xs rounded-[var(--radius-2xl)]",
       },
       elevation: {
         none: "shadow-none",
-        low: "shadow-elevation-1",
-        medium: "shadow-elevation-2",
-        high: "shadow-elevation-3",
-        glow: "shadow-elevation-glow",
+        low: "shadow-xs",
+        medium: "shadow-sm",
+        high: "shadow-md",
+        glow: "shadow-xs",
       },
       interactive: {
-        true: "transition-all duration-300 ease-standard hover:shadow-elevation-3 hover:-translate-y-0.5 hover:border-zinc-700 cursor-pointer",
+        true: "transition-all duration-200 hover:border-[var(--border-hover)] hover:bg-[var(--bg-tertiary)] cursor-pointer",
         false: "",
       },
       padding: {
         none: "",
-        sm: "p-4",
-        default: "p-6",
-        lg: "p-8",
+        sm: "p-3.5",
+        default: "p-5",
+        lg: "p-6",
       },
     },
-    compoundVariants: [
-      {
-        variant: "glass",
-        interactive: true,
-        className: "hover:bg-glass-bg/70 hover:border-glass-border-strong",
-      },
-      {
-        variant: "default",
-        interactive: true,
-        className: "hover:bg-zinc-950/70",
-      },
-    ],
+    compoundVariants: [],
     defaultVariants: {
       variant: "default",
-      elevation: "low",
+      elevation: "none",
       interactive: false,
       padding: "default",
     },
@@ -116,7 +107,7 @@ const CardFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex items-center pt-4 border-t border-zinc-800/50", className)}
+    className={cn("flex items-center pt-4 border-t border-[var(--border-subtle)]", className)}
     {...props}
   />
 ))

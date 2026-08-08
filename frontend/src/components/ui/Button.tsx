@@ -5,48 +5,40 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-all duration-200 ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] text-sm font-medium transition-all duration-200 ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-primary)] disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer select-none",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/95 shadow-sm",
+        default:
+          "bg-[var(--accent-primary)] text-white hover:opacity-90 active:scale-[0.98] shadow-xs",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/95 shadow-sm",
+          "bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/30 active:scale-[0.98]",
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground active:bg-accent/50",
+          "border border-[var(--border-default)] bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] hover:border-[var(--border-hover)] active:bg-[var(--bg-elevated)]",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/70",
-        ghost: "hover:bg-accent hover:text-accent-foreground active:bg-accent/50",
-        link: "text-primary underline-offset-4 hover:underline",
-        success: "bg-green-600 text-white hover:bg-green-700 active:bg-green-800 shadow-sm",
+          "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-default)] active:scale-[0.98]",
+        ghost:
+          "bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] active:bg-[var(--bg-elevated)]",
+        link: "text-[var(--accent-primary)] underline-offset-4 hover:underline",
+        success:
+          "bg-emerald-600/90 text-white hover:bg-emerald-600 active:scale-[0.98] shadow-xs",
       },
       size: {
-        xs: "h-7 px-2.5 text-xs gap-1.5",
-        sm: "h-9 rounded-md px-3 text-sm",
-        default: "h-10 px-4 py-2",
-        lg: "h-11 rounded-md px-6 text-base",
-        xl: "h-12 rounded-lg px-6 text-base",
-        icon: "h-10 w-10",
-        iconSm: "h-8 w-8",
-        iconLg: "h-12 w-12",
+        xs: "h-7 px-2.5 text-xs rounded-[var(--radius-sm)] gap-1.5",
+        sm: "h-8 px-3 text-xs font-medium rounded-[var(--radius-md)]",
+        default: "h-10 px-4 text-sm font-medium rounded-[var(--radius-lg)]",
+        lg: "h-11 px-5 text-sm font-medium rounded-[var(--radius-xl)]",
+        xl: "h-12 px-6 text-base font-medium rounded-[var(--radius-xl)]",
+        icon: "h-9 w-9 rounded-[var(--radius-md)]",
+        iconSm: "h-8 w-8 rounded-[var(--radius-sm)]",
+        iconLg: "h-10 w-10 rounded-[var(--radius-lg)]",
       },
       loading: {
-        true: "opacity-75 cursor-wait [&_svg]:animate-spin",
+        true: "opacity-70 cursor-wait [&_svg]:animate-spin",
         false: "",
       },
     },
-    compoundVariants: [
-      {
-        variant: "default",
-        size: "default",
-        className: "shadow-elevation-1 hover:shadow-elevation-2 active:shadow-elevation-1",
-      },
-      {
-        variant: "destructive",
-        size: "default",
-        className: "shadow-elevation-1 hover:shadow-elevation-2 active:shadow-elevation-1",
-      },
-    ],
+    compoundVariants: [],
     defaultVariants: {
       variant: "default",
       size: "default",

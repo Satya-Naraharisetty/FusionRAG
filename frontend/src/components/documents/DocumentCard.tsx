@@ -28,8 +28,6 @@ import {
   DropdownMenuSeparator,
 } from "../ui/Dropdown";
 import { Button } from "../ui/Button";
-import { Card, CardContent } from "../ui/card";
-import { Badge } from "../ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -56,6 +54,13 @@ interface DocumentCardProps {
   onDrop?: (e: React.DragEvent) => void;
 }
 
+const STATUS_CLASSES: Record<Document["status"], string> = {
+  pending:    "bg-amber-500/10   text-amber-400   border border-amber-500/20",
+  processing: "bg-blue-500/10    text-blue-400    border border-blue-500/20",
+  completed:  "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+  failed:     "bg-red-500/10     text-red-400     border border-red-500/20",
+};
+
 export const DocumentCard: React.FC<DocumentCardProps> = ({
   document,
   onDelete,
@@ -73,118 +78,98 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
   onDrop,
 }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleting, setIsDeleting]             = useState(false);
 
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
       await onDelete(document.id);
       setShowDeleteDialog(false);
-    } catch (_e) {
-      // Handled in hook
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const statusColors: Record<Document["status"], string> = {
-    pending: "bg-amber-100 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/30",
-    processing: "bg-blue-100 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/30",
-    completed: "bg-emerald-100 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/30",
-    failed: "bg-red-100 dark:bg-red-950/20 text-red-650 dark:text-red-400 border-red-200 dark:border-red-900/30",
-  };
-
   return (
     <>
-      <Card
+      <div
         draggable="true"
         onDragStart={onDragStart}
         onDragOver={onDragOver}
         onDrop={onDrop}
         className={cn(
-          "group flex flex-col bg-white dark:bg-[#1e1e1e] border rounded-2xl transition-all duration-300 overflow-hidden select-none hover:shadow-md",
+          "group flex flex-col bg-[var(--bg-secondary)] border rounded-[var(--radius-xl)] transition-all duration-200 overflow-hidden select-none",
           isSelected
-            ? "border-zinc-900 dark:border-zinc-100 ring-1 ring-zinc-900 dark:ring-zinc-100 bg-zinc-50/50 dark:bg-zinc-800/10"
-            : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+            ? "border-[var(--accent-primary)]/40 ring-1 ring-[var(--accent-primary)]/20"
+            : "border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-tertiary)]/40"
         )}
       >
-        <CardContent className="p-5 flex flex-col justify-between h-full gap-4.5">
-          {/* Header row: Checkbox, file info, drag handles */}
-          <div className="flex items-start justify-between gap-1.5">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                {/* Reorder drag handle */}
-                <div className="cursor-grab active:cursor-grabbing text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-300 p-0.5" title="Drag to reorder">
-                  <GripVertical size={14} />
-                </div>
-                {/* Select checkbox */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectToggle();
-                  }}
-                  className="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 cursor-pointer p-0.5"
-                  aria-label={isSelected ? "Deselect document" : "Select document"}
-                >
-                  {isSelected ? (
-                    <CheckSquare size={15} className="text-zinc-800 dark:text-zinc-100 fill-zinc-800/10 dark:fill-zinc-100/10" />
-                  ) : (
-                    <Square size={15} />
-                  )}
-                </button>
+        <div className="p-4 flex flex-col gap-3 h-full">
+          {/* Header: drag handle, checkbox, type badge, title */}
+          <div className="flex items-start gap-2">
+            <div className="flex items-center gap-1 flex-shrink-0 pt-0.5">
+              <div
+                className="cursor-grab active:cursor-grabbing text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors p-0.5"
+                title="Drag to reorder"
+              >
+                <GripVertical size={13} />
               </div>
-
-              {/* Styled Document Type Icon */}
-              <FileTypeBadge
-                filename={document.original_filename}
-                contentType={document.content_type}
-                variant="card"
-                className="w-10 h-10"
-              />
-
-              {/* Doc Title and Size */}
-              <div className="min-w-0 flex-1">
-                <h4
-                  className="text-xs font-bold text-zinc-800 dark:text-zinc-150 truncate leading-snug"
-                  title={document.original_filename}
-                >
-                  {document.original_filename}
-                </h4>
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-550 font-medium">
-                  {formatBytes(document.file_size)}
-                </p>
-              </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onSelectToggle(); }}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer p-0.5 transition-colors"
+                aria-label={isSelected ? "Deselect document" : "Select document"}
+              >
+                {isSelected
+                  ? <CheckSquare size={14} className="text-[var(--accent-primary)]" />
+                  : <Square size={14} />
+                }
+              </button>
             </div>
 
-            {/* Context dropdown option menu */}
+            <FileTypeBadge
+              filename={document.original_filename}
+              contentType={document.content_type}
+              variant="card"
+              className="w-9 h-9 flex-shrink-0"
+            />
+
+            <div className="min-w-0 flex-1">
+              <h4
+                className="text-xs font-semibold text-[var(--text-primary)] truncate leading-snug"
+                title={document.original_filename}
+              >
+                {document.original_filename}
+              </h4>
+              <p className="text-[11px] text-[var(--text-muted)] font-medium mt-0.5">
+                {formatBytes(document.file_size)}
+              </p>
+            </div>
+
+            {/* Options menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-zinc-400 dark:text-zinc-550 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 cursor-pointer"
+                  size="iconSm"
+                  className="flex-shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                   aria-label="Document options"
                 >
-                  <MoreVertical size={14} />
+                  <MoreVertical size={13} />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-52 bg-zinc-950 border-zinc-800 text-zinc-300"
-              >
-                {/* Move to folder */}
+              <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuSub>
-                  <DropdownMenuSubTrigger className="gap-2 text-xs cursor-pointer focus:bg-zinc-900">
+                  <DropdownMenuSubTrigger className="gap-2 cursor-pointer">
                     <FolderOpen size={12} />
                     <span>Move to Folder</span>
                   </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="bg-zinc-950 border-zinc-850 text-zinc-300 w-44">
+                  <DropdownMenuSubContent className="w-44">
                     <DropdownMenuItem
                       onClick={() => onMoveToFolder(null)}
-                      className="text-xs cursor-pointer focus:bg-zinc-900"
+                      className="cursor-pointer"
                     >
-                      <span className={!currentFolderId ? "font-bold text-zinc-200" : ""}>
+                      <span className={!currentFolderId ? "font-semibold text-[var(--accent-primary)]" : ""}>
                         No Folder
                       </span>
                     </DropdownMenuItem>
@@ -192,9 +177,9 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                       <DropdownMenuItem
                         key={folder.id}
                         onClick={() => onMoveToFolder(folder.id)}
-                        className="text-xs cursor-pointer focus:bg-zinc-900"
+                        className="cursor-pointer"
                       >
-                        <span className={currentFolderId === folder.id ? "font-bold text-zinc-200" : ""}>
+                        <span className={currentFolderId === folder.id ? "font-semibold text-[var(--accent-primary)]" : ""}>
                           {folder.name}
                         </span>
                       </DropdownMenuItem>
@@ -202,139 +187,130 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
 
-                <DropdownMenuItem
-                  onClick={onDuplicate}
-                  className="gap-2 focus:bg-zinc-900 focus:text-zinc-100 cursor-pointer text-xs"
-                >
+                <DropdownMenuItem onClick={onDuplicate} className="gap-2 cursor-pointer">
                   <Copy size={12} />
                   <span>Duplicate</span>
                 </DropdownMenuItem>
 
-                <DropdownMenuItem
-                  onClick={onExport}
-                  className="gap-2 focus:bg-zinc-900 focus:text-zinc-100 cursor-pointer text-xs"
-                >
+                <DropdownMenuItem onClick={onExport} className="gap-2 cursor-pointer">
                   <Download size={12} />
                   <span>Export</span>
                 </DropdownMenuItem>
 
-                <DropdownMenuSeparator className="bg-zinc-850" />
+                <DropdownMenuSeparator />
 
                 <DropdownMenuItem
                   onClick={() => onReprocess(document.id)}
-                  className="gap-2 focus:bg-zinc-900 focus:text-zinc-100 cursor-pointer text-xs"
+                  className="gap-2 cursor-pointer"
                 >
                   <RefreshCw size={12} />
-                  <span>Reprocess File</span>
+                  <span>Reprocess</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => onRegenerateEmbeddings(document.id)}
-                  className="gap-2 focus:bg-zinc-900 focus:text-zinc-100 cursor-pointer text-xs"
+                  className="gap-2 cursor-pointer"
                 >
                   <Database size={12} />
                   <span>Regenerate Vectors</span>
                 </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
                 <DropdownMenuItem
                   onClick={() => setShowDeleteDialog(true)}
-                  className="gap-2 text-red-400 focus:bg-red-950/20 focus:text-red-300 cursor-pointer text-xs"
+                  className="gap-2 text-[var(--accent-error)] focus:bg-red-500/10 focus:text-red-400 cursor-pointer"
                 >
                   <Trash size={12} />
-                  <span>Delete File</span>
+                  <span>Delete</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
 
-          {/* Details Row: Calendar, page count */}
-          <div className="grid grid-cols-2 gap-2 text-[10px] text-zinc-550 dark:text-zinc-450">
+          {/* Meta row */}
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
             <div className="flex items-center gap-1.5">
-              <Calendar size={12} className="text-zinc-400 dark:text-zinc-600" />
+              <Calendar size={11} />
               <span>{relativeTime(document.created_at)}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Layers size={12} className="text-zinc-400 dark:text-zinc-600" />
-              <span>
-                {document.page_count ? `${document.page_count} pages` : "1 page"}
-              </span>
+              <Layers size={11} />
+              <span>{document.page_count ? `${document.page_count} pg` : "1 pg"}</span>
             </div>
             {document.language && (
-              <div className="flex items-center gap-1.5 col-span-2">
-                <span className="font-semibold text-zinc-400 dark:text-zinc-500 uppercase text-[9px] tracking-wide">
-                  Language:
-                </span>
+              <div className="col-span-2 flex items-center gap-1.5">
+                <span className="uppercase text-[9px] tracking-wide font-semibold">Lang:</span>
                 <span>{document.language.toUpperCase()}</span>
               </div>
             )}
           </div>
 
-          {/* Bottom Row: Status pill and View/Delete quick-action buttons */}
-          <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800/80 pt-3.5 mt-0.5">
-            <Badge
-              variant="outline"
+          {/* Footer: status badge + quick actions */}
+          <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-3 mt-auto">
+            <span
               className={cn(
-                "text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider",
-                statusColors[document.status]
+                "inline-flex items-center text-[9px] px-2 py-0.5 rounded-[var(--radius-pill)] font-bold uppercase tracking-wider",
+                STATUS_CLASSES[document.status]
               )}
             >
               {document.status}
-            </Badge>
+            </span>
 
-            {/* Quick Actions (View / Delete) */}
-            <div className="flex items-center gap-1.5">
-              {/* View/Export download button */}
+            <div className="flex items-center gap-1">
               <Button
                 onClick={onExport}
                 variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 rounded-md"
+                size="iconSm"
+                className="h-7 w-7 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 title="View / Download"
+                aria-label="View or download document"
               >
-                <Eye size={13} />
+                <Eye size={12} />
               </Button>
-              {/* Delete button */}
               <Button
                 onClick={() => setShowDeleteDialog(true)}
                 variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-zinc-500 hover:text-red-500 dark:hover:text-red-400 rounded-md"
+                size="iconSm"
+                className="h-7 w-7 text-[var(--text-muted)] hover:text-[var(--accent-error)]"
                 title="Delete"
+                aria-label="Delete document"
               >
-                <Trash size={13} />
+                <Trash size={12} />
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Delete Dialog */}
+      {/* Delete dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="bg-[#171717] border-zinc-800 text-zinc-200 sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-zinc-150 flex items-center gap-2">
-              <Trash size={18} className="text-red-550" />
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <Trash size={15} className="text-[var(--accent-error)]" />
               <span>Delete Document?</span>
             </DialogTitle>
-            <DialogDescription className="text-zinc-450 text-xs mt-2 leading-relaxed">
-              Are you sure you want to delete this document? Doing so will permanently wipe its
-              file metadata, text chunks, and embedding vectors from the database.
+            <DialogDescription>
+              Permanently remove "{document.original_filename}"? This will delete all text chunks and embedding vectors. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="mt-4 flex gap-2">
+          <DialogFooter className="gap-2 pt-2">
             <Button
-              variant="outline"
+              variant="secondary"
+              size="sm"
               onClick={() => setShowDeleteDialog(false)}
-              className="bg-transparent border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 text-xs"
               disabled={isDeleting}
             >
               Cancel
             </Button>
             <Button
               variant="destructive"
+              size="sm"
               onClick={handleDelete}
-              className="bg-red-650 hover:bg-red-750 text-white text-xs font-semibold"
               disabled={isDeleting}
+              loading={isDeleting}
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              {isDeleting ? "Deleting…" : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -342,4 +318,5 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
     </>
   );
 };
+
 export default DocumentCard;

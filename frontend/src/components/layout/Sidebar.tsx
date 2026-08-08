@@ -83,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       className={cn(
-        "flex flex-col h-full bg-[#171717] dark:bg-[#171717] light:bg-[#f9f9f9] border-r border-white/[0.07] transition-all duration-300 relative z-20 select-none",
+        "flex flex-col h-full bg-[var(--bg-secondary)] border-r border-[var(--border-subtle)] transition-all duration-200 relative z-20 select-none",
         collapsed ? "w-16" : "w-[272px]",
         className
       )}
@@ -91,40 +91,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       {/* Sidebar Header & Toggle Section */}
       <div
         className={cn(
-          "flex items-center px-3 shrink-0",
-          collapsed ? "h-14 justify-center" : "h-14 justify-between"
+          "flex items-center px-3 shrink-0 h-14 border-b border-[var(--border-subtle)]",
+          collapsed ? "justify-center" : "justify-between"
         )}
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
       >
         {!collapsed && (
           <div
             onClick={handleNewChat}
-            style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", paddingLeft: "4px" }}
-            className="hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2.5 cursor-pointer pl-1 hover:opacity-90 transition-opacity"
           >
-            <div
-              style={{
-                width: "28px",
-                height: "28px",
-                borderRadius: "8px",
-                background: "linear-gradient(135deg, hsl(250,84%,63%) 0%, hsl(282,84%,60%) 100%)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <span style={{ color: "white", fontWeight: 800, fontSize: "13px", fontFamily: "var(--font-title, Outfit, Inter, sans-serif)" }}>H</span>
+            <div className="w-7 h-7 rounded-[var(--radius-md)] bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-xs">
+              <span className="text-white font-bold text-xs font-title">H</span>
             </div>
-            <span style={{ fontWeight: 700, fontSize: "15px", color: "#e4e4e7", letterSpacing: "-0.01em", fontFamily: "var(--font-title, Outfit, Inter, sans-serif)" }}>Hybrid RAG</span>
+            <span className="font-semibold text-sm text-[var(--text-primary)] tracking-tight font-title">Hybrid RAG</span>
           </div>
         )}
         <Button
           variant="ghost"
-          size="icon"
+          size="iconSm"
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "h-8 w-8 text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] cursor-pointer transition-colors duration-200",
+            "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]",
             collapsed && "mx-auto"
           )}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -148,11 +135,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
         </div>
       ) : isLoading ? (
-        <div className="flex-1 px-3 py-4 flex flex-col gap-2">
+        <div className="flex-1 px-2.5 py-3 flex flex-col gap-1.5">
           {Array.from({ length: 6 }).map((_, idx) => (
             <div
               key={idx}
-              className="h-8 bg-zinc-800/20 border border-zinc-800/10 rounded-md animate-pulse"
+              className="h-8 bg-[var(--bg-tertiary)]/40 border border-[var(--border-subtle)] rounded-[var(--radius-md)] animate-pulse"
             />
           ))}
         </div>

@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { Folder as FolderIcon, FolderPlus, ChevronRight, ChevronDown, Trash2, Edit } from "lucide-react";
+import {
+  Folder as FolderIcon,
+  FolderPlus,
+  ChevronRight,
+  ChevronDown,
+  Trash2,
+  Edit,
+} from "lucide-react";
 import { Conversation } from "../../types";
 import { ConversationItem } from "../sidebar/ConversationItem";
 import { Folder, Tag } from "../../hooks/useLocalConversationMetadata";
@@ -12,6 +19,7 @@ import {
 } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
+import { cn } from "@/lib/utils";
 
 interface SidebarFoldersProps {
   folders: Folder[];
@@ -52,302 +60,191 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
   keyboardSelectIdx,
   flatVisibleConversations,
 }) => {
-  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>(() => {
-    return { "folder-general": true, "folder-research": true };
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
+    "folder-general":  true,
+    "folder-research": true,
   });
   const [draggedOverFolderId, setDraggedOverFolderId] = useState<string | null>(null);
-  const [showFolderModal, setShowFolderModal] = useState(false);
-  const [newFolderName, setNewFolderName] = useState("");
-  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [showFolderModal, setShowFolderModal]         = useState(false);
+  const [newFolderName, setNewFolderName]             = useState("");
+  const [renamingFolderId, setRenamingFolderId]       = useState<string | null>(null);
 
-  const toggleFolderExpand = (folderId: string) => {
-    setExpandedFolders((prev) => ({ ...prev, [folderId]: !prev[folderId] }));
-  };
+  const toggleExpand = (id: string) =>
+    setExpandedFolders((prev) => ({ ...prev, [id]: !prev[id] }));
 
-  const handleDragOver = (e: React.DragEvent, folderId: string | null) => {
-    e.preventDefault();
-    setDraggedOverFolderId(folderId);
-  };
-
-  const handleDragLeave = () => {
-    setDraggedOverFolderId(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, folderId: string | null) => {
+  const handleDragOver  = (e: React.DragEvent, id: string) => { e.preventDefault(); setDraggedOverFolderId(id); };
+  const handleDragLeave = () => setDraggedOverFolderId(null);
+  const handleDrop      = (e: React.DragEvent, folderId: string | null) => {
     e.preventDefault();
     setDraggedOverFolderId(null);
-    const conversationId = e.dataTransfer.getData("text/plain");
-    if (conversationId) {
-      moveConversationToFolder(conversationId, folderId);
-    }
+    const convId = e.dataTransfer.getData("text/plain");
+    if (convId) moveConversationToFolder(convId, folderId);
   };
 
-  const handleCreateFolderSubmit = () => {
+  const handleSubmit = () => {
     const trimmed = newFolderName.trim();
     if (!trimmed) return;
-    if (renamingFolderId) {
-      renameFolder(renamingFolderId, trimmed);
-    } else {
-      createFolder(trimmed);
-    }
+    if (renamingFolderId) renameFolder(renamingFolderId, trimmed);
+    else                  createFolder(trimmed);
     setNewFolderName("");
     setRenamingFolderId(null);
     setShowFolderModal(false);
   };
 
+  if (folders.length === 0) return null;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }} className="select-none">
-      {/* FOLDERS section header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "4px 4px 2px",
-          fontSize: "11px",
-          fontWeight: 600,
-          color: "var(--text-muted, #737373)",
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-        }}
-      >
-        <span>Folders</span>
-        <button
-          onClick={() => {
-            setRenamingFolderId(null);
-            setNewFolderName("");
-            setShowFolderModal(true);
-          }}
-          style={{
-            background: "none",
-            border: "none",
-            color: "var(--text-muted, #737373)",
-            cursor: "pointer",
-            padding: "2px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: "4px",
-            transition: "color 0.15s",
-          }}
-          className="hover:text-zinc-300"
-          title="Create Folder"
-        >
-          <FolderPlus size={13} />
-        </button>
-      </div>
+    <>
+      <div className="flex flex-col gap-0.5 select-none">
+        {/* Section header */}
+        <div className="flex items-center justify-between px-1 py-1.5">
+          <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+            Folders
+          </span>
+          <button
+            onClick={() => { setRenamingFolderId(null); setNewFolderName(""); setShowFolderModal(true); }}
+            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-0.5 rounded cursor-pointer transition-colors"
+            title="New folder"
+            aria-label="Create new folder"
+          >
+            <FolderPlus size={13} />
+          </button>
+        </div>
 
-      {/* Folder list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-        {folders.map((folder) => {
-          const nestedDocs = folderConversations[folder.id] || [];
-          const isExpanded = expandedFolders[folder.id];
-          const isDraggedOver = draggedOverFolderId === folder.id;
+        {/* Folder list */}
+        <div className="flex flex-col gap-0.5">
+          {folders.map((folder) => {
+            const nested     = folderConversations[folder.id] || [];
+            const isExpanded = expandedFolders[folder.id];
+            const isDragOver = draggedOverFolderId === folder.id;
 
-          return (
-            <div
-              key={folder.id}
-              onDragOver={(e) => handleDragOver(e, folder.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, folder.id)}
-              style={{
-                borderRadius: "8px",
-                border: isDraggedOver ? "1px solid rgba(255,255,255,0.10)" : "1px solid transparent",
-                background: isDraggedOver ? "rgba(255,255,255,0.04)" : "transparent",
-                transition: "all 0.15s ease",
-              }}
-            >
-              {/* Folder Row */}
+            return (
               <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "0 8px",
-                  height: "34px",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  color: "var(--text-secondary, #A3A3A3)",
-                  transition: "all 0.15s ease",
-                }}
-                className="hover:bg-white/[0.05] hover:text-zinc-200 group"
-                onClick={() => toggleFolderExpand(folder.id)}
+                key={folder.id}
+                onDragOver={(e) => handleDragOver(e, folder.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, folder.id)}
+                className={cn(
+                  "rounded-[var(--radius-md)] transition-colors",
+                  isDragOver && "bg-[var(--bg-tertiary)] ring-1 ring-[var(--border-hover)]"
+                )}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "7px", minWidth: 0 }}>
-                  <span style={{ color: "var(--text-muted, #737373)", flexShrink: 0 }}>
-                    {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                  </span>
-                  <FolderIcon size={13} style={{ color: "var(--text-muted, #737373)", flexShrink: 0 }} />
-                  <span
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: 500,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {folder.name}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      fontFamily: "monospace",
-                      fontWeight: 600,
-                      color: "var(--text-muted, #737373)",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {nestedDocs.length > 0 ? nestedDocs.length : ""}
-                  </span>
-                </div>
-
-                {/* Folder actions — shown on hover */}
+                {/* Folder row */}
                 <div
-                  style={{ display: "flex", alignItems: "center", gap: "4px" }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                  className="flex items-center justify-between px-2 h-8 rounded-[var(--radius-md)] cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60 transition-colors group"
+                  onClick={() => toggleExpand(folder.id)}
+                  role="button"
+                  aria-expanded={isExpanded}
+                  aria-label={`${folder.name} folder`}
                 >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRenamingFolderId(folder.id);
-                      setNewFolderName(folder.name);
-                      setShowFolderModal(true);
-                    }}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--text-muted, #737373)",
-                      cursor: "pointer",
-                      padding: "3px",
-                      borderRadius: "4px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      transition: "color 0.15s",
-                    }}
-                    className="hover:text-zinc-300"
-                    title="Rename folder"
-                  >
-                    <Edit size={11} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteFolder(folder.id);
-                    }}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--text-muted, #737373)",
-                      cursor: "pointer",
-                      padding: "3px",
-                      borderRadius: "4px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      transition: "color 0.15s",
-                    }}
-                    className="hover:text-red-400"
-                    title="Delete folder"
-                  >
-                    <Trash2 size={11} />
-                  </button>
-                </div>
-              </div>
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span className="text-[var(--text-muted)] flex-shrink-0">
+                      {isExpanded
+                        ? <ChevronDown size={12} />
+                        : <ChevronRight size={12} />}
+                    </span>
+                    <FolderIcon size={12} className="text-[var(--text-muted)] flex-shrink-0" />
+                    <span className="text-[13px] font-medium truncate">{folder.name}</span>
+                    {nested.length > 0 && (
+                      <span className="text-[10px] font-mono text-[var(--text-muted)] flex-shrink-0">
+                        {nested.length}
+                      </span>
+                    )}
+                  </div>
 
-              {/* Nested conversations */}
-              {isExpanded && (
-                <div
-                  style={{
-                    paddingLeft: "20px",
-                    marginTop: "2px",
-                    borderLeft: "1px solid rgba(255,255,255,0.06)",
-                    marginLeft: "20px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "1px",
-                  }}
-                >
-                  {nestedDocs.length === 0 ? (
-                    <div
-                      style={{
-                        padding: "10px 8px",
-                        fontSize: "12px",
-                        color: "var(--text-muted, #737373)",
-                        fontStyle: "italic",
+                  {/* Hover actions */}
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRenamingFolderId(folder.id);
+                        setNewFolderName(folder.name);
+                        setShowFolderModal(true);
                       }}
+                      className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] cursor-pointer transition-colors"
+                      title="Rename folder"
+                      aria-label={`Rename ${folder.name}`}
                     >
-                      No conversations yet
-                    </div>
-                  ) : (
-                    nestedDocs.map((c) => {
-                      const globalIndex = flatVisibleConversations.findIndex((vis) => vis.id === c.id);
-                      return (
-                        <ConversationItem
-                          key={`folder-${folder.id}-${c.id}`}
-                          conversation={c}
-                          isActive={c.id === activeId}
-                          onSelect={() => onSelect(c.id)}
-                          onRename={onRename}
-                          onDelete={onDelete}
-                          isPinned={pinnedIds.includes(c.id)}
-                          onTogglePin={() => togglePin(c.id)}
-                          folders={folders}
-                          onMoveToFolder={(fId) => moveConversationToFolder(c.id, fId)}
-                          currentFolderId={folder.id}
-                          tags={tags[c.id] || []}
-                          onAddTag={(tag) => addTag(c.id, tag)}
-                          onRemoveTag={(tName) => removeTag(c.id, tName)}
-                          isHighlighted={keyboardSelectIdx === globalIndex}
-                        />
-                      );
-                    })
-                  )}
+                      <Edit size={11} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }}
+                      className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent-error)] hover:bg-red-500/10 cursor-pointer transition-colors"
+                      title="Delete folder"
+                      aria-label={`Delete ${folder.name}`}
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
-          );
-        })}
+
+                {/* Nested conversations */}
+                {isExpanded && (
+                  <div className="ml-5 pl-2.5 border-l border-[var(--border-subtle)] mt-0.5 mb-1 flex flex-col gap-0.5">
+                    {nested.length === 0 ? (
+                      <p className="py-2 px-2 text-[11px] text-[var(--text-muted)] italic">
+                        No conversations yet
+                      </p>
+                    ) : (
+                      nested.map((c) => {
+                        const globalIdx = flatVisibleConversations.findIndex((v) => v.id === c.id);
+                        return (
+                          <ConversationItem
+                            key={`folder-${folder.id}-${c.id}`}
+                            conversation={c}
+                            isActive={c.id === activeId}
+                            onSelect={() => onSelect(c.id)}
+                            onRename={onRename}
+                            onDelete={onDelete}
+                            isPinned={pinnedIds.includes(c.id)}
+                            onTogglePin={() => togglePin(c.id)}
+                            folders={folders}
+                            onMoveToFolder={(fId) => moveConversationToFolder(c.id, fId)}
+                            currentFolderId={folder.id}
+                            tags={tags[c.id] || []}
+                            onAddTag={(tag) => addTag(c.id, tag)}
+                            onRemoveTag={(name) => removeTag(c.id, name)}
+                            isHighlighted={keyboardSelectIdx === globalIdx}
+                          />
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Folder Creation / Rename Dialog */}
+      {/* Create / Rename folder dialog */}
       <Dialog open={showFolderModal} onOpenChange={setShowFolderModal}>
-        <DialogContent className="bg-[var(--bg-secondary,#171717)] border-[var(--border-color)] text-zinc-200 sm:max-w-md rounded-2xl">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-zinc-100 flex items-center gap-2 text-sm font-semibold">
-              <FolderIcon size={16} className="text-zinc-400" />
-              <span>{renamingFolderId ? "Rename Folder" : "Create Folder"}</span>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <FolderIcon size={14} className="text-[var(--text-muted)]" />
+              {renamingFolderId ? "Rename Folder" : "Create Folder"}
             </DialogTitle>
           </DialogHeader>
-          <div className="py-2.5">
+          <div className="py-2">
             <Input
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               placeholder="Folder name"
-              className="text-sm h-10 rounded-xl"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCreateFolderSubmit();
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
+              autoFocus
             />
           </div>
-          <DialogFooter className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowFolderModal(false)}
-              className="bg-transparent border-[var(--border-color)] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 text-sm h-10 rounded-xl"
-            >
+          <DialogFooter className="gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setShowFolderModal(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleCreateFolderSubmit}
-              className="bg-zinc-100 hover:bg-zinc-250 text-zinc-950 text-sm font-semibold h-10 rounded-xl"
-            >
+            <Button variant="default" size="sm" onClick={handleSubmit}>
               {renamingFolderId ? "Rename" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 };

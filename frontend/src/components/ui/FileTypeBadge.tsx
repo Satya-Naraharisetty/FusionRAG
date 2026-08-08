@@ -10,25 +10,25 @@ interface FileTypeBadgeProps {
   className?: string;
 }
 
-const FILE_TYPE_CONFIG: Record<string, { label: string; bg: string; border: string; text: string; icon: React.ReactNode }> = {
-  pdf: { label: "PDF", bg: "bg-red-500/10", border: "border-red-500/30", text: "text-red-500", icon: <FileText size={10} /> },
-  md: { label: "MD", bg: "bg-fuchsia-500/10", border: "border-fuchsia-500/30", text: "text-fuchsia-500", icon: <FileText size={10} /> },
-  docx: { label: "DOCX", bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-500", icon: <FileText size={10} /> },
-  doc: { label: "DOC", bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-500", icon: <FileText size={10} /> },
-  txt: { label: "TXT", bg: "bg-zinc-500/10", border: "border-zinc-500/30", text: "text-zinc-500", icon: <FileText size={10} /> },
-  png: { label: "PNG", bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-500", icon: <Image size={10} /> },
-  jpg: { label: "JPG", bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-500", icon: <Image size={10} /> },
-  jpeg: { label: "JPEG", bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-500", icon: <Image size={10} /> },
-  webp: { label: "WEBP", bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-500", icon: <Image size={10} /> },
-  gif: { label: "GIF", bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-500", icon: <Image size={10} /> },
-  js: { label: "JS", bg: "bg-yellow-500/10", border: "border-yellow-500/30", text: "text-yellow-500", icon: <FileCode size={10} /> },
-  ts: { label: "TS", bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-500", icon: <FileCode size={10} /> },
-  tsx: { label: "TSX", bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-500", icon: <FileCode size={10} /> },
-  jsx: { label: "JSX", bg: "bg-yellow-500/10", border: "border-yellow-500/30", text: "text-yellow-500", icon: <FileCode size={10} /> },
-  py: { label: "PY", bg: "bg-green-500/10", border: "border-green-500/30", text: "text-green-500", icon: <FileCode size={10} /> },
-  json: { label: "JSON", bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-500", icon: <FileCode size={10} /> },
-  yaml: { label: "YAML", bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-500", icon: <FileCode size={10} /> },
-  yml: { label: "YML", bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-500", icon: <FileCode size={10} /> },
+const FILE_TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode }> = {
+  pdf: { label: "PDF", icon: <FileText size={10} /> },
+  md: { label: "MD", icon: <FileText size={10} /> },
+  docx: { label: "DOCX", icon: <FileText size={10} /> },
+  doc: { label: "DOC", icon: <FileText size={10} /> },
+  txt: { label: "TXT", icon: <FileText size={10} /> },
+  png: { label: "PNG", icon: <Image size={10} /> },
+  jpg: { label: "JPG", icon: <Image size={10} /> },
+  jpeg: { label: "JPEG", icon: <Image size={10} /> },
+  webp: { label: "WEBP", icon: <Image size={10} /> },
+  gif: { label: "GIF", icon: <Image size={10} /> },
+  js: { label: "JS", icon: <FileCode size={10} /> },
+  ts: { label: "TS", icon: <FileCode size={10} /> },
+  tsx: { label: "TSX", icon: <FileCode size={10} /> },
+  jsx: { label: "JSX", icon: <FileCode size={10} /> },
+  py: { label: "PY", icon: <FileCode size={10} /> },
+  json: { label: "JSON", icon: <FileCode size={10} /> },
+  yaml: { label: "YAML", icon: <FileCode size={10} /> },
+  yml: { label: "YML", icon: <FileCode size={10} /> },
 };
 
 const SIZE_CLASSES = {
@@ -38,9 +38,9 @@ const SIZE_CLASSES = {
 };
 
 const VARIANT_CLASSES = {
-  default: "inline-flex items-center font-bold uppercase tracking-wider rounded-full border",
-  minimal: "inline-flex items-center font-medium rounded-full border",
-  card: "flex items-center justify-center font-bold uppercase tracking-wider rounded-xl border shadow-xs",
+  default: "inline-flex items-center font-bold uppercase tracking-wider rounded-full border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)]",
+  minimal: "inline-flex items-center font-medium rounded-full border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)]",
+  card: "flex items-center justify-center font-bold uppercase tracking-wider rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] shadow-xs",
 };
 
 export const FileTypeBadge: React.FC<FileTypeBadgeProps> = ({
@@ -55,9 +55,6 @@ export const FileTypeBadge: React.FC<FileTypeBadgeProps> = ({
   const key = ext || mimeType;
   const config = FILE_TYPE_CONFIG[key] || {
     label: ext.toUpperCase() || "FILE",
-    bg: "bg-zinc-500/10",
-    border: "border-zinc-500/30",
-    text: "text-zinc-500",
     icon: <FileText size={10} />,
   };
 
@@ -65,10 +62,7 @@ export const FileTypeBadge: React.FC<FileTypeBadgeProps> = ({
     return (
       <div
         className={cn(
-          "flex flex-col items-center justify-center rounded-xl border shadow-xs flex-shrink-0",
-          config.bg,
-          config.border,
-          config.text,
+          "flex flex-col items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] shadow-xs flex-shrink-0",
           className
         )}
       >
@@ -83,9 +77,6 @@ export const FileTypeBadge: React.FC<FileTypeBadgeProps> = ({
       className={cn(
         SIZE_CLASSES[size],
         VARIANT_CLASSES[variant],
-        config.bg,
-        config.border,
-        config.text,
         className
       )}
     >

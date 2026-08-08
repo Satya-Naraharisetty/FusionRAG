@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Search, X, FolderOpen, Calendar, Filter, Save, Trash2 } from "lucide-react";
-import { Input } from "../ui/Input";
 import { Button } from "../ui/Button";
 import { cn } from "../../lib/utils";
 
@@ -21,8 +20,6 @@ interface DocumentFiltersProps {
   onFilterChange: (val: DocumentFilterType) => void;
   totalCount: number;
   filteredCount: number;
-
-  // New Phase 5 advanced filters:
   selectedFolderId: string | null;
   onSelectedFolderChange: (val: string | null) => void;
   folders: { id: string; name: string }[];
@@ -32,13 +29,19 @@ interface DocumentFiltersProps {
   dateRange: DateRange;
   onDateRangeChange: (range: DateRange) => void;
   onClearAll: () => void;
-
-  // Saved Presets:
   savedPresets: Record<string, Record<string, unknown>>;
   onSavePreset: (name: string) => void;
   onDeletePreset: (name: string) => void;
   onLoadPreset: (presetName: string) => void;
 }
+
+const STATUS_TABS: { label: string; value: DocumentFilterType }[] = [
+  { label: "All",        value: "all" },
+  { label: "Chat",       value: "chat" },
+  { label: "Completed",  value: "completed" },
+  { label: "Processing", value: "processing" },
+  { label: "Failed",     value: "failed" },
+];
 
 export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
   search,
@@ -63,88 +66,91 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
   onDeletePreset,
   onLoadPreset,
 }) => {
-  const tabs: { label: string; value: DocumentFilterType }[] = [
-    { label: "All Statuses", value: "all" },
-    { label: "Chat Files", value: "chat" },
-    { label: "Completed", value: "completed" },
-    { label: "Processing", value: "processing" },
-    { label: "Failed", value: "failed" },
-  ];
-
-  const [presetInput, setPresetInput] = useState("");
+  const [presetInput, setPresetInput]       = useState("");
   const [showPresetsMenu, setShowPresetsMenu] = useState(false);
 
   const toggleLanguage = (lang: string) => {
-    if (selectedLanguages.includes(lang)) {
-      onSelectedLanguagesChange(selectedLanguages.filter((l) => l !== lang));
-    } else {
-      onSelectedLanguagesChange([...selectedLanguages, lang]);
-    }
-  };
-
-  const handleSavePreset = () => {
-    const trimmed = presetInput.trim();
-    if (!trimmed) return;
-    onSavePreset(trimmed);
-    setPresetInput("");
+    onSelectedLanguagesChange(
+      selectedLanguages.includes(lang)
+        ? selectedLanguages.filter((l) => l !== lang)
+        : [...selectedLanguages, lang]
+    );
   };
 
   const isAnyFilterActive =
-    !!search ||
-    filter !== "all" ||
-    selectedFolderId !== null ||
-    selectedLanguages.length > 0 ||
-    !!dateRange.start ||
-    !!dateRange.end;
+    !!search || filter !== "all" || selectedFolderId !== null ||
+    selectedLanguages.length > 0 || !!dateRange.start || !!dateRange.end;
 
   return (
-    <div className="space-y-4 bg-zinc-950 border border-zinc-900 rounded-2xl p-4.5">
-      {/* Search and Sort row */}
-      <div className="flex flex-col md:flex-row gap-3">
+    <div className="space-y-3">
+      {/* ── Row 1: search + sort + presets ── */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        {/* Search */}
         <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <Input
-            placeholder="Search documents by name..."
+          <Search
+            size={13}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none"
+          />
+          <input
+            type="text"
+            placeholder="Search documents…"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-9 bg-zinc-900/60 border-zinc-900 focus-visible:ring-1 focus-visible:ring-violet-600 text-xs text-zinc-200 placeholder:text-zinc-500 rounded-lg h-9.5"
+            className="w-full h-9 pl-8 pr-4 bg-[var(--bg-input)] border border-[var(--border-default)] hover:border-[var(--border-hover)] focus:border-[var(--accent-primary)]/50 focus:ring-2 focus:ring-[var(--accent-primary)]/20 rounded-[var(--radius-lg)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all"
           />
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Saved Presets Button */}
+        <div className="flex items-center gap-2">
+          {/* Sort */}
+          <select
+            value={sort}
+            onChange={(e) => onSortChange(e.target.value as DocumentSortType)}
+            className="h-9 rounded-[var(--radius-lg)] bg-[var(--bg-input)] border border-[var(--border-default)] hover:border-[var(--border-hover)] text-xs px-3 text-[var(--text-primary)] cursor-pointer outline-none focus:border-[var(--accent-primary)]/50 transition-colors"
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="name">A → Z</option>
+            <option value="status">By status</option>
+            <option value="size">By size</option>
+          </select>
+
+          {/* Presets */}
           <div className="relative">
             <Button
-              variant="outline"
+              variant="secondary"
+              size="sm"
               onClick={() => setShowPresetsMenu(!showPresetsMenu)}
-              className="h-9.5 text-xs bg-zinc-900/60 border-zinc-900 hover:border-zinc-800 text-zinc-300 gap-1.5 cursor-pointer rounded-lg px-3.5"
+              className="h-9 gap-1.5"
             >
-              <Filter size={13} />
+              <Filter size={12} />
               <span>Presets</span>
             </Button>
+
             {showPresetsMenu && (
-              <div className="absolute right-0 top-11 z-30 w-64 bg-zinc-950 border border-zinc-850 rounded-xl p-3 shadow-xl space-y-3">
-                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+              <div className="absolute right-0 top-11 z-30 w-60 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-xl)] p-3 shadow-md space-y-2.5">
+                <div className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                   Filter Presets
                 </div>
+
                 {Object.keys(savedPresets).length === 0 ? (
-                  <p className="text-[10px] text-zinc-500 italic">No saved presets.</p>
+                  <p className="text-[11px] text-[var(--text-muted)] italic">No saved presets yet.</p>
                 ) : (
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  <div className="space-y-1 max-h-36 overflow-y-auto">
                     {Object.keys(savedPresets).map((name) => (
-                      <div key={name} className="flex items-center justify-between gap-2 p-1.5 bg-zinc-900/40 rounded-lg">
+                      <div
+                        key={name}
+                        className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-[var(--radius-md)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                      >
                         <button
-                          onClick={() => {
-                            onLoadPreset(name);
-                            setShowPresetsMenu(false);
-                          }}
-                          className="text-xs font-semibold text-zinc-300 hover:text-violet-400 text-left truncate flex-1 cursor-pointer"
+                          onClick={() => { onLoadPreset(name); setShowPresetsMenu(false); }}
+                          className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-left truncate flex-1 cursor-pointer transition-colors"
                         >
                           {name}
                         </button>
                         <button
                           onClick={() => onDeletePreset(name)}
-                          className="text-zinc-500 hover:text-red-400 cursor-pointer"
+                          className="text-[var(--text-muted)] hover:text-[var(--accent-error)] cursor-pointer transition-colors flex-shrink-0"
+                          aria-label={`Delete preset ${name}`}
                         >
                           <Trash2 size={11} />
                         </button>
@@ -152,127 +158,114 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
                     ))}
                   </div>
                 )}
-                <div className="border-t border-zinc-900 pt-2 flex gap-1.5">
-                  <Input
-                    placeholder="New preset name..."
+
+                <div className="border-t border-[var(--border-subtle)] pt-2.5 flex gap-1.5">
+                  <input
+                    type="text"
+                    placeholder="New preset name…"
                     value={presetInput}
                     onChange={(e) => setPresetInput(e.target.value)}
-                    className="h-8 bg-zinc-900 border-zinc-850 text-[10px] px-2"
+                    onKeyDown={(e) => e.key === "Enter" && presetInput.trim() && onSavePreset(presetInput.trim())}
+                    className="flex-1 h-8 bg-[var(--bg-input)] border border-[var(--border-default)] rounded-[var(--radius-md)] text-[11px] px-2 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent-primary)]/50 transition-colors"
                   />
                   <Button
-                    onClick={handleSavePreset}
-                    className="h-8 text-[10px] bg-violet-600 hover:bg-violet-750 text-white font-bold cursor-pointer"
+                    size="sm"
+                    className="h-8 px-2"
+                    onClick={() => presetInput.trim() && onSavePreset(presetInput.trim())}
+                    aria-label="Save preset"
                   >
-                    <Save size={10} />
+                    <Save size={11} />
                   </Button>
                 </div>
               </div>
             )}
           </div>
-
-          {/* Sort Selector */}
-          <select
-            value={sort}
-            onChange={(e) => onSortChange(e.target.value as DocumentSortType)}
-            className="h-9.5 rounded-lg bg-zinc-900/60 border border-zinc-900 text-xs px-3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-600 text-zinc-300 font-semibold cursor-pointer"
-          >
-            <option value="newest">Sort: Newest</option>
-            <option value="oldest">Sort: Oldest</option>
-            <option value="name">Sort: A-Z</option>
-            <option value="status">Sort: Status</option>
-            <option value="size">Sort: Size</option>
-          </select>
         </div>
       </div>
 
-      {/* Advanced Filters Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-zinc-900 pt-3.5">
-        {/* Folder Selector (Combobox replacement) */}
+      {/* ── Row 2: Advanced filters (folder + date range) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-[var(--border-subtle)] pt-3">
+        {/* Folder */}
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
-            <FolderOpen size={11} />
-            <span>Folder</span>
+          <label className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1.5">
+            <FolderOpen size={10} />
+            Folder
           </label>
           <select
             value={selectedFolderId || ""}
             onChange={(e) => onSelectedFolderChange(e.target.value || null)}
-            className="w-full h-8 rounded-lg bg-zinc-900/40 border border-zinc-900 text-[11px] px-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-600 text-zinc-300 cursor-pointer"
+            className="w-full h-8 rounded-[var(--radius-md)] bg-[var(--bg-input)] border border-[var(--border-default)] hover:border-[var(--border-hover)] text-[11px] px-2 text-[var(--text-primary)] cursor-pointer outline-none focus:border-[var(--accent-primary)]/50 transition-colors"
           >
             <option value="">All Folders</option>
             {folders.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
+              <option key={f.id} value={f.id}>{f.name}</option>
             ))}
           </select>
         </div>
 
-        {/* Date Range Picker */}
+        {/* Date range */}
         <div className="space-y-1.5 sm:col-span-2">
-          <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
-            <Calendar size={11} />
-            <span>Date Range</span>
+          <label className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1.5">
+            <Calendar size={10} />
+            Date Range
           </label>
           <div className="flex items-center gap-2">
-            <Input
+            <input
               type="date"
               value={dateRange.start}
               onChange={(e) => onDateRangeChange({ ...dateRange, start: e.target.value })}
-              className="h-8 bg-zinc-900/40 border-zinc-900 text-[10px] text-zinc-300"
+              className="flex-1 h-8 rounded-[var(--radius-md)] bg-[var(--bg-input)] border border-[var(--border-default)] text-[11px] px-2 text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 transition-colors cursor-pointer"
             />
-            <span className="text-zinc-650 text-xs">to</span>
-            <Input
+            <span className="text-[var(--text-muted)] text-xs flex-shrink-0">to</span>
+            <input
               type="date"
               value={dateRange.end}
               onChange={(e) => onDateRangeChange({ ...dateRange, end: e.target.value })}
-              className="h-8 bg-zinc-900/40 border-zinc-900 text-[10px] text-zinc-300"
+              className="flex-1 h-8 rounded-[var(--radius-md)] bg-[var(--bg-input)] border border-[var(--border-default)] text-[11px] px-2 text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 transition-colors cursor-pointer"
             />
           </div>
         </div>
       </div>
 
-      {/* Language Chips & Active Status Tabs */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-zinc-900 pt-3 pb-0.5">
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider pl-0.5">
-            Filter by Languages:
-          </span>
-          <div className="flex flex-wrap gap-1.5">
-            {availableLanguages.length === 0 ? (
-              <span className="text-[10px] text-zinc-600 italic">No language data</span>
-            ) : (
-              availableLanguages.map((lang) => {
+      {/* ── Row 3: Language chips + status tabs + stats ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-3">
+        {/* Language chips */}
+        <div className="flex flex-wrap gap-1.5 items-center">
+          {availableLanguages.length > 0 && (
+            <>
+              <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Lang:</span>
+              {availableLanguages.map((lang) => {
                 const isSelected = selectedLanguages.includes(lang);
                 return (
                   <button
                     key={lang}
                     onClick={() => toggleLanguage(lang)}
                     className={cn(
-                      "px-2.5 py-1 rounded-full text-[10px] font-bold transition-all duration-200 border cursor-pointer",
+                      "px-2 py-0.5 rounded-[var(--radius-pill)] text-[10px] font-medium border transition-all duration-150 cursor-pointer",
                       isSelected
-                        ? "bg-violet-950/40 text-violet-400 border-violet-900/40 shadow-sm"
-                        : "bg-zinc-900/30 text-zinc-500 border-transparent hover:text-zinc-400"
+                        ? "bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] border-[var(--accent-primary)]/30"
+                        : "bg-transparent text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-secondary)] hover:border-[var(--border-default)]"
                     )}
                   >
                     {lang.toUpperCase()}
                   </button>
                 );
-              })
-            )}
-          </div>
+              })}
+            </>
+          )}
         </div>
 
-        {/* Tab Status filters */}
-        <div className="flex gap-1.5 self-end sm:self-auto">
-          {tabs.map((tab) => (
+        {/* Status tabs */}
+        <div className="flex gap-1 self-end sm:self-auto flex-wrap">
+          {STATUS_TABS.map((tab) => (
             <button
               key={tab.value}
               onClick={() => onFilterChange(tab.value)}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 border cursor-pointer",
+                "px-2.5 py-1 rounded-[var(--radius-md)] text-[11px] font-medium transition-all duration-150 cursor-pointer",
                 filter === tab.value
-                  ? "bg-zinc-800 text-zinc-150 border-zinc-700/50"
-                  : "text-zinc-500 hover:text-zinc-350 border-transparent"
+                  ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)]"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-transparent"
               )}
             >
               {tab.label}
@@ -281,18 +274,17 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
         </div>
       </div>
 
-      {/* Filter Stats & Clear Action */}
-      <div className="flex items-center justify-between text-[10px] text-zinc-500 font-medium pt-1 border-t border-zinc-900/40">
-        <span className="font-mono font-bold">
-          Showing {filteredCount} of {totalCount} files
+      {/* ── Stats + clear ── */}
+      <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] border-t border-[var(--border-subtle)] pt-2">
+        <span className="font-mono">
+          {filteredCount} of {totalCount} documents
         </span>
-
         {isAnyFilterActive && (
           <button
             onClick={onClearAll}
-            className="flex items-center gap-1 text-violet-400 hover:text-violet-300 font-bold transition-colors duration-200 cursor-pointer"
+            className="flex items-center gap-1 text-[var(--accent-primary)] hover:text-[var(--accent-secondary)] font-medium transition-colors cursor-pointer"
           >
-            <span>Clear All Filters</span>
+            <span>Clear filters</span>
             <X size={11} />
           </button>
         )}

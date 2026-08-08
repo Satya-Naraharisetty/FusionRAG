@@ -279,23 +279,23 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             {attachments.map((att) => (
               <div
                 key={att.id}
-                className="flex items-center gap-2 p-1.5 pr-2.5 bg-zinc-900/90 border border-zinc-800 rounded-xl shadow-xs transition-all"
+                className="flex items-center gap-2 p-1.5 pr-2.5 bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-[var(--radius-xl)] transition-colors"
               >
                 {att.preview ? (
                   <img
                     src={att.preview}
                     alt={att.file.name}
-                    className="w-8 h-8 rounded-lg object-cover flex-shrink-0 border border-zinc-750"
+                    className="w-8 h-8 rounded-[var(--radius-md)] object-cover flex-shrink-0 border border-[var(--border-subtle)]"
                   />
                 ) : (
                   <FileTypeBadge filename={att.file.name} variant="card" className="w-8 h-8 text-[8px]" />
                 )}
 
                 <div className="min-w-0 max-w-[130px] space-y-0.5">
-                  <p className="text-xs font-semibold text-zinc-200 truncate leading-none">
+                  <p className="text-xs font-medium text-[var(--text-primary)] truncate leading-none">
                     {att.file.name}
                   </p>
-                  <p className="text-[10px] text-zinc-500 font-mono leading-none">
+                  <p className="text-[10px] text-[var(--text-muted)] font-mono leading-none">
                     {(att.file.size / 1024).toFixed(0)} KB
                   </p>
                 </div>
@@ -305,7 +305,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 <button
                   type="button"
                   onClick={() => removeAttachment(att.id)}
-                  className="p-1 text-zinc-500 hover:text-red-400 rounded-md transition-colors cursor-pointer ml-0.5"
+                  className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-error)] rounded-[var(--radius-sm)] transition-colors cursor-pointer ml-0.5"
                   aria-label={`Remove ${att.file.name}`}
                 >
                   <X size={12} />
@@ -349,35 +349,32 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   variant="ghost"
                   size="icon"
                   disabled={isStreaming || attachments.length >= 5}
-                  className="h-9.5 w-9.5 rounded-full text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50 cursor-pointer flex items-center justify-center transition-colors"
+                  className="h-9 w-9 rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] cursor-pointer flex items-center justify-center transition-colors"
                   aria-label="Attach files options"
                 >
                   <Paperclip size={17} />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top" className="w-56 bg-zinc-950 border-zinc-800 text-zinc-200 p-1.5">
+              <DropdownMenuContent align="start" side="top" className="w-56">
                 <DropdownMenuItem
                   onClick={() => fileInputRef.current?.click()}
-                  className="gap-2 text-xs font-semibold cursor-pointer focus:bg-zinc-900 focus:text-zinc-100"
+                  className="gap-2 cursor-pointer"
                 >
-                  <Paperclip size={14} className="text-violet-400" />
-                  <span>Upload from computer...</span>
+                  <Paperclip size={14} className="text-[var(--accent-primary)]" />
+                  <span>Upload from computer…</span>
                 </DropdownMenuItem>
 
                 {recents.length > 0 && (
                   <>
-                    <DropdownMenuSeparator className="bg-zinc-900 my-1" />
+                    <DropdownMenuSeparator />
                     <div className="flex items-center justify-between px-2 py-1">
-                      <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                      <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
                         <History size={10} /> Recent Files
                       </span>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          clearRecents();
-                        }}
-                        className="text-[10px] text-zinc-500 hover:text-red-400 p-0.5 cursor-pointer"
+                        onClick={(e) => { e.stopPropagation(); clearRecents(); }}
+                        className="text-[10px] text-[var(--text-muted)] hover:text-[var(--accent-error)] p-0.5 cursor-pointer"
                         title="Clear recent list"
                       >
                         <Trash2 size={10} />
@@ -387,13 +384,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     {recents.slice(0, 5).map((rec, idx) => (
                       <DropdownMenuItem
                         key={rec.name + idx}
-                        onClick={() => {
-                          toast.success(`Selected recent attachment: "${rec.name}"`);
-                        }}
-                        className="flex items-center justify-between text-xs cursor-pointer focus:bg-zinc-900 focus:text-zinc-100 py-1.5"
+                        onClick={() => { toast.success(`Selected: "${rec.name}"`); }}
+                        className="flex items-center justify-between cursor-pointer py-1.5"
                       >
                         <span className="truncate max-w-[130px] font-medium">{rec.name}</span>
-                        <span className="text-[10px] text-zinc-500 font-mono flex-shrink-0">
+                        <span className="text-[10px] text-[var(--text-muted)] font-mono flex-shrink-0">
                           {(rec.size / 1024).toFixed(0)} KB
                         </span>
                       </DropdownMenuItem>
@@ -435,33 +430,35 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 fontFamily: "inherit",
                 width: "100%",
               }}
-              className="placeholder:text-zinc-500 disabled:opacity-50 scrollbar-none"
+              className="placeholder:text-[var(--text-muted)] disabled:opacity-50 scrollbar-none"
               aria-label="Message prompt input"
             />
 
             {showCommands && (
-              <Command className="absolute bottom-full left-0 right-0 mb-2 bg-[var(--bg-secondary,#171717)] border border-[var(--border-color)] rounded-2xl shadow-xl overflow-hidden animate-slide-up z-10 text-zinc-300">
+              <Command className="absolute bottom-full left-0 right-0 mb-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-2xl)] shadow-md overflow-hidden z-10 text-[var(--text-primary)] animate-in fade-in slide-in-from-bottom-2 duration-150">
                 <CommandInput
                   value={commandSearch}
                   onValueChange={setCommandSearch}
-                  placeholder="Search commands..."
-                  className="h-10 px-4 bg-transparent border-0 text-zinc-100 text-sm placeholder:text-zinc-500 focus-visible:ring-0 focus:outline-none"
+                  placeholder="Search commands…"
+                  className="h-10 bg-transparent border-0 text-sm focus-visible:ring-0 focus:outline-none"
                   autoFocus
                 />
-                <CommandEmpty className="py-6 text-center text-zinc-500 text-sm">No commands found.</CommandEmpty>
+                <CommandEmpty className="py-4 text-center text-[var(--text-muted)] text-xs">No commands found.</CommandEmpty>
                 <CommandGroup>
                   {filteredCommands.map((cmd) => (
                     <CommandItem
                       key={cmd.id}
                       onSelect={() => handleCommandSelect(cmd)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-zinc-900/50 cursor-pointer"
+                      className="flex items-center gap-3 px-3 py-2 cursor-pointer"
                     >
-                      <span className="text-base">{cmd.icon}</span>
-                      <div style={{ flex: 1, textAlign: "left" }}>
-                        <div style={{ fontWeight: 500, color: "#f5f5f5", fontSize: "14px" }}>{cmd.label}</div>
-                        <div style={{ fontSize: "12px", color: "#737373" }}>{cmd.description}</div>
+                      <span className="text-base flex-shrink-0">{cmd.icon}</span>
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="text-sm font-medium text-[var(--text-primary)] truncate">{cmd.label}</div>
+                        <div className="text-xs text-[var(--text-muted)] truncate">{cmd.description}</div>
                       </div>
-                      <kbd style={{ padding: "2px 6px", fontSize: "11px", fontFamily: "monospace", background: "#27272a", color: "#a3a3a3", borderRadius: "4px" }}>{cmd.shortcut}</kbd>
+                      <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-[var(--bg-tertiary)] text-[var(--text-muted)] rounded-[var(--radius-sm)] border border-[var(--border-subtle)] flex-shrink-0">
+                        {cmd.shortcut}
+                      </kbd>
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -493,7 +490,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   flexShrink: 0,
                   transition: "all 0.15s",
                 }}
-                className={cn(isRecording ? "animate-pulse" : "hover:text-zinc-200 hover:bg-zinc-700/50")}
+                className={cn(isRecording ? "animate-pulse" : "hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]")}
                 aria-label={isRecording ? "Stop recording" : "Record voice"}
                 aria-pressed={isRecording}
               >
@@ -521,7 +518,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   flexShrink: 0,
                   transition: "all 0.15s",
                 }}
-                className="hover:bg-zinc-200 active:scale-95"
+                className="hover:bg-[var(--bg-tertiary)] active:scale-95"
                 aria-label="Stop generation"
               >
                 <Square size={9} fill="currentColor" />

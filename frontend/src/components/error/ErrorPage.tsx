@@ -44,15 +44,17 @@ export const ErrorPage: React.FC<ErrorPageProps> = ({ status }) => {
   const current = configs[status] || configs[404];
 
   return (
-    <div className="flex h-screen w-screen flex-col items-center justify-center bg-zinc-950 p-6 text-center text-zinc-300 select-none">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 border border-zinc-800/80 mb-5 shadow-lg">
+    <div className="flex h-screen w-screen flex-col items-center justify-center bg-[var(--bg-primary)] p-6 text-center text-[var(--text-primary)] select-none">
+      <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-xl)] bg-[var(--bg-secondary)] border border-[var(--border-subtle)] mb-5">
         {current.icon}
       </div>
-      <h1 className="font-title font-bold text-lg text-zinc-100 mb-1">{current.title}</h1>
-      <p className="text-xs text-zinc-500 max-w-sm mb-6 leading-relaxed">{current.desc}</p>
+      <h1 className="font-title font-bold text-xl text-[var(--text-primary)] mb-1">{current.title}</h1>
+      <p className="text-xs text-[var(--text-secondary)] max-w-sm mb-6 leading-relaxed">{current.desc}</p>
       <Button
+        variant="default"
+        size="sm"
         onClick={current.action}
-        className="bg-violet-600 hover:bg-violet-700 text-white text-xs px-4 h-9 gap-1.5 shadow-md"
+        className="gap-1.5"
       >
         {status === 500 ? <RefreshCw size={14} /> : <Home size={14} />}
         <span>{current.label}</span>

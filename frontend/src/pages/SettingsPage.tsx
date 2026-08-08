@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme, Theme, Density } from "../context/ThemeContext";
 import {
-  Settings as SettingsIcon,
   User,
   Sliders,
   ShieldAlert,
@@ -34,7 +33,7 @@ interface ConversationDefaults {
   hybridEnabled: boolean;
 }
 
-const defaultValues: ConversationDefaults = {
+const DEFAULT_VALUES: ConversationDefaults = {
   temperature: 0.0,
   retrievalMode: "hybrid",
   topK: 10,
@@ -42,212 +41,242 @@ const defaultValues: ConversationDefaults = {
   hybridEnabled: true,
 };
 
+type TabId = "profile" | "appearance" | "notifications" | "advanced" | "data";
+
+const NAV_TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
+  { id: "profile",       label: "Profile",       icon: <User size={14} /> },
+  { id: "appearance",    label: "Appearance",     icon: <Palette size={14} /> },
+  { id: "notifications", label: "Notifications",  icon: <Bell size={14} /> },
+  { id: "advanced",      label: "Conversation",   icon: <Sliders size={14} /> },
+  { id: "data",          label: "Data & Privacy", icon: <Database size={14} /> },
+];
+
+/* ── Shared section header ── */
+const SectionHeader: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+}> = ({ icon, title, description, action }) => (
+  <div className="flex items-start justify-between gap-4 pb-4 border-b border-[var(--border-subtle)]">
+    <div>
+      <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
+        <span className="text-[var(--text-muted)]">{icon}</span>
+        {title}
+      </h3>
+      {description && (
+        <p className="text-xs text-[var(--text-secondary)] mt-0.5">{description}</p>
+      )}
+    </div>
+    {action}
+  </div>
+);
+
+/* ── Setting row (label + control) ── */
+const SettingRow: React.FC<{
+  label: string;
+  description?: string;
+  control: React.ReactNode;
+  className?: string;
+}> = ({ label, description, control, className = "" }) => (
+  <div className={`flex items-center justify-between gap-6 py-4 border-b border-[var(--border-subtle)] last:border-0 ${className}`}>
+    <div className="min-w-0">
+      <span className="text-sm text-[var(--text-primary)] font-medium block">{label}</span>
+      {description && (
+        <span className="text-xs text-[var(--text-muted)] block mt-0.5 leading-relaxed">{description}</span>
+      )}
+    </div>
+    <div className="flex-shrink-0">{control}</div>
+  </div>
+);
+
+/* ── Checkbox toggle styled to tokens ── */
+const ToggleCheckbox: React.FC<{
+  checked: boolean;
+  onChange: (val: boolean) => void;
+  label: string;
+}> = ({ checked, onChange, label }) => (
+  <label className="relative inline-flex items-center cursor-pointer select-none" aria-label={label}>
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+      className="sr-only"
+    />
+    <div
+      className={`w-9 h-5 rounded-full transition-colors duration-200 ${
+        checked ? "bg-[var(--accent-primary)]" : "bg-[var(--bg-tertiary)]"
+      } border ${checked ? "border-[var(--accent-primary)]/50" : "border-[var(--border-default)]"}`}
+    >
+      <div
+        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+          checked ? "translate-x-4" : "translate-x-0"
+        }`}
+      />
+    </div>
+  </label>
+);
+
 const SettingsPage: React.FC = () => {
   const { user } = useAuth();
   const { theme, setTheme, fontSize, setFontSize, density, setDensity } = useTheme();
 
-  const [activeTab, setActiveTab] = useState<"profile" | "appearance" | "notifications" | "data" | "advanced">("profile");
+  const [activeTab, setActiveTab] = useState<TabId>("profile");
 
-  // Defaults
   const [defaults, setDefaults] = useState<ConversationDefaults>(() => {
-    const saved = localStorage.getItem("conversation-defaults");
-    if (saved) {
-      try {
-        return { ...defaultValues, ...JSON.parse(saved) };
-      } catch (_e) {
-        // use default
-      }
+    try {
+      const saved = localStorage.getItem("conversation-defaults");
+      return saved ? { ...DEFAULT_VALUES, ...JSON.parse(saved) } : DEFAULT_VALUES;
+    } catch {
+      return DEFAULT_VALUES;
     }
-    return defaultValues;
   });
 
-  // Modal checks
-  const [showClearHistoryDialog, setShowClearHistoryDialog] = useState(false);
-  const [showResetConfigDialog, setShowResetConfigDialog] = useState(false);
+  const [showClearHistoryDialog, setShowClearHistoryDialog]   = useState(false);
+  const [showResetConfigDialog,  setShowResetConfigDialog]    = useState(false);
 
-  const updateSetting = <K extends keyof ConversationDefaults>(
-    key: K,
-    value: ConversationDefaults[K]
-  ) => {
+  const updateSetting = <K extends keyof ConversationDefaults>(key: K, value: ConversationDefaults[K]) => {
     const updated = { ...defaults, [key]: value };
     setDefaults(updated);
     localStorage.setItem("conversation-defaults", JSON.stringify(updated));
   };
 
   const handleResetDefaults = () => {
-    setDefaults(defaultValues);
-    localStorage.setItem("conversation-defaults", JSON.stringify(defaultValues));
-    toast.success("Conversation defaults reset to system defaults!");
+    setDefaults(DEFAULT_VALUES);
+    localStorage.setItem("conversation-defaults", JSON.stringify(DEFAULT_VALUES));
+    toast.success("Defaults reset.");
   };
 
   const handleExportData = () => {
     const data: Record<string, string> = {};
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key) {
-        data[key] = localStorage.getItem(key) || "";
-      }
+      if (key) data[key] = localStorage.getItem(key) || "";
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
     a.download = `hybrid-rag-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
-    toast.success("Preferences and folder data exported successfully.");
+    toast.success("Backup exported.");
   };
 
   const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = (ev) => {
       try {
-        const parsed = JSON.parse(event.target?.result as string);
-        Object.entries(parsed).forEach(([key, val]) => {
-          localStorage.setItem(key, val as string);
-        });
-        toast.success("Configuration imported! Reloading...");
+        const parsed = JSON.parse(ev.target?.result as string);
+        Object.entries(parsed).forEach(([k, v]) => localStorage.setItem(k, v as string));
+        toast.success("Configuration imported! Reloading…");
         setTimeout(() => window.location.reload(), 1000);
-      } catch (_e) {
-        toast.error("Invalid configuration backup file.");
+      } catch {
+        toast.error("Invalid backup file.");
       }
     };
     reader.readAsText(file);
   };
 
-  const handleClearHistory = () => {
-    // Mock deleting conversation history
-    toast.success("All conversation history cleared.");
-    setShowClearHistoryDialog(false);
-  };
-
-  const handleWipePreferences = () => {
-    localStorage.clear();
-    toast.success("All preferences reset! Reloading...");
-    setTimeout(() => window.location.reload(), 1000);
-  };
-
-  const userInitials = user?.email
-    ? user.email.slice(0, 2).toUpperCase()
-    : "US";
+  const userInitials = user?.email ? user.email.slice(0, 2).toUpperCase() : "US";
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6 md:p-8 bg-white dark:bg-[var(--bg-primary,#0D0D0D)] scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <div className="space-y-1">
-          <h1 className="text-lg font-bold font-title text-zinc-800 dark:text-zinc-150 flex items-center gap-2">
-            <SettingsIcon size={18} className="text-zinc-500" />
-            <span>Settings Console</span>
-          </h1>
-          <p className="text-xs text-zinc-500">
-            Configure system execution defaults and user account preferences.
+    <div className="flex-1 overflow-y-auto bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <div className="max-w-3xl mx-auto px-4 py-8 md:px-8">
+
+        {/* ── Page header ── */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Settings</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            Manage your account, appearance, and AI preferences.
           </p>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Navigation tabs column */}
-          <div className="w-full md:w-48 flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 border-b md:border-b-0 md:border-r border-zinc-200/50 dark:border-zinc-900 pr-0 md:pr-4 flex-shrink-0 select-none">
-            {([
-              { id: "profile", label: "Profile", icon: <User size={14} /> },
-              { id: "appearance", label: "Appearance", icon: <Palette size={14} /> },
-              { id: "notifications", label: "Notifications", icon: <Bell size={14} /> },
-              { id: "advanced", label: "Conversation", icon: <Sliders size={14} /> },
-              { id: "data", label: "Data Sync", icon: <Database size={14} /> },
-            ] as const).map((tab) => (
+        <div className="flex flex-col md:flex-row gap-8">
+
+          {/* ── Side nav ── */}
+          <nav
+            className="w-full md:w-44 flex flex-row md:flex-col gap-0.5 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 flex-shrink-0"
+            aria-label="Settings navigation"
+          >
+            {NAV_TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl transition-all duration-205 cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-[var(--radius-md)] transition-colors cursor-pointer whitespace-nowrap text-left ${
                   activeTab === tab.id
-                    ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-150 border border-zinc-200/60 dark:border-zinc-700/40 shadow-xs"
-                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-350 hover:bg-zinc-100/50 dark:hover:bg-zinc-900/20 border border-transparent"
+                    ? "bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]/60 border border-transparent"
                 }`}
+                aria-current={activeTab === tab.id ? "page" : undefined}
               >
                 {tab.icon}
                 <span>{tab.label}</span>
               </button>
             ))}
-          </div>
+          </nav>
 
-          {/* Tab content panel */}
-          <div className="flex-1 min-w-0">
+          {/* ── Tab content ── */}
+          <div className="flex-1 min-w-0 animate-in fade-in duration-200">
+
+            {/* ─ Profile ─ */}
             {activeTab === "profile" && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="border-b border-[var(--border-color)] pb-3">
-                  <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-1.5">
-                    <User size={14} className="text-zinc-500" />
-                    <span>User Profile</span>
-                  </h3>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">Your identity details</p>
-                </div>
-                
-                <div className="flex items-center gap-4 py-1">
-                    <Avatar className="h-12 w-12 bg-violet-950/40 border border-violet-900/30 text-violet-300 shadow-md">
-                      <AvatarFallback className="text-sm font-bold bg-transparent">
-                        {userInitials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="space-y-1 min-w-0">
-                      <h4 className="text-xs font-bold text-zinc-200 truncate">
-                        {user?.email}
-                      </h4>
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center px-1.5 py-0.5 text-[8px] font-extrabold uppercase rounded bg-zinc-900 text-zinc-400 border border-zinc-800/40">
-                          Role: {user?.role}
-                        </span>
-                        <span className="inline-flex items-center px-1.5 py-0.5 text-[8px] font-extrabold uppercase rounded bg-emerald-950 text-emerald-400 border border-emerald-900/10">
-                          Active
-                        </span>
-                      </div>
+              <div className="space-y-0">
+                <SectionHeader icon={<User size={14} />} title="User Profile" description="Your identity and account details." />
+                <div className="flex items-center gap-4 py-6 border-b border-[var(--border-subtle)]">
+                  <Avatar className="h-12 w-12 bg-[var(--bg-tertiary)] border border-[var(--border-default)]">
+                    <AvatarFallback className="text-sm font-semibold">{userInitials}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{user?.email}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-[var(--radius-pill)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                        {user?.role}
+                      </span>
+                      <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-[var(--radius-pill)] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        Active
+                      </span>
                     </div>
                   </div>
                 </div>
-              )}
-
-            {activeTab === "appearance" && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="border-b border-[var(--border-color)] pb-3">
-                  <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-1.5">
-                    <Palette size={14} className="text-zinc-500" />
-                    <span>Appearance Options</span>
-                  </h3>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">Customize font sizes, theme selection, and spacing layout density</p>
+                <div className="pt-4 text-xs text-[var(--text-muted)]">
+                  To change your email or password, contact your administrator.
                 </div>
+              </div>
+            )}
 
-                {/* Theme Selector */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
-                    Theme Mode
-                  </label>
+            {/* ─ Appearance ─ */}
+            {activeTab === "appearance" && (
+              <div className="space-y-0">
+                <SectionHeader icon={<Palette size={14} />} title="Appearance" description="Customize theme, font size, and interface density." />
+
+                {/* Theme */}
+                <div className="py-5 border-b border-[var(--border-subtle)]">
+                  <p className="text-xs font-medium text-[var(--text-secondary)] mb-3">Theme Mode</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[
-                      { id: "dark", label: "Dark mode" },
-                      { id: "light", label: "Light mode" },
-                      { id: "system", label: "System theme" },
-                      { id: "high-contrast", label: "High contrast" },
-                    ].map((opt) => (
+                    {(["dark", "light", "system", "high-contrast"] as Theme[]).map((opt) => (
                       <button
-                        key={opt.id}
-                        onClick={() => setTheme(opt.id as Theme)}
-                        className={`px-3 py-2.5 text-xs font-semibold rounded-xl border text-center transition-all duration-200 cursor-pointer ${
-                          theme === opt.id
-                            ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-950 dark:text-zinc-150 border-zinc-300 dark:border-zinc-700 shadow-xs"
-                            : "bg-transparent border-[var(--border-color)] hover:border-[var(--border-hover)] text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
+                        key={opt}
+                        onClick={() => setTheme(opt)}
+                        className={`px-3 py-2 text-xs font-medium rounded-[var(--radius-md)] border text-center transition-colors cursor-pointer capitalize ${
+                          theme === opt
+                            ? "bg-[var(--bg-secondary)] text-[var(--text-primary)] border-[var(--border-hover)]"
+                            : "bg-transparent border-[var(--border-subtle)] hover:border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                         }`}
+                        aria-pressed={theme === opt}
                       >
-                        {opt.label}
+                        {opt === "high-contrast" ? "High Contrast" : opt.charAt(0).toUpperCase() + opt.slice(1)}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Font Size Slider */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-xs font-semibold text-zinc-300">
-                    <span>Base Font Size ({fontSize}px)</span>
-                    <span className="text-[10px] text-zinc-500">Adjust text size globally</span>
+                {/* Font size */}
+                <div className="py-5 border-b border-[var(--border-subtle)]">
+                  <div className="flex justify-between items-center mb-3">
+                    <p className="text-xs font-medium text-[var(--text-secondary)]">Base Font Size</p>
+                    <span className="text-xs font-mono text-[var(--text-muted)]">{fontSize}px</span>
                   </div>
                   <input
                     type="range"
@@ -256,31 +285,29 @@ const SettingsPage: React.FC = () => {
                     step="1"
                     value={fontSize}
                     onChange={(e) => setFontSize(parseInt(e.target.value, 10))}
-                    className="w-full h-1 bg-zinc-900 rounded-lg appearance-none cursor-pointer accent-zinc-700 focus-visible:outline-none"
+                    aria-label={`Font size: ${fontSize}px`}
                   />
+                  <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1.5">
+                    <span>12px</span><span>16px</span><span>20px</span>
+                  </div>
                 </div>
 
-                {/* Layout Density */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
-                    Interface Spacing Density
-                  </label>
+                {/* Density */}
+                <div className="py-5">
+                  <p className="text-xs font-medium text-[var(--text-secondary)] mb-3">Interface Density</p>
                   <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: "comfortable", label: "Comfortable" },
-                      { id: "cozy", label: "Cozy" },
-                      { id: "compact", label: "Compact" },
-                    ].map((opt) => (
+                    {(["comfortable", "cozy", "compact"] as Density[]).map((opt) => (
                       <button
-                        key={opt.id}
-                        onClick={() => setDensity(opt.id as Density)}
-                        className={`px-3 py-2 text-xs font-semibold rounded-xl border text-center transition-all duration-200 cursor-pointer ${
-                          density === opt.id
-                            ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-950 dark:text-zinc-150 border-zinc-300 dark:border-zinc-700 shadow-xs"
-                            : "bg-transparent border-[var(--border-color)] hover:border-[var(--border-hover)] text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
+                        key={opt}
+                        onClick={() => setDensity(opt)}
+                        className={`px-3 py-2 text-xs font-medium rounded-[var(--radius-md)] border text-center transition-colors cursor-pointer capitalize ${
+                          density === opt
+                            ? "bg-[var(--bg-secondary)] text-[var(--text-primary)] border-[var(--border-hover)]"
+                            : "bg-transparent border-[var(--border-subtle)] hover:border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                         }`}
+                        aria-pressed={density === opt}
                       >
-                        {opt.label}
+                        {opt.charAt(0).toUpperCase() + opt.slice(1)}
                       </button>
                     ))}
                   </div>
@@ -288,69 +315,59 @@ const SettingsPage: React.FC = () => {
               </div>
             )}
 
+            {/* ─ Notifications ─ */}
             {activeTab === "notifications" && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="border-b border-[var(--border-color)] pb-3">
-                  <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-1.5">
-                    <Bell size={14} className="text-zinc-500" />
-                    <span>Notification Settings</span>
-                  </h3>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">Manage push notifications and sound alerts</p>
-                </div>
-
-                <div className="space-y-3.5">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-0.5">
-                      <span className="text-xs font-semibold text-zinc-300 block">Desktop Notifications</span>
-                      <span className="text-[9px] text-zinc-500 block">Show browser push notifications for answers</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      defaultChecked
-                      className="h-4 w-4 bg-zinc-900 border-zinc-800 rounded accent-zinc-700 focus-visible:outline-none cursor-pointer"
+              <div className="space-y-0">
+                <SectionHeader icon={<Bell size={14} />} title="Notifications" description="Control how and when you receive alerts." />
+                <SettingRow
+                  label="Desktop Notifications"
+                  description="Show browser push notifications when responses complete."
+                  control={
+                    <ToggleCheckbox
+                      checked={true}
+                      onChange={() => {}}
+                      label="Toggle desktop notifications"
                     />
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-0.5">
-                      <span className="text-xs font-semibold text-zinc-300 block">Sound alerts</span>
-                      <span className="text-[9px] text-zinc-500 block">Play soft notification chimes when tool finishes</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 bg-zinc-900 border-zinc-800 rounded accent-zinc-700 focus-visible:outline-none cursor-pointer"
+                  }
+                />
+                <SettingRow
+                  label="Sound Alerts"
+                  description="Play a soft chime when the model finishes responding."
+                  control={
+                    <ToggleCheckbox
+                      checked={false}
+                      onChange={() => {}}
+                      label="Toggle sound alerts"
                     />
-                  </div>
-                </div>
+                  }
+                />
               </div>
             )}
 
+            {/* ─ Conversation defaults ─ */}
             {activeTab === "advanced" && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-1.5">
-                      <Sliders size={14} className="text-zinc-500" />
-                      <span>Conversation Defaults</span>
-                    </h3>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">Adjust default generation settings for LLM sessions</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    onClick={handleResetDefaults}
-                    className="h-7 text-[10px] gap-1 hover:bg-zinc-800 hover:text-zinc-100 text-zinc-400 font-semibold cursor-pointer rounded-lg border border-[var(--border-color)] px-2.5"
-                  >
-                    <RotateCcw size={10} />
-                    <span>Reset Defaults</span>
-                  </Button>
-                </div>
+              <div className="space-y-0">
+                <SectionHeader
+                  icon={<Sliders size={14} />}
+                  title="Conversation Defaults"
+                  description="Default generation and retrieval parameters for new chats."
+                  action={
+                    <Button variant="ghost" size="sm" onClick={handleResetDefaults} className="gap-1.5 text-xs">
+                      <RotateCcw size={12} />
+                      Reset
+                    </Button>
+                  }
+                />
 
                 {/* Temperature */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-[11px] font-semibold text-zinc-300">
-                    <span>LLM Temperature ({defaults.temperature.toFixed(1)})</span>
-                    <span className="text-[10px] text-zinc-500">
-                      {defaults.temperature === 0 ? "Strict / Deterministic" : "Creative / Generative"}
-                    </span>
+                <div className="py-5 border-b border-[var(--border-subtle)]">
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">Temperature</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                        {defaults.temperature === 0 ? "Deterministic" : "Creative"} · {defaults.temperature.toFixed(1)}
+                      </p>
+                    </div>
                   </div>
                   <input
                     type="range"
@@ -359,15 +376,20 @@ const SettingsPage: React.FC = () => {
                     step="0.1"
                     value={defaults.temperature}
                     onChange={(e) => updateSetting("temperature", parseFloat(e.target.value))}
-                    className="w-full h-1 bg-zinc-900 rounded-lg appearance-none cursor-pointer accent-zinc-700 focus-visible:outline-none"
+                    aria-label={`Temperature: ${defaults.temperature}`}
                   />
+                  <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1.5">
+                    <span>0 — Strict</span><span>1 — Creative</span>
+                  </div>
                 </div>
 
                 {/* Top K */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-[11px] font-semibold text-zinc-300">
-                    <span>Retrieval Top K ({defaults.topK})</span>
-                    <span className="text-[10px] text-zinc-500">Maximum retrieved chunks</span>
+                <div className="py-5 border-b border-[var(--border-subtle)]">
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">Retrieval Top K</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">Maximum chunks retrieved · {defaults.topK}</p>
+                    </div>
                   </div>
                   <input
                     type="range"
@@ -376,182 +398,159 @@ const SettingsPage: React.FC = () => {
                     step="1"
                     value={defaults.topK}
                     onChange={(e) => updateSetting("topK", parseInt(e.target.value, 10))}
-                    className="w-full h-1 bg-zinc-900 rounded-lg appearance-none cursor-pointer accent-zinc-700 focus-visible:outline-none"
+                    aria-label={`Top K: ${defaults.topK}`}
                   />
+                  <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1.5">
+                    <span>1</span><span>20</span>
+                  </div>
                 </div>
 
-                {/* Retrieval Mode select */}
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <span className="text-[11px] font-semibold text-zinc-300 block">Retrieval Mode</span>
-                    <span className="text-[9px] text-zinc-500 block">Grounding search method</span>
-                  </div>
-                  <select
-                    value={defaults.retrievalMode}
-                    onChange={(e) => updateSetting("retrievalMode", e.target.value as ConversationDefaults["retrievalMode"])}
-                    className="h-8.5 rounded-xl bg-zinc-900 border border-[var(--border-color)] text-xs px-3 focus-visible:outline-none focus:ring-1 focus:ring-zinc-700 focus:border-zinc-700 text-zinc-300 font-semibold cursor-pointer"
-                  >
-                    <option value="hybrid">Hybrid Search</option>
-                    <option value="semantic">Semantic (Dense)</option>
-                    <option value="sparse">Keyword (Sparse)</option>
-                    <option value="auto">Auto Selection</option>
-                  </select>
-                </div>
+                {/* Retrieval mode */}
+                <SettingRow
+                  label="Retrieval Mode"
+                  description="The search strategy used to ground responses."
+                  control={
+                    <select
+                      value={defaults.retrievalMode}
+                      onChange={(e) => updateSetting("retrievalMode", e.target.value as ConversationDefaults["retrievalMode"])}
+                      className="h-8 rounded-[var(--radius-md)] bg-[var(--bg-input)] border border-[var(--border-default)] hover:border-[var(--border-hover)] text-xs px-2.5 text-[var(--text-primary)] cursor-pointer outline-none focus:border-[var(--accent-primary)]/50 transition-colors min-w-[140px]"
+                    >
+                      <option value="hybrid">Hybrid Search</option>
+                      <option value="semantic">Semantic (Dense)</option>
+                      <option value="sparse">Keyword (Sparse)</option>
+                      <option value="auto">Auto Select</option>
+                    </select>
+                  }
+                />
 
-                {/* Toggle Streaming */}
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <span className="text-[11px] font-semibold text-zinc-300 block">SSE Response Streaming</span>
-                    <span className="text-[9px] text-zinc-500 block">Streams LLM tokens chunk-by-chunk</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={defaults.stream}
-                    onChange={(e) => updateSetting("stream", e.target.checked)}
-                    className="h-4 w-4 bg-zinc-900 border-[var(--border-color)] rounded accent-zinc-700 focus-visible:outline-none cursor-pointer"
-                  />
-                </div>
+                <SettingRow
+                  label="SSE Response Streaming"
+                  description="Stream LLM tokens chunk-by-chunk as they are generated."
+                  control={
+                    <ToggleCheckbox
+                      checked={defaults.stream}
+                      onChange={(v) => updateSetting("stream", v)}
+                      label="Toggle response streaming"
+                    />
+                  }
+                />
 
-                {/* Toggle Hybrid search */}
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <span className="text-[11px] font-semibold text-zinc-300 block">Enable Reciprocal Rank Fusion</span>
-                    <span className="text-[9px] text-zinc-500 block">Merges keyword and semantic results</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={defaults.hybridEnabled}
-                    onChange={(e) => updateSetting("hybridEnabled", e.target.checked)}
-                    className="h-4 w-4 bg-zinc-900 border-[var(--border-color)] rounded accent-zinc-700 focus-visible:outline-none cursor-pointer"
-                  />
-                </div>
+                <SettingRow
+                  label="Reciprocal Rank Fusion"
+                  description="Merge keyword and semantic scores using RRF for hybrid retrieval."
+                  control={
+                    <ToggleCheckbox
+                      checked={defaults.hybridEnabled}
+                      onChange={(v) => updateSetting("hybridEnabled", v)}
+                      label="Toggle reciprocal rank fusion"
+                    />
+                  }
+                />
               </div>
             )}
 
+            {/* ─ Data & Privacy ─ */}
             {activeTab === "data" && (
-              <div className="space-y-8 animate-in fade-in duration-200">
-                {/* Sync & Backup */}
-                <div className="space-y-4">
-                  <div className="border-b border-[var(--border-color)] pb-3">
-                    <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-1.5">
-                      <Database size={14} className="text-zinc-500" />
-                      <span>Data Sync & Backup</span>
-                    </h3>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">Export preferences and folder data locally</p>
-                  </div>
+              <div className="space-y-0">
+                <SectionHeader icon={<Database size={14} />} title="Data & Privacy" description="Export your preferences or wipe local data." />
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    {/* Export */}
-                    <div className="p-4 bg-zinc-900/10 border border-[var(--border-color)] rounded-xl space-y-2">
-                      <span className="text-[11px] font-bold text-zinc-250 flex items-center gap-1">
-                        <Download size={12} className="text-zinc-400" />
-                        <span>Backup Preferences</span>
-                      </span>
-                      <p className="text-[9px] text-zinc-500 leading-normal">
-                        Download folder structures, pinned conversation markers, custom search criteria, and workspace parameters.
-                      </p>
-                      <Button
-                        onClick={handleExportData}
-                        className="h-8.5 w-full bg-zinc-900/30 border border-[var(--border-color)] hover:bg-zinc-800 text-zinc-300 text-[10px] font-bold cursor-pointer rounded-xl gap-1.5 mt-1"
-                      >
-                        Export Backup JSON
+                {/* Export */}
+                <SettingRow
+                  label="Export Preferences"
+                  description="Download a JSON backup of all local settings, folders, and pinned items."
+                  control={
+                    <Button variant="secondary" size="sm" onClick={handleExportData} className="gap-1.5">
+                      <Download size={13} />
+                      Export
+                    </Button>
+                  }
+                />
+
+                {/* Import */}
+                <SettingRow
+                  label="Import Preferences"
+                  description="Restore from a previously exported backup. This replaces all current local settings."
+                  control={
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleImportData}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        aria-label="Import preferences file"
+                      />
+                      <Button variant="secondary" size="sm" className="gap-1.5 pointer-events-none">
+                        <Upload size={13} />
+                        Import
                       </Button>
                     </div>
+                  }
+                />
 
-                    {/* Import */}
-                    <div className="p-4 bg-zinc-900/10 border border-[var(--border-color)] rounded-xl space-y-2">
-                      <span className="text-[11px] font-bold text-zinc-250 flex items-center gap-1">
-                        <Upload size={12} className="text-zinc-400" />
-                        <span>Restore Preferences</span>
-                      </span>
-                      <p className="text-[9px] text-zinc-500 leading-normal">
-                        Restore backup configuration parameters. Warning: this replaces all active local settings and page layout folders.
-                      </p>
-                      <div className="relative">
-                        <input
-                          type="file"
-                          accept=".json"
-                          onChange={handleImportData}
-                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                        />
-                        <Button className="h-8.5 w-full bg-zinc-900/30 border border-[var(--border-color)] hover:bg-zinc-800 text-zinc-300 text-[10px] font-bold cursor-pointer rounded-xl gap-1.5 mt-1">
-                          Load JSON File
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Danger Zone */}
-                <div className="space-y-4">
-                  <div className="border-b border-red-900/20 pb-3">
-                    <h3 className="text-sm font-semibold text-red-400 flex items-center gap-1.5">
-                      <ShieldAlert size={14} className="text-red-500" />
-                      <span>Danger Zone</span>
-                    </h3>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">Destructive actions on local store data</p>
+                {/* Danger zone */}
+                <div className="pt-6 mt-2 border-t border-[var(--border-subtle)]">
+                  <div className="flex items-center gap-2 mb-4">
+                    <ShieldAlert size={14} className="text-[var(--accent-error)]" />
+                    <span className="text-sm font-semibold text-[var(--accent-error)]">Danger Zone</span>
                   </div>
 
-                  <div className="space-y-3.5">
-                    {/* Clear history */}
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-bold text-zinc-200 block">Clear History</span>
-                        <span className="text-[9px] text-zinc-500 block">Delete all conversation records and summaries.</span>
-                      </div>
+                  <SettingRow
+                    label="Clear Conversation History"
+                    description="Permanently delete all conversation records and message transcripts."
+                    control={
                       <Button
                         variant="destructive"
+                        size="sm"
                         onClick={() => setShowClearHistoryDialog(true)}
-                        className="bg-red-950/20 hover:bg-red-950/40 text-red-550 border border-red-900/35 text-[10px] font-bold h-8 px-4 cursor-pointer rounded-xl"
+                        className="gap-1.5"
                       >
-                        Clear History
+                        <Trash2 size={13} />
+                        Clear
                       </Button>
-                    </div>
+                    }
+                  />
 
-                    {/* Wipe all preferences */}
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-bold text-zinc-200 block">Factory Reset</span>
-                        <span className="text-[9px] text-zinc-500 block">Clear local preferences, folders, tags, and sign out.</span>
-                      </div>
+                  <SettingRow
+                    label="Factory Reset"
+                    description="Wipe all local preferences, folders, tags, and settings. You will be signed out."
+                    control={
                       <Button
                         variant="destructive"
+                        size="sm"
                         onClick={() => setShowResetConfigDialog(true)}
-                        className="bg-red-650 hover:bg-red-750 text-white text-[10px] font-bold h-8 px-4 cursor-pointer rounded-xl"
+                        className="gap-1.5"
                       >
-                        Reset Console
+                        <RotateCcw size={13} />
+                        Reset
                       </Button>
-                    </div>
-                  </div>
+                    }
+                  />
                 </div>
               </div>
             )}
+
           </div>
         </div>
       </div>
 
+      {/* ── Confirm: clear history ── */}
       <Dialog open={showClearHistoryDialog} onOpenChange={setShowClearHistoryDialog}>
-        <DialogContent className="bg-[var(--bg-secondary,#171717)] border-[var(--border-color)] text-zinc-200 sm:max-w-md rounded-2xl">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-zinc-100 flex items-center gap-2 text-sm font-semibold">
-              <Trash2 size={16} className="text-red-500" />
-              <span>Clear Conversation History?</span>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <Trash2 size={15} className="text-[var(--accent-error)]" />
+              Clear Conversation History?
             </DialogTitle>
-            <DialogDescription className="text-zinc-400 text-xs mt-2">
-              This will permanently delete all conversations and message transcripts. This action is irreversible.
+            <DialogDescription>
+              This will permanently delete all conversations and message transcripts. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="mt-4 flex gap-2">
+          <DialogFooter className="gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setShowClearHistoryDialog(false)}>Cancel</Button>
             <Button
-              variant="outline"
-              onClick={() => setShowClearHistoryDialog(false)}
-              className="bg-transparent border-[var(--border-color)] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 text-xs h-10 rounded-xl"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleClearHistory}
-              className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold h-10 rounded-xl"
+              variant="destructive"
+              size="sm"
+              onClick={() => { toast.success("History cleared."); setShowClearHistoryDialog(false); }}
             >
               Confirm Clear
             </Button>
@@ -559,28 +558,28 @@ const SettingsPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
+      {/* ── Confirm: factory reset ── */}
       <Dialog open={showResetConfigDialog} onOpenChange={setShowResetConfigDialog}>
-        <DialogContent className="bg-[var(--bg-secondary,#171717)] border-[var(--border-color)] text-zinc-200 sm:max-w-md rounded-2xl">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-zinc-100 flex items-center gap-2 text-sm font-semibold">
-              <RotateCcw size={16} className="text-red-500" />
-              <span>Perform Factory Reset?</span>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <RotateCcw size={15} className="text-[var(--accent-error)]" />
+              Perform Factory Reset?
             </DialogTitle>
-            <DialogDescription className="text-zinc-400 text-xs mt-2">
-              This will wipe all custom folders, color tag setups, pinned records, layout configurations, and settings. You will be signed out.
+            <DialogDescription>
+              This wipes all custom folders, pinned items, tags, layout settings, and logs you out. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="mt-4 flex gap-2">
+          <DialogFooter className="gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setShowResetConfigDialog(false)}>Cancel</Button>
             <Button
-              variant="outline"
-              onClick={() => setShowResetConfigDialog(false)}
-              className="bg-transparent border-[var(--border-color)] text-zinc-300 hover:bg-zinc-900 hover:text-zinc-100 text-xs h-10 rounded-xl"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleWipePreferences}
-              className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold h-10 rounded-xl"
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                localStorage.clear();
+                toast.success("Preferences reset! Reloading…");
+                setTimeout(() => window.location.reload(), 1000);
+              }}
             >
               Wipe Everything
             </Button>

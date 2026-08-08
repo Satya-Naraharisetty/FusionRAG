@@ -17,19 +17,19 @@ const SIZE_CONFIG = {
 };
 
 const STATUS_COLORS = {
-  queued: "text-zinc-500",
-  uploading: "text-violet-500",
-  completed: "text-emerald-500",
-  error: "text-red-500",
-  paused: "text-amber-500",
+  queued: "text-[var(--text-muted)]",
+  uploading: "text-[var(--accent-primary)]",
+  completed: "text-[var(--accent-success)]",
+  error: "text-[var(--accent-error)]",
+  paused: "text-[var(--accent-warning)]",
 };
 
 const STATUS_BG = {
-  queued: "bg-zinc-500",
-  uploading: "bg-violet-500",
-  completed: "bg-emerald-500",
-  error: "bg-red-500",
-  paused: "bg-amber-500",
+  queued: "bg-[var(--text-muted)]",
+  uploading: "bg-[var(--accent-primary)]",
+  completed: "bg-[var(--accent-success)]",
+  error: "bg-[var(--accent-error)]",
+  paused: "bg-[var(--accent-warning)]",
 };
 
 export const UploadProgress: React.FC<UploadProgressProps> = ({

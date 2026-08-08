@@ -25,35 +25,23 @@ interface QueueFile {
   controller?: AbortController;
 }
 
-interface UploadDropzoneProps {
-  conversationId?: string | null;
-}
-
-export const UploadDropzone: React.FC<UploadDropzoneProps> = () => {
+export const UploadDropzone: React.FC = () => {
   const uploadMutation = useUploadDocument();
-  const [queue, setQueue] = useState<QueueFile[]>([]);
-
-  // Drag and drop sorting in queue
+  const [queue, setQueue]           = useState<QueueFile[]>([]);
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newItems: QueueFile[] = [];
-
     acceptedFiles.forEach((file) => {
-      // Validate file size
       if (file.size > UPLOAD_LIMITS.MAX_FILE_SIZE) {
-        toast.error(`File "${file.name}" exceeds the 50MB size limit.`);
+        toast.error(`"${file.name}" exceeds the 50 MB size limit.`);
         return;
       }
-
-      // Validate file type
-      const fileExt = file.name.split(".").pop()?.toLowerCase() || "";
-      const validExts = ["pdf", "txt", "docx", "doc", "md"];
-      if (!validExts.includes(fileExt)) {
-        toast.error(`File format ".${fileExt}" for "${file.name}" is not supported.`);
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      if (!["pdf", "txt", "docx", "doc", "md"].includes(ext)) {
+        toast.error(`".${ext}" is not a supported format.`);
         return;
       }
-
       newItems.push({
         id: `upload-${Math.random().toString(36).substring(2, 9)}`,
         file,
@@ -61,23 +49,18 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = () => {
         progress: 0,
       });
     });
-
     if (newItems.length > 0) {
       setQueue((prev) => [...prev, ...newItems]);
-      toast.success(`Added ${newItems.length} file(s) to the queue.`);
+      toast.success(`Added ${newItems.length} file${newItems.length > 1 ? "s" : ""} to queue.`);
     }
   }, []);
 
   const startUpload = async (item: QueueFile) => {
     if (item.status === "uploading" || item.status === "completed") return;
-
     const controller = new AbortController();
     setQueue((prev) =>
-      prev.map((q) =>
-        q.id === item.id ? { ...q, status: "uploading", controller } : q
-      )
+      prev.map((q) => (q.id === item.id ? { ...q, status: "uploading", controller } : q))
     );
-
     try {
       await uploadMutation.mutateAsync({
         file: item.file,
@@ -90,16 +73,14 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = () => {
         },
         signal: controller.signal,
       });
-
       setQueue((prev) =>
         prev.map((q) => (q.id === item.id ? { ...q, status: "completed", progress: 100 } : q))
       );
-      toast.success(`Successfully uploaded "${item.file.name}"!`);
+      toast.success(`Uploaded "${item.file.name}"`);
     } catch (err: unknown) {
-      const isAborted = (err as Error)?.name === "CanceledError" || (err as Error)?.name === "AbortError";
-      if (isAborted) {
-        // Paused/cancelled states handled separately
-      } else {
+      const isAborted =
+        (err as Error)?.name === "CanceledError" || (err as Error)?.name === "AbortError";
+      if (!isAborted) {
         setQueue((prev) =>
           prev.map((q) => (q.id === item.id ? { ...q, status: "error" } : q))
         );
@@ -110,76 +91,52 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = () => {
 
   const handlePause = (id: string) => {
     const item = queue.find((q) => q.id === id);
-    if (item && item.status === "uploading" && item.controller) {
+    if (item?.status === "uploading" && item.controller) {
       item.controller.abort();
       setQueue((prev) =>
         prev.map((q) => (q.id === id ? { ...q, status: "paused", controller: undefined } : q))
-      );
-      toast.custom(
-        (t) => (
-          <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-zinc-900 border border-zinc-800 shadow-lg rounded-xl pointer-events-auto flex p-3 text-xs text-zinc-400 font-semibold gap-2`}>
-            <Pause size={14} className="text-amber-500 flex-shrink-0" />
-            <span>Paused upload for "{item.file.name}".</span>
-          </div>
-        )
       );
     }
   };
 
   const handleResume = (id: string) => {
     const item = queue.find((q) => q.id === id);
-    if (item && item.status === "paused") {
-      startUpload(item);
-    }
+    if (item?.status === "paused") startUpload(item);
   };
 
   const handleCancel = (id: string) => {
     const item = queue.find((q) => q.id === id);
     if (item) {
-      if (item.controller) {
-        item.controller.abort();
-      }
+      item.controller?.abort();
       setQueue((prev) => prev.filter((q) => q.id !== id));
-      toast.error(`Cancelled upload for "${item.file.name}".`);
     }
   };
 
   const uploadAll = () => {
-    const pending = queue.filter((q) => q.status === "queued" || q.status === "paused" || q.status === "error");
-    if (pending.length === 0) {
-      toast.error("No pending files to upload.");
-      return;
-    }
+    const pending = queue.filter(
+      (q) => q.status === "queued" || q.status === "paused" || q.status === "error"
+    );
+    if (pending.length === 0) { toast.error("No pending files to upload."); return; }
     pending.forEach((item) => startUpload(item));
   };
 
-  // Batch progress summary calculation
   const batchSummary = useMemo(() => {
     if (queue.length === 0) return { completed: 0, total: 0, overallProgress: 0 };
     const completed = queue.filter((q) => q.status === "completed").length;
     const totalProgress = queue.reduce((sum, q) => sum + q.progress, 0);
-    const overallProgress = Math.round(totalProgress / queue.length);
-    return { completed, total: queue.length, overallProgress };
+    return { completed, total: queue.length, overallProgress: Math.round(totalProgress / queue.length) };
   }, [queue]);
 
-  // Reorder queue logic
-  const handleDragStart = (idx: number) => {
-    setDraggedIdx(idx);
-  };
+  const handleDragStart = (idx: number) => setDraggedIdx(idx);
 
   const handleDragOver = (e: React.DragEvent, targetIdx: number) => {
     e.preventDefault();
     if (draggedIdx === null || draggedIdx === targetIdx) return;
-
-    const updatedQueue = [...queue];
-    const item = updatedQueue.splice(draggedIdx, 1)[0];
-    updatedQueue.splice(targetIdx, 0, item);
-    setQueue(updatedQueue);
+    const updated = [...queue];
+    const item = updated.splice(draggedIdx, 1)[0];
+    updated.splice(targetIdx, 0, item);
+    setQueue(updated);
     setDraggedIdx(targetIdx);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIdx(null);
   };
 
   const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
@@ -189,137 +146,139 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = () => {
   });
 
   return (
-    <div className="space-y-4">
-      {/* Drag Drop Area */}
+    <div className="space-y-3">
+      {/* Drop zone */}
       <div
         {...getRootProps()}
-        className={`group rounded-2xl p-8.5 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 bg-gradient-to-br from-zinc-950/50 via-transparent to-violet-950/10 ${
+        className={`group rounded-[var(--radius-2xl)] p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${
           isDragActive
-            ? "border-2 border-dashed border-violet-500/60 animate-pulse bg-violet-950/20 shadow-lg"
-            : "border border-dashed border-[var(--border-color)] bg-zinc-900/5 hover:border-[var(--border-hover)] hover:bg-zinc-900/10 hover:shadow-xs"
+            ? "border-2 border-dashed border-[var(--accent-primary)]/70 bg-[var(--accent-primary)]/8"
+            : "border border-dashed border-[var(--border-default)] bg-transparent hover:border-[var(--border-hover)] hover:bg-[var(--bg-secondary)]"
         }`}
       >
         <input {...getInputProps()} />
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900/60 border border-zinc-800 text-zinc-400 mb-3 group-hover:text-violet-400 group-hover:border-violet-500/40 transition-all duration-300">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-muted)] mb-3 group-hover:text-[var(--text-secondary)] transition-colors">
           <Upload size={16} />
         </div>
-        <p className="text-xs font-semibold text-zinc-200 mb-1">
-          {isDragActive ? "Drop files here..." : "Drag & drop files here"}
+        <p className="text-sm font-medium text-[var(--text-primary)] mb-1">
+          {isDragActive ? "Drop files here…" : "Drag & drop files here"}
         </p>
-        <p className="text-[10px] text-zinc-500 leading-normal">
-          Supports PDF, TXT, DOCX, MD (max 50MB)
+        <p className="text-xs text-[var(--text-muted)]">
+          PDF, TXT, DOCX, MD · max 50 MB
         </p>
       </div>
 
-      {/* File Size Error Display */}
+      {/* File rejections */}
       {fileRejections.length > 0 && (
-        <div className="flex items-center gap-2 p-3 bg-red-950/10 border border-red-900/20 rounded-xl text-red-400 text-[10px] font-medium leading-normal">
+        <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-[var(--radius-xl)] text-red-400 text-xs font-medium">
           <AlertCircle size={14} className="flex-shrink-0" />
-          <span>Some files were rejected because they exceed 50MB or are unsupported.</span>
+          <span>Some files were rejected (too large or unsupported format).</span>
         </div>
       )}
 
-      {/* Uploading Queue Display */}
+      {/* Upload queue */}
       {queue.length > 0 && (
-        <div className="space-y-3 bg-zinc-950/40 border border-zinc-900 rounded-2xl p-4">
-          {/* Queue Top Header with Batch Summary */}
-          <div className="flex items-center justify-between border-b border-zinc-900/80 pb-3">
-            <div className="space-y-0.5">
+        <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-[var(--radius-2xl)] p-4 space-y-3">
+          {/* Queue header */}
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
+            <div>
               <div className="flex items-center gap-2">
-                <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider select-none">
+                <h4 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
                   Upload Queue ({queue.length})
                 </h4>
                 {batchSummary.completed === batchSummary.total && (
-                  <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold">
+                  <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
                     <CheckCircle2 size={11} /> All done
                   </span>
                 )}
               </div>
-              <p className="text-[10px] text-zinc-500 font-mono">
-                {batchSummary.completed} of {batchSummary.total} completed ({batchSummary.overallProgress}%)
+              <p className="text-[11px] text-[var(--text-muted)] font-mono mt-0.5">
+                {batchSummary.completed}/{batchSummary.total} completed · {batchSummary.overallProgress}%
               </p>
             </div>
-
-            {queue.some((q) => q.status === "queued" || q.status === "paused" || q.status === "error") && (
-              <Button
-                onClick={uploadAll}
-                className="h-7 text-[10px] font-bold bg-violet-600 hover:bg-violet-750 text-white px-3 gap-1 cursor-pointer"
-              >
-                <ArrowUp size={11} />
-                <span>Upload All</span>
+            {queue.some((q) => ["queued", "paused", "error"].includes(q.status)) && (
+              <Button size="sm" onClick={uploadAll} className="gap-1.5 text-xs">
+                <ArrowUp size={12} />
+                Upload All
               </Button>
             )}
           </div>
 
-          {/* Batch overall progress bar */}
-          <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+          {/* Batch progress bar */}
+          <div className="w-full bg-[var(--bg-tertiary)] rounded-full h-1 overflow-hidden">
             <div
-              className="bg-gradient-to-r from-violet-600 to-emerald-500 h-1.5 rounded-full transition-all duration-300"
+              className="h-1 rounded-full bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-success)] transition-all duration-300"
               style={{ width: `${batchSummary.overallProgress}%` }}
             />
           </div>
 
-          <div className="space-y-2 pt-1">
+          {/* File rows */}
+          <div className="space-y-1.5 pt-1">
             {queue.map((item, idx) => (
               <div
                 key={item.id}
                 draggable="true"
                 onDragStart={() => handleDragStart(idx)}
                 onDragOver={(e) => handleDragOver(e, idx)}
-                onDragEnd={handleDragEnd}
-                className="flex items-center justify-between gap-3 p-3 bg-zinc-900/20 hover:bg-zinc-900/40 border border-zinc-900 rounded-xl transition-all duration-300"
+                onDragEnd={() => setDraggedIdx(null)}
+                className="flex items-center justify-between gap-3 p-3 bg-[var(--bg-tertiary)]/40 hover:bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] transition-colors duration-150"
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <div className="cursor-grab active:cursor-grabbing text-zinc-600 hover:text-zinc-400" title="Reorder file">
+                  <div
+                    className="cursor-grab active:cursor-grabbing text-[var(--text-muted)] hover:text-[var(--text-secondary)] flex-shrink-0"
+                    title="Reorder"
+                  >
                     <GripVertical size={13} />
                   </div>
 
-                  <FileTypeBadge filename={item.file.name} variant="card" className="w-9 h-9" />
+                  <FileTypeBadge filename={item.file.name} variant="card" className="w-8 h-8 flex-shrink-0" />
 
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-semibold text-zinc-300 truncate">
+                      <p className="text-xs font-medium text-[var(--text-primary)] truncate">
                         {item.file.name}
                       </p>
-                      <FileTypeBadge filename={item.file.name} variant="minimal" size="sm" />
+                      <FileTypeBadge filename={item.file.name} variant="minimal" size="sm" className="flex-shrink-0" />
                     </div>
-
-                    <UploadProgress progress={item.progress} status={item.status} size="sm" showLabel={true} />
+                    <UploadProgress progress={item.progress} status={item.status} size="sm" showLabel />
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center gap-0.5 flex-shrink-0">
                   {item.status === "uploading" && (
                     <Button
                       variant="ghost"
-                      size="icon"
+                      size="iconSm"
                       onClick={() => handlePause(item.id)}
-                      className="h-8 w-8 hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                      className="h-7 w-7"
                       title="Pause"
+                      aria-label="Pause upload"
                     >
-                      <Pause size={12} />
+                      <Pause size={11} />
                     </Button>
                   )}
                   {item.status === "paused" && (
                     <Button
                       variant="ghost"
-                      size="icon"
+                      size="iconSm"
                       onClick={() => handleResume(item.id)}
-                      className="h-8 w-8 hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                      className="h-7 w-7"
                       title="Resume"
+                      aria-label="Resume upload"
                     >
-                      <Play size={12} className="fill-current" />
+                      <Play size={11} className="fill-current" />
                     </Button>
                   )}
                   {item.status !== "completed" && (
                     <Button
                       variant="ghost"
-                      size="icon"
+                      size="iconSm"
                       onClick={() => handleCancel(item.id)}
-                      className="h-8 w-8 hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                      className="h-7 w-7 hover:text-[var(--accent-error)]"
                       title="Cancel"
+                      aria-label="Cancel upload"
                     >
-                      <X size={12} />
+                      <X size={11} />
                     </Button>
                   )}
                 </div>
@@ -333,4 +292,3 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = () => {
 };
 
 export default UploadDropzone;
-

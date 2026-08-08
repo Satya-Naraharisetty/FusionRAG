@@ -48,11 +48,11 @@ export const ChatLayout: React.FC = () => {
   });
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden font-sans" style={{ background: "var(--bg-primary, #0D0D0D)", color: "var(--text-primary, #F5F5F5)" }}>
-      {/* Accessibility skip to main content link */}
+    <div className="flex flex-col h-screen w-screen overflow-hidden font-sans bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {/* Skip to main content */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-zinc-900 focus:text-white focus:rounded-md focus:outline-none focus:ring-2 focus:ring-zinc-400 text-xs font-semibold"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-[var(--bg-elevated)] focus:text-[var(--text-primary)] focus:rounded-[var(--radius-md)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/50 text-xs font-semibold"
       >
         Skip to main content
       </a>
@@ -73,8 +73,7 @@ export const ChatLayout: React.FC = () => {
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative focus:outline-none"
-          style={{ background: "var(--bg-primary, #0D0D0D)" }}
+          className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative focus:outline-none bg-[var(--bg-primary)]"
         >
           <Outlet />
         </main>

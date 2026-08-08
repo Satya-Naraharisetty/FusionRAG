@@ -24,176 +24,61 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
 
   if (collapsed) {
     return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "8px",
-          padding: "12px 0",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-        }}
-      >
+      <div className="flex flex-col items-center gap-2 py-3 border-b border-[var(--border-subtle)]">
         <button
           onClick={onNewChat}
-          style={{
-            width: "40px",
-            height: "40px",
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: "10px",
-            color: "#f5f5f5",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-          className="hover:bg-white/[0.10]"
+          className="w-10 h-10 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-elevated)] rounded-[var(--radius-lg)] text-[var(--text-primary)] flex items-center justify-center cursor-pointer transition-colors"
           title="New Chat"
         >
-          <Plus size={17} />
+          <Plus size={16} />
         </button>
         <button
           onClick={() => navigate("/documents")}
-          style={{
-            width: "40px",
-            height: "40px",
-            background: "transparent",
-            border: "none",
-            borderRadius: "10px",
-            color: "var(--text-muted, #737373)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-          className="hover:text-zinc-300 hover:bg-white/[0.06]"
+          className="w-10 h-10 bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-[var(--radius-lg)] flex items-center justify-center cursor-pointer transition-colors"
           title={`Documents (${documents.length})`}
         >
-          <Database size={17} />
+          <Database size={16} />
         </button>
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-        padding: "12px 16px 14px",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-      }}
-    >
+    <div className="flex flex-col gap-2 p-3 border-b border-[var(--border-subtle)]">
       {/* New Chat Button */}
       <button
         onClick={onNewChat}
-        style={{
-          width: "100%",
-          height: "42px",
-          background: "rgba(255,255,255,0.05)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: "12px",
-          color: "#e4e4e7",
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          padding: "0 14px",
-          cursor: "pointer",
-          fontSize: "14px",
-          fontWeight: 500,
-          fontFamily: "inherit",
-          transition: "all 0.15s ease",
-          textAlign: "left",
-        }}
-        className="hover:bg-white/[0.09] hover:border-white/[0.12]"
+        className="w-full h-10 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-elevated)] rounded-[var(--radius-lg)] text-[var(--text-primary)] flex items-center gap-2.5 px-3 cursor-pointer text-xs font-medium transition-colors text-left"
       >
-        <Plus size={16} style={{ flexShrink: 0, color: "#a3a3a3" }} />
+        <Plus size={16} className="flex-shrink-0 text-[var(--text-secondary)]" />
         <span>New Chat</span>
       </button>
 
       {/* Documents Button */}
       <button
         onClick={() => navigate("/documents")}
-        style={{
-          width: "100%",
-          height: "42px",
-          background: "transparent",
-          border: "none",
-          borderRadius: "12px",
-          color: "var(--text-secondary, #A3A3A3)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 14px",
-          cursor: "pointer",
-          fontSize: "14px",
-          fontWeight: 500,
-          fontFamily: "inherit",
-          transition: "all 0.15s ease",
-          textAlign: "left",
-        }}
-        className="hover:text-zinc-200 hover:bg-white/[0.05]"
+        className="w-full h-10 bg-transparent hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-[var(--radius-lg)] flex items-center justify-between px-3 cursor-pointer text-xs font-medium transition-colors text-left"
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <Database size={15} style={{ flexShrink: 0, color: "var(--text-muted, #737373)" }} />
+        <div className="flex items-center gap-2.5">
+          <Database size={15} className="flex-shrink-0 text-[var(--text-muted)]" />
           <span>Documents</span>
         </div>
-        <span
-          style={{
-            fontSize: "12px",
-            fontFamily: "monospace",
-            fontWeight: 600,
-            color: "var(--text-muted, #737373)",
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.06)",
-            padding: "1px 7px",
-            borderRadius: "5px",
-            flexShrink: 0,
-          }}
-        >
+        <span className="text-[11px] font-mono font-medium text-[var(--text-muted)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] px-1.5 py-0.5 rounded-[var(--radius-sm)] flex-shrink-0">
           {documents.length}
         </span>
       </button>
 
       {/* Section label */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "6px 4px 2px",
-          fontSize: "11px",
-          fontWeight: 600,
-          color: "var(--text-muted, #737373)",
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-        }}
-      >
+      <div className="flex items-center justify-between px-1 pt-1 text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
         <span>Conversations</span>
-        <span style={{ fontFamily: "monospace", fontWeight: 700 }}>{conversations.length}</span>
+        <span className="font-mono text-[10px]">{conversations.length}</span>
       </div>
 
       {/* Search Box */}
-      <div
-        style={{
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
+      <div className="relative flex items-center">
         <Search
           size={13}
-          style={{
-            position: "absolute",
-            left: "11px",
-            color: "var(--text-muted, #737373)",
-            pointerEvents: "none",
-            flexShrink: 0,
-          }}
+          className="absolute left-3 text-[var(--text-muted)] pointer-events-none flex-shrink-0"
         />
         <input
           id="sidebar-search-input"
@@ -204,46 +89,11 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             if (e.key === "Escape") setSearchQuery("");
           }}
           placeholder="Search conversations..."
-          style={{
-            width: "100%",
-            height: "38px",
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.07)",
-            borderRadius: "10px",
-            paddingLeft: "34px",
-            paddingRight: "60px",
-            paddingTop: "0",
-            paddingBottom: "0",
-            color: "var(--text-primary, #F5F5F5)",
-            fontSize: "13px",
-            fontFamily: "inherit",
-            outline: "none",
-            transition: "border-color 0.15s ease, background 0.15s ease",
-          }}
-          className="placeholder:text-zinc-600 focus:border-white/[0.14] focus:bg-white/[0.06]"
+          className="w-full h-9 bg-[var(--bg-input)] border border-[var(--border-default)] hover:border-[var(--border-hover)] rounded-[var(--radius-lg)] pl-8 pr-12 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent-primary)]/50 focus:ring-2 focus:ring-[var(--accent-primary)]/20 transition-all"
         />
         {/* Keyboard shortcut hint */}
-        <span
-          style={{
-            position: "absolute",
-            right: "9px",
-            display: "flex",
-            alignItems: "center",
-            gap: "2px",
-          }}
-        >
-          <kbd
-            style={{
-              fontSize: "10px",
-              fontFamily: "monospace",
-              color: "var(--text-muted, #737373)",
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "4px",
-              padding: "1px 4px",
-              lineHeight: 1.4,
-            }}
-          >
+        <span className="absolute right-2.5 flex items-center">
+          <kbd className="text-[10px] font-mono text-[var(--text-muted)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded px-1.5 py-0.5 leading-none">
             Ctrl+/
           </kbd>
         </span>
