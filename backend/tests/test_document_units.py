@@ -3,6 +3,8 @@ from unittest.mock import MagicMock, patch
 
 import boto3
 import pytest
+from moto import mock_aws
+
 from app.documents.domain.exceptions import (
     DocumentCorrupted,
     InvalidStateTransitionException,
@@ -24,7 +26,6 @@ from app.documents.infrastructure.storage import LocalStorageProvider, S3Storage
 from app.documents.services.chunking import ChunkingService
 from app.documents.services.metadata_extractor import MetadataExtractor
 from app.documents.services.text_cleaner import TextCleaner
-from moto import mock_aws
 
 # --- State Machine Tests ---
 

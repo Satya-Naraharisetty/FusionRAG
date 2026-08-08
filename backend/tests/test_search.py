@@ -2,6 +2,10 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
+from fastapi import status
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 from app.api.dependencies import (
     get_conversation_manager,
     get_current_user_context,
@@ -20,9 +24,6 @@ from app.documents.infrastructure.persistence.repositories.chunk_repository impo
 )
 from app.documents.services.ranking import SemanticSearchRanker
 from app.documents.services.retrieval_service import RetrievalService
-from fastapi import status
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
 

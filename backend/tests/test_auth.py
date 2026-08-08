@@ -1,11 +1,12 @@
 import concurrent.futures
 
 import pytest
-from app.auth.infrastructure.persistence.models import Base
-from app.core.config import settings
 from fastapi import status
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+
+from app.auth.infrastructure.persistence.models import Base
+from app.core.config import settings
 
 TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
 
@@ -19,10 +20,10 @@ def test_db(client):
     engine = create_engine(TEST_DATABASE_URL)
     Base.metadata.create_all(bind=engine)
 
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
     # Clean the tables to guarantee test isolation
-    db = SessionLocal()
+    db = session_local()
     try:
         db.execute(text("TRUNCATE TABLE refresh_sessions CASCADE;"))
         db.execute(text("TRUNCATE TABLE users CASCADE;"))
@@ -31,9 +32,9 @@ def test_db(client):
         db.close()
 
     # Wire our test database session factory into the application state
-    client.app.state.db_session_factory = SessionLocal
+    client.app.state.db_session_factory = session_local
 
-    yield SessionLocal
+    yield session_local
 
 
 def test_register_user_success(client, test_db):
@@ -241,8 +242,9 @@ def test_refresh_concurrency_fails(client, test_db):
     cookie_v1 = login_res.cookies[settings.COOKIE_NAME]
 
     def do_refresh():
-        from app.main import app
         from fastapi.testclient import TestClient
+
+        from app.main import app
 
         thread_client = TestClient(app)
         thread_client.app.state.db_session_factory = client.app.state.db_session_factory

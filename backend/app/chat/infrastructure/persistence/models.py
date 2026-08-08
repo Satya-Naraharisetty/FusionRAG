@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime
 
-from app.db.session import Base
 from sqlalchemy import (
     JSON,
     DateTime,
@@ -12,6 +11,8 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.session import Base
 
 
 class ConversationORM(Base):

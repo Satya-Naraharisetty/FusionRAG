@@ -1,6 +1,7 @@
 import logging
 
 import httpx
+
 from app.documents.domain.interfaces import EmbeddingGenerator
 
 logger = logging.getLogger(__name__)

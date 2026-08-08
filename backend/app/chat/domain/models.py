@@ -3,8 +3,9 @@ from enum import Enum
 from typing import Any
 from uuid import UUID
 
-from app.documents.domain.models import RetrievalMode, RetrievedChunk
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.documents.domain.models import RetrievalMode, RetrievedChunk
 
 
 class ChatRole(str, Enum):

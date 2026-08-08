@@ -2,6 +2,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
 from app.chat.domain.interfaces import ChatMessage, LLMProvider, ProviderResponse, Usage
 from app.chat.infrastructure.router import LLMProviderRouter, SettingsRoutingPolicy
 from app.core.cache.memory_cache import InMemoryCache

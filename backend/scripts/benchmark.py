@@ -6,6 +6,8 @@ import sys
 # Ensure backend directory is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from sqlalchemy.orm import sessionmaker
+
 from app.api.dependencies import (
     get_chunk_repository,
     get_embedding_generator,
@@ -24,7 +26,6 @@ from app.evaluation.services.agent_evaluator import AgentEvaluator
 from app.evaluation.services.conversation_evaluator import ConversationEvaluator
 from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
 from app.evaluation.services.tool_evaluator import ToolEvaluator
-from sqlalchemy.orm import sessionmaker
 
 
 async def main() -> None:
@@ -58,8 +59,8 @@ async def main() -> None:
 
     Base.metadata.create_all(bind=engine)
 
-    SessionLocal = sessionmaker(bind=engine)
-    db = SessionLocal()
+    session_local = sessionmaker(bind=engine)
+    db = session_local()
 
     try:
         # 2. Resolve retrieval service and evaluators

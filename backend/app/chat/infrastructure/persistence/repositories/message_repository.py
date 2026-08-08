@@ -2,6 +2,8 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy.orm import Session
+
 from app.chat.domain.interfaces import MessageRepository
 from app.chat.domain.models import (
     ConversationMessage,
@@ -9,7 +11,6 @@ from app.chat.domain.models import (
     MessageStatus,
 )
 from app.chat.infrastructure.persistence.models import ConversationMessageORM
-from sqlalchemy.orm import Session
 
 
 class SQLAlchemyMessageRepository(MessageRepository):

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 DEEPEVAL_AVAILABLE = False
 try:
     from deepeval.metrics import AnswerRelevancyMetric, HallucinationMetric
-    from deepeval.test_case import ConversationalTestCase, LLMTestCase
+    from deepeval.test_case import LLMTestCase
 
     DEEPEVAL_AVAILABLE = True
 except ImportError as e:
@@ -61,7 +61,6 @@ class DeepEvalProvider(EvaluationProvider):
             for sample in samples:
                 actual_answer = sample.metadata.get("actual_answer") or ""
                 retrieved_contexts = sample.metadata.get("retrieved_contexts") or []
-                gts = sample.ground_truth_context or []
 
                 # DeepEval LLMTestCase format
                 test_case = LLMTestCase(

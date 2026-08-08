@@ -1,8 +1,9 @@
 import uuid
 from datetime import UTC, datetime
 
-from app.auth.domain.interfaces import TimeProvider, UnitOfWork, UUIDGenerator
 from sqlalchemy.orm import Session
+
+from app.auth.domain.interfaces import TimeProvider, UnitOfWork, UUIDGenerator
 
 
 class SystemTimeProvider(TimeProvider):

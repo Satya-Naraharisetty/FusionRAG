@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
+
 from app.auth.domain.interfaces import TokenProvider
 from app.core.config import settings
 

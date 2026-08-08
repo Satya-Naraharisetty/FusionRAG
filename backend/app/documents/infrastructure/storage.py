@@ -3,10 +3,11 @@ import pathlib
 import uuid
 
 import boto3
-from app.documents.domain.interfaces import StorageProvider
-from app.documents.infrastructure.persistence.models import SQLAlchemyDocumentFile
 from botocore.exceptions import ClientError
 from sqlalchemy.orm import Session
+
+from app.documents.domain.interfaces import StorageProvider
+from app.documents.infrastructure.persistence.models import SQLAlchemyDocumentFile
 
 logger = logging.getLogger(__name__)
 

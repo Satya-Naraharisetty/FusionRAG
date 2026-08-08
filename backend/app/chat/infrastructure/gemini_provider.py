@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from enum import Enum
 
 import httpx
+
 from app.chat.domain.agents import ToolCall, ToolDefinition
 from app.chat.domain.exceptions import LLMProviderError
 from app.chat.domain.interfaces import LLMProvider, ProviderResponse, StreamChunk

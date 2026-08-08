@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
+
 from app.documents.domain.interfaces import ChunkRepository
 from app.documents.domain.models import Chunk, RetrievalMode, RetrievedChunk
 from app.documents.services.fusion import ReciprocalRankFusionEngine

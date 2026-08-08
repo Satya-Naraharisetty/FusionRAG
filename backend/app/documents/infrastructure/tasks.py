@@ -1,8 +1,9 @@
 from collections.abc import Callable
 from typing import Any
 
-from app.documents.domain.interfaces import TaskQueue
 from fastapi import BackgroundTasks
+
+from app.documents.domain.interfaces import TaskQueue
 
 
 class FastAPIBackgroundTasksQueue(TaskQueue):

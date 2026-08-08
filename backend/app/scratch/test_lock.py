@@ -3,13 +3,14 @@ import logging
 import uuid
 from datetime import datetime
 
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+
 from app.auth.infrastructure.persistence.models import Base, SQLAlchemyUser
 from app.chat.domain.models import Conversation, ConversationSettings, ConversationState
 from app.chat.infrastructure.persistence.repositories import (
     SQLAlchemyConversationRepository,
 )
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
@@ -20,9 +21,9 @@ DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
 async def main():
     engine = create_engine(DATABASE_URL)
     Base.metadata.create_all(bind=engine)
-    SessionLocal = sessionmaker(bind=engine)
+    session_local = sessionmaker(bind=engine)
 
-    db = SessionLocal()
+    db = session_local()
     # Create user
     user_id = uuid.uuid4()
     user = SQLAlchemyUser(

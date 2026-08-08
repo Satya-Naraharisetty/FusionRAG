@@ -3,6 +3,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 from app.db.session import Base
 from app.evaluation.datasets.dataset_loader import DatasetLoader
 from app.evaluation.infrastructure.persistence.models import (
@@ -18,8 +21,6 @@ from app.evaluation.services.agent_evaluator import AgentEvaluator
 from app.evaluation.services.conversation_evaluator import ConversationEvaluator
 from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
 from app.evaluation.services.tool_evaluator import ToolEvaluator
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 # Absolute path to the evaluation dataset fixtures, independent of CWD
 _DATASET_PATH = str(Path(__file__).parent / "evaluation" / "simple_rag_dataset.json")

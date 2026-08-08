@@ -2,6 +2,10 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
+from fastapi import status
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+
 from app.api.dependencies import (
     get_answer_generation_service,
     get_conversation_manager,
@@ -39,9 +43,6 @@ from app.chat.services.prompt_builder import PromptBuilder
 from app.chat.services.rolling_memory import RollingConversationMemory
 from app.chat.services.token_estimator import CharacterTokenEstimator
 from app.documents.domain.models import RetrievedChunk, SearchResult
-from fastapi import status
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 
 TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
 
@@ -54,9 +55,9 @@ def chat_test_db(client):
     engine = create_engine(TEST_DATABASE_URL)
     Base.metadata.create_all(bind=engine)
 
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-    db = SessionLocal()
+    db = session_local()
     try:
         db.execute(text("TRUNCATE TABLE conversation_summaries CASCADE;"))
         db.execute(text("TRUNCATE TABLE conversation_messages CASCADE;"))
@@ -67,8 +68,8 @@ def chat_test_db(client):
     finally:
         db.close()
 
-    client.app.state.db_session_factory = SessionLocal
-    yield SessionLocal
+    client.app.state.db_session_factory = session_local
+    yield session_local
 
 
 @pytest.fixture(scope="function")

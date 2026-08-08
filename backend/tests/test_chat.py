@@ -1,6 +1,8 @@
 from uuid import uuid4
 
 import pytest
+from fastapi import status
+
 from app.api.dependencies import get_answer_generation_service, get_current_user_context
 from app.chat.domain.exceptions import (
     NoRelevantContext,
@@ -14,7 +16,6 @@ from app.chat.services.prompt_builder import PromptBuilder
 from app.chat.services.token_estimator import CharacterTokenEstimator
 from app.documents.domain.models import RetrievedChunk, SearchResult
 from app.main import app
-from fastapi import status
 
 
 # --- 1. TokenEstimator Tests ---

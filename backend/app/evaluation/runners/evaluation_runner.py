@@ -96,7 +96,7 @@ class EvaluationRunner:
                     samples, mock=mock
                 )
                 # Map retrieval results contexts back into samples metadata for downstream steps
-                for ret, sample in zip(retrieval_results, samples):
+                for ret, sample in zip(retrieval_results, samples, strict=True):
                     sample.metadata["retrieved_contexts"] = [
                         c.text for c in ret.retrieved_contexts
                     ]

@@ -2,8 +2,9 @@ import os
 import sys
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import create_engine, pool
+
+from alembic import context
 
 # Add app directory to Python path to ensure backend imports work inside Alembic context
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

@@ -6,11 +6,12 @@ import uuid
 # Ensure backend directory is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from sqlalchemy.orm import sessionmaker
+
 from app.core.config import settings
 from app.db.session import init_postgres_engine
 from app.evaluation.infrastructure.persistence.models import SQLAlchemyEvaluationRun
 from app.evaluation.runners.regression_runner import RegressionRunner
-from sqlalchemy.orm import sessionmaker
 
 
 def main() -> None:
@@ -32,8 +33,8 @@ def main() -> None:
     args = parser.parse_args()
 
     engine = init_postgres_engine(settings.DATABASE_URL)
-    SessionLocal = sessionmaker(bind=engine)
-    db = SessionLocal()
+    session_local = sessionmaker(bind=engine)
+    db = session_local()
 
     try:
         # Resolve runs if not provided

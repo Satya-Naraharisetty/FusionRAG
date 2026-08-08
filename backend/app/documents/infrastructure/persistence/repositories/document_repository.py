@@ -1,9 +1,10 @@
 from uuid import UUID
 
+from sqlalchemy.orm import Session
+
 from app.documents.domain.interfaces import DocumentRepository
 from app.documents.domain.models import Document, DocumentStatus
 from app.documents.infrastructure.persistence.models import SQLAlchemyDocument
-from sqlalchemy.orm import Session
 
 
 class SQLAlchemyDocumentRepository(DocumentRepository):

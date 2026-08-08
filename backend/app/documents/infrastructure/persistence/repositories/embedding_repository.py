@@ -1,12 +1,13 @@
 from uuid import UUID
 
+from sqlalchemy.orm import Session
+
 from app.documents.domain.interfaces import EmbeddingRepository
 from app.documents.domain.models import Embedding, EmbeddingMetadata, EmbeddingStatus
 from app.documents.infrastructure.persistence.models import (
     SQLAlchemyChunk,
     SQLAlchemyEmbedding,
 )
-from sqlalchemy.orm import Session
 
 
 class SQLAlchemyEmbeddingRepository(EmbeddingRepository):

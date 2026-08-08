@@ -2,10 +2,11 @@ import io
 import pathlib
 
 import docx
+from pypdf import PdfReader
+
 from app.documents.domain.exceptions import DocumentCorrupted, UnsupportedDocumentType
 from app.documents.domain.interfaces import DocumentExtractor
 from app.documents.domain.models import ExtractionResult
-from pypdf import PdfReader
 
 
 class PDFExtractor(DocumentExtractor):

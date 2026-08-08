@@ -63,9 +63,7 @@ class RagasProvider(EvaluationProvider):
                 answers.append(sample.metadata.get("actual_answer") or "")
 
                 # retrieved contexts list of strings
-                retrieved = [
-                    c for c in (sample.metadata.get("retrieved_contexts") or [])
-                ]
+                retrieved = list(sample.metadata.get("retrieved_contexts") or [])
                 contexts_list.append(retrieved if retrieved else [""])
 
                 # ground truth context list of strings

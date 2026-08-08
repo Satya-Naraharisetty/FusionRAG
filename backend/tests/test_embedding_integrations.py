@@ -2,12 +2,13 @@ from unittest.mock import MagicMock, patch
 from uuid import UUID
 
 import pytest
-from app.api.dependencies import get_embedding_generator, get_vector_store
-from app.auth.infrastructure.persistence.models import Base
-from app.documents.domain.models import ExtractionResult
 from fastapi import status
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+
+from app.api.dependencies import get_embedding_generator, get_vector_store
+from app.auth.infrastructure.persistence.models import Base
+from app.documents.domain.models import ExtractionResult
 
 TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
 
@@ -19,9 +20,9 @@ def emb_test_db(client):
     """
     engine = create_engine(TEST_DATABASE_URL)
     Base.metadata.create_all(bind=engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-    db = SessionLocal()
+    db = session_local()
     try:
         db.execute(text("TRUNCATE TABLE document_embeddings CASCADE;"))
         db.execute(text("TRUNCATE TABLE document_chunks CASCADE;"))
@@ -32,8 +33,8 @@ def emb_test_db(client):
     finally:
         db.close()
 
-    client.app.state.db_session_factory = SessionLocal
-    yield SessionLocal
+    client.app.state.db_session_factory = session_local
+    yield session_local
     client.app.dependency_overrides.clear()
 
 
