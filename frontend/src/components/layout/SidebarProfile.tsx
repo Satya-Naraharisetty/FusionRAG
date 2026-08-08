@@ -29,12 +29,12 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({
     : "US";
 
   return (
-    <div className="p-3 border-t border-zinc-800/40 mt-auto bg-[#171717]/80 backdrop-blur-md">
+    <div className="p-3 border-t border-zinc-800/40 mt-auto bg-transparent">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             className={cn(
-              "flex items-center w-full rounded-xl hover:bg-zinc-800/40 border border-transparent transition-all duration-200 focus:outline-none p-1.5 cursor-pointer text-left",
+              "flex items-center w-full rounded-xl hover:bg-zinc-800/30 border border-transparent transition-all duration-200 focus:outline-none p-1.5 cursor-pointer text-left",
               collapsed ? "justify-center" : "justify-between"
             )}
             aria-label="User profile menu"
@@ -48,9 +48,9 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({
               {!collapsed && user && (
                 <div className="text-left min-w-0 flex-1">
                   <p className="text-[11px] font-bold text-zinc-200 truncate leading-tight">
-                    {user.email}
+                     {user.email}
                   </p>
-                  <span className="inline-flex items-center px-1.5 py-0.5 mt-0.5 text-[8px] font-extrabold uppercase rounded bg-zinc-900 text-zinc-400 border border-zinc-800/50 tracking-wider">
+                  <span className="inline-flex items-center px-1.5 py-0.5 mt-0.5 text-[8px] font-extrabold uppercase rounded bg-zinc-900 text-zinc-500 border border-zinc-850 tracking-wider">
                     {user.role}
                   </span>
                 </div>
@@ -58,7 +58,7 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({
             </div>
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[190px] bg-zinc-950 border-zinc-850 text-zinc-300">
+        <DropdownMenuContent align="end" className="w-[190px]">
           <DropdownMenuItem
             onClick={() => navigate("/settings")}
             className="gap-2 focus:bg-zinc-900 focus:text-zinc-100 cursor-pointer text-xs font-medium"

@@ -211,19 +211,19 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
 
       {/* Folder Creation / Rename Dialog */}
       <Dialog open={showFolderModal} onOpenChange={setShowFolderModal}>
-        <DialogContent className="bg-[#171717] border-zinc-800 text-zinc-200 sm:max-w-md">
+        <DialogContent className="bg-[var(--bg-secondary,#171717)] border-[var(--border-color)] text-zinc-200 sm:max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-zinc-100 flex items-center gap-2">
-              <FolderIcon size={18} className="text-zinc-400" />
+            <DialogTitle className="text-zinc-100 flex items-center gap-2 text-sm font-semibold">
+              <FolderIcon size={16} className="text-zinc-400" />
               <span>{renamingFolderId ? "Rename Folder" : "Create Folder"}</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="py-3">
+          <div className="py-2.5">
             <Input
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               placeholder="Folder name"
-              className="bg-transparent border-zinc-800 text-zinc-200 text-xs focus-visible:ring-1 focus-visible:ring-zinc-700"
+              className="text-xs h-10 rounded-xl"
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCreateFolderSubmit();
               }}
@@ -233,13 +233,13 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
             <Button
               variant="outline"
               onClick={() => setShowFolderModal(false)}
-              className="bg-transparent border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 text-xs"
+              className="bg-transparent border-[var(--border-color)] text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 text-xs h-10 rounded-xl"
             >
               Cancel
             </Button>
             <Button
               onClick={handleCreateFolderSubmit}
-              className="bg-zinc-100 hover:bg-zinc-200 text-zinc-950 text-xs font-semibold"
+              className="bg-zinc-100 hover:bg-zinc-250 text-zinc-950 text-xs font-semibold h-10 rounded-xl"
             >
               {renamingFolderId ? "Rename" : "Create"}
             </Button>

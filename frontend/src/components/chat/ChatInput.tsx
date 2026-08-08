@@ -187,9 +187,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         {/* Input Wrapper Card - Matches ChatGPT's modern input container */}
         <div className={cn(
-          "relative flex items-end border transition-all duration-200 rounded-3xl bg-[#f4f4f4] dark:bg-[#2f2f2f] text-zinc-900 dark:text-zinc-100",
-          "border-transparent focus-within:border-zinc-300 dark:focus-within:border-zinc-700 focus-within:shadow-[0_4px_24px_rgba(0,0,0,0.05)]",
-          isRecording && "border-zinc-400/50 dark:border-zinc-650"
+          "relative flex items-end border transition-all duration-200 rounded-[22px] bg-zinc-100/50 dark:bg-[var(--bg-input,#2A2A2A)] text-zinc-900 dark:text-zinc-100",
+          "border-zinc-200/60 dark:border-[var(--border-color)] focus-within:border-zinc-300 dark:focus-within:border-zinc-750 focus-within:shadow-[0_8px_30px_rgba(0,0,0,0.15)]",
+          isRecording && "border-red-500/50 dark:border-red-900/30"
         )}>
           {/* Paperclip upload button */}
           <div className="flex items-center justify-center pl-3 pr-1 h-12">
@@ -199,7 +199,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               size="icon"
               onClick={() => fileInputRef.current?.click()}
               disabled={isStreaming || attachments.length >= 5}
-              className="h-8 w-8 text-zinc-550 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-850 rounded-full transition-colors flex items-center justify-center cursor-pointer"
+              className="h-8 w-8 text-zinc-550 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800/60 rounded-full transition-colors flex items-center justify-center cursor-pointer"
               aria-label="Attach files"
             >
               <Paperclip size={16} />
@@ -224,7 +224,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             />
 
             {showCommands && (
-              <Command className="absolute bottom-full left-0 right-0 mb-2 bg-[#171717] border border-zinc-800 rounded-2xl shadow-xl overflow-hidden animate-slide-up z-10 text-zinc-300">
+              <Command className="absolute bottom-full left-0 right-0 mb-2 bg-[var(--bg-secondary,#171717)] border border-[var(--border-color)] rounded-2xl shadow-xl overflow-hidden animate-slide-up z-10 text-zinc-300">
                 <CommandInput
                   value={commandSearch}
                   onValueChange={setCommandSearch}

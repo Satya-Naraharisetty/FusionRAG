@@ -73,7 +73,7 @@ export const RegisterForm: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-screen flex items-center justify-center bg-zinc-50 dark:bg-[#000000] px-4 relative overflow-hidden select-none">
+    <div className="min-h-screen w-screen flex items-center justify-center bg-zinc-50 dark:bg-[#0D0D0D] px-4 relative overflow-hidden select-none">
       <RegisterCard
         email={email}
         setEmail={setEmail}

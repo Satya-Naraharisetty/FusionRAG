@@ -38,9 +38,9 @@ export const LoginCard: React.FC<LoginCardProps> = ({
   onSocialAuth,
 }) => {
   return (
-    <div className="w-full max-w-[400px] flex flex-col items-center bg-white dark:bg-[#171717] text-zinc-900 dark:text-zinc-100 p-8 rounded-2xl shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/80 transition-all duration-300 animate-in fade-in zoom-in-95">
+    <div className="w-full max-w-[430px] flex flex-col items-center bg-white dark:bg-[#171717] text-zinc-900 dark:text-zinc-100 p-8 rounded-2xl shadow-sm border border-zinc-200/40 dark:border-[rgba(255,255,255,0.07)] transition-all duration-300 animate-in fade-in zoom-in-95">
       {/* Brand Logo - Minimalist, ChatGPT-inspired but proprietary */}
-      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black font-extrabold text-xl shadow-sm mb-6 transition-transform duration-300 hover:scale-105 select-none">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black font-extrabold text-lg shadow-xs mb-5 transition-transform duration-300 hover:scale-105 select-none">
         H
       </div>
 
@@ -67,7 +67,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({
           onChange={(e) => setEmail(e.target.value)}
           required
           disabled={isSubmitting}
-          className="bg-transparent border-zinc-300 dark:border-zinc-855 focus-visible:ring-1 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-300 text-sm rounded-xl h-11 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+          className="h-12 rounded-xl text-sm"
         />
 
         {!isMagicLink && setPassword && (
@@ -90,25 +90,25 @@ export const LoginCard: React.FC<LoginCardProps> = ({
                 {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             }
-            className="bg-transparent border-zinc-300 dark:border-zinc-850 focus-visible:ring-1 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-300 text-sm rounded-xl h-11 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+            className="h-12 rounded-xl text-sm"
           />
         )}
 
         {/* Options Row */}
-        <div className="flex items-center justify-between text-xs font-medium text-zinc-500 dark:text-zinc-400 select-none px-0.5">
-          <label className="flex items-center gap-2 cursor-pointer hover:text-zinc-750 dark:hover:text-zinc-200">
+        <div className="flex items-center justify-between text-xs font-medium text-zinc-500 dark:text-zinc-450 select-none px-0.5">
+          <label className="flex items-center gap-2 cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-200">
             <input
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="rounded border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 accent-zinc-900 dark:accent-zinc-100 cursor-pointer focus:ring-0"
+              className="rounded border-zinc-300 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 accent-zinc-900 dark:accent-zinc-100 cursor-pointer focus:ring-0"
             />
             <span>Remember me</span>
           </label>
           <button
             type="button"
             onClick={() => setIsMagicLink(!isMagicLink)}
-            className="text-zinc-650 dark:text-zinc-350 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer font-semibold underline underline-offset-2"
+            className="text-zinc-650 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer font-semibold underline underline-offset-2"
           >
             {isMagicLink ? "Use password" : "Use magic link"}
           </button>
@@ -116,7 +116,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({
 
         <Button
           type="submit"
-          className="w-full bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-950 text-white font-semibold h-11 rounded-xl transition-all duration-200 shadow-sm cursor-pointer mt-2 text-sm flex items-center justify-center gap-1.5"
+          className="w-full bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-250 dark:text-zinc-950 text-white font-semibold h-12 rounded-xl transition-all duration-200 active:scale-[0.98] cursor-pointer mt-2 text-sm flex items-center justify-center gap-1.5"
           disabled={isSubmitting}
         >
           {isSubmitting ? (
@@ -148,7 +148,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({
         <Button
           variant="outline"
           onClick={() => onSocialAuth("Google")}
-          className="bg-transparent border-zinc-300 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300 text-xs h-10 rounded-xl cursor-pointer gap-2"
+          className="bg-transparent border-zinc-200 dark:border-[rgba(255,255,255,0.08)] hover:bg-zinc-50 dark:hover:bg-zinc-900/40 text-zinc-700 dark:text-zinc-300 text-xs h-12 rounded-xl cursor-pointer gap-2"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24">
             <path fill="#EA4335" d="M12 5.04c1.62 0 3.08.56 4.22 1.65l3.15-3.15C17.45 1.84 14.93 1 12 1 7.35 1 3.39 3.65 1.5 7.5l3.6 2.8C6.01 7.03 8.79 5.04 12 5.04z" />
@@ -161,7 +161,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({
         <Button
           variant="outline"
           onClick={() => onSocialAuth("GitHub")}
-          className="bg-transparent border-zinc-300 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300 text-xs h-10 rounded-xl cursor-pointer gap-2"
+          className="bg-transparent border-zinc-200 dark:border-[rgba(255,255,255,0.08)] hover:bg-zinc-50 dark:hover:bg-zinc-900/40 text-zinc-700 dark:text-zinc-300 text-xs h-12 rounded-xl cursor-pointer gap-2"
         >
           <Github size={14} />
           <span>GitHub</span>
@@ -170,7 +170,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({
 
       <div className="text-center mt-6 text-xs text-zinc-500 dark:text-zinc-450 select-none">
         <span>Don't have an account? </span>
-        <Link to="/register" className="text-zinc-800 dark:text-zinc-200 hover:underline font-bold transition-colors">
+        <Link to="/register" className="text-zinc-850 dark:text-zinc-200 hover:underline font-bold transition-colors">
           Sign up
         </Link>
       </div>

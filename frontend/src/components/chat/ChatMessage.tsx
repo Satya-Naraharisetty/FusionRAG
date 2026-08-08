@@ -47,7 +47,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
         >
           <div className="w-full max-w-3xl flex justify-end px-4 sm:px-6">
             <div className="flex flex-col items-end gap-1.5 max-w-[75%]">
-              <div className="relative px-4 py-2.5 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-150 text-xs sm:text-[13px] sm:leading-relaxed font-sans shadow-xs border border-zinc-200/40 dark:border-zinc-700/20 select-text">
+              <div className="relative px-4 py-2.5 rounded-2xl bg-zinc-100/80 dark:bg-[var(--bg-tertiary,#1E1E1E)] text-zinc-900 dark:text-zinc-150 text-xs sm:text-[13px] sm:leading-relaxed font-sans shadow-xs border border-zinc-200/40 dark:border-[var(--border-color)] select-text">
                 {message.content ? (
                   <MarkdownRenderer content={message.content} />
                 ) : null}

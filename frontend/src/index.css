@@ -3,9 +3,10 @@
 /* Design System Variables & Base Customizations */
 :root {
   /* Color Palette - Premium Dark Theme (HSL-Tailored) */
-  --bg-primary: hsl(222, 47%, 6%);
-  --bg-secondary: hsl(222, 47%, 10%);
-  --bg-tertiary: hsl(223, 47%, 14%);
+  --bg-primary: #0D0D0D;
+  --bg-secondary: #171717;
+  --bg-tertiary: #1E1E1E;
+  --bg-input: #2A2A2A;
 
   --accent-primary: hsl(250, 84%, 63%);
   --accent-secondary: hsl(282, 84%, 60%);
@@ -14,13 +15,13 @@
   --accent-warning: hsl(38, 92%, 50%);
 
   /* Text Mappings */
-  --text-primary: hsl(210, 40%, 98%);
-  --text-secondary: hsl(215, 20%, 75%);
-  --text-muted: hsl(215, 16%, 47%);
+  --text-primary: #F5F5F5;
+  --text-secondary: #A3A3A3;
+  --text-muted: #737373;
 
   /* Borders and Dividers */
-  --border-color: hsl(223, 20%, 16%);
-  --border-hover: hsl(223, 20%, 28%);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.14);
 
   /* Gradients */
   --gradient-main: linear-gradient(
@@ -197,6 +198,7 @@
 
   --color-border: var(--border-color);
   --color-input: var(--border-color);
+  --color-input-bg: var(--bg-input);
   --color-ring: var(--accent-primary);
 
   --radius-lg: var(--radius-lg);

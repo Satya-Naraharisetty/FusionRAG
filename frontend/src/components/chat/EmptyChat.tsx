@@ -1,5 +1,4 @@
 import React from "react";
-import { Sparkles, MessageSquare, BookOpen, Search } from "lucide-react";
 
 interface EmptyChatProps {
   onSelectPrompt: (prompt: string) => void;
@@ -8,68 +7,47 @@ interface EmptyChatProps {
 export const EmptyChat: React.FC<EmptyChatProps> = ({ onSelectPrompt }) => {
   const examples = [
     {
-      icon: <BookOpen size={16} className="text-violet-400" />,
-      title: "Summarize a document",
-      desc: "Get key takeaways from your uploaded files instantly.",
+      label: "Summarize my documents",
       prompt: "Can you provide a comprehensive summary of my uploaded documents?",
     },
     {
-      icon: <Search size={16} className="text-fuchsia-400" />,
-      title: "Hybrid Search retrieval",
-      desc: "Query specific details across vector and sparse DBs.",
-      prompt: "Find all key references to security policies inside the documents.",
-    },
-    {
-      icon: <Sparkles size={16} className="text-amber-400" />,
-      title: "Explain complex concepts",
-      desc: "Break down terms using context-grounded sources.",
+      label: "Explain this concept",
       prompt: "Explain how our retrieval pipeline merges vector and sparse results.",
     },
     {
-      icon: <MessageSquare size={16} className="text-emerald-400" />,
-      title: "Compare documents",
-      desc: "Analyze differences in two file contents.",
+      label: "Search my knowledge base",
+      prompt: "Find all key references to security policies inside the documents.",
+    },
+    {
+      label: "Compare these documents",
       prompt: "Compare the architecture guidelines in file A and file B.",
     },
   ];
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 pb-36 text-center max-w-2xl mx-auto my-auto select-none">
-      {/* Decorative center logo with glowing ring */}
-      <div className="relative mb-6 group">
-        <div className="absolute inset-0 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-2xl blur-md opacity-70 group-hover:opacity-100 transition-opacity duration-500 animate-pulse" />
-        <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white font-extrabold text-xl shadow-lg transition-transform duration-300 group-hover:scale-105">
-          H
-        </div>
+    <div className="flex-1 flex flex-col items-center justify-center p-6 pb-24 text-center max-w-2xl mx-auto my-auto select-none animate-in fade-in duration-300">
+      {/* Premium Minimal Logo */}
+      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black font-extrabold text-lg shadow-xs mb-5 transition-transform duration-300 hover:scale-105 select-none">
+        H
       </div>
 
-      <h2 className="text-xl font-extrabold font-title tracking-tight bg-gradient-to-r from-zinc-100 via-zinc-200 to-zinc-400 bg-clip-text text-transparent mb-2">
-        Hybrid RAG Assistant
+      <h2 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 mb-2">
+        How can I help you today?
       </h2>
-      <p className="text-xs text-zinc-400 mb-8 max-w-md leading-relaxed">
-        Upload PDF, TXT, DOCX or MD files to index them, then chat with your database using grounded, high-fidelity LLM responses.
+      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-8 max-w-md leading-relaxed">
+        Upload PDF, TXT, DOCX, or MD files to your library, then ask questions to search and retrieve insights from your grounded knowledge base.
       </p>
 
-      {/* Grid of premium glass cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full">
+      {/* Grid of subtle prompts */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-lg">
         {examples.map((item, idx) => (
-          <div
+          <button
             key={idx}
             onClick={() => onSelectPrompt(item.prompt)}
-            className="flex flex-col items-start text-left p-4.5 bg-zinc-900/10 backdrop-blur-md border border-zinc-900/80 hover:border-violet-500/30 hover:bg-violet-950/5 rounded-xl cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.3),0_0_15px_rgba(139,92,246,0.1)] group"
+            className="flex items-center justify-start px-4 py-3 bg-zinc-50 dark:bg-zinc-900/10 hover:bg-zinc-100 dark:hover:bg-zinc-900/40 border border-zinc-200/50 dark:border-[var(--border-color)] hover:border-zinc-300 dark:hover:border-[var(--border-hover)] text-zinc-700 dark:text-zinc-300 text-xs rounded-xl cursor-pointer transition-all duration-200 text-left font-medium"
           >
-            <div className="flex items-center gap-2.5 mb-2">
-              <div className="p-1.5 rounded-lg bg-zinc-900/60 border border-zinc-800/40 group-hover:bg-violet-950/20 group-hover:border-violet-500/20 transition-colors duration-300">
-                {item.icon}
-              </div>
-              <h3 className="text-xs font-bold text-zinc-200 group-hover:text-zinc-100 transition-colors duration-300">
-                {item.title}
-              </h3>
-            </div>
-            <p className="text-[10px] text-zinc-500 group-hover:text-zinc-400 leading-relaxed transition-colors duration-300">
-              {item.desc}
-            </p>
-          </div>
+            <span>{item.label}</span>
+          </button>
         ))}
       </div>
     </div>

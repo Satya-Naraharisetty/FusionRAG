@@ -333,7 +333,7 @@ const DocumentsPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6 md:p-8 bg-white dark:bg-[#212121] text-zinc-900 dark:text-zinc-100 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent transition-colors">
+    <div className="flex-1 overflow-y-auto px-4 py-6 md:p-8 bg-white dark:bg-[var(--bg-primary,#0D0D0D)] text-zinc-900 dark:text-zinc-100 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent transition-colors">
       <div className="max-w-4xl mx-auto space-y-6 relative pb-16">
         <div className="flex items-center justify-between">
           <div className="space-y-1">

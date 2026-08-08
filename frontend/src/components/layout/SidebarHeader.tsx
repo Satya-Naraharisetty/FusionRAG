@@ -49,25 +49,12 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   }
 
   return (
-    <div className="flex flex-col gap-3 p-3.5 border-b border-zinc-800/40">
-      {/* Brand logo & Application Name */}
-      <div
-        onClick={onNewChat}
-        className="flex items-center gap-2 cursor-pointer font-bold text-zinc-150 hover:opacity-90 select-none pl-1 transition-opacity"
-      >
-        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-zinc-800 dark:bg-zinc-200 text-white dark:text-black font-extrabold text-xs">
-          H
-        </div>
-        <span className="text-sm font-semibold tracking-wide">
-          Hybrid RAG
-        </span>
-      </div>
-
+    <div className="flex flex-col gap-3.5 p-3.5 border-b border-zinc-800/40">
       {/* Action Buttons */}
       <div className="flex flex-col gap-1.5">
         <Button
           onClick={onNewChat}
-          className="w-full bg-zinc-800 hover:bg-zinc-750 border border-zinc-700/50 hover:border-zinc-600 text-zinc-100 text-xs font-semibold h-10 rounded-lg flex items-center justify-start gap-2 px-3 transition-colors cursor-pointer"
+          className="w-full bg-zinc-800/40 hover:bg-zinc-800/85 border border-zinc-800/80 hover:border-zinc-700/40 text-zinc-200 text-xs font-medium h-10 rounded-xl flex items-center justify-start gap-2 px-3.5 transition-all cursor-pointer"
         >
           <Plus size={15} />
           <span>New Chat</span>
@@ -76,13 +63,13 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
         <Button
           onClick={() => navigate("/documents")}
           variant="ghost"
-          className="w-full text-zinc-400 hover:text-zinc-250 hover:bg-zinc-800/40 text-xs font-medium h-9 rounded-lg flex items-center justify-between px-3 transition-all cursor-pointer"
+          className="w-full text-zinc-450 hover:text-zinc-200 hover:bg-zinc-800/30 text-xs font-medium h-10 rounded-xl flex items-center justify-between px-3.5 transition-all cursor-pointer"
         >
           <div className="flex items-center gap-2">
-            <Database size={14} />
+            <Database size={14} className="text-zinc-500" />
             <span>Documents</span>
           </div>
-          <span className="text-[10px] bg-zinc-800 text-zinc-400 border border-zinc-700/30 px-1.5 py-0.5 rounded font-mono font-bold">
+          <span className="text-[10px] bg-zinc-900 text-zinc-500 border border-zinc-850 px-1.5 py-0.5 rounded font-mono font-bold">
             {documents.length}
           </span>
         </Button>

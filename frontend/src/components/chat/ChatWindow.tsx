@@ -97,7 +97,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
   const activeModel = activeConv?.settings?.model || "Hybrid RAG v1";
 
   return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-white dark:bg-[#212121] relative transition-colors">
+    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-white dark:bg-[var(--bg-primary,#0D0D0D)] relative transition-colors">
       {/* Top Header toolbar */}
       <ChatToolbar
         title={activeTitle}
@@ -152,7 +152,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
       )}
 
       {/* Fixed bottom input wrapper */}
-      <div className="w-full bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#212121] dark:via-[#212121]/95 dark:to-transparent pt-12 pb-6 flex justify-center z-10 shrink-0">
+      <div className="w-full bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[var(--bg-primary,#0D0D0D)] dark:via-[var(--bg-primary,#0D0D0D)]/95 dark:to-transparent pt-12 pb-6 flex justify-center z-10 shrink-0">
         <ChatInput
           conversationId={conversationId}
           onSend={handleSend}

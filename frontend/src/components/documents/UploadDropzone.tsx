@@ -194,10 +194,10 @@ export const UploadDropzone: React.FC = () => {
       {/* Drag Drop Area */}
       <div
         {...getRootProps()}
-        className={`group border border-dashed rounded-2xl p-8.5 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 ${
+        className={`group border border-dashed rounded-2xl p-8.5 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${
           isDragActive
-            ? "border-violet-500/80 bg-violet-950/20 shadow-[0_0_20px_rgba(139,92,246,0.15)]"
-            : "border-zinc-850 bg-zinc-900/10 hover:border-zinc-700/80 hover:bg-zinc-900/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.25)]"
+            ? "border-primary/60 bg-primary/5 shadow-xs"
+            : "border-[var(--border-color)] bg-zinc-900/5 hover:border-[var(--border-hover)] hover:bg-zinc-900/10 hover:shadow-xs"
         }`}
       >
         <input {...getInputProps()} />
