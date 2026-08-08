@@ -68,6 +68,19 @@ services:
     volumes:
       - hf_cache:/cache/huggingface
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hybrid_rag_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_URL=http://localhost:8000
+
 volumes:
   postgres_data:
   redis_data:

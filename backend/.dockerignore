@@ -8,3 +8,7 @@ __pycache__/
 .git/
 .github/
 tests/
+.env
+.env.*
+!.env.example
+*.log
