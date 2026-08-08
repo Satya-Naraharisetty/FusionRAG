@@ -33,6 +33,9 @@ COPY --from=builder /build/.venv /app/.venv
 # Set up PATH to use the venv
 ENV PATH="/app/.venv/bin:$PATH"
 
+# Create huggingface cache directory
+RUN mkdir -p /cache/huggingface
+
 # Copy backend application code
 COPY . .
 
