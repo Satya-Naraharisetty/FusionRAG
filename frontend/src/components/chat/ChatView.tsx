@@ -129,7 +129,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ conversationId }) => {
 
       {/* Connection recovery panel */}
       {connectionLost && (
-        <div className="absolute bottom-28 left-0 right-0 px-4 md:px-6 max-w-3xl mx-auto w-full z-20">
+        <div className="absolute bottom-28 left-1/2 -translate-x-1/2 px-4 md:px-6 w-full max-w-3xl z-20">
           <StreamingRecovery
             onRetry={retry}
             onContinue={continueFromPartial}
@@ -139,7 +139,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ conversationId }) => {
       )}
 
       {/* Input textbox bar - absolute floating with gradient fade behind */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent pt-12 pb-4 px-4">
+      <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent pt-12 pb-4 px-4 flex justify-center">
         <ChatInput
           conversationId={conversationId}
           onSend={handleSend}

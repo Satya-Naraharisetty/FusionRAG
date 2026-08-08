@@ -143,7 +143,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const hasContent = text.trim().length > 0 || attachments.length > 0;
 
   return (
-    <form onSubmit={handleSubmit} className="relative">
+    <form onSubmit={handleSubmit} className="relative w-full max-w-3xl px-4 md:px-6">
       <input
         ref={fileInputRef}
         type="file"
@@ -154,7 +154,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         id="chat-file-input"
       />
 
-      <div className="max-w-3xl mx-auto relative flex flex-col gap-2">
+      <div className="relative flex flex-col gap-2">
         {/* Warning messages */}
         {!isOnline && (
           <div className="flex items-center gap-1.5 text-[10px] font-semibold text-red-400 bg-red-950/15 p-2 rounded-lg border border-red-900/10 animate-slide-down">

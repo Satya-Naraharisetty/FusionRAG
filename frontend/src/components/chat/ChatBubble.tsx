@@ -42,11 +42,11 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onRetry, onReac
       <TooltipProvider>
         <div
           ref={contentRef}
-          className="w-full py-2 select-none group"
+          className="flex w-full py-2 select-none group justify-center"
           role="article"
           aria-label="User message"
         >
-          <div className="mx-auto w-full max-w-3xl flex justify-end px-4 md:px-6">
+          <div className="w-full max-w-3xl flex justify-end px-4 md:px-6">
             <div className="flex flex-col items-end gap-1 max-w-[70%]">
               <div className="relative px-4 py-2.5 rounded-[22px] bg-zinc-800 text-zinc-100 text-xs md:text-sm select-text leading-relaxed font-sans shadow-xs border border-zinc-700/20">
                 {message.content ? (
@@ -74,13 +74,13 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onRetry, onReac
     <TooltipProvider>
       <div
         ref={contentRef}
-        className="w-full py-6 select-none group bg-transparent transition-all duration-200 ease-standard"
+        className="flex w-full py-6 select-none group bg-transparent transition-all duration-200 ease-standard justify-center"
         role="article"
         aria-label="Assistant response"
         onMouseEnter={() => setShowActions(true)}
         onMouseLeave={() => setShowActions(false)}
       >
-        <div className="mx-auto w-full max-w-3xl flex gap-4 px-4 md:px-6 items-start">
+        <div className="w-full max-w-3xl flex gap-4 px-4 md:px-6 items-start">
           {/* Avatar */}
           <Avatar
             className="h-8 w-8 flex-shrink-0 border bg-violet-950/40 border-violet-900/30 text-violet-300 transition-all duration-200 hover:shadow-[0_0_12px_rgba(139,92,246,0.3)] rounded-full"
