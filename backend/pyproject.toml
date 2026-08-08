@@ -50,7 +50,7 @@ ignore = ["B008", "E501", "ARG001", "ARG002", "B904", "N818", "UP042", "E712", "
 "scripts/*" = ["N806", "PTH"]
 "app/scratch/*" = ["N806"]
 "app/evaluation/reports/*" = ["PTH"]
-"app/evaluation/runners/*" = ["PTH", "B905", "C416", "F416", "F401", "F841"]
+"app/evaluation/runners/*" = ["PTH", "B905", "C416", "F401", "F841"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
