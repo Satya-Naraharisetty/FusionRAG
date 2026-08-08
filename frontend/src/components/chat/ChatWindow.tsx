@@ -131,12 +131,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
     >
       {/* Visual drag-and-drop feedback overlay */}
       {isDraggingWindow && (
-        <div className="absolute inset-0 bg-violet-950/60 backdrop-blur-xs border-2 border-dashed border-violet-500/80 z-30 flex flex-col items-center justify-center pointer-events-none animate-enter">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-600/30 border border-violet-400 text-violet-300 mb-4 animate-bounce">
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center border-2 border-dashed border-[var(--accent-primary)]/50 bg-[var(--bg-primary)]/88 backdrop-blur-xs pointer-events-none animate-enter">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/12 text-[var(--accent-primary)] animate-bounce">
             <Upload size={30} />
           </div>
-          <h3 className="text-base font-bold text-white mb-1">Drop files here to attach</h3>
-          <p className="text-xs text-violet-300">Files will be uploaded and attached to your next prompt</p>
+          <h3 className="mb-1 text-base font-semibold text-[var(--text-primary)]">Drop files here to attach</h3>
+          <p className="text-xs text-[var(--text-secondary)]">Files will be uploaded and attached to your next prompt</p>
         </div>
       )}
 

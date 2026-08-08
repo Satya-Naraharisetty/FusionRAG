@@ -98,12 +98,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
         {!collapsed && (
           <div
             onClick={handleNewChat}
-            className="flex items-center gap-2.5 cursor-pointer pl-1 hover:opacity-90 transition-opacity"
+            className="flex cursor-pointer items-center gap-2.5 pl-1 transition-opacity hover:opacity-90"
           >
-            <div className="w-7 h-7 rounded-[var(--radius-md)] bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-xs">
-              <span className="text-white font-bold text-xs font-title">H</span>
+            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-xs font-semibold text-[var(--text-primary)] shadow-none">
+              <span className="font-title">H</span>
             </div>
-            <span className="font-semibold text-sm text-[var(--text-primary)] tracking-tight font-title">Hybrid RAG</span>
+            <span className="font-title text-sm font-semibold tracking-tight text-[var(--text-primary)]">Hybrid RAG</span>
           </div>
         )}
         <Button
@@ -132,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       {/* Scrollable Conversations List */}
       {collapsed ? (
         <div className="flex-1 flex flex-col items-center gap-2 pt-4">
-          <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
+          <div className="h-1.5 w-1.5 rounded-full bg-[var(--border-default)]" />
         </div>
       ) : isLoading ? (
         <div className="flex-1 px-2.5 py-3 flex flex-col gap-1.5">

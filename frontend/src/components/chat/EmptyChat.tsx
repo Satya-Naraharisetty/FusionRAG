@@ -17,8 +17,8 @@ export const EmptyChat: React.FC<EmptyChatProps> = ({ onSelectPrompt }) => {
       <div className="w-full max-w-[580px] flex flex-col items-center text-center">
 
         {/* Logo badge */}
-        <div className="w-12 h-12 rounded-[14px] bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mb-6 shadow-sm hover:scale-105 transition-transform duration-200 flex-shrink-0">
-          <span className="text-white font-bold text-xl font-title leading-none">H</span>
+        <div className="mb-6 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-sm transition-transform duration-200 hover:scale-105">
+          <span className="font-title text-xl font-bold leading-none text-[var(--accent-primary)]">H</span>
         </div>
 
         {/* Heading */}

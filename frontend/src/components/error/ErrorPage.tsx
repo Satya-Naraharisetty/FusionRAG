@@ -26,7 +26,7 @@ export const ErrorPage: React.FC<ErrorPageProps> = ({ status }) => {
       label: "Go to Dashboard",
     },
     404: {
-      icon: <FileQuestion size={32} className="text-zinc-500" />,
+      icon: <FileQuestion size={32} className="text-[var(--text-muted)]" />,
       title: "Page Not Found",
       desc: "The page you are looking for does not exist or has been relocated.",
       action: () => navigate("/"),
@@ -45,11 +45,11 @@ export const ErrorPage: React.FC<ErrorPageProps> = ({ status }) => {
 
   return (
     <div className="flex h-screen w-screen flex-col items-center justify-center bg-[var(--bg-primary)] p-6 text-center text-[var(--text-primary)] select-none">
-      <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-xl)] bg-[var(--bg-secondary)] border border-[var(--border-subtle)] mb-5">
+      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         {current.icon}
       </div>
-      <h1 className="font-title font-bold text-xl text-[var(--text-primary)] mb-1">{current.title}</h1>
-      <p className="text-xs text-[var(--text-secondary)] max-w-sm mb-6 leading-relaxed">{current.desc}</p>
+      <h1 className="mb-1 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{current.title}</h1>
+      <p className="mb-6 max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">{current.desc}</p>
       <Button
         variant="default"
         size="sm"

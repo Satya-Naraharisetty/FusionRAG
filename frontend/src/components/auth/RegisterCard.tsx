@@ -43,15 +43,15 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
 }) => {
   return (
     <div
-      className="relative z-10 w-full max-w-[400px] flex flex-col bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-[var(--radius-2xl)] p-8 shadow-sm animate-in fade-in zoom-in-95 duration-300"
+      className="relative z-10 flex w-full max-w-[408px] flex-col rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-8 shadow-none animate-in fade-in zoom-in-95 duration-300"
       aria-label="Register form"
     >
       {/* Brand mark */}
       <div className="flex flex-col items-center mb-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-lg)] bg-gradient-to-br from-violet-500 to-purple-600 text-white font-bold text-base mb-4 select-none shadow-sm">
+        <div className="mb-4 flex h-10 w-10 select-none items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-base font-semibold text-[var(--text-primary)]">
           H
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)] mb-1">
+        <h1 className="mb-1 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
           Create account
         </h1>
         <p className="text-sm text-[var(--text-secondary)] text-center">
@@ -63,9 +63,9 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
       {error && (
         <div
           role="alert"
-          className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-[var(--radius-xl)] text-red-400 text-xs font-medium mb-5 animate-in slide-in-from-top duration-200"
+          className="mb-5 flex items-center gap-2 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3 text-xs font-medium text-[var(--text-secondary)] animate-in slide-in-from-top duration-200"
         >
-          <ShieldAlert size={14} className="flex-shrink-0" />
+          <ShieldAlert size={14} className="flex-shrink-0 text-[var(--accent-error)]" />
           <span>{error}</span>
         </div>
       )}
@@ -101,7 +101,7 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowPassword?.(!showPassword)}
-                    className="text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer focus:outline-none flex items-center p-1 transition-colors"
+                    className="flex cursor-pointer items-center p-1 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] focus:outline-none"
                     disabled={isSubmitting}
                     tabIndex={-1}
                     aria-label={showPassword ? "Hide password" : "Show password"}

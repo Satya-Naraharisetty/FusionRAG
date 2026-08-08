@@ -10,7 +10,7 @@ interface MarkdownRendererProps {
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
   return (
-    <div className="markdown-body text-zinc-350 text-xs leading-relaxed max-w-none prose prose-invert select-text">
+    <div className="markdown-body max-w-none select-text text-xs leading-relaxed text-[var(--text-secondary)] prose prose-invert">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
@@ -26,7 +26,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
               />
             ) : (
               <code
-                className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-zinc-200"
+                className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--text-primary)]"
                 {...props}
               >
                 {children}
@@ -35,16 +35,16 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
           },
           table({ children }) {
             return (
-              <div className="overflow-x-auto my-3 border border-zinc-800 rounded-lg">
-                <table className="min-w-full divide-y divide-zinc-800 text-[11px]">{children}</table>
+              <div className="my-3 overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border-subtle)]">
+                <table className="min-w-full divide-y divide-[var(--border-subtle)] text-[11px]">{children}</table>
               </div>
             );
           },
           th({ children }) {
-            return <th className="px-3 py-2 bg-zinc-900 text-left font-semibold text-zinc-300">{children}</th>;
+            return <th className="bg-[var(--bg-tertiary)] px-3 py-2 text-left font-semibold text-[var(--text-primary)]">{children}</th>;
           },
           td({ children }) {
-            return <td className="px-3 py-2 border-t border-zinc-800 text-zinc-400">{children}</td>;
+            return <td className="border-t border-[var(--border-subtle)] px-3 py-2 text-[var(--text-secondary)]">{children}</td>;
           },
           a({ href, children }) {
             return (
@@ -52,7 +52,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-violet-400 hover:text-violet-300 underline font-medium"
+                className="font-medium text-[var(--accent-primary)] underline hover:text-[var(--accent-primary)]/85"
               >
                 {children}
               </a>

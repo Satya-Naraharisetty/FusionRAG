@@ -14,12 +14,12 @@ export const StreamingRecovery: React.FC<StreamingRecoveryProps> = ({
   onCancel,
 }) => {
   return (
-    <div className="flex flex-col gap-3 p-4 bg-red-950/20 border border-red-900/30 rounded-lg text-zinc-300 max-w-lg my-4 animate-in fade-in duration-300">
-      <div className="flex items-center gap-2.5 text-red-400 font-semibold text-xs">
+    <div className="my-4 flex max-w-lg flex-col gap-3 rounded-[var(--radius-xl)] border border-[var(--accent-error)]/20 bg-[var(--bg-secondary)] p-4 text-[var(--text-secondary)] animate-in fade-in duration-300">
+      <div className="flex items-center gap-2.5 text-xs font-semibold text-[var(--accent-error)]">
         <WifiOff size={16} />
         <span>Connection lost during generation.</span>
       </div>
-      <p className="text-[11px] text-zinc-400">
+      <p className="text-[11px] text-[var(--text-muted)]">
         The response stream was interrupted. You can choose to regenerate the response, continue from where it stopped, or cancel and keep the current partial text.
       </p>
       <div className="flex flex-wrap gap-2 mt-1">
@@ -27,7 +27,7 @@ export const StreamingRecovery: React.FC<StreamingRecoveryProps> = ({
           onClick={onRetry}
           variant="outline"
           size="sm"
-          className="bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-[10px] h-8 gap-1.5"
+          className="h-8 gap-1.5 text-[10px]"
         >
           <RefreshCcw size={12} />
           <span>Regenerate</span>
@@ -36,7 +36,7 @@ export const StreamingRecovery: React.FC<StreamingRecoveryProps> = ({
           onClick={onContinue}
           variant="outline"
           size="sm"
-          className="bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-[10px] h-8 gap-1.5"
+          className="h-8 gap-1.5 text-[10px]"
         >
           <Play size={12} />
           <span>Continue Writing</span>
@@ -45,7 +45,7 @@ export const StreamingRecovery: React.FC<StreamingRecoveryProps> = ({
           onClick={onCancel}
           variant="ghost"
           size="sm"
-          className="hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 text-[10px] h-8 gap-1.5"
+          className="h-8 gap-1.5 text-[10px]"
         >
           <X size={12} />
           <span>Cancel & Keep</span>

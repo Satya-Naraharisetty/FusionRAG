@@ -170,8 +170,8 @@ export const UploadDropzone: React.FC = () => {
 
       {/* File rejections */}
       {fileRejections.length > 0 && (
-        <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-[var(--radius-xl)] text-red-400 text-xs font-medium">
-          <AlertCircle size={14} className="flex-shrink-0" />
+        <div className="flex items-center gap-2 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3 text-xs font-medium text-[var(--text-secondary)]">
+          <AlertCircle size={14} className="flex-shrink-0 text-[var(--accent-error)]" />
           <span>Some files were rejected (too large or unsupported format).</span>
         </div>
       )}
@@ -187,7 +187,7 @@ export const UploadDropzone: React.FC = () => {
                   Upload Queue ({queue.length})
                 </h4>
                 {batchSummary.completed === batchSummary.total && (
-                  <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-success)]">
                     <CheckCircle2 size={11} /> All done
                   </span>
                 )}

@@ -58,14 +58,14 @@ const SectionHeader: React.FC<{
   description?: string;
   action?: React.ReactNode;
 }> = ({ icon, title, description, action }) => (
-  <div className="flex items-start justify-between gap-4 pb-4 border-b border-[var(--border-subtle)]">
+  <div className="flex items-start justify-between gap-4 border-b border-(--border-subtle) pb-4">
     <div>
-      <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
-        <span className="text-[var(--text-muted)]">{icon}</span>
+      <h3 className="flex items-center gap-2 text-sm font-semibold text-(--text-primary)">
+        <span className="text-(--text-muted)">{icon}</span>
         {title}
       </h3>
       {description && (
-        <p className="text-xs text-[var(--text-secondary)] mt-0.5">{description}</p>
+        <p className="mt-0.5 text-xs text-(--text-secondary)">{description}</p>
       )}
     </div>
     {action}
@@ -79,14 +79,14 @@ const SettingRow: React.FC<{
   control: React.ReactNode;
   className?: string;
 }> = ({ label, description, control, className = "" }) => (
-  <div className={`flex items-center justify-between gap-6 py-4 border-b border-[var(--border-subtle)] last:border-0 ${className}`}>
+  <div className={`flex items-center justify-between gap-6 border-b border-(--border-subtle) py-4 last:border-0 ${className}`}>
     <div className="min-w-0">
-      <span className="text-sm text-[var(--text-primary)] font-medium block">{label}</span>
+      <span className="block text-sm font-medium text-(--text-primary)">{label}</span>
       {description && (
-        <span className="text-xs text-[var(--text-muted)] block mt-0.5 leading-relaxed">{description}</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-(--text-muted)">{description}</span>
       )}
     </div>
-    <div className="flex-shrink-0">{control}</div>
+    <div className="shrink-0">{control}</div>
   </div>
 );
 
@@ -105,11 +105,11 @@ const ToggleCheckbox: React.FC<{
     />
     <div
       className={`w-9 h-5 rounded-full transition-colors duration-200 ${
-        checked ? "bg-[var(--accent-primary)]" : "bg-[var(--bg-tertiary)]"
-      } border ${checked ? "border-[var(--accent-primary)]/50" : "border-[var(--border-default)]"}`}
+        checked ? "bg-(--accent-primary)" : "bg-(--bg-tertiary)"
+      } border ${checked ? "border-(--accent-primary)/50" : "border-(--border-default)"}`}
     >
       <div
-        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+        className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-(--bg-primary) shadow-sm transition-transform duration-200 ${
           checked ? "translate-x-4" : "translate-x-0"
         }`}
       />
@@ -182,13 +182,13 @@ const SettingsPage: React.FC = () => {
   const userInitials = user?.email ? user.email.slice(0, 2).toUpperCase() : "US";
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="flex-1 overflow-y-auto bg-(--bg-primary) text-(--text-primary)">
       <div className="max-w-3xl mx-auto px-4 py-8 md:px-8">
 
         {/* ── Page header ── */}
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Settings</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-(--text-primary)">Settings</h1>
+          <p className="mt-1 text-sm text-(--text-secondary)">
             Manage your account, appearance, and AI preferences.
           </p>
         </div>
@@ -197,17 +197,17 @@ const SettingsPage: React.FC = () => {
 
           {/* ── Side nav ── */}
           <nav
-            className="w-full md:w-44 flex flex-row md:flex-col gap-0.5 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 flex-shrink-0"
+            className="w-full shrink-0 flex-row gap-0.5 overflow-x-auto pb-2 md:w-44 md:flex-col md:overflow-x-visible md:pb-0"
             aria-label="Settings navigation"
           >
             {NAV_TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-[var(--radius-md)] transition-colors cursor-pointer whitespace-nowrap text-left ${
+                className={`flex cursor-pointer items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${
                   activeTab === tab.id
-                    ? "bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]/60 border border-transparent"
+                    ? "border border-(--border-subtle) bg-(--bg-secondary) text-(--text-primary)"
+                    : "border border-transparent text-(--text-muted) hover:bg-(--bg-secondary)/60 hover:text-(--text-primary)"
                 }`}
                 aria-current={activeTab === tab.id ? "page" : undefined}
               >
@@ -224,23 +224,23 @@ const SettingsPage: React.FC = () => {
             {activeTab === "profile" && (
               <div className="space-y-0">
                 <SectionHeader icon={<User size={14} />} title="User Profile" description="Your identity and account details." />
-                <div className="flex items-center gap-4 py-6 border-b border-[var(--border-subtle)]">
-                  <Avatar className="h-12 w-12 bg-[var(--bg-tertiary)] border border-[var(--border-default)]">
+                <div className="flex items-center gap-4 border-b border-(--border-subtle) py-6">
+                  <Avatar className="h-12 w-12 border border-(--border-default) bg-(--bg-tertiary)">
                     <AvatarFallback className="text-sm font-semibold">{userInitials}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{user?.email}</p>
+                    <p className="truncate text-sm font-semibold text-(--text-primary)">{user?.email}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-[var(--radius-pill)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                      <span className="inline-flex items-center rounded-pill border border-(--border-subtle) bg-(--bg-tertiary) px-2 py-0.5 text-[10px] font-medium text-(--text-secondary)">
                         {user?.role}
                       </span>
-                      <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-[var(--radius-pill)] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <span className="inline-flex items-center rounded-pill border border-(--accent-success)/20 bg-(--accent-success)/10 px-2 py-0.5 text-[10px] font-medium text-(--accent-success)">
                         Active
                       </span>
                     </div>
                   </div>
                 </div>
-                <div className="pt-4 text-xs text-[var(--text-muted)]">
+                <div className="pt-4 text-xs text-(--text-muted)">
                   To change your email or password, contact your administrator.
                 </div>
               </div>
@@ -252,19 +252,19 @@ const SettingsPage: React.FC = () => {
                 <SectionHeader icon={<Palette size={14} />} title="Appearance" description="Customize theme, font size, and interface density." />
 
                 {/* Theme */}
-                <div className="py-5 border-b border-[var(--border-subtle)]">
-                  <p className="text-xs font-medium text-[var(--text-secondary)] mb-3">Theme Mode</p>
+                <div className="border-b border-(--border-subtle) py-5">
+                  <p className="mb-3 text-xs font-medium text-(--text-secondary)">Theme Mode</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {(["dark", "light", "system", "high-contrast"] as Theme[]).map((opt) => (
                       <button
                         key={opt}
                         onClick={() => setTheme(opt)}
-                        className={`px-3 py-2 text-xs font-medium rounded-[var(--radius-md)] border text-center transition-colors cursor-pointer capitalize ${
+                        className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium capitalize transition-colors ${
                           theme === opt
-                            ? "bg-[var(--bg-secondary)] text-[var(--text-primary)] border-[var(--border-hover)]"
-                            : "bg-transparent border-[var(--border-subtle)] hover:border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                            ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
+                            : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
                         }`}
-                        aria-pressed={theme === opt}
+                        data-active={theme === opt}
                       >
                         {opt === "high-contrast" ? "High Contrast" : opt.charAt(0).toUpperCase() + opt.slice(1)}
                       </button>
@@ -273,10 +273,10 @@ const SettingsPage: React.FC = () => {
                 </div>
 
                 {/* Font size */}
-                <div className="py-5 border-b border-[var(--border-subtle)]">
-                  <div className="flex justify-between items-center mb-3">
-                    <p className="text-xs font-medium text-[var(--text-secondary)]">Base Font Size</p>
-                    <span className="text-xs font-mono text-[var(--text-muted)]">{fontSize}px</span>
+                <div className="border-b border-(--border-subtle) py-5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-xs font-medium text-(--text-secondary)">Base Font Size</p>
+                    <span className="font-mono text-xs text-(--text-muted)">{fontSize}px</span>
                   </div>
                   <input
                     type="range"
@@ -287,25 +287,25 @@ const SettingsPage: React.FC = () => {
                     onChange={(e) => setFontSize(parseInt(e.target.value, 10))}
                     aria-label={`Font size: ${fontSize}px`}
                   />
-                  <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1.5">
+                  <div className="mt-1.5 flex justify-between text-[10px] text-(--text-muted)">
                     <span>12px</span><span>16px</span><span>20px</span>
                   </div>
                 </div>
 
                 {/* Density */}
                 <div className="py-5">
-                  <p className="text-xs font-medium text-[var(--text-secondary)] mb-3">Interface Density</p>
+                  <p className="mb-3 text-xs font-medium text-(--text-secondary)">Interface Density</p>
                   <div className="grid grid-cols-3 gap-2">
                     {(["comfortable", "cozy", "compact"] as Density[]).map((opt) => (
                       <button
                         key={opt}
                         onClick={() => setDensity(opt)}
-                        className={`px-3 py-2 text-xs font-medium rounded-[var(--radius-md)] border text-center transition-colors cursor-pointer capitalize ${
+                        className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium capitalize transition-colors ${
                           density === opt
-                            ? "bg-[var(--bg-secondary)] text-[var(--text-primary)] border-[var(--border-hover)]"
-                            : "bg-transparent border-[var(--border-subtle)] hover:border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                            ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
+                            : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
                         }`}
-                        aria-pressed={density === opt}
+                        data-active={density === opt}
                       >
                         {opt.charAt(0).toUpperCase() + opt.slice(1)}
                       </button>
@@ -360,11 +360,11 @@ const SettingsPage: React.FC = () => {
                 />
 
                 {/* Temperature */}
-                <div className="py-5 border-b border-[var(--border-subtle)]">
-                  <div className="flex justify-between items-center mb-3">
+                <div className="border-b border-(--border-subtle) py-5">
+                  <div className="mb-3 flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-[var(--text-primary)]">Temperature</p>
-                      <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                      <p className="text-sm font-medium text-(--text-primary)">Temperature</p>
+                      <p className="mt-0.5 text-xs text-(--text-muted)">
                         {defaults.temperature === 0 ? "Deterministic" : "Creative"} · {defaults.temperature.toFixed(1)}
                       </p>
                     </div>
@@ -378,17 +378,17 @@ const SettingsPage: React.FC = () => {
                     onChange={(e) => updateSetting("temperature", parseFloat(e.target.value))}
                     aria-label={`Temperature: ${defaults.temperature}`}
                   />
-                  <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1.5">
+                  <div className="mt-1.5 flex justify-between text-[10px] text-(--text-muted)">
                     <span>0 — Strict</span><span>1 — Creative</span>
                   </div>
                 </div>
 
                 {/* Top K */}
-                <div className="py-5 border-b border-[var(--border-subtle)]">
-                  <div className="flex justify-between items-center mb-3">
+                <div className="border-b border-(--border-subtle) py-5">
+                  <div className="mb-3 flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-[var(--text-primary)]">Retrieval Top K</p>
-                      <p className="text-xs text-[var(--text-muted)] mt-0.5">Maximum chunks retrieved · {defaults.topK}</p>
+                      <p className="text-sm font-medium text-(--text-primary)">Retrieval Top K</p>
+                      <p className="mt-0.5 text-xs text-(--text-muted)">Maximum chunks retrieved · {defaults.topK}</p>
                     </div>
                   </div>
                   <input
@@ -400,7 +400,7 @@ const SettingsPage: React.FC = () => {
                     onChange={(e) => updateSetting("topK", parseInt(e.target.value, 10))}
                     aria-label={`Top K: ${defaults.topK}`}
                   />
-                  <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1.5">
+                  <div className="mt-1.5 flex justify-between text-[10px] text-(--text-muted)">
                     <span>1</span><span>20</span>
                   </div>
                 </div>
@@ -413,7 +413,8 @@ const SettingsPage: React.FC = () => {
                     <select
                       value={defaults.retrievalMode}
                       onChange={(e) => updateSetting("retrievalMode", e.target.value as ConversationDefaults["retrievalMode"])}
-                      className="h-8 rounded-[var(--radius-md)] bg-[var(--bg-input)] border border-[var(--border-default)] hover:border-[var(--border-hover)] text-xs px-2.5 text-[var(--text-primary)] cursor-pointer outline-none focus:border-[var(--accent-primary)]/50 transition-colors min-w-[140px]"
+                      className="h-8 min-w-35 cursor-pointer rounded-md border border-(--border-default) bg-(--bg-input) px-2.5 text-xs text-(--text-primary) outline-none transition-colors hover:border-(--border-hover) focus:border-(--accent-primary)/50"
+                      title="Retrieval mode"
                     >
                       <option value="hybrid">Hybrid Search</option>
                       <option value="semantic">Semantic (Dense)</option>
@@ -488,10 +489,10 @@ const SettingsPage: React.FC = () => {
                 />
 
                 {/* Danger zone */}
-                <div className="pt-6 mt-2 border-t border-[var(--border-subtle)]">
+                <div className="mt-2 border-t border-(--border-subtle) pt-6">
                   <div className="flex items-center gap-2 mb-4">
-                    <ShieldAlert size={14} className="text-[var(--accent-error)]" />
-                    <span className="text-sm font-semibold text-[var(--accent-error)]">Danger Zone</span>
+                    <ShieldAlert size={14} className="text-(--accent-error)" />
+                    <span className="text-sm font-semibold text-(--accent-error)">Danger Zone</span>
                   </div>
 
                   <SettingRow
@@ -538,7 +539,7 @@ const SettingsPage: React.FC = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm">
-              <Trash2 size={15} className="text-[var(--accent-error)]" />
+              <Trash2 size={15} className="text-(--accent-error)" />
               Clear Conversation History?
             </DialogTitle>
             <DialogDescription>
@@ -563,7 +564,7 @@ const SettingsPage: React.FC = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm">
-              <RotateCcw size={15} className="text-[var(--accent-error)]" />
+              <RotateCcw size={15} className="text-(--accent-error)" />
               Perform Factory Reset?
             </DialogTitle>
             <DialogDescription>

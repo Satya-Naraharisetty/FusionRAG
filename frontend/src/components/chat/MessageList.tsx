@@ -146,7 +146,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         <Button
           onClick={handleScrollBtnClick}
           size="icon"
-          className="absolute bottom-4 right-4 h-10 w-10 bg-zinc-900/80 backdrop-blur-sm border border-zinc-800 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-150 rounded-full shadow-lg z-10 cursor-pointer transition-all duration-300 ease-emphasized"
+          className="absolute bottom-4 right-4 z-10 h-10 w-10 cursor-pointer rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 text-[var(--text-secondary)] shadow-lg backdrop-blur-sm transition-all duration-300 ease-emphasized hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
           aria-label={scrollDirection === "down" ? "Scroll to bottom" : "Scroll to top"}
         >
           {scrollDirection === "down" ? (
@@ -158,7 +158,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       )}
 
       {isStreaming && !showScrollBtn && (
-        <div className="absolute bottom-4 right-4 h-10 w-10 flex items-center justify-center bg-primary/20 text-primary rounded-full animate-pulse z-10" aria-live="polite" aria-atomic="true">
+        <div className="absolute bottom-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] animate-pulse" aria-live="polite" aria-atomic="true">
           <span className="text-xs font-mono">AI</span>
         </div>
       )}

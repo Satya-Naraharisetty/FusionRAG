@@ -7,10 +7,10 @@ export const ProtectedRoute: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[#0d0f12] text-white">
+      <div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)] text-[var(--text-primary)]">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#3b82f6] border-t-transparent"></div>
-          <p className="text-sm font-medium text-[#9ca3af]">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--accent-primary)] border-t-transparent"></div>
+          <p className="text-sm font-medium text-[var(--text-secondary)]">
             Securing session...
           </p>
         </div>

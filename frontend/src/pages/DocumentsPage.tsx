@@ -189,7 +189,7 @@ const DocumentsPage: React.FC = () => {
   const handleDragOver  = (e: React.DragEvent) => e.preventDefault();
   const handleDrop      = (targetId: string) => {
     if (!draggedDocId || draggedDocId === targetId) return;
-    let newOrder = customOrder.length > 0 ? [...customOrder] : documents.map((d) => d.id);
+    const newOrder = customOrder.length > 0 ? [...customOrder] : documents.map((d) => d.id);
     const fromIdx = newOrder.indexOf(draggedDocId);
     const toIdx   = newOrder.indexOf(targetId);
     if (fromIdx !== -1 && toIdx !== -1) {
@@ -201,22 +201,22 @@ const DocumentsPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="flex-1 overflow-y-auto bg-(--bg-primary) text-(--text-primary)">
       <div className="max-w-4xl mx-auto px-4 py-8 md:px-8 space-y-6 relative pb-20">
 
         {/* ── Page header ── */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+            <h1 className="text-2xl font-semibold tracking-tight text-(--text-primary)">
               Documents
             </h1>
-            <p className="text-sm text-[var(--text-secondary)] mt-1">
+            <p className="mt-1 text-sm text-(--text-secondary)">
               Manage your knowledge base. Upload documents to query them in chat.
             </p>
           </div>
 
           {/* View toggle + new folder */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               variant="ghost"
               size="iconSm"
@@ -226,30 +226,30 @@ const DocumentsPage: React.FC = () => {
             >
               <FolderOpen size={15} />
             </Button>
-            <div className="flex items-center bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] p-0.5 rounded-[var(--radius-md)]">
+            <div className="flex items-center rounded-md border border-(--border-subtle) bg-(--bg-tertiary) p-0.5">
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-[var(--radius-sm)] cursor-pointer transition-colors ${
+                className={`cursor-pointer rounded-sm p-1.5 transition-colors ${
                   viewMode === "grid"
-                    ? "bg-[var(--bg-elevated)] text-[var(--text-primary)]"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    ? "bg-(--bg-elevated) text-(--text-primary)"
+                    : "text-(--text-muted) hover:text-(--text-primary)"
                 }`}
                 title="Grid view"
                 aria-label="Switch to grid view"
-                aria-pressed={viewMode === "grid"}
+                data-active={viewMode === "grid"}
               >
                 <LayoutGrid size={13} />
               </button>
               <button
                 onClick={() => setViewMode("list")}
-                className={`p-1.5 rounded-[var(--radius-sm)] cursor-pointer transition-colors ${
+                className={`cursor-pointer rounded-sm p-1.5 transition-colors ${
                   viewMode === "list"
-                    ? "bg-[var(--bg-elevated)] text-[var(--text-primary)]"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    ? "bg-(--bg-elevated) text-(--text-primary)"
+                    : "text-(--text-muted) hover:text-(--text-primary)"
                 }`}
                 title="List view"
                 aria-label="Switch to list view"
-                aria-pressed={viewMode === "list"}
+                data-active={viewMode === "list"}
               >
                 <List size={13} />
               </button>
@@ -332,11 +332,11 @@ const DocumentsPage: React.FC = () => {
         {/* ── Bulk action bar ── */}
         {selectedIds.length > 0 && (
           <div
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-pill)] px-5 py-2.5 shadow-md animate-in slide-in-from-bottom duration-200"
+            className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-pill border border-(--border-default) bg-(--bg-elevated) px-5 py-2.5 shadow-md animate-in slide-in-from-bottom duration-200"
             role="toolbar"
             aria-label="Bulk actions"
           >
-            <span className="text-xs font-medium text-[var(--text-secondary)] border-r border-[var(--border-subtle)] pr-3 select-none">
+            <span className="border-r border-(--border-subtle) pr-3 text-xs font-medium text-(--text-secondary) select-none">
               {selectedIds.length} selected
             </span>
 
@@ -348,8 +348,9 @@ const DocumentsPage: React.FC = () => {
                   else if (val)       handleBulkMoveToFolder(val);
                   e.target.value = "";
                 }}
-                className="h-8 rounded-[var(--radius-md)] bg-[var(--bg-input)] border border-[var(--border-default)] text-xs px-2 text-[var(--text-primary)] cursor-pointer outline-none focus:border-[var(--accent-primary)]/50 transition-colors"
+                className="h-8 cursor-pointer rounded-md border border-(--border-default) bg-(--bg-input) px-2 text-xs text-(--text-primary) outline-none transition-colors focus:border-(--accent-primary)/50"
                 aria-label="Move selected to folder"
+                title="Move selected to folder"
               >
                 <option value="">Move to folder…</option>
                 <option value="none">No folder</option>
@@ -369,8 +370,9 @@ const DocumentsPage: React.FC = () => {
               </Button>
 
               <button
+                type="button"
                 onClick={() => setSelectedIds([])}
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1 cursor-pointer transition-colors"
+                className="cursor-pointer p-1 text-(--text-muted) transition-colors hover:text-(--text-primary)"
                 title="Clear selection"
                 aria-label="Clear selection"
               >
@@ -386,7 +388,7 @@ const DocumentsPage: React.FC = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm">
-              <FolderOpen size={15} className="text-[var(--accent-primary)]" />
+              <FolderOpen size={15} className="text-(--accent-primary)" />
               <span>Create Folder</span>
             </DialogTitle>
           </DialogHeader>

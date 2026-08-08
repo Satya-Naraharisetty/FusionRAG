@@ -234,12 +234,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   return (
     <form
       onSubmit={handleSubmit}
-      style={{
-        width: "100%",
-        maxWidth: "780px",
-        padding: "0 20px",
-      }}
-      className="select-none relative"
+      className="relative w-full max-w-195 select-none px-5"
     >
       <input
         ref={fileInputRef}
@@ -249,25 +244,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         onChange={(e) => handleFileSelect(e.target.files)}
         className="hidden"
         id="chat-file-input"
+        aria-label="Attach files"
       />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div className="flex flex-col gap-2">
         {/* Offline Warning Alert */}
         {!isOnline && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              fontSize: "12px",
-              fontWeight: 600,
-              color: "#f87171",
-              background: "rgba(248,113,113,0.08)",
-              padding: "8px 12px",
-              borderRadius: "10px",
-              border: "1px solid rgba(248,113,113,0.15)",
-            }}
-          >
+          <div className="flex items-center gap-1.5 rounded-[10px] border border-[rgba(248,113,113,0.15)] bg-[rgba(248,113,113,0.08)] px-3 py-2 text-xs font-semibold text-red-400">
             <AlertCircle size={13} />
             <span>Sending disabled — you are offline.</span>
           </div>
@@ -279,23 +262,23 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             {attachments.map((att) => (
               <div
                 key={att.id}
-                className="flex items-center gap-2 p-1.5 pr-2.5 bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-[var(--radius-xl)] transition-colors"
+                className="flex items-center gap-2 rounded-xl border border-(--border-default) bg-(--bg-tertiary) p-1.5 pr-2.5 transition-colors"
               >
                 {att.preview ? (
                   <img
                     src={att.preview}
                     alt={att.file.name}
-                    className="w-8 h-8 rounded-[var(--radius-md)] object-cover flex-shrink-0 border border-[var(--border-subtle)]"
+                    className="h-8 w-8 shrink-0 rounded-md border border-(--border-subtle) object-cover"
                   />
                 ) : (
-                  <FileTypeBadge filename={att.file.name} variant="card" className="w-8 h-8 text-[8px]" />
+                  <FileTypeBadge filename={att.file.name} variant="card" className="h-8 w-8 text-[8px]" />
                 )}
 
-                <div className="min-w-0 max-w-[130px] space-y-0.5">
-                  <p className="text-xs font-medium text-[var(--text-primary)] truncate leading-none">
+                <div className="min-w-0 max-w-32.5 space-y-0.5">
+                  <p className="truncate text-xs font-medium leading-none text-(--text-primary)">
                     {att.file.name}
                   </p>
-                  <p className="text-[10px] text-[var(--text-muted)] font-mono leading-none">
+                  <p className="font-mono text-[10px] leading-none text-(--text-muted)">
                     {(att.file.size / 1024).toFixed(0)} KB
                   </p>
                 </div>
@@ -305,7 +288,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 <button
                   type="button"
                   onClick={() => removeAttachment(att.id)}
-                  className="p-1 text-[var(--text-muted)] hover:text-[var(--accent-error)] rounded-[var(--radius-sm)] transition-colors cursor-pointer ml-0.5"
+                  className="ml-0.5 cursor-pointer rounded-sm p-1 text-(--text-muted) transition-colors hover:text-(--accent-error)"
                   aria-label={`Remove ${att.file.name}`}
                 >
                   <X size={12} />
@@ -320,24 +303,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          style={{
-            position: "relative",
-            display: "flex",
-            alignItems: "flex-end",
-            background: "var(--bg-input, #2A2A2A)",
-            border: isDraggingOver
-              ? "2px dashed #8b5cf6"
-              : "1px solid rgba(255,255,255,0.10)",
-            borderRadius: "20px",
-            boxShadow: isDraggingOver
-              ? "0 0 25px rgba(139, 92, 246, 0.35)"
-              : "0 4px 20px rgba(0,0,0,0.25)",
-            transition: "all 0.2s ease",
-          }}
           className={cn(
-            "focus-within:border-white/[0.18] focus-within:shadow-[0_8px_32px_rgba(0,0,0,0.35)]",
-            isRecording && "border-red-500/40",
-            isDraggingOver && "bg-violet-950/20"
+            "relative flex items-end rounded-[20px] border bg-(--bg-secondary) transition-all duration-200 focus-within:border-(--border-hover) focus-within:shadow-[0_8px_32px_rgba(0,0,0,0.35)]",
+            isDraggingOver
+              ? "border-dashed border-(--accent-primary)/70 bg-(--accent-primary)/8 shadow-[0_0_25px_rgba(110,168,255,0.18)]"
+              : "border-(--border-default) shadow-[0_4px_20px_rgba(0,0,0,0.22)]",
+            isRecording && "border-(--accent-error)/45"
           )}
         >
           {/* Paperclip button with Recent Attachments dropdown */}
@@ -349,7 +320,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   variant="ghost"
                   size="icon"
                   disabled={isStreaming || attachments.length >= 5}
-                  className="h-9 w-9 rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] cursor-pointer flex items-center justify-center transition-colors"
+                  className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-(--text-muted) transition-colors hover:bg-(--bg-tertiary) hover:text-(--text-primary)"
                   aria-label="Attach files options"
                 >
                   <Paperclip size={17} />
@@ -360,7 +331,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   onClick={() => fileInputRef.current?.click()}
                   className="gap-2 cursor-pointer"
                 >
-                  <Paperclip size={14} className="text-[var(--accent-primary)]" />
+                  <Paperclip size={14} className="text-(--accent-primary)" />
                   <span>Upload from computer…</span>
                 </DropdownMenuItem>
 
@@ -368,13 +339,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   <>
                     <DropdownMenuSeparator />
                     <div className="flex items-center justify-between px-2 py-1">
-                      <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
+                      <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-(--text-muted)">
                         <History size={10} /> Recent Files
                       </span>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); clearRecents(); }}
-                        className="text-[10px] text-[var(--text-muted)] hover:text-[var(--accent-error)] p-0.5 cursor-pointer"
+                        className="cursor-pointer p-0.5 text-[10px] text-(--text-muted) hover:text-(--accent-error)"
                         title="Clear recent list"
                       >
                         <Trash2 size={10} />
@@ -387,8 +358,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         onClick={() => { toast.success(`Selected: "${rec.name}"`); }}
                         className="flex items-center justify-between cursor-pointer py-1.5"
                       >
-                        <span className="truncate max-w-[130px] font-medium">{rec.name}</span>
-                        <span className="text-[10px] text-[var(--text-muted)] font-mono flex-shrink-0">
+                        <span className="truncate max-w-32.5 font-medium">{rec.name}</span>
+                        <span className="shrink-0 font-mono text-[10px] text-(--text-muted)">
                           {(rec.size / 1024).toFixed(0)} KB
                         </span>
                       </DropdownMenuItem>
@@ -399,7 +370,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </DropdownMenu>
           </div>
 
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <div className="flex min-w-0 flex-1 flex-col">
             <textarea
               ref={textareaRef}
               value={text}
@@ -414,28 +385,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               }
               rows={1}
               disabled={!isOnline || isStreaming}
-              style={{
-                flex: 1,
-                maxHeight: "200px",
-                minHeight: "52px",
-                background: "transparent",
-                border: "none",
-                color: "var(--text-primary, #F5F5F5)",
-                fontSize: "15px",
-                padding: "16px 8px 16px 8px",
-                resize: "none",
-                outline: "none",
-                boxShadow: "none",
-                lineHeight: 1.55,
-                fontFamily: "inherit",
-                width: "100%",
-              }}
-              className="placeholder:text-[var(--text-muted)] disabled:opacity-50 scrollbar-none"
+              className="min-h-13 max-h-50 w-full flex-1 resize-none border-0 bg-transparent px-2 py-4 text-[15px] leading-[1.55] text-(--text-primary) shadow-none outline-none placeholder:text-(--text-muted) disabled:opacity-50 scrollbar-none"
               aria-label="Message prompt input"
             />
 
             {showCommands && (
-              <Command className="absolute bottom-full left-0 right-0 mb-2 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-2xl)] shadow-md overflow-hidden z-10 text-[var(--text-primary)] animate-in fade-in slide-in-from-bottom-2 duration-150">
+              <Command className="absolute bottom-full left-0 right-0 z-10 mb-2 overflow-hidden rounded-2xl border border-(--border-subtle) bg-(--bg-elevated) text-(--text-primary) shadow-md animate-in fade-in slide-in-from-bottom-2 duration-150">
                 <CommandInput
                   value={commandSearch}
                   onValueChange={setCommandSearch}
@@ -443,7 +398,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   className="h-10 bg-transparent border-0 text-sm focus-visible:ring-0 focus:outline-none"
                   autoFocus
                 />
-                <CommandEmpty className="py-4 text-center text-[var(--text-muted)] text-xs">No commands found.</CommandEmpty>
+                <CommandEmpty className="py-4 text-center text-xs text-(--text-muted)">No commands found.</CommandEmpty>
                 <CommandGroup>
                   {filteredCommands.map((cmd) => (
                     <CommandItem
@@ -451,12 +406,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                       onSelect={() => handleCommandSelect(cmd)}
                       className="flex items-center gap-3 px-3 py-2 cursor-pointer"
                     >
-                      <span className="text-base flex-shrink-0">{cmd.icon}</span>
+                      <span className="shrink-0 text-base">{cmd.icon}</span>
                       <div className="flex-1 text-left min-w-0">
-                        <div className="text-sm font-medium text-[var(--text-primary)] truncate">{cmd.label}</div>
-                        <div className="text-xs text-[var(--text-muted)] truncate">{cmd.description}</div>
+                        <div className="truncate text-sm font-medium text-(--text-primary)">{cmd.label}</div>
+                        <div className="truncate text-xs text-(--text-muted)">{cmd.description}</div>
                       </div>
-                      <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-[var(--bg-tertiary)] text-[var(--text-muted)] rounded-[var(--radius-sm)] border border-[var(--border-subtle)] flex-shrink-0">
+                      <kbd className="shrink-0 rounded-sm border border-(--border-subtle) bg-(--bg-tertiary) px-1.5 py-0.5 font-mono text-[10px] text-(--text-muted)">
                         {cmd.shortcut}
                       </kbd>
                     </CommandItem>
@@ -467,7 +422,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
 
           {/* Right Action buttons: Voice & Send */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", paddingRight: "12px", paddingLeft: "4px", paddingBottom: "10px", paddingTop: "10px" }}>
+          <div className="flex items-center gap-1.5 px-3 pl-1 pt-2.5 pb-2.5">
             {/* Voice Input */}
             {onVoiceInput && (
               <Button
@@ -476,23 +431,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 size="icon"
                 onClick={() => { onVoiceInput(); setIsRecording(!isRecording); }}
                 disabled={isStreaming}
-                style={{
-                  width: "38px",
-                  height: "38px",
-                  borderRadius: "50%",
-                  background: isRecording ? "#ef4444" : "transparent",
-                  border: "none",
-                  color: isRecording ? "white" : "var(--text-muted, #737373)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  flexShrink: 0,
-                  transition: "all 0.15s",
-                }}
-                className={cn(isRecording ? "animate-pulse" : "hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]")}
+                className={cn(
+                  "h-9.5 w-9.5 shrink-0 rounded-full border transition-colors",
+                  isRecording
+                    ? "border-(--accent-error)/20 bg-(--accent-error)/12 text-(--accent-error) animate-pulse"
+                    : "border-transparent text-(--text-muted) hover:border-(--border-subtle) hover:bg-(--bg-tertiary) hover:text-(--text-primary)"
+                )}
                 aria-label={isRecording ? "Stop recording" : "Record voice"}
-                aria-pressed={isRecording}
+                data-pressed={isRecording}
               >
                 <Mic size={17} />
               </Button>
@@ -504,21 +450,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 type="button"
                 onClick={onStop}
                 size="icon"
-                style={{
-                  width: "36px",
-                  height: "36px",
-                  background: "#f5f5f5",
-                  border: "none",
-                  borderRadius: "50%",
-                  color: "#0a0a0a",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  flexShrink: 0,
-                  transition: "all 0.15s",
-                }}
-                className="hover:bg-[var(--bg-tertiary)] active:scale-95"
+                className="h-9 w-9 shrink-0 rounded-full border border-(--border-subtle) bg-(--bg-elevated) text-(--text-primary) transition-all hover:bg-(--bg-tertiary) active:scale-95"
                 aria-label="Stop generation"
               >
                 <Square size={9} fill="currentColor" />
@@ -528,21 +460,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 type="submit"
                 disabled={!hasContent || !isOnline}
                 size="icon"
-                style={{
-                  width: "36px",
-                  height: "36px",
-                  background: hasContent && isOnline ? "#f5f5f5" : "rgba(255,255,255,0.08)",
-                  border: "none",
-                  borderRadius: "50%",
-                  color: hasContent && isOnline ? "#0a0a0a" : "var(--text-muted, #737373)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: hasContent && isOnline ? "pointer" : "not-allowed",
-                  flexShrink: 0,
-                  transition: "all 0.15s",
-                }}
-                className="active:scale-95"
+                className={cn(
+                  "h-9 w-9 shrink-0 rounded-full border transition-all active:scale-95",
+                  hasContent && isOnline
+                    ? "border-(--border-subtle) bg-(--bg-elevated) text-(--text-primary) hover:bg-(--bg-tertiary)"
+                    : "border-(--border-subtle) bg-(--bg-tertiary) text-(--text-muted) cursor-not-allowed"
+                )}
                 aria-label="Send query"
               >
                 <ArrowUp size={16} strokeWidth={2.5} />
@@ -553,18 +476,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         {/* Character count */}
         {(isNearingLimit || attachments.length > 0) && (
-          <div
-            style={{
-              fontSize: "11px",
-              fontFamily: "monospace",
-              textAlign: "right",
-              alignSelf: "flex-end",
-              padding: "0 4px",
-              color: isOverLimit ? "#f87171" : "var(--text-muted, #737373)",
-              fontWeight: isOverLimit ? 700 : 400,
-              transition: "color 0.2s",
-            }}
-          >
+          <div className={cn(
+            "self-end px-1 text-right font-mono text-[11px] transition-colors",
+            isOverLimit ? "font-semibold text-(--accent-error)" : "text-(--text-muted)"
+          )}>
             {charCount} / 4000 {attachments.length > 0 && `· ${attachments.length} files`}
           </div>
         )}
