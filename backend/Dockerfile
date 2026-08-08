@@ -1,21 +1,16 @@
-# Build stage: install dependencies with uv
+# Build stage: install dependencies
 FROM python:3.12-slim AS builder
-
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /build
 
 # Copy dependency files
-COPY pyproject.toml uv.lock* ./
+COPY requirements.txt ./
 
-# Install dependencies using uv
-RUN if [ -f pyproject.toml ]; then \
-        uv sync --frozen --no-install-workspace --no-dev; \
-    else \
-        echo "Error: pyproject.toml not found"; \
-        exit 1; \
-    fi
+# Install dependencies using pip
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code after installing dependencies
+COPY . .
 
 # Production stage: minimal runtime image
 FROM python:3.12-slim
@@ -27,11 +22,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the virtual environment from builder
-COPY --from=builder /build/.venv /app/.venv
+# Copy installed packages from builder stage
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Set up PATH to use the venv
-ENV PATH="/app/.venv/bin:$PATH"
+# Set up PATH to include installed binaries
+ENV PATH="/usr/local/bin:$PATH"
 
 # Create huggingface cache directory
 RUN mkdir -p /cache/huggingface
@@ -43,4 +39,4 @@ COPY . .
 EXPOSE 8000
 
 # Run migrations and start the application
-CMD sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+CMD ["sh", "-c", "python -m alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
