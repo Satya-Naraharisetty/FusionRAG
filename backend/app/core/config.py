@@ -85,6 +85,26 @@ class Settings(BaseSettings):
     EMBEDDING_BATCH_SIZE: int = 32
     EMBEDDING_VERSION: str = "v1"
 
+    # Local Embedding Model (for development/testing)
+    LOCAL_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
+    LOCAL_EMBEDDING_DEVICE: str = "cpu"
+    LOCAL_EMBEDDING_DIMENSION: int = 384
+
+    # Computed properties based on ENV
+    @property
+    def effective_embedding_dimension(self) -> int:
+        """Return the correct embedding dimension based on environment."""
+        if self.ENV == "development":
+            return self.LOCAL_EMBEDDING_DIMENSION
+        return self.EMBEDDING_DIMENSION
+
+    @property
+    def effective_embedding_model(self) -> str:
+        """Return the correct embedding model based on environment."""
+        if self.ENV == "development":
+            return self.LOCAL_EMBEDDING_MODEL
+        return self.EMBEDDING_MODEL
+
     # OpenAI API Configurations
     OPENAI_API_KEY: str = ""
 

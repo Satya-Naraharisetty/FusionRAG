@@ -1,4 +1,5 @@
 from typing import Any
+import logging
 
 import jwt
 from fastapi import BackgroundTasks, Depends, HTTPException, Request, status
@@ -51,6 +52,8 @@ from app.documents.services.document_service import DocumentService
 from app.documents.services.embedding_service import EmbeddingService
 from app.documents.services.metadata_extractor import MetadataExtractor
 from app.documents.services.text_cleaner import TextCleaner
+
+logger = logging.getLogger(__name__)
 
 # Security header scheme helper
 security_scheme = HTTPBearer(auto_error=False)
@@ -242,6 +245,21 @@ def get_chunking_service() -> ChunkingService:
 
 
 def get_embedding_generator() -> EmbeddingGenerator:
+    from app.core.config import settings
+
+    # Use local embedder for development - zero cost, fast, no API key needed
+    if settings.ENV == "development":
+        from app.documents.infrastructure.embedding_generator import (
+            LocalEmbeddingGenerator,
+        )
+
+        logger.info("Using LocalEmbeddingGenerator for development environment")
+        return LocalEmbeddingGenerator(
+            model_name=settings.LOCAL_EMBEDDING_MODEL,
+            device=settings.LOCAL_EMBEDDING_DEVICE,
+        )
+
+    # Production: use configured provider (gemini or openai)
     if settings.EMBEDDING_PROVIDER.lower() == "gemini":
         from app.documents.infrastructure.embedding_generator import (
             GeminiEmbeddingGenerator,
@@ -287,7 +305,7 @@ def get_vector_store(request: Request = None) -> VectorStore:
     return QdrantVectorStore(
         client=qdrant_client,
         collection_name=settings.VECTOR_COLLECTION_NAME,
-        dimension=settings.EMBEDDING_DIMENSION,
+        dimension=settings.effective_embedding_dimension,
     )
 
 
@@ -316,9 +334,9 @@ def get_embedding_service(
         time_provider=SystemTimeProvider(),
         uuid_generator=SystemUUIDGenerator(),
         batch_size=settings.EMBEDDING_BATCH_SIZE,
-        provider_name=settings.EMBEDDING_PROVIDER,
-        model_name=settings.EMBEDDING_MODEL,
-        dimension=settings.EMBEDDING_DIMENSION,
+        provider_name=settings.EMBEDDING_PROVIDER if settings.ENV != "development" else "local",
+        model_name=settings.effective_embedding_model,
+        dimension=settings.effective_embedding_dimension,
         embedding_version=settings.EMBEDDING_VERSION,
     )
 

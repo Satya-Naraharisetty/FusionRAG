@@ -1,5 +1,48 @@
 import httpx
+import logging
 from app.documents.domain.interfaces import EmbeddingGenerator
+
+logger = logging.getLogger(__name__)
+
+
+class LocalEmbeddingGenerator(EmbeddingGenerator):
+    """
+    Local embedding generator using sentence-transformers.
+    Runs entirely offline - zero API costs, minimal latency.
+    Uses sentence-transformers models like all-MiniLM-L6-v2 (384 dims, 256 max tokens).
+    """
+
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2", device: str = "cpu") -> None:
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError:
+            raise RuntimeError(
+                "sentence-transformers not installed. Run: pip install sentence-transformers"
+            )
+
+        self._model_name = model_name
+        self._device = device
+        self._model = SentenceTransformer(model_name, device=device)
+        self._dimension = self._model.get_sentence_embedding_dimension()
+
+    @property
+    def dimension(self) -> int:
+        return self._dimension
+
+    def generate(self, text: str) -> list[float]:
+        return self.batch_generate([text])[0]
+
+    def batch_generate(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+
+        embeddings = self._model.encode(
+            texts,
+            normalize_embeddings=True,
+            convert_to_numpy=True,
+            show_progress_bar=False,
+        )
+        return embeddings.tolist()
 
 
 class OpenAIEmbeddingGenerator(EmbeddingGenerator):

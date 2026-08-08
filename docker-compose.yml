@@ -64,8 +64,12 @@ services:
       - QDRANT_URL=http://qdrant:6333
       - ENV=development
       - SKIP_DB_MIGRATION_CHECK=false
+      - HF_HOME=/cache/huggingface
+    volumes:
+      - hf_cache:/cache/huggingface
 
 volumes:
   postgres_data:
   redis_data:
   qdrant_data:
+  hf_cache:
