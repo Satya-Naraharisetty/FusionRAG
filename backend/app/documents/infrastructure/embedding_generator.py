@@ -1,5 +1,6 @@
-import httpx
 import logging
+
+import httpx
 from app.documents.domain.interfaces import EmbeddingGenerator
 
 logger = logging.getLogger(__name__)
@@ -12,7 +13,9 @@ class LocalEmbeddingGenerator(EmbeddingGenerator):
     Uses sentence-transformers models like all-MiniLM-L6-v2 (384 dims, 256 max tokens).
     """
 
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2", device: str = "cpu") -> None:
+    def __init__(
+        self, model_name: str = "all-MiniLM-L6-v2", device: str = "cpu"
+    ) -> None:
         try:
             from sentence_transformers import SentenceTransformer
         except ImportError:

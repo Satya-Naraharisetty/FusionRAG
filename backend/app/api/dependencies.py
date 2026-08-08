@@ -1,5 +1,5 @@
-from typing import Any
 import logging
+from typing import Any
 
 import jwt
 from fastapi import BackgroundTasks, Depends, HTTPException, Request, status
@@ -334,7 +334,9 @@ def get_embedding_service(
         time_provider=SystemTimeProvider(),
         uuid_generator=SystemUUIDGenerator(),
         batch_size=settings.EMBEDDING_BATCH_SIZE,
-        provider_name=settings.EMBEDDING_PROVIDER if settings.ENV != "development" else "local",
+        provider_name=settings.EMBEDDING_PROVIDER
+        if settings.ENV != "development"
+        else "local",
         model_name=settings.effective_embedding_model,
         dimension=settings.effective_embedding_dimension,
         embedding_version=settings.EMBEDDING_VERSION,
