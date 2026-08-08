@@ -200,8 +200,10 @@ const DocumentsPage: React.FC = () => {
   const filteredAndSortedDocs = useMemo(() => {
     let result = [...documents];
 
-    // Filter by status tab
-    if (filter !== "all") {
+    // Filter by status or chat origin tab
+    if (filter === "chat") {
+      result = result.filter((d) => d.conversation_id !== null);
+    } else if (filter !== "all") {
       result = result.filter((d) => d.status === filter);
     }
 

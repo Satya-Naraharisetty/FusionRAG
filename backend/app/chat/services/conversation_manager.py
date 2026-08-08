@@ -24,6 +24,7 @@ from app.chat.domain.models import (
 )
 from app.chat.services.access_service import ConversationAccessService
 from app.documents.domain.events import EventDispatcher
+from app.documents.services.document_service import DocumentService
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ class ConversationManager:
         rewriter: HistoryRewriter,
         title_generator: ConversationTitleGenerator,
         event_dispatcher: EventDispatcher,
+        document_service: DocumentService | None = None,
     ) -> None:
         self._conversation_repo = conversation_repo
         self._message_repo = message_repo
@@ -48,6 +50,7 @@ class ConversationManager:
         self._rewriter = rewriter
         self._title_generator = title_generator
         self._event_dispatcher = event_dispatcher
+        self._document_service = document_service
 
     async def get_or_create_conversation(
         self,
@@ -192,3 +195,33 @@ class ConversationManager:
                 message_role=MessageRole.ASSISTANT,
             )
         )
+
+    async def delete_conversation(self, conversation_id: UUID, user_id: UUID) -> int:
+        """
+        Deletes a conversation and all associated documents.
+        Returns the count of deleted documents.
+        """
+        # Verify ownership first
+        await self._access_service.verify_owner(conversation_id, user_id)
+
+        # Delete associated documents if document service is available
+        deleted_docs_count = 0
+        if self._document_service:
+            try:
+                deleted_docs_count = (
+                    self._document_service.delete_documents_by_conversation(
+                        conversation_id, user_id
+                    )
+                )
+                logger.info(
+                    f"Deleted {deleted_docs_count} documents for conversation {conversation_id}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to delete documents for conversation {conversation_id}: {e}"
+                )
+
+        # Delete the conversation (soft delete)
+        await self._conversation_repo.delete_conversation(conversation_id)
+
+        return deleted_docs_count

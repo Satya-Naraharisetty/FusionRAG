@@ -1,10 +1,26 @@
+import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ChatInput } from "../components/chat/ChatInput";
+
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+
+const renderWithQueryClient = (ui: React.ReactElement) => {
+  const queryClient = createTestQueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+};
 
 describe("ChatInput", () => {
   it("renders textarea correctly", () => {
-    render(
+    renderWithQueryClient(
       <ChatInput
         conversationId={null}
         onSend={() => {}}
@@ -17,7 +33,7 @@ describe("ChatInput", () => {
 
   it("triggers onSend when submitting text", () => {
     const handleSend = vi.fn();
-    render(
+    renderWithQueryClient(
       <ChatInput
         conversationId={null}
         onSend={handleSend}
@@ -34,12 +50,12 @@ describe("ChatInput", () => {
       fireEvent.submit(form);
     }
 
-    expect(handleSend).toHaveBeenCalledWith("Hello assistant");
+    expect(handleSend).toHaveBeenCalledWith("Hello assistant", undefined);
   });
 
   it("renders stop button instead of send when streaming", () => {
     const handleStop = vi.fn();
-    render(
+    renderWithQueryClient(
       <ChatInput
         conversationId={null}
         onSend={() => {}}
@@ -55,3 +71,4 @@ describe("ChatInput", () => {
     expect(handleStop).toHaveBeenCalled();
   });
 });
+

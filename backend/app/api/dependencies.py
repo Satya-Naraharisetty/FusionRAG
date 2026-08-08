@@ -759,6 +759,7 @@ def get_conversation_manager(
     rewriter=Depends(get_history_rewriter),
     title_generator=Depends(get_conversation_title_generator),
     event_dispatcher=Depends(get_event_dispatcher),
+    document_service=Depends(get_document_service),
 ) -> Any:
     from app.chat.services.conversation_manager import ConversationManager
 
@@ -771,6 +772,7 @@ def get_conversation_manager(
         rewriter=rewriter,
         title_generator=title_generator,
         event_dispatcher=event_dispatcher,
+        document_service=document_service,
     )
 
 

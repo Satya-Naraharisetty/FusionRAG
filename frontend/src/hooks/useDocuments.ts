@@ -42,6 +42,7 @@ export const useUploadDocument = () => {
       const newDoc: Document = {
         id: tempId,
         user_id: "",
+        conversation_id: null,
         filename: file.name,
         original_filename: file.name,
         content_type: file.type || "application/octet-stream",

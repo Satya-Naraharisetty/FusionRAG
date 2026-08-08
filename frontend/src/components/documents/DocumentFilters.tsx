@@ -5,7 +5,7 @@ import { Button } from "../ui/Button";
 import { cn } from "../../lib/utils";
 
 export type DocumentSortType = "newest" | "oldest" | "name" | "status" | "size";
-export type DocumentFilterType = "all" | "completed" | "processing" | "failed";
+export type DocumentFilterType = "all" | "chat" | "completed" | "processing" | "failed";
 
 export interface DateRange {
   start: string;
@@ -65,6 +65,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
 }) => {
   const tabs: { label: string; value: DocumentFilterType }[] = [
     { label: "All Statuses", value: "all" },
+    { label: "Chat Files", value: "chat" },
     { label: "Completed", value: "completed" },
     { label: "Processing", value: "processing" },
     { label: "Failed", value: "failed" },

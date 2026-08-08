@@ -62,6 +62,7 @@ class DocumentService:
         content_type: str,
         file_bytes: bytes,
         user_id: UUID,
+        conversation_id: UUID | None = None,
     ) -> Document:
         """
         Validates, registers, and triggers the ingestion pipeline for a new document.
@@ -130,6 +131,7 @@ class DocumentService:
         document = Document(
             id=document_id,
             user_id=user_id,
+            conversation_id=conversation_id,
             filename=storage_key,
             original_filename=safe_original_name,
             content_type=content_type,
@@ -168,6 +170,14 @@ class DocumentService:
         Lists all documents belonging to a user.
         """
         return self._document_repo.list_by_user(user_id)
+
+    def list_documents_by_conversation(
+        self, conversation_id: UUID, user_id: UUID
+    ) -> list[Document]:
+        """
+        Lists all documents belonging to a conversation.
+        """
+        return self._document_repo.list_by_conversation(conversation_id, user_id)
 
     def get_document_by_id(self, id: UUID, user_id: UUID) -> Document:
         """
@@ -209,6 +219,25 @@ class DocumentService:
 
         # Attempt storage deletion (failures are logged, not raised)
         self._storage_provider.delete(document.filename)
+
+    def delete_documents_by_conversation(
+        self, conversation_id: UUID, user_id: UUID
+    ) -> int:
+        """
+        Deletes all documents belonging to a conversation.
+        Returns the count of deleted documents.
+        """
+        documents = self._document_repo.list_by_conversation(conversation_id, user_id)
+        count = 0
+        for doc in documents:
+            try:
+                self.delete_document(doc.id, user_id)
+                count += 1
+            except Exception as e:
+                logger.error(
+                    f"Failed to delete document {doc.id} for conversation {conversation_id}: {e}"
+                )
+        return count
 
     def reprocess_document(self, id: UUID, user_id: UUID) -> Document:
         """

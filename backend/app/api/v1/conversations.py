@@ -144,12 +144,12 @@ async def delete_conversation(
     manager: ConversationManager = Depends(get_conversation_manager),
 ) -> None:
     """
-    Soft-delete a conversation session.
+    Soft-delete a conversation session and all associated documents.
     """
     user_id = UUID(user_context["user_id"])
     try:
         await manager._access_service.verify_owner(id, user_id)
-        await manager._conversation_repo.delete_conversation(id)
+        await manager.delete_conversation(id, user_id)
     except ConversationNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

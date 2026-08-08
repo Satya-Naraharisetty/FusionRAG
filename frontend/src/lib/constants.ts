@@ -9,11 +9,22 @@ export const KEYBOARD_SHORTCUTS = {
 
 export const UPLOAD_LIMITS = {
   MAX_FILE_SIZE: 50 * 1024 * 1024, // 50MB
+  CHAT_MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB for chat attachments
   ACCEPTED_TYPES: {
     "application/pdf": [".pdf"],
     "text/plain": [".txt"],
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
     "text/markdown": [".md"],
+  },
+  CHAT_ACCEPTED_TYPES: {
+    "application/pdf": [".pdf"],
+    "text/plain": [".txt"],
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+    "text/markdown": [".md"],
+    "image/png": [".png"],
+    "image/jpeg": [".jpg", ".jpeg"],
+    "image/webp": [".webp"],
+    "image/gif": [".gif"],
   },
 };
 

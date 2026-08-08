@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMessages } from "../../hooks/useMessages";
 import { useSSEChat } from "../../hooks/useSSEChat";
@@ -9,7 +9,7 @@ import { ChatInput } from "./ChatInput";
 import { ChatToolbar } from "./ChatToolbar";
 import { StreamingRecovery } from "./StreamingRecovery";
 import { Skeleton } from "../ui/skeleton";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Upload } from "lucide-react";
 
 interface ChatWindowProps {
   conversationId: string | null;
@@ -19,6 +19,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
   const navigate = useNavigate();
   const { data: messagesData, isLoading, error } = useMessages(conversationId);
   const { data: activeConv } = useConversation(conversationId);
+  const [isDraggingWindow, setIsDraggingWindow] = useState(false);
+  const [windowDroppedFiles, setWindowDroppedFiles] = useState<File[]>([]);
 
   const {
     chatMessages,
@@ -93,11 +95,52 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
     handleSend(prompt);
   };
 
+  // Window-level Drag and Drop events
+  const handleWindowDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDraggingWindow) setIsDraggingWindow(true);
+  };
+
+  const handleWindowDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only turn off if leaving main container
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDraggingWindow(false);
+  };
+
+  const handleWindowDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingWindow(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setWindowDroppedFiles(Array.from(e.dataTransfer.files));
+    }
+  };
+
   const activeTitle = activeConv?.title || "New Chat";
   const activeModel = activeConv?.settings?.model || "Hybrid RAG v1";
 
   return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative transition-colors" style={{ background: "var(--bg-primary, #0D0D0D)" }}>
+    <div
+      onDragOver={handleWindowDragOver}
+      onDragLeave={handleWindowDragLeave}
+      onDrop={handleWindowDrop}
+      className="flex-1 flex flex-col h-full w-full overflow-hidden relative transition-colors"
+      style={{ background: "var(--bg-primary, #0D0D0D)" }}
+    >
+      {/* Visual drag-and-drop feedback overlay */}
+      {isDraggingWindow && (
+        <div className="absolute inset-0 bg-violet-950/60 backdrop-blur-xs border-2 border-dashed border-violet-500/80 z-30 flex flex-col items-center justify-center pointer-events-none animate-enter">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-600/30 border border-violet-400 text-violet-300 mb-4 animate-bounce">
+            <Upload size={30} />
+          </div>
+          <h3 className="text-base font-bold text-white mb-1">Drop files here to attach</h3>
+          <p className="text-xs text-violet-300">Files will be uploaded and attached to your next prompt</p>
+        </div>
+      )}
+
       {/* Top Header toolbar */}
       <ChatToolbar
         title={activeTitle}
@@ -169,9 +212,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
           onSend={handleSend}
           onStop={stop}
           isStreaming={isStreaming}
+          droppedFiles={windowDroppedFiles}
         />
       </div>
     </div>
   );
 };
 export default ChatWindow;
+

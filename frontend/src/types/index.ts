@@ -65,6 +65,7 @@ export type DocumentStatus = "pending" | "processing" | "completed" | "failed";
 export interface Document {
   id: string;
   user_id: string;
+  conversation_id: string | null;
   filename: string;
   original_filename: string;
   content_type: string;
@@ -118,4 +119,15 @@ export interface ToolCallEvent {
   result?: unknown;
   error?: string;
   status: "running" | "done" | "failed";
+}
+
+// Chat Attachment
+export interface ChatAttachment {
+  id: string;
+  file: File;
+  preview?: string;
+  status: "uploading" | "completed" | "error";
+  progress: number;
+  documentId?: string;
+  error?: string;
 }

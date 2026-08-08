@@ -45,6 +45,7 @@ class DocumentMetadata(BaseModel):
 class Document(BaseModel):
     id: UUID
     user_id: UUID
+    conversation_id: UUID | None = None
     filename: str
     original_filename: str
     content_type: str

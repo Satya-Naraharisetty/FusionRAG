@@ -109,6 +109,15 @@ class DocumentRepository(ABC):
         pass
 
     @abstractmethod
+    def list_by_conversation(
+        self, conversation_id: UUID, user_id: UUID
+    ) -> list[Document]:
+        """
+        Lists all documents belonging to a conversation.
+        """
+        pass
+
+    @abstractmethod
     def save(self, document: Document) -> Document:
         """
         Persists or updates a document.

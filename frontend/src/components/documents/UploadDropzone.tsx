@@ -1,20 +1,21 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   Upload,
   X,
   AlertCircle,
-  FileText,
   Play,
   Pause,
   ArrowUp,
   GripVertical,
+  CheckCircle2,
 } from "lucide-react";
 import { useUploadDocument } from "../../hooks/useDocuments";
 import { UPLOAD_LIMITS } from "../../lib/constants";
 import { Button } from "../ui/Button";
+import { FileTypeBadge } from "../ui/FileTypeBadge";
+import { UploadProgress } from "../ui/UploadProgress";
 import toast from "react-hot-toast";
-import { cn } from "../../lib/utils";
 
 interface QueueFile {
   id: string;
@@ -24,7 +25,11 @@ interface QueueFile {
   controller?: AbortController;
 }
 
-export const UploadDropzone: React.FC = () => {
+interface UploadDropzoneProps {
+  conversationId?: string | null;
+}
+
+export const UploadDropzone: React.FC<UploadDropzoneProps> = () => {
   const uploadMutation = useUploadDocument();
   const [queue, setQueue] = useState<QueueFile[]>([]);
 
@@ -148,6 +153,15 @@ export const UploadDropzone: React.FC = () => {
     pending.forEach((item) => startUpload(item));
   };
 
+  // Batch progress summary calculation
+  const batchSummary = useMemo(() => {
+    if (queue.length === 0) return { completed: 0, total: 0, overallProgress: 0 };
+    const completed = queue.filter((q) => q.status === "completed").length;
+    const totalProgress = queue.reduce((sum, q) => sum + q.progress, 0);
+    const overallProgress = Math.round(totalProgress / queue.length);
+    return { completed, total: queue.length, overallProgress };
+  }, [queue]);
+
   // Reorder queue logic
   const handleDragStart = (idx: number) => {
     setDraggedIdx(idx);
@@ -168,21 +182,6 @@ export const UploadDropzone: React.FC = () => {
     setDraggedIdx(null);
   };
 
-  const getFileIcon = (filename: string) => {
-    const ext = filename.split(".").pop()?.toLowerCase();
-    switch (ext) {
-      case "pdf":
-        return <FileText size={16} className="text-red-400 flex-shrink-0" />;
-      case "md":
-        return <FileText size={16} className="text-fuchsia-400 flex-shrink-0" />;
-      case "docx":
-      case "doc":
-        return <FileText size={16} className="text-blue-400 flex-shrink-0" />;
-      default:
-        return <FileText size={16} className="text-zinc-400 flex-shrink-0" />;
-    }
-  };
-
   const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
     onDrop,
     maxSize: UPLOAD_LIMITS.MAX_FILE_SIZE,
@@ -194,14 +193,14 @@ export const UploadDropzone: React.FC = () => {
       {/* Drag Drop Area */}
       <div
         {...getRootProps()}
-        className={`group border border-dashed rounded-2xl p-8.5 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${
+        className={`group rounded-2xl p-8.5 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 bg-gradient-to-br from-zinc-950/50 via-transparent to-violet-950/10 ${
           isDragActive
-            ? "border-primary/60 bg-primary/5 shadow-xs"
-            : "border-[var(--border-color)] bg-zinc-900/5 hover:border-[var(--border-hover)] hover:bg-zinc-900/10 hover:shadow-xs"
+            ? "border-2 border-dashed border-violet-500/60 animate-pulse bg-violet-950/20 shadow-lg"
+            : "border border-dashed border-[var(--border-color)] bg-zinc-900/5 hover:border-[var(--border-hover)] hover:bg-zinc-900/10 hover:shadow-xs"
         }`}
       >
         <input {...getInputProps()} />
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900/60 border border-zinc-800 text-zinc-400 mb-3 group-hover:text-zinc-200 group-hover:border-zinc-700 transition-all duration-300">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900/60 border border-zinc-800 text-zinc-400 mb-3 group-hover:text-violet-400 group-hover:border-violet-500/40 transition-all duration-300">
           <Upload size={16} />
         </div>
         <p className="text-xs font-semibold text-zinc-200 mb-1">
@@ -223,11 +222,25 @@ export const UploadDropzone: React.FC = () => {
       {/* Uploading Queue Display */}
       {queue.length > 0 && (
         <div className="space-y-3 bg-zinc-950/40 border border-zinc-900 rounded-2xl p-4">
-          <div className="flex items-center justify-between">
-            <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider pl-1 select-none">
-              Upload Queue ({queue.length})
-            </h4>
-            {queue.some((q) => q.status === "queued" || q.status === "paused") && (
+          {/* Queue Top Header with Batch Summary */}
+          <div className="flex items-center justify-between border-b border-zinc-900/80 pb-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider select-none">
+                  Upload Queue ({queue.length})
+                </h4>
+                {batchSummary.completed === batchSummary.total && (
+                  <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold">
+                    <CheckCircle2 size={11} /> All done
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-zinc-500 font-mono">
+                {batchSummary.completed} of {batchSummary.total} completed ({batchSummary.overallProgress}%)
+              </p>
+            </div>
+
+            {queue.some((q) => q.status === "queued" || q.status === "paused" || q.status === "error") && (
               <Button
                 onClick={uploadAll}
                 className="h-7 text-[10px] font-bold bg-violet-600 hover:bg-violet-750 text-white px-3 gap-1 cursor-pointer"
@@ -238,7 +251,15 @@ export const UploadDropzone: React.FC = () => {
             )}
           </div>
 
-          <div className="space-y-2">
+          {/* Batch overall progress bar */}
+          <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+            <div
+              className="bg-gradient-to-r from-violet-600 to-emerald-500 h-1.5 rounded-full transition-all duration-300"
+              style={{ width: `${batchSummary.overallProgress}%` }}
+            />
+          </div>
+
+          <div className="space-y-2 pt-1">
             {queue.map((item, idx) => (
               <div
                 key={item.id}
@@ -252,39 +273,18 @@ export const UploadDropzone: React.FC = () => {
                   <div className="cursor-grab active:cursor-grabbing text-zinc-600 hover:text-zinc-400" title="Reorder file">
                     <GripVertical size={13} />
                   </div>
-                  {getFileIcon(item.file.name)}
+
+                  <FileTypeBadge filename={item.file.name} variant="card" className="w-9 h-9" />
+
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-semibold text-zinc-300 truncate">
                         {item.file.name}
                       </p>
-                      <span
-                        className={cn(
-                          "text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded",
-                          item.status === "queued" && "bg-zinc-800 text-zinc-500",
-                          item.status === "uploading" && "bg-blue-950/40 text-blue-400 animate-pulse",
-                          item.status === "paused" && "bg-amber-950/40 text-amber-500",
-                          item.status === "completed" && "bg-emerald-950/40 text-emerald-400",
-                          item.status === "error" && "bg-red-950/40 text-red-500"
-                        )}
-                      >
-                        {item.status}
-                      </span>
+                      <FileTypeBadge filename={item.file.name} variant="minimal" size="sm" />
                     </div>
 
-                    {item.status === "uploading" && (
-                      <div className="flex items-center gap-2">
-                        <div className="w-full bg-zinc-950 rounded-full h-1">
-                          <div
-                            className="bg-violet-600 h-1 rounded-full transition-all duration-200"
-                            style={{ width: `${item.progress}%` }}
-                          />
-                        </div>
-                        <span className="text-[9px] font-mono font-bold text-zinc-400 min-w-[28px]">
-                          {item.progress}%
-                        </span>
-                      </div>
-                    )}
+                    <UploadProgress progress={item.progress} status={item.status} size="sm" showLabel={true} />
                   </div>
                 </div>
 
@@ -331,3 +331,6 @@ export const UploadDropzone: React.FC = () => {
     </div>
   );
 };
+
+export default UploadDropzone;
+

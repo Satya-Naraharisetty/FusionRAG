@@ -53,6 +53,20 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
         )
         return [self._to_domain(d) for d in db_docs]
 
+    def list_by_conversation(
+        self, conversation_id: UUID, user_id: UUID
+    ) -> list[Document]:
+        db_docs = (
+            self._db.query(SQLAlchemyDocument)
+            .filter(
+                SQLAlchemyDocument.conversation_id == conversation_id,
+                SQLAlchemyDocument.user_id == user_id,
+            )
+            .order_by(SQLAlchemyDocument.created_at.desc())
+            .all()
+        )
+        return [self._to_domain(d) for d in db_docs]
+
     def save(self, document: Document) -> Document:
         db_doc = (
             self._db.query(SQLAlchemyDocument)
@@ -63,6 +77,7 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
             db_doc = SQLAlchemyDocument(
                 id=document.id,
                 user_id=document.user_id,
+                conversation_id=document.conversation_id,
                 filename=document.filename,
                 original_filename=document.original_filename,
                 content_type=document.content_type,
@@ -108,6 +123,7 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
         return Document(
             id=db_doc.id,
             user_id=db_doc.user_id,
+            conversation_id=db_doc.conversation_id,
             filename=db_doc.filename,
             original_filename=db_doc.original_filename,
             content_type=db_doc.content_type,

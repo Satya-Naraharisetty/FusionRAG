@@ -20,6 +20,7 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
 class DocumentResponse(BaseModel):
     id: UUID
     user_id: UUID
+    conversation_id: UUID | None = None
     filename: str
     original_filename: str
     content_type: str
@@ -44,11 +45,13 @@ class DocumentResponse(BaseModel):
 )
 async def upload_document(
     file: UploadFile = File(...),
+    conversation_id: UUID | None = None,
     current_user: dict = Depends(get_current_user_context),
     document_service: DocumentService = Depends(get_document_service),
 ):
     """
     Upload a document, validating the formats and enqueuing background parsing & chunking.
+    Optionally associate the document with a conversation.
     """
     user_id = UUID(current_user["user_id"])
     file_bytes = await file.read()
@@ -59,6 +62,7 @@ async def upload_document(
         content_type=file.content_type or "application/octet-stream",
         file_bytes=file_bytes,
         user_id=user_id,
+        conversation_id=conversation_id,
     )
     return document
 

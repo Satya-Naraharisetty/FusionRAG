@@ -1,9 +1,24 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Square, AlertCircle, Paperclip, Mic, X, ArrowUp, Image, FileText } from "lucide-react";
+import { Square, AlertCircle, Paperclip, Mic, X, ArrowUp, History, Trash2 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { useDraft } from "../../hooks/useDrafts";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "../ui/command";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "../ui/Dropdown";
+import { FileTypeBadge } from "../ui/FileTypeBadge";
+import { UploadProgress } from "../ui/UploadProgress";
+import { useFileValidation } from "../../hooks/useFileValidation";
+import { useRecentAttachments } from "../../hooks/useRecentAttachments";
+import { useUploadDocument } from "../../hooks/useDocuments";
+import { ChatAttachment } from "../../types";
+import { UPLOAD_LIMITS } from "../../lib/constants";
+import toast from "react-hot-toast";
 import { cn } from "../../lib/utils";
 
 interface ChatInputProps {
@@ -12,6 +27,7 @@ interface ChatInputProps {
   onStop: () => void;
   isStreaming: boolean;
   onVoiceInput?: () => void;
+  droppedFiles?: File[];
 }
 
 const SLASH_COMMANDS = [
@@ -23,31 +39,121 @@ const SLASH_COMMANDS = [
   { id: "settings", label: "Settings", description: "Open settings panel", icon: "⚙️", shortcut: "/settings" },
 ];
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_TYPES = ["application/pdf", "text/plain", "text/markdown", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
-
 export const ChatInput: React.FC<ChatInputProps> = ({
   conversationId,
   onSend,
   onStop,
   isStreaming,
   onVoiceInput,
+  droppedFiles,
 }) => {
   const { draft, setDraft, clearDraft } = useDraft(conversationId);
   const { isOnline } = useOnlineStatus();
   const [text, setText] = useState(draft);
   const [showCommands, setShowCommands] = useState(false);
   const [commandSearch, setCommandSearch] = useState("");
-  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [charCount, setCharCount] = useState(0);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { validateFiles } = useFileValidation({
+    maxSize: UPLOAD_LIMITS.CHAT_MAX_FILE_SIZE,
+    acceptedTypes: UPLOAD_LIMITS.CHAT_ACCEPTED_TYPES,
+    existingFiles: attachments,
+    checkDuplicates: true,
+  });
+
+  const { recents, addRecent, clearRecents } = useRecentAttachments();
+  const uploadMutation = useUploadDocument();
+
+  const handleAddFiles = useCallback(
+    (files: File[]) => {
+      const { valid } = validateFiles(files);
+      if (valid.length === 0) return;
+
+      const newAttachments: ChatAttachment[] = valid.map((file) => ({
+        id: `att-${Math.random().toString(36).substring(2, 9)}`,
+        file,
+        preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+        status: "uploading",
+        progress: 0,
+      }));
+
+      setAttachments((prev) => [...prev, ...newAttachments].slice(0, 5));
+
+      newAttachments.forEach(async (att) => {
+        try {
+          const doc = await uploadMutation.mutateAsync({
+            file: att.file,
+            onProgress: (evt: unknown) => {
+              const pe = evt as { loaded: number; total?: number };
+              const progress = pe.total ? Math.round((pe.loaded * 100) / pe.total) : 0;
+              setAttachments((prev) =>
+                prev.map((a) => (a.id === att.id ? { ...a, progress } : a))
+              );
+            },
+          });
+
+          setAttachments((prev) =>
+            prev.map((a) =>
+              a.id === att.id
+                ? { ...a, status: "completed", progress: 100, documentId: doc.id }
+                : a
+            )
+          );
+          addRecent(att.file);
+        } catch (err: unknown) {
+          setAttachments((prev) =>
+            prev.map((a) => (a.id === att.id ? { ...a, status: "error", error: "Upload failed" } : a))
+          );
+          toast.error(`Failed to upload "${att.file.name}"`);
+        }
+      });
+    },
+    [validateFiles, uploadMutation, addRecent]
+  );
+
   useEffect(() => {
-    setText(draft);
-  }, [conversationId, draft]);
+    if (droppedFiles && droppedFiles.length > 0) {
+      handleAddFiles(droppedFiles);
+    }
+  }, [droppedFiles, handleAddFiles]);
+
+  const handleFileSelect = (files: FileList | null) => {
+    if (!files) return;
+    handleAddFiles(Array.from(files));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => {
+      const item = prev.find((a) => a.id === id);
+      if (item?.preview) {
+        URL.revokeObjectURL(item.preview);
+      }
+      return prev.filter((a) => a.id !== id);
+    });
+  };
+
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const trimmed = text.trim();
+    if ((!trimmed && attachments.length === 0) || isStreaming || !isOnline) return;
+
+    const rawFiles = attachments.map((a) => a.file);
+    onSend(trimmed, rawFiles.length > 0 ? rawFiles : undefined);
+
+    setText("");
+    setAttachments([]);
+    clearDraft();
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+  };
 
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
@@ -69,24 +175,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     adjustHeight();
   };
 
-  const handleSubmit = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const trimmed = text.trim();
-    if ((!trimmed && attachments.length === 0) || isStreaming || !isOnline) return;
-
-    if (attachments.length > 0) {
-      onSend(trimmed, attachments);
-    } else {
-      onSend(trimmed);
-    }
-    setText("");
-    setAttachments([]);
-    clearDraft();
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -102,38 +190,40 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  const handleFileSelect = (files: FileList | null) => {
-    if (!files) return;
-    const newFiles = Array.from(files).filter((file) => {
-      if (file.size > MAX_FILE_SIZE) {
-        alert(`File ${file.name} exceeds 10MB limit`);
-        return false;
-      }
-      if (!ALLOWED_TYPES.includes(file.type)) {
-        alert(`File ${file.name} type not supported`);
-        return false;
-      }
-      return true;
-    });
-    setAttachments((prev) => [...prev, ...newFiles].slice(0, 5));
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
-
   const handleCommandSelect = (cmd: typeof SLASH_COMMANDS[0]) => {
     setText(cmd.shortcut + " ");
     setShowCommands(false);
     textareaRef.current?.focus();
   };
 
+  // Drag and drop events for input wrapper
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDraggingOver) setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleAddFiles(Array.from(e.dataTransfer.files));
+    }
+  };
+
   const filteredCommands = useMemo(() => {
     if (!commandSearch) return SLASH_COMMANDS;
     return SLASH_COMMANDS.filter(
-      (c) => c.label.toLowerCase().includes(commandSearch.toLowerCase()) ||
-             c.description.toLowerCase().includes(commandSearch.toLowerCase())
+      (c) =>
+        c.label.toLowerCase().includes(commandSearch.toLowerCase()) ||
+        c.description.toLowerCase().includes(commandSearch.toLowerCase())
     );
   }, [commandSearch]);
 
@@ -155,14 +245,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         ref={fileInputRef}
         type="file"
         multiple
-        accept={ALLOWED_TYPES.join(",")}
+        accept={Object.values(UPLOAD_LIMITS.CHAT_ACCEPTED_TYPES).flat().map((ext) => `.${ext}`).join(",")}
         onChange={(e) => handleFileSelect(e.target.files)}
         className="hidden"
         id="chat-file-input"
       />
 
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        {/* Warning Alert */}
+        {/* Offline Warning Alert */}
         {!isOnline && (
           <div
             style={{
@@ -185,42 +275,38 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         {/* Attachments Preview Tray */}
         {attachments.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", padding: "0 4px" }}>
-            {attachments.map((file, idx) => (
+          <div className="flex flex-wrap gap-2 px-1">
+            {attachments.map((att) => (
               <div
-                key={idx}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "6px 12px",
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.09)",
-                  borderRadius: "10px",
-                }}
+                key={att.id}
+                className="flex items-center gap-2 p-1.5 pr-2.5 bg-zinc-900/90 border border-zinc-800 rounded-xl shadow-xs transition-all"
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "var(--text-secondary, #A3A3A3)" }}>
-                  {file.type.startsWith("image/") ? <Image size={13} /> : <FileText size={13} />}
-                  <span style={{ maxWidth: "140px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>{file.name}</span>
-                  <span style={{ fontSize: "11px", color: "var(--text-muted, #737373)" }}>({(file.size / 1024).toFixed(0)} KB)</span>
+                {att.preview ? (
+                  <img
+                    src={att.preview}
+                    alt={att.file.name}
+                    className="w-8 h-8 rounded-lg object-cover flex-shrink-0 border border-zinc-750"
+                  />
+                ) : (
+                  <FileTypeBadge filename={att.file.name} variant="card" className="w-8 h-8 text-[8px]" />
+                )}
+
+                <div className="min-w-0 max-w-[130px] space-y-0.5">
+                  <p className="text-xs font-semibold text-zinc-200 truncate leading-none">
+                    {att.file.name}
+                  </p>
+                  <p className="text-[10px] text-zinc-500 font-mono leading-none">
+                    {(att.file.size / 1024).toFixed(0)} KB
+                  </p>
                 </div>
+
+                <UploadProgress progress={att.progress} status={att.status} size="sm" showLabel={att.status === "uploading"} />
+
                 <button
                   type="button"
-                  onClick={() => removeAttachment(idx)}
-                  style={{
-                    padding: "2px",
-                    color: "var(--text-muted, #737373)",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: "4px",
-                    transition: "color 0.15s",
-                  }}
-                  className="hover:text-red-400"
-                  aria-label={`Remove ${file.name}`}
+                  onClick={() => removeAttachment(att.id)}
+                  className="p-1 text-zinc-500 hover:text-red-400 rounded-md transition-colors cursor-pointer ml-0.5"
+                  aria-label={`Remove ${att.file.name}`}
                 >
                   <X size={12} />
                 </button>
@@ -229,50 +315,93 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         )}
 
-        {/* Input Wrapper — Premium composer */}
+        {/* Input Wrapper — Premium composer with Drag & Drop */}
         <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
           style={{
             position: "relative",
             display: "flex",
             alignItems: "flex-end",
             background: "var(--bg-input, #2A2A2A)",
-            border: "1px solid rgba(255,255,255,0.10)",
+            border: isDraggingOver
+              ? "2px dashed #8b5cf6"
+              : "1px solid rgba(255,255,255,0.10)",
             borderRadius: "20px",
-            boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
-            transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+            boxShadow: isDraggingOver
+              ? "0 0 25px rgba(139, 92, 246, 0.35)"
+              : "0 4px 20px rgba(0,0,0,0.25)",
+            transition: "all 0.2s ease",
           }}
           className={cn(
             "focus-within:border-white/[0.18] focus-within:shadow-[0_8px_32px_rgba(0,0,0,0.35)]",
-            isRecording && "border-red-500/40"
+            isRecording && "border-red-500/40",
+            isDraggingOver && "bg-violet-950/20"
           )}
         >
-          {/* Paperclip upload button */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", paddingLeft: "12px", paddingRight: "4px", paddingBottom: "10px", paddingTop: "10px" }}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isStreaming || attachments.length >= 5}
-              style={{
-                width: "38px",
-                height: "38px",
-                borderRadius: "50%",
-                color: "var(--text-muted, #737373)",
-                background: "transparent",
-                border: "none",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                flexShrink: 0,
-                transition: "color 0.15s, background 0.15s",
-              }}
-              className="hover:text-zinc-200 hover:bg-zinc-700/50"
-              aria-label="Attach files"
-            >
-              <Paperclip size={17} />
-            </Button>
+          {/* Paperclip button with Recent Attachments dropdown */}
+          <div className="flex items-center justify-center pl-3 pr-1 pb-2.5 pt-2.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={isStreaming || attachments.length >= 5}
+                  className="h-9.5 w-9.5 rounded-full text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50 cursor-pointer flex items-center justify-center transition-colors"
+                  aria-label="Attach files options"
+                >
+                  <Paperclip size={17} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top" className="w-56 bg-zinc-950 border-zinc-800 text-zinc-200 p-1.5">
+                <DropdownMenuItem
+                  onClick={() => fileInputRef.current?.click()}
+                  className="gap-2 text-xs font-semibold cursor-pointer focus:bg-zinc-900 focus:text-zinc-100"
+                >
+                  <Paperclip size={14} className="text-violet-400" />
+                  <span>Upload from computer...</span>
+                </DropdownMenuItem>
+
+                {recents.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator className="bg-zinc-900 my-1" />
+                    <div className="flex items-center justify-between px-2 py-1">
+                      <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                        <History size={10} /> Recent Files
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          clearRecents();
+                        }}
+                        className="text-[10px] text-zinc-500 hover:text-red-400 p-0.5 cursor-pointer"
+                        title="Clear recent list"
+                      >
+                        <Trash2 size={10} />
+                      </button>
+                    </div>
+
+                    {recents.slice(0, 5).map((rec, idx) => (
+                      <DropdownMenuItem
+                        key={rec.name + idx}
+                        onClick={() => {
+                          toast.success(`Selected recent attachment: "${rec.name}"`);
+                        }}
+                        className="flex items-center justify-between text-xs cursor-pointer focus:bg-zinc-900 focus:text-zinc-100 py-1.5"
+                      >
+                        <span className="truncate max-w-[130px] font-medium">{rec.name}</span>
+                        <span className="text-[10px] text-zinc-500 font-mono flex-shrink-0">
+                          {(rec.size / 1024).toFixed(0)} KB
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
@@ -281,7 +410,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               value={text}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
-              placeholder={isStreaming ? "AI is responding..." : "Message Hybrid RAG..."}
+              placeholder={
+                isDraggingOver
+                  ? "Drop files here to attach..."
+                  : isStreaming
+                  ? "AI is responding..."
+                  : "Message Hybrid RAG..."
+              }
               rows={1}
               disabled={!isOnline || isStreaming}
               style={{
@@ -440,3 +575,5 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     </form>
   );
 };
+
+export default ChatInput;

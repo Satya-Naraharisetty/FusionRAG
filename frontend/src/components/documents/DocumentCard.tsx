@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  FileText,
   MoreVertical,
   RefreshCw,
   Trash,
@@ -16,6 +15,7 @@ import {
   Eye,
 } from "lucide-react";
 import { Document } from "../../types";
+import { FileTypeBadge } from "../ui/FileTypeBadge";
 import { formatBytes, relativeTime, cn } from "../../lib/utils";
 import {
   DropdownMenu,
@@ -94,24 +94,6 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
     failed: "bg-red-100 dark:bg-red-950/20 text-red-650 dark:text-red-400 border-red-200 dark:border-red-900/30",
   };
 
-  const fileExt = document.original_filename.split(".").pop()?.toLowerCase() || "";
-  
-  const getThumbnailConfig = () => {
-    switch (fileExt) {
-      case "pdf":
-        return { label: "PDF", bg: "bg-red-50 dark:bg-red-950/30", border: "border-red-200 dark:border-red-900/20", text: "text-red-600 dark:text-red-400" };
-      case "md":
-        return { label: "MD", bg: "bg-fuchsia-50 dark:bg-fuchsia-950/30", border: "border-fuchsia-200 dark:border-fuchsia-900/20", text: "text-fuchsia-600 dark:text-fuchsia-400" };
-      case "docx":
-      case "doc":
-        return { label: "DOCX", bg: "bg-blue-50 dark:bg-blue-950/30", border: "border-blue-200 dark:border-blue-900/20", text: "text-blue-600 dark:text-blue-400" };
-      default:
-        return { label: "TXT", bg: "bg-zinc-55 dark:bg-zinc-900/60", border: "border-zinc-200 dark:border-zinc-800", text: "text-zinc-550 dark:text-zinc-400" };
-    }
-  };
-
-  const thumb = getThumbnailConfig();
-
   return (
     <>
       <Card
@@ -154,15 +136,12 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               </div>
 
               {/* Styled Document Type Icon */}
-              <div className={cn(
-                "flex h-10 w-10 flex-col items-center justify-center rounded-xl border font-mono font-bold text-[9px] flex-shrink-0 shadow-xs",
-                thumb.bg,
-                thumb.border,
-                thumb.text
-              )}>
-                <FileText size={14} className="mb-0.5" />
-                <span>{thumb.label}</span>
-              </div>
+              <FileTypeBadge
+                filename={document.original_filename}
+                contentType={document.content_type}
+                variant="card"
+                className="w-10 h-10"
+              />
 
               {/* Doc Title and Size */}
               <div className="min-w-0 flex-1">
