@@ -36,24 +36,22 @@ jobs:
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - name: Install dependencies
+        working-directory: ./backend
         run: |
           uv pip install --system .
           uv pip install --system -e ".[dev]"
 
       - name: Run Ruff Linter
-        run: |
-          cd backend
-          ruff check .
+        working-directory: ./backend
+        run: ruff check .
 
       - name: Run Ruff Formatter Check
-        run: |
-          cd backend
-          ruff format --check .
+        working-directory: ./backend
+        run: ruff format --check .
 
       - name: Run Pytest Tests
-        run: |
-          cd backend
-          pytest
+        working-directory: ./backend
+        run: pytest
 
   frontend-checks:
     runs-on: ubuntu-latest

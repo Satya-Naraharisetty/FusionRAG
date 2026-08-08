@@ -50,17 +50,18 @@ jobs:
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - name: Install dependencies
+        working-directory: ./backend
         run: |
           uv pip install --system .
           uv pip install --system -e ".[dev]"
           uv pip install --system ragas deepeval langchain-google-vertexai langchain-community
 
       - name: Run Standard Benchmark Suite
+        working-directory: ./backend
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          cd backend
           alembic upgrade head
           # Run standard profile; fall back to mock if no secrets are present
           if [ -z "$GEMINI_API_KEY" ] && [ -z "$OPENAI_API_KEY" ]; then
@@ -72,10 +73,8 @@ jobs:
           fi
 
       - name: Run Regression Analysis
-        run: |
-          cd backend
-          # Compare the last two runs (the candidate we just ran vs baseline)
-          python scripts/regression.py
+        working-directory: ./backend
+        run: python scripts/regression.py
 
       - name: Upload Benchmark Reports
         uses: actions/upload-artifact@v4

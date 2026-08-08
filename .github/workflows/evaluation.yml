@@ -47,14 +47,15 @@ jobs:
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - name: Install dependencies
+        working-directory: ./backend
         run: |
           uv pip install --system .
           uv pip install --system -e ".[dev]"
           uv pip install --system ragas deepeval langchain-google-vertexai langchain-community
 
       - name: Run Quick Mock Benchmark
+        working-directory: ./backend
         run: |
-          cd backend
           alembic upgrade head
           python scripts/benchmark.py --dataset tests/evaluation/simple_rag_dataset.json --profile quick --mock
 
