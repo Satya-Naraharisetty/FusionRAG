@@ -1,6 +1,6 @@
 import React from "react";
 import { WifiOff, RefreshCcw, Play, X } from "lucide-react";
-import { Button } from "../ui/button";
+import { Button } from "../ui/Button";
 
 interface StreamingRecoveryProps {
   onRetry: () => void;

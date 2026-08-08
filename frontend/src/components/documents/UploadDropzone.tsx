@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useUploadDocument } from "../../hooks/useDocuments";
 import { UPLOAD_LIMITS } from "../../lib/constants";
-import { Button } from "../ui/button";
+import { Button } from "../ui/Button";
 import toast from "react-hot-toast";
 import { cn } from "../../lib/utils";
 

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Search, X, FolderOpen, Calendar, Filter, Save, Trash2 } from "lucide-react";
-import { Input } from "../ui/input";
-import { Button } from "../ui/button";
+import { Input } from "../ui/Input";
+import { Button } from "../ui/Button";
 import { cn } from "../../lib/utils";
 
 export type DocumentSortType = "newest" | "oldest" | "name" | "status" | "size";

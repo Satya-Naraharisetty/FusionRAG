@@ -6,7 +6,7 @@ import { LoginForm } from "./components/auth/LoginForm";
 import { RegisterForm } from "./components/auth/RegisterForm";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { PublicRoute } from "./routes/PublicRoute";
-import { AppLayout } from "./components/layout/AppLayout";
+import { ChatLayout } from "./components/layout/ChatLayout";
 import { ErrorBoundary } from "./components/error/ErrorBoundary";
 import { ErrorPage } from "./components/error/ErrorPage";
 import { Toaster } from "react-hot-toast";
@@ -52,7 +52,7 @@ function App() {
 
                 {/* Secure application routes */}
                 <Route element={<ProtectedRoute />}>
-                  <Route element={<AppLayout />}>
+                  <Route element={<ChatLayout />}>
                     <Route index element={<Navigate to="/chat" replace />} />
                     <Route
                       path="/chat"

@@ -2,21 +2,24 @@ import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMessages } from "../../hooks/useMessages";
 import { useSSEChat } from "../../hooks/useSSEChat";
+import { useConversation } from "../../hooks/useConversations";
 import { EmptyChat } from "./EmptyChat";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
+import { ChatToolbar } from "./ChatToolbar";
 import { StreamingRecovery } from "./StreamingRecovery";
 import { Skeleton } from "../ui/skeleton";
 import { AlertCircle } from "lucide-react";
 
-interface ChatViewProps {
+interface ChatWindowProps {
   conversationId: string | null;
 }
 
-export const ChatView: React.FC<ChatViewProps> = ({ conversationId }) => {
+export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
   const navigate = useNavigate();
   const { data: messagesData, isLoading, error } = useMessages(conversationId);
-  
+  const { data: activeConv } = useConversation(conversationId);
+
   const {
     chatMessages,
     setChatMessages,
@@ -44,7 +47,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ conversationId }) => {
     setCurrentConversationId(conversationId);
   }, [conversationId, setCurrentConversationId]);
 
-  // Reconcile infinite Query messages with SSE chat state
+  // Reconcile messages with SSE chat state
   useEffect(() => {
     if (messagesData) {
       const flat = messagesData.pages.flatMap((page) => page.messages);
@@ -90,29 +93,39 @@ export const ChatView: React.FC<ChatViewProps> = ({ conversationId }) => {
     handleSend(prompt);
   };
 
+  const activeTitle = activeConv?.title || "New Chat";
+  const activeModel = activeConv?.settings?.model || "Hybrid RAG v1";
+
   return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-zinc-950 relative">
-      {/* Messages / Welcome list */}
+    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-white dark:bg-[#212121] relative transition-colors">
+      {/* Top Header toolbar */}
+      <ChatToolbar
+        title={activeTitle}
+        model={activeModel}
+        connectionLost={connectionLost}
+      />
+
+      {/* Messages Scroll Area */}
       <div className="flex-1 overflow-hidden flex flex-col h-full w-full">
         {isLoading ? (
-          <div className="flex-1 flex flex-col gap-6 p-6 max-w-3xl mx-auto w-full pt-16">
+          <div className="flex-1 flex flex-col gap-6 p-6 max-w-3xl mx-auto w-full pt-16 select-none">
             <div className="flex items-center gap-3">
-              <Skeleton className="h-8 w-8 rounded-full bg-zinc-900" />
+              <Skeleton className="h-8 w-8 rounded-full bg-zinc-100 dark:bg-zinc-800" />
               <div className="space-y-2 flex-1">
-                <Skeleton className="h-4 w-1/4 bg-zinc-900" />
-                <Skeleton className="h-4 w-3/4 bg-zinc-900" />
+                <Skeleton className="h-4 w-1/4 bg-zinc-100 dark:bg-zinc-800" />
+                <Skeleton className="h-4 w-3/4 bg-zinc-100 dark:bg-zinc-800" />
               </div>
             </div>
             <div className="flex items-center gap-3 flex-row-reverse">
-              <Skeleton className="h-8 w-8 rounded-full bg-zinc-900" />
+              <Skeleton className="h-8 w-8 rounded-full bg-zinc-100 dark:bg-zinc-800" />
               <div className="space-y-2 flex-1">
-                <Skeleton className="h-4 w-1/4 bg-zinc-900 ml-auto" />
-                <Skeleton className="h-4 w-2/3 bg-zinc-900 ml-auto" />
+                <Skeleton className="h-4 w-1/4 bg-zinc-100 dark:bg-zinc-800 ml-auto" />
+                <Skeleton className="h-4 w-2/3 bg-zinc-100 dark:bg-zinc-800 ml-auto" />
               </div>
             </div>
           </div>
         ) : error ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-red-400">
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-red-500 select-none">
             <AlertCircle size={24} className="mb-2" />
             <p className="text-xs font-semibold">Failed to load message history.</p>
           </div>
@@ -127,7 +140,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ conversationId }) => {
         )}
       </div>
 
-      {/* Connection recovery panel */}
+      {/* Connection recovery popup */}
       {connectionLost && (
         <div className="absolute bottom-28 left-1/2 -translate-x-1/2 px-4 md:px-6 w-full max-w-3xl z-20">
           <StreamingRecovery
@@ -138,8 +151,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ conversationId }) => {
         </div>
       )}
 
-      {/* Input textbox bar - absolute floating with gradient fade behind */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent pt-12 pb-4 px-4 flex justify-center">
+      {/* Fixed bottom input wrapper */}
+      <div className="w-full bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#212121] dark:via-[#212121]/95 dark:to-transparent pt-12 pb-6 flex justify-center z-10 shrink-0">
         <ChatInput
           conversationId={conversationId}
           onSend={handleSend}
@@ -150,3 +163,4 @@ export const ChatView: React.FC<ChatViewProps> = ({ conversationId }) => {
     </div>
   );
 };
+export default ChatWindow;

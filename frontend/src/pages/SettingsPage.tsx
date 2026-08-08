@@ -14,9 +14,9 @@ import {
   Download,
   Upload,
 } from "lucide-react";
-import { Button } from "../components/ui/button";
+import { Button } from "../components/ui/Button";
 import { Card, CardContent } from "../components/ui/card";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Avatar, AvatarFallback } from "../components/ui/Avatar";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../components/ui/dialog";
+} from "../components/ui/Modal";
 import toast from "react-hot-toast";
 
 interface ConversationDefaults {

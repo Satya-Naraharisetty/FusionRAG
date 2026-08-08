@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { Sidebar } from "../sidebar/Sidebar";
+import { Sidebar } from "./Sidebar";
 import { MobileDrawer } from "./MobileDrawer";
 import { OfflineBanner } from "./OfflineBanner";
 import { useSidebarState } from "../../hooks/useSidebarState";
@@ -8,7 +8,7 @@ import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 import { CommandPalette } from "../command/CommandPalette";
 import { OnboardingTour } from "./OnboardingTour";
 
-export const AppLayout: React.FC = () => {
+export const ChatLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   useSidebarState();
@@ -48,11 +48,11 @@ export const AppLayout: React.FC = () => {
   });
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 font-sans">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-white dark:bg-[#212121] text-zinc-900 dark:text-zinc-100 font-sans">
       {/* Accessibility skip to main content link */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-violet-600 focus:text-white focus:rounded-md focus:outline-none focus:ring-2 focus:ring-violet-400 text-xs font-semibold"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-zinc-900 focus:text-white focus:rounded-md focus:outline-none focus:ring-2 focus:ring-zinc-400 text-xs font-semibold"
       >
         Skip to main content
       </a>
@@ -73,7 +73,7 @@ export const AppLayout: React.FC = () => {
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative focus:outline-none"
+          className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative focus:outline-none bg-white dark:bg-[#212121]"
         >
           <Outlet />
         </main>
@@ -87,3 +87,4 @@ export const AppLayout: React.FC = () => {
     </div>
   );
 };
+export default ChatLayout;

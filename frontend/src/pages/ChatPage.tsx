@@ -1,13 +1,13 @@
 import React from "react";
 import { useParams } from "react-router-dom";
-import { ChatView } from "../components/chat/ChatView";
+import { ChatWindow } from "../components/chat/ChatWindow";
 
 const ChatPage: React.FC = () => {
   const { conversationId } = useParams<{ conversationId?: string }>();
 
   return (
     <div className="flex-1 flex flex-col h-full w-full overflow-hidden">
-      <ChatView conversationId={conversationId || null} />
+      <ChatWindow conversationId={conversationId || null} />
     </div>
   );
 };

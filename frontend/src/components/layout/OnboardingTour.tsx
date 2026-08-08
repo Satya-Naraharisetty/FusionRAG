@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, ChevronLeft, ChevronRight, HelpCircle, Sparkles, FileText, Keyboard, MessageSquare } from "lucide-react";
-import { Button } from "../ui/button";
+import { Button } from "../ui/Button";
 
 export const OnboardingTour: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);

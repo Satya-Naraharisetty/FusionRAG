@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Square, AlertCircle, Paperclip, Mic, X, Send, Image, FileText, Mic2, Loader2 } from "lucide-react";
-import { Button } from "../ui/button";
-import { Textarea } from "../ui/textarea";
+import { Square, AlertCircle, Paperclip, Mic, X, ArrowUp, Image, FileText } from "lucide-react";
+import { Button } from "../ui/Button";
 import { useDraft } from "../../hooks/useDrafts";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "../ui/command";
@@ -143,7 +142,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const hasContent = text.trim().length > 0 || attachments.length > 0;
 
   return (
-    <form onSubmit={handleSubmit} className="relative w-full max-w-3xl px-4 md:px-6">
+    <form onSubmit={handleSubmit} className="relative w-full max-w-3xl px-4 select-none">
       <input
         ref={fileInputRef}
         type="file"
@@ -155,28 +154,28 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       />
 
       <div className="relative flex flex-col gap-2">
-        {/* Warning messages */}
+        {/* Warning Alert */}
         {!isOnline && (
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-red-400 bg-red-950/15 p-2 rounded-lg border border-red-900/10 animate-slide-down">
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-red-500 bg-red-50 dark:bg-red-950/15 p-2 rounded-xl border border-red-200/50 dark:border-red-900/10 animate-slide-down">
             <AlertCircle size={12} />
             <span>Sending disabled. You are offline.</span>
           </div>
         )}
 
-        {/* Attachments Preview */}
+        {/* Attachments Preview Tray */}
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 px-1 animate-slide-down">
             {attachments.map((file, idx) => (
-              <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/50 border border-zinc-800 rounded-lg animate-fade-in">
-                <div className="flex items-center gap-1.5 text-xs text-zinc-300">
-                  {file.type.startsWith("image/") ? <Image size={13} /> : file.type === "application/pdf" ? <FileText size={13} /> : <Paperclip size={13} />}
-                  <span className="truncate max-w-[150px] font-medium">{file.name}</span>
-                  <span className="text-zinc-500">({(file.size / 1024).toFixed(1)} KB)</span>
+              <div key={idx} className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 rounded-xl animate-fade-in">
+                <div className="flex items-center gap-1.5 text-xs text-zinc-700 dark:text-zinc-300">
+                  {file.type.startsWith("image/") ? <Image size={13} /> : <FileText size={13} />}
+                  <span className="truncate max-w-[140px] font-medium">{file.name}</span>
+                  <span className="text-[10px] text-zinc-500">({(file.size / 1024).toFixed(0)} KB)</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => removeAttachment(idx)}
-                  className="p-0.5 text-zinc-500 hover:text-red-400 hover:bg-red-950/20 rounded transition-colors"
+                  className="p-0.5 text-zinc-400 hover:text-red-500 dark:hover:text-red-400 rounded transition-colors"
                   aria-label={`Remove ${file.name}`}
                 >
                   <X size={12} />
@@ -186,37 +185,51 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         )}
 
-        {/* Input Area */}
+        {/* Input Wrapper Card - Matches ChatGPT's modern input container */}
         <div className={cn(
-          "relative flex items-end bg-zinc-900/40 backdrop-blur-md border rounded-2xl overflow-hidden transition-all duration-300 ease-standard",
-          "border-zinc-800/80",
-          "focus-within:border-violet-500/40 focus-within:shadow-[0_0_15px_rgba(139,92,246,0.15)]",
-          isRecording && "border-violet-500/50 bg-violet-950/5 shadow-[0_0_20px_rgba(139,92,246,0.2)]",
-          hasContent && "ring-1 ring-violet-500/10"
+          "relative flex items-end border transition-all duration-200 rounded-3xl bg-[#f4f4f4] dark:bg-[#2f2f2f] text-zinc-900 dark:text-zinc-100",
+          "border-transparent focus-within:border-zinc-300 dark:focus-within:border-zinc-700 focus-within:shadow-[0_4px_24px_rgba(0,0,0,0.05)]",
+          isRecording && "border-zinc-400/50 dark:border-zinc-650"
         )}>
+          {/* Paperclip upload button */}
+          <div className="flex items-center justify-center pl-3 pr-1 h-12">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isStreaming || attachments.length >= 5}
+              className="h-8 w-8 text-zinc-550 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-850 rounded-full transition-colors flex items-center justify-center cursor-pointer"
+              aria-label="Attach files"
+            >
+              <Paperclip size={16} />
+            </Button>
+          </div>
+
           <div className="flex-1 flex flex-col min-w-0">
-            <Textarea
+            <textarea
               ref={textareaRef}
               value={text}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
-              placeholder={isStreaming ? "AI is responding..." : "Ask anything... (Enter to send, Shift+Enter for new line, / for commands)"}
+              placeholder={isStreaming ? "AI is responding..." : "Message Hybrid RAG..."}
               rows={1}
               disabled={!isOnline || isStreaming}
               className={cn(
-                "flex-1 max-h-[200px] min-h-[44px] bg-transparent border-0 text-zinc-150 text-xs px-4 py-3.5 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-50 placeholder:text-zinc-500 leading-relaxed scrollbar-none",
+                "flex-1 max-h-[200px] min-h-[44px] bg-transparent border-0 text-zinc-800 dark:text-zinc-100 text-xs sm:text-[13px] px-2 py-3 resize-none focus:outline-none disabled:opacity-50 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 leading-relaxed scrollbar-none",
                 attachments.length > 0 && "pb-2"
               )}
-              aria-label="Chat input query"
+              style={{ outline: "none", boxShadow: "none" }}
+              aria-label="Message prompt input"
             />
 
             {showCommands && (
-              <Command className="absolute bottom-full left-0 right-0 mb-1 bg-zinc-950 border border-zinc-800 rounded-xl shadow-elevation-4 overflow-hidden animate-slide-up z-10">
+              <Command className="absolute bottom-full left-0 right-0 mb-2 bg-[#171717] border border-zinc-800 rounded-2xl shadow-xl overflow-hidden animate-slide-up z-10 text-zinc-300">
                 <CommandInput
                   value={commandSearch}
                   onValueChange={setCommandSearch}
                   placeholder="Search commands..."
-                  className="h-10 px-4 bg-transparent border-0 text-zinc-100 text-xs placeholder:text-zinc-500 focus-visible:ring-0"
+                  className="h-10 px-4 bg-transparent border-0 text-zinc-100 text-xs placeholder:text-zinc-500 focus-visible:ring-0 focus:outline-none"
                   autoFocus
                 />
                 <CommandEmpty className="py-6 text-center text-zinc-500 text-xs">No commands found.</CommandEmpty>
@@ -225,9 +238,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     <CommandItem
                       key={cmd.id}
                       onSelect={() => handleCommandSelect(cmd)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-xs hover:bg-zinc-900/50"
+                      className="flex items-center gap-3 px-4 py-2.5 text-xs hover:bg-zinc-900/50 cursor-pointer"
                     >
-                      <span className="text-lg">{cmd.icon}</span>
+                      <span className="text-sm">{cmd.icon}</span>
                       <div className="flex-1 text-left">
                         <div className="font-medium text-zinc-100">{cmd.label}</div>
                         <div className="text-[10px] text-zinc-500">{cmd.description}</div>
@@ -240,21 +253,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-1 h-12 px-2">
-            {/* Attach File */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isStreaming || attachments.length >= 5}
-              className="h-9 w-9 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors"
-              aria-label="Attach file"
-            >
-              <Paperclip size={16} />
-            </Button>
-
+          {/* Right Action buttons: Voice & Send */}
+          <div className="flex items-center gap-1.5 h-12 pr-3 pl-1">
             {/* Voice Input */}
             {onVoiceInput && (
               <Button
@@ -264,28 +264,28 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 onClick={() => { onVoiceInput(); setIsRecording(!isRecording); }}
                 disabled={isStreaming}
                 className={cn(
-                  "h-9 w-9 transition-all duration-200",
+                  "h-8 w-8 rounded-full transition-all flex items-center justify-center cursor-pointer",
                   isRecording
-                    ? "text-violet-400 bg-violet-950/20 animate-pulse shadow-[0_0_10px_rgba(139,92,246,0.4)]"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+                    ? "text-zinc-100 bg-red-500 animate-pulse"
+                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-850"
                 )}
-                aria-label={isRecording ? "Stop voice input" : "Start voice input"}
+                aria-label={isRecording ? "Stop recording" : "Record voice"}
                 aria-pressed={isRecording}
               >
-                {isRecording ? <Mic2 size={16} fill="currentColor" /> : <Mic size={16} />}
+                <Mic size={15} />
               </Button>
             )}
 
-            {/* Send / Stop */}
+            {/* Circle Send / Stop Button - Matches ChatGPT's modern arrow-up design */}
             {isStreaming ? (
               <Button
                 type="button"
                 onClick={onStop}
                 size="icon"
-                className="h-9 w-9 bg-zinc-800 hover:bg-zinc-700 text-zinc-150 rounded-full flex items-center justify-center shadow-md cursor-pointer transition-transform active:scale-95 duration-200"
+                className="h-8 w-8 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 rounded-full flex items-center justify-center shadow-xs cursor-pointer transition-transform active:scale-95 duration-200"
                 aria-label="Stop generation"
               >
-                <Square size={10} fill="currentColor" />
+                <Square size={9} fill="currentColor" />
               </Button>
             ) : (
               <Button
@@ -293,27 +293,26 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 disabled={!hasContent || !isOnline}
                 size="icon"
                 className={cn(
-                  "h-9 w-9 rounded-full flex items-center justify-center shadow-md cursor-pointer transition-all active:scale-95 duration-200",
+                  "h-8 w-8 rounded-full flex items-center justify-center shadow-xs transition-all active:scale-95 duration-200 cursor-pointer",
                   hasContent && isOnline
-                    ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:opacity-90 text-white"
-                    : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                    ? "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-150 dark:text-zinc-950 dark:hover:bg-zinc-200"
+                    : "bg-zinc-200 dark:bg-zinc-800/80 text-zinc-400 dark:text-zinc-500 cursor-not-allowed border-0"
                 )}
-                aria-label="Send message"
+                aria-label="Send query"
               >
-                <Send size={16} strokeWidth={2.5} />
-                {!hasContent && <Loader2 size={14} className="animate-spin" />}
+                <ArrowUp size={15} strokeWidth={3} />
               </Button>
             )}
           </div>
         </div>
 
-        {/* Character count */}
+        {/* Character count limit warning indicator */}
         {(isNearingLimit || attachments.length > 0) && (
           <div className={cn(
-            "text-[9px] font-mono text-right self-end px-1 transition-colors",
+            "text-[9px] font-mono text-right self-end px-2 transition-colors",
             isOverLimit ? "text-red-500 font-bold" : "text-zinc-500"
           )}>
-            {charCount} / 4000 {attachments.length > 0 && `· ${attachments.length} file(s)`}
+            {charCount} / 4000 {attachments.length > 0 && `· ${attachments.length} files`}
           </div>
         )}
       </div>

@@ -19,7 +19,7 @@ import {
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
-} from "../ui/dropdown-menu";
+} from "../ui/Dropdown";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { Folder, Tag } from "../../hooks/useLocalConversationMetadata";
 

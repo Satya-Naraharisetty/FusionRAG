@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { ShieldAlert, FileQuestion, ServerCrash, Home, RefreshCw } from "lucide-react";
-import { Button } from "../ui/button";
+import { Button } from "../ui/Button";
 
 interface ErrorPageProps {
   status: 401 | 403 | 404 | 500;

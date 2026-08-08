@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Menu } from "lucide-react";
-import { Sidebar } from "../sidebar/Sidebar";
-import { Button } from "../ui/button";
+import { Sidebar } from "./Sidebar";
+import { Button } from "../ui/Button";
 import { cn } from "../../lib/utils";
 
 interface MobileDrawerProps {

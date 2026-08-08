@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ChatMessage } from "../../types";
-import { ChatBubble } from "./ChatBubble";
-import { Button } from "../ui/button";
+import { ChatMessage as ChatMessageType } from "../../types";
+import { ChatMessage } from "./ChatMessage";
+import { Button } from "../ui/Button";
 
 interface MessageListProps {
-  messages: ChatMessage[];
+  messages: ChatMessageType[];
   onRetry: () => void;
   isStreaming: boolean;
 }
@@ -130,7 +130,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                   contain: "layout paint",
                 }}
               >
-                <ChatBubble
+                <ChatMessage
                   message={msg}
                   onRetry={isLast ? onRetry : undefined}
                 />

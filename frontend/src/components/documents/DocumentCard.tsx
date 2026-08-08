@@ -13,6 +13,7 @@ import {
   Copy,
   Download,
   FolderOpen,
+  Eye,
 } from "lucide-react";
 import { Document } from "../../types";
 import { formatBytes, relativeTime, cn } from "../../lib/utils";
@@ -25,8 +26,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
   DropdownMenuSeparator,
-} from "../ui/dropdown-menu";
-import { Button } from "../ui/button";
+} from "../ui/Dropdown";
+import { Button } from "../ui/Button";
 import { Card, CardContent } from "../ui/card";
 import { Badge } from "../ui/badge";
 import {
@@ -36,14 +37,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../ui/dialog";
+} from "../ui/Modal";
 
 interface DocumentCardProps {
   document: Document;
   onDelete: (id: string) => Promise<unknown>;
   onReprocess: (id: string) => Promise<unknown>;
   onRegenerateEmbeddings: (id: string) => Promise<unknown>;
-  // Phase 5 requirements:
   isSelected: boolean;
   onSelectToggle: () => void;
   documentFolders: { id: string; name: string }[];
@@ -81,32 +81,32 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
       await onDelete(document.id);
       setShowDeleteDialog(false);
     } catch (_e) {
-      // handled in hook
+      // Handled in hook
     } finally {
       setIsDeleting(false);
     }
   };
 
   const statusColors: Record<Document["status"], string> = {
-    pending: "bg-amber-950/40 text-amber-400 border-amber-900/30",
-    processing: "bg-blue-950/40 text-blue-400 border-blue-900/30",
-    completed: "bg-emerald-950/40 text-emerald-400 border-emerald-900/30",
-    failed: "bg-red-950/40 text-red-400 border-red-900/30",
+    pending: "bg-amber-100 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/30",
+    processing: "bg-blue-100 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/30",
+    completed: "bg-emerald-100 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/30",
+    failed: "bg-red-100 dark:bg-red-950/20 text-red-650 dark:text-red-400 border-red-200 dark:border-red-900/30",
   };
 
-  // Thumbnail file type visual stylings
   const fileExt = document.original_filename.split(".").pop()?.toLowerCase() || "";
+  
   const getThumbnailConfig = () => {
     switch (fileExt) {
       case "pdf":
-        return { label: "PDF", bg: "bg-red-950/40", border: "border-red-900/30", text: "text-red-400" };
+        return { label: "PDF", bg: "bg-red-50 dark:bg-red-950/30", border: "border-red-200 dark:border-red-900/20", text: "text-red-600 dark:text-red-400" };
       case "md":
-        return { label: "MD", bg: "bg-fuchsia-950/40", border: "border-fuchsia-900/30", text: "text-fuchsia-400" };
+        return { label: "MD", bg: "bg-fuchsia-50 dark:bg-fuchsia-950/30", border: "border-fuchsia-200 dark:border-fuchsia-900/20", text: "text-fuchsia-600 dark:text-fuchsia-400" };
       case "docx":
       case "doc":
-        return { label: "DOCX", bg: "bg-blue-950/40", border: "border-blue-900/30", text: "text-blue-400" };
+        return { label: "DOCX", bg: "bg-blue-50 dark:bg-blue-950/30", border: "border-blue-200 dark:border-blue-900/20", text: "text-blue-600 dark:text-blue-400" };
       default:
-        return { label: "TXT", bg: "bg-zinc-900/60", border: "border-zinc-800", text: "text-zinc-400" };
+        return { label: "TXT", bg: "bg-zinc-55 dark:bg-zinc-900/60", border: "border-zinc-200 dark:border-zinc-800", text: "text-zinc-550 dark:text-zinc-400" };
     }
   };
 
@@ -120,67 +120,71 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
         onDragOver={onDragOver}
         onDrop={onDrop}
         className={cn(
-          "group bg-zinc-900/10 backdrop-blur-md border overflow-hidden hover:border-zinc-800 hover:bg-zinc-900/20 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-all duration-300",
-          isSelected ? "border-violet-600/80 bg-violet-950/5" : "border-zinc-900/80"
+          "group flex flex-col bg-white dark:bg-[#1e1e1e] border rounded-2xl transition-all duration-300 overflow-hidden select-none hover:shadow-md",
+          isSelected
+            ? "border-zinc-900 dark:border-zinc-100 ring-1 ring-zinc-900 dark:ring-zinc-100 bg-zinc-50/50 dark:bg-zinc-800/10"
+            : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
         )}
       >
-        <CardContent className="p-4 flex flex-col justify-between h-full gap-4">
-          {/* Header Row */}
-          <div className="flex items-start justify-between gap-1">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              {/* Drag Handle & Checkbox */}
+        <CardContent className="p-5 flex flex-col justify-between h-full gap-4.5">
+          {/* Header row: Checkbox, file info, drag handles */}
+          <div className="flex items-start justify-between gap-1.5">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                <div className="cursor-grab active:cursor-grabbing text-zinc-650 hover:text-zinc-400 p-0.5" title="Drag to reorder">
+                {/* Reorder drag handle */}
+                <div className="cursor-grab active:cursor-grabbing text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-300 p-0.5" title="Drag to reorder">
                   <GripVertical size={14} />
                 </div>
+                {/* Select checkbox */}
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     onSelectToggle();
                   }}
-                  className="text-zinc-500 hover:text-violet-400 cursor-pointer p-0.5"
-                  aria-label={isSelected ? "Deselect file" : "Select file"}
+                  className="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 cursor-pointer p-0.5"
+                  aria-label={isSelected ? "Deselect document" : "Select document"}
                 >
                   {isSelected ? (
-                    <CheckSquare size={15} className="text-violet-500 fill-violet-950/20" />
+                    <CheckSquare size={15} className="text-zinc-800 dark:text-zinc-100 fill-zinc-800/10 dark:fill-zinc-100/10" />
                   ) : (
                     <Square size={15} />
                   )}
                 </button>
               </div>
 
-              {/* PDF/Text Thumbnail preview */}
+              {/* Styled Document Type Icon */}
               <div className={cn(
-                "flex h-9 w-9 flex-col items-center justify-center rounded-lg border font-mono font-bold text-[9px] flex-shrink-0 transition-all duration-300 shadow-sm",
+                "flex h-10 w-10 flex-col items-center justify-center rounded-xl border font-mono font-bold text-[9px] flex-shrink-0 shadow-xs",
                 thumb.bg,
                 thumb.border,
                 thumb.text
               )}>
-                <FileText size={12} className="mb-0.5" />
+                <FileText size={14} className="mb-0.5" />
                 <span>{thumb.label}</span>
               </div>
 
+              {/* Doc Title and Size */}
               <div className="min-w-0 flex-1">
                 <h4
-                  className="text-xs font-bold text-zinc-200 truncate"
+                  className="text-xs font-bold text-zinc-800 dark:text-zinc-150 truncate leading-snug"
                   title={document.original_filename}
                 >
                   {document.original_filename}
                 </h4>
-                <p className="text-[10px] text-zinc-500 font-mono">
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-550 font-medium">
                   {formatBytes(document.file_size)}
                 </p>
               </div>
             </div>
 
-            {/* Dropdown Menu */}
+            {/* Context dropdown option menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 cursor-pointer"
+                  className="h-8 w-8 text-zinc-400 dark:text-zinc-550 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 cursor-pointer"
                   aria-label="Document options"
                 >
                   <MoreVertical size={14} />
@@ -190,7 +194,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                 align="end"
                 className="w-52 bg-zinc-950 border-zinc-800 text-zinc-300"
               >
-                {/* Move to Folder submenu */}
+                {/* Move to folder */}
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger className="gap-2 text-xs cursor-pointer focus:bg-zinc-900">
                     <FolderOpen size={12} />
@@ -201,7 +205,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                       onClick={() => onMoveToFolder(null)}
                       className="text-xs cursor-pointer focus:bg-zinc-900"
                     >
-                      <span className={!currentFolderId ? "font-bold text-violet-400" : ""}>
+                      <span className={!currentFolderId ? "font-bold text-zinc-200" : ""}>
                         No Folder
                       </span>
                     </DropdownMenuItem>
@@ -211,7 +215,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                         onClick={() => onMoveToFolder(folder.id)}
                         className="text-xs cursor-pointer focus:bg-zinc-900"
                       >
-                        <span className={currentFolderId === folder.id ? "font-bold text-violet-400" : ""}>
+                        <span className={currentFolderId === folder.id ? "font-bold text-zinc-200" : ""}>
                           {folder.name}
                         </span>
                       </DropdownMenuItem>
@@ -262,74 +266,76 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             </DropdownMenu>
           </div>
 
-          {/* Details Grid */}
-          <div className="grid grid-cols-2 gap-2 text-[10px] text-zinc-400">
+          {/* Details Row: Calendar, page count */}
+          <div className="grid grid-cols-2 gap-2 text-[10px] text-zinc-550 dark:text-zinc-450">
             <div className="flex items-center gap-1.5">
-              <Calendar size={12} className="text-zinc-650" />
+              <Calendar size={12} className="text-zinc-400 dark:text-zinc-600" />
               <span>{relativeTime(document.created_at)}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Layers size={12} className="text-zinc-650" />
+              <Layers size={12} className="text-zinc-400 dark:text-zinc-600" />
               <span>
                 {document.page_count ? `${document.page_count} pages` : "1 page"}
               </span>
             </div>
             {document.language && (
               <div className="flex items-center gap-1.5 col-span-2">
-                <span className="font-semibold text-zinc-500 uppercase text-[9px] tracking-wide">
-                  Lang:
+                <span className="font-semibold text-zinc-400 dark:text-zinc-500 uppercase text-[9px] tracking-wide">
+                  Language:
                 </span>
                 <span>{document.language.toUpperCase()}</span>
               </div>
             )}
           </div>
 
-          {/* Badges / Status Row */}
-          <div className="flex items-center justify-between border-t border-zinc-900/60 pt-3">
+          {/* Bottom Row: Status pill and View/Delete quick-action buttons */}
+          <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800/80 pt-3.5 mt-0.5">
             <Badge
               variant="outline"
               className={cn(
-                "text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider",
+                "text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider",
                 statusColors[document.status]
               )}
             >
               {document.status}
             </Badge>
 
-            {document.status === "processing" && (
-              <div className="flex items-center gap-1.5 text-blue-400">
-                {/* SVG inline progress ring */}
-                <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                <span className="text-[9px] font-bold uppercase tracking-wider animate-pulse">
-                  Processing...
-                </span>
-              </div>
-            )}
-
-            {document.status === "failed" && document.failure_reason && (
-              <span
-                className="text-[9px] text-red-400 max-w-[150px] truncate"
-                title={document.failure_reason}
+            {/* Quick Actions (View / Delete) */}
+            <div className="flex items-center gap-1.5">
+              {/* View/Export download button */}
+              <Button
+                onClick={onExport}
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 rounded-md"
+                title="View / Download"
               >
-                {document.failure_reason}
-              </span>
-            )}
+                <Eye size={13} />
+              </Button>
+              {/* Delete button */}
+              <Button
+                onClick={() => setShowDeleteDialog(true)}
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-zinc-500 hover:text-red-500 dark:hover:text-red-400 rounded-md"
+                title="Delete"
+              >
+                <Trash size={13} />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Delete Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-200 sm:max-w-md">
+        <DialogContent className="bg-[#171717] border-zinc-800 text-zinc-200 sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-zinc-100 flex items-center gap-2">
-              <Trash size={18} className="text-red-500" />
+            <DialogTitle className="text-zinc-150 flex items-center gap-2">
+              <Trash size={18} className="text-red-550" />
               <span>Delete Document?</span>
             </DialogTitle>
-            <DialogDescription className="text-zinc-400 text-xs mt-2">
+            <DialogDescription className="text-zinc-450 text-xs mt-2 leading-relaxed">
               Are you sure you want to delete this document? Doing so will permanently wipe its
               file metadata, text chunks, and embedding vectors from the database.
             </DialogDescription>
@@ -338,7 +344,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             <Button
               variant="outline"
               onClick={() => setShowDeleteDialog(false)}
-              className="bg-transparent border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-zinc-100 text-xs"
+              className="bg-transparent border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 text-xs"
               disabled={isDeleting}
             >
               Cancel
@@ -346,7 +352,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             <Button
               variant="destructive"
               onClick={handleDelete}
-              className="bg-red-650 hover:bg-red-750 text-white text-xs"
+              className="bg-red-650 hover:bg-red-750 text-white text-xs font-semibold"
               disabled={isDeleting}
             >
               {isDeleting ? "Deleting..." : "Delete"}
@@ -357,3 +363,4 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
     </>
   );
 };
+export default DocumentCard;
