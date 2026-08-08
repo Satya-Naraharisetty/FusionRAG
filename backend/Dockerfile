@@ -1,25 +1,39 @@
-# Use Python 3.12 slim image
-FROM python:3.12-slim
+# Build stage: install dependencies with uv
+FROM python:3.12-slim AS builder
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+WORKDIR /build
+
+# Copy dependency files
+COPY pyproject.toml uv.lock* ./
+
+# Install dependencies using uv
+RUN if [ -f pyproject.toml ]; then \
+        uv sync --frozen --no-install-workspace --no-dev; \
+    else \
+        echo "Error: pyproject.toml not found"; \
+        exit 1; \
+    fi
+
+# Production stage: minimal runtime image
+FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install system dependencies (curl for health check)
+# Install curl for health checks
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy only the requirements file first to leverage Docker cache
-COPY requirements.txt .
+# Copy the virtual environment from builder
+COPY --from=builder /build/.venv /app/.venv
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Set up PATH to use the venv
+ENV PATH="/app/.venv/bin:$PATH"
 
-# Copy the rest of the application files
+# Copy backend application code
 COPY . .
 
 # Expose port 8000
