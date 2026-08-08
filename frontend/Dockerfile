@@ -12,6 +12,9 @@ RUN npm ci --only=production && npm ci --dev
 # Copy source code
 COPY . .
 
+# Set environment variable for build
+ENV VITE_API_URL=http://localhost:8000
+
 # Build the application
 RUN npm run build
 
