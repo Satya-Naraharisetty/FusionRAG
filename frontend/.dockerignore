@@ -5,7 +5,6 @@ dist
 .gitignore
 *.md
 .env
-.eslintrc.cjs
 .prettierrc
 vitest.config.ts
 coverage

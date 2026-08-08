@@ -2,7 +2,6 @@
 name = "hybrid-rag-backend"
 version = "0.1.0"
 description = "FastAPI Backend for Hybrid RAG Chatbot"
-readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.110.0",
@@ -39,35 +38,28 @@ dev = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "C4", "ARG", "PTH"]
 ignore = ["B008", "E501", "ARG001", "ARG002", "B904", "N818", "UP042", "E712", "PTH", "B023", "B039", "ARG004"]
 
 [tool.ruff.lint.per-file-ignores]
-"backend/tests/*" = ["ARG001", "N806", "E501"]
-"backend/alembic/*" = ["PTH"]
-"backend/scripts/*" = ["N806", "PTH"]
-"backend/app/scratch/*" = ["N806"]
-"backend/app/evaluation/reports/*" = ["PTH"]
-"backend/app/evaluation/runners/*" = ["PTH", "B905", "C416", "F401", "F841"]
+"tests/*" = ["ARG001", "N806", "E501"]
+"alembic/*" = ["PTH"]
+"scripts/*" = ["N806", "PTH"]
+"app/scratch/*" = ["N806"]
+"app/evaluation/reports/*" = ["PTH"]
+"app/evaluation/runners/*" = ["PTH", "B905", "C416", "F416", "F401", "F841"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-ra -v"
-testpaths = ["backend/tests"]
+testpaths = ["tests"]
 asyncio_mode = "auto"
-norecursedirs = ["backend/app/scratch", "app/scratch", ".venv", ".git"]
+norecursedirs = ["app/scratch", ".venv", ".git"]
 timeout = 30
 
 [tool.setuptools]
-package-dir = {"" = "backend"}
 packages = ["app"]
-
-[dependency-groups]
-dev = [
-    "pytest-timeout>=2.4.0",
-    "ruff>=0.16.0",
-]
 
