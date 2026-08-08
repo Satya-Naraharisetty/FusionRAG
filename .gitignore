@@ -242,3 +242,5 @@ nginx-ssl/
 .env.production.local
 
 
+.vscode/
+.agents/
