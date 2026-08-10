@@ -3,7 +3,7 @@ from app.chat.domain.interfaces import HistoryRewriteCache
 
 class MemoryRewriteCache(HistoryRewriteCache):
     def __init__(self) -> None:
-        self._cache = {}
+        self._cache: dict[str, str] = {}
 
     async def get(self, key: str) -> str | None:
         return self._cache.get(key)

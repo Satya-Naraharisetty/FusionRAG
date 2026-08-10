@@ -5,8 +5,8 @@ from fastapi import status
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-from app.auth.infrastructure.persistence.models import Base
 from app.core.config import settings
+from app.db.models import Base
 
 TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
 

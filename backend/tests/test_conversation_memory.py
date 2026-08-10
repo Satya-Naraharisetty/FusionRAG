@@ -10,10 +10,11 @@ from app.api.dependencies import (
     get_answer_generation_service,
     get_conversation_manager,
 )
-from app.auth.infrastructure.persistence.models import Base, SQLAlchemyUser
+from app.auth.infrastructure.persistence.models import SQLAlchemyUser
 from app.chat.domain.exceptions import (
     ConversationConcurrentUpdateException,
     ConversationNotFoundException,
+    InvalidStatusTransitionException,
     UnauthorizedConversationAccessException,
 )
 from app.chat.domain.models import (
@@ -22,6 +23,7 @@ from app.chat.domain.models import (
     ConversationMessage,
     ConversationState,
     ConversationSummary,
+    HistoryRewriteResult,
     MessageRole,
     MessageStatus,
     RetrievalDiagnostics,
@@ -42,6 +44,7 @@ from app.chat.services.history_rewriter import LLMHistoryRewriter
 from app.chat.services.prompt_builder import PromptBuilder
 from app.chat.services.rolling_memory import RollingConversationMemory
 from app.chat.services.token_estimator import CharacterTokenEstimator
+from app.db.models import Base
 from app.documents.domain.models import RetrievedChunk, SearchResult
 
 TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
@@ -919,3 +922,468 @@ def test_conversations_api_flow(client, chat_test_db):
 
     client.app.dependency_overrides.clear()
     db_session.close()
+
+
+# --- 8. Chat Persistence & Client-Disconnect Handling ---
+
+
+class IdentityHistoryRewriter:
+    """Rewrite stub that never rewrites; keeps tests deterministic."""
+
+    async def rewrite(self, question, history):
+        return HistoryRewriteResult(
+            original_query=question,
+            rewritten_query=question,
+            rewrite_reason="test stub",
+            rewrite_applied=False,
+        )
+
+
+@pytest.fixture(scope="function")
+def real_chat_wiring(client, chat_test_db):
+    """
+    Wires the real chat dependency graph — real request-scoped get_db session,
+    real ConversationManager and real orchestrator — with only the external
+    services (LLM, retrieval, titles, rewrites) mocked. Persistence therefore
+    depends entirely on the get_db commit at request teardown, which is the
+    behavior these regression tests guard.
+    """
+    db = chat_test_db()
+
+    from app.api.dependencies import (
+        get_conversation_title_generator,
+        get_document_service,
+        get_history_rewriter,
+        get_llm_provider,
+        get_prompt_builder,
+        get_retrieval_service,
+    )
+    from app.chat.services.title_generator import FallbackConversationTitleGenerator
+
+    llm = MockLLMProvider("Mocked Answer")
+    chunk = RetrievedChunk(
+        chunk_id=uuid4(),
+        document_id=uuid4(),
+        document_name="doc.txt",
+        text="Python was created in 1991.",
+        similarity_score=0.95,
+        chunk_index=0,
+    )
+
+    client.app.dependency_overrides[get_llm_provider] = lambda: llm
+    client.app.dependency_overrides[get_retrieval_service] = lambda: (
+        MockRetrievalService([chunk])
+    )
+    client.app.dependency_overrides[get_history_rewriter] = lambda: (
+        IdentityHistoryRewriter()
+    )
+    client.app.dependency_overrides[get_conversation_title_generator] = lambda: (
+        FallbackConversationTitleGenerator()
+    )
+    client.app.dependency_overrides[get_prompt_builder] = lambda: PromptBuilder("")
+    client.app.dependency_overrides[get_document_service] = lambda: None
+
+    yield db
+
+    client.app.dependency_overrides.clear()
+    db.close()
+
+
+def _assert_persisted_turn(client, token, question, *, stream):
+    """
+    Runs one chat request and asserts conversation + messages persist.
+
+    Critically, no manual db.commit() is ever called: persistence must come
+    from get_db's commit at request teardown (regression guard for the chat
+    persistence fix). Rows are read through a fresh session.
+    """
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = client.post(
+        "/api/v1/chat",
+        headers=headers,
+        json={"question": question, "stream": stream},
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    if stream:
+        assert "text/event-stream" in resp.headers["content-type"]
+        assert "Mocked Answer" in resp.text
+
+    db = client.app.state.db_session_factory()
+    try:
+        rows = db.execute(
+            text(
+                "SELECT c.id, m.role, m.status, m.content "
+                "FROM conversations c "
+                "JOIN conversation_messages m ON m.conversation_id = c.id "
+                "ORDER BY m.created_at, m.id"
+            )
+        ).fetchall()
+    finally:
+        db.close()
+
+    assert len(rows) == 2, f"expected user + assistant messages, got {len(rows)}"
+    roles = [r[1] for r in rows]
+    statuses = [r[2] for r in rows]
+    contents = [r[3] for r in rows]
+    assert roles == ["user", "assistant"]
+    assert statuses == ["completed", "completed"]
+    assert contents[0] == question
+    assert "Mocked Answer" in contents[1]
+    return rows[0][0]
+
+
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
+def test_api_chat_stream_persists_conversation_and_messages(client, real_chat_wiring):
+    """
+    Regression: after a streaming /chat request, the conversation, the user
+    question and the completed assistant answer must be persisted in the DB
+    even though no code path calls db.commit() explicitly (get_db owns it).
+    """
+    token, _user_id = get_user_token_and_id(client)
+    conv_id = _assert_persisted_turn(
+        client, token, "When was Python created?", stream=True
+    )
+    assert conv_id is not None
+
+
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
+def test_api_chat_sync_persists_conversation_and_messages(client, real_chat_wiring):
+    """
+    Same persistence regression guard for the synchronous (non-streaming) path.
+    """
+    token, _user_id = get_user_token_and_id(client)
+    conv_id = _assert_persisted_turn(
+        client, token, "When was Python created?", stream=False
+    )
+    assert conv_id is not None
+
+
+def _build_answer_service(db):
+    """Builds a real orchestrator stack bound to the given session."""
+    from app.chat.services.title_generator import FallbackConversationTitleGenerator
+    from app.documents.infrastructure.event_dispatcher import SimpleEventDispatcher
+
+    conv_repo = SQLAlchemyConversationRepository(db)
+    msg_repo = SQLAlchemyMessageRepository(db)
+    sum_repo = SQLAlchemySummaryRepository(db)
+
+    llm = MockLLMProvider("Mocked Answer")
+    estimator = CharacterTokenEstimator()
+    prompt_builder = PromptBuilder("")
+    context_builder = ConversationContextBuilder()
+    chunks = [
+        RetrievedChunk(
+            chunk_id=uuid4(),
+            document_id=uuid4(),
+            document_name="doc.txt",
+            text="Python was created in 1991.",
+            similarity_score=0.95,
+            chunk_index=0,
+        )
+    ]
+    retrieval_service = MockRetrievalService(chunks)
+    dispatcher = SimpleEventDispatcher()
+    access_service = ConversationAccessService(conv_repo)
+    memory = RollingConversationMemory(msg_repo, sum_repo, max_messages=12)
+    rewriter = LLMHistoryRewriter(llm, "gemini-1.5-flash", MemoryRewriteCache())
+
+    manager = ConversationManager(
+        conversation_repo=conv_repo,
+        message_repo=msg_repo,
+        summary_repo=sum_repo,
+        access_service=access_service,
+        memory=memory,
+        rewriter=rewriter,
+        title_generator=FallbackConversationTitleGenerator(),
+        event_dispatcher=dispatcher,
+    )
+
+    service = AnswerGenerationService(
+        retrieval_service=retrieval_service,
+        prompt_builder=prompt_builder,
+        llm_provider=llm,
+        token_estimator=estimator,
+        conversation_manager=manager,
+        context_builder=context_builder,
+        model="gemini-1.5-flash",
+        temperature=0.0,
+        max_response_tokens=100,
+        system_prompt_tokens_limit=500,
+        max_context_tokens=1000,
+        reserved_completion_tokens=50,
+        enable_conversation_memory=True,
+    )
+    return service
+
+
+def _read_messages(db, conversation_id):
+    return db.execute(
+        text(
+            "SELECT role, status, content, metadata "
+            "FROM conversation_messages "
+            "WHERE conversation_id = :c "
+            "ORDER BY created_at, id"
+        ),
+        {"c": conversation_id},
+    ).fetchall()
+
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
+async def test_stream_disconnect_persists_partial_answer_as_interrupted(
+    chat_test_db, test_users
+):
+    """
+    When a client disconnects mid-stream (the generator is closed while a
+    stream is in flight), the partial assistant answer must be persisted in a
+    terminal INTERRUPTED status — not left STREAMING — while the user question
+    and conversation remain.
+    """
+    db = chat_test_db()
+    user_id, _ = test_users
+    service = _build_answer_service(db)
+
+    agen = service.generate_answer_stream(
+        question="When was Python created?", user_id=user_id, top_k=10
+    )
+
+    first = await agen.__anext__()
+    assert first["event"] == "metadata"
+    conv_id = UUID(first["data"]["conversation_id"])
+
+    second = await agen.__anext__()
+    assert second["event"] == "text"
+
+    # Client disconnects: closing the async generator delivers GeneratorExit
+    # into the orchestrator, which triggers the interrupt sweep.
+    await agen.aclose()
+
+    db.commit()
+    fresh = chat_test_db()
+    try:
+        rows = _read_messages(fresh, conv_id)
+    finally:
+        fresh.close()
+
+    assert len(rows) == 2
+    assert rows[0][0] == "user"
+    assert rows[0][1] == "completed"
+    assert rows[0][2] == "When was Python created?"
+
+    assert rows[1][0] == "assistant"
+    assert rows[1][1] == "interrupted"
+    assert rows[1][2] == "Mocked "  # partial content preserved
+    meta = rows[1][3]
+    if isinstance(meta, str):
+        import json
+
+        meta = json.loads(meta)
+    assert meta.get("interrupt_reason") == "client_disconnected"
+
+    db.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
+async def test_stream_disconnect_before_first_chunk_persists_interrupted(
+    chat_test_db, test_users
+):
+    """
+    Disconnecting after the metadata event but before any text chunk must still
+    leave a terminal INTERRUPTED record (empty partial content), never a PENDING
+    message stuck in the DB.
+    """
+    db = chat_test_db()
+    user_id, _ = test_users
+    service = _build_answer_service(db)
+
+    agen = service.generate_answer_stream(
+        question="When was Python created?", user_id=user_id, top_k=10
+    )
+
+    first = await agen.__anext__()
+    assert first["event"] == "metadata"
+    conv_id = UUID(first["data"]["conversation_id"])
+
+    await agen.aclose()
+
+    db.commit()
+    fresh = chat_test_db()
+    try:
+        rows = _read_messages(fresh, conv_id)
+    finally:
+        fresh.close()
+
+    assert len(rows) == 2
+    assert rows[1][0] == "assistant"
+    assert rows[1][1] == "interrupted"
+    assert rows[1][2] == ""
+
+    db.close()
+
+
+@pytest.mark.asyncio
+async def test_message_repository_interrupt_lifecycle(chat_test_db, test_users):
+    """
+    Repo-level coverage of interrupt_message: PENDING/STREAMING -> INTERRUPTED
+    with partial content preserved, idempotent no-op on terminal messages, and
+    illegal transitions out of INTERRUPTED rejected.
+    """
+    db = chat_test_db()
+    conv_repo = SQLAlchemyConversationRepository(db)
+    msg_repo = SQLAlchemyMessageRepository(db)
+    user_id, _ = test_users
+
+    conv_id = uuid4()
+    conv = Conversation(
+        id=conv_id,
+        user_id=user_id,
+        title="Chat",
+        state=ConversationState.ACTIVE,
+        version=1,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_message_at=datetime.now(UTC),
+    )
+    await conv_repo.create_conversation(conv)
+
+    # PENDING -> INTERRUPTED with reason recorded
+    pending_id = uuid4()
+    await msg_repo.create_assistant_message(conv_id, pending_id, MessageRole.ASSISTANT)
+    interrupted = await msg_repo.interrupt_message(
+        pending_id, reason="client_disconnected"
+    )
+    assert interrupted.status == MessageStatus.INTERRUPTED
+    assert interrupted.metadata["interrupt_reason"] == "client_disconnected"
+
+    # STREAMING (with partial content) -> INTERRUPTED, content preserved
+    streaming_id = uuid4()
+    await msg_repo.create_assistant_message(
+        conv_id, streaming_id, MessageRole.ASSISTANT
+    )
+    await msg_repo.append_stream_chunk(streaming_id, "partial ")
+    await msg_repo.append_stream_chunk(streaming_id, "answer")
+    interrupted2 = await msg_repo.interrupt_message(streaming_id)
+    assert interrupted2.status == MessageStatus.INTERRUPTED
+    assert interrupted2.content == "partial answer"
+
+    # No-op on already-completed messages
+    completed_id = uuid4()
+    await msg_repo.create_assistant_message(
+        conv_id, completed_id, MessageRole.ASSISTANT
+    )
+    completed = await msg_repo.complete_message(completed_id, 1, 2)
+    noop = await msg_repo.interrupt_message(completed_id)
+    assert noop.status == MessageStatus.COMPLETED
+    assert completed.status == MessageStatus.COMPLETED
+
+    # Illegal transitions OUT of INTERRUPTED are rejected
+    with pytest.raises(InvalidStatusTransitionException):
+        await msg_repo.complete_message(pending_id, 1, 2)
+    with pytest.raises(InvalidStatusTransitionException):
+        await msg_repo.append_stream_chunk(pending_id, "more")
+    with pytest.raises(InvalidStatusTransitionException):
+        await msg_repo.fail_message(pending_id, "nope")
+
+    db.close()
+
+
+# --- 9. No-Documents Fallback & @documents Mention ---
+
+
+def _override_empty_retrieval(client):
+    from app.api.dependencies import get_retrieval_service
+
+    client.app.dependency_overrides[get_retrieval_service] = lambda: (
+        MockRetrievalService([])
+    )
+
+
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
+def test_api_chat_without_documents_answers_generally(client, real_chat_wiring):
+    """
+    No documents uploaded / nothing matched: the chatbot must still answer
+    (general-knowledge fallback) with no citations instead of erroring.
+    """
+    _override_empty_retrieval(client)
+    token, _user_id = get_user_token_and_id(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = client.post(
+        "/api/v1/chat",
+        headers=headers,
+        json={"question": "When was Python created?", "stream": False},
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()
+    assert data["answer"] == "Mocked Answer"
+    assert data["citations"] == []
+
+
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
+def test_api_chat_stream_without_documents_answers_generally(client, real_chat_wiring):
+    """
+    Same fallback for the SSE streaming path: done event with a general answer,
+    no citations.
+    """
+    _override_empty_retrieval(client)
+    token, _user_id = get_user_token_and_id(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = client.post(
+        "/api/v1/chat",
+        headers=headers,
+        json={"question": "When was Python created?", "stream": True},
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert "text/event-stream" in resp.headers["content-type"]
+    assert "event: done" in resp.text
+    assert "Mocked Answer" in resp.text
+    assert "NO_RELEVANT_CONTEXT" not in resp.text
+
+
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
+def test_api_chat_documents_mention_persists_clean_question(client, real_chat_wiring):
+    """
+    @documents with nothing relevant: the request succeeds, no citations are
+    returned, and the persisted user message has the control mention stripped.
+    """
+    _override_empty_retrieval(client)
+    token, _user_id = get_user_token_and_id(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = client.post(
+        "/api/v1/chat",
+        headers=headers,
+        json={
+            "question": "@documents When was Python created?",
+            "stream": False,
+        },
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    assert resp.json()["citations"] == []
+
+    db = client.app.state.db_session_factory()
+    try:
+        rows = db.execute(
+            text("SELECT content FROM conversation_messages ORDER BY created_at, id")
+        ).fetchall()
+    finally:
+        db.close()
+    assert len(rows) == 2
+    assert rows[0][0] == "When was Python created?"
+    assert "@documents" not in rows[0][0]

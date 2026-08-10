@@ -126,6 +126,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
               ) : null}
 
               {message.status === "streaming" && <StreamingCursor />}
+
+              {message.status === "interrupted" && (
+                <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] mt-1 animate-fade-in">
+                  <span className="h-1 w-1 rounded-full bg-[var(--text-muted)] flex-shrink-0" />
+                  <span>Generation stopped — response is incomplete.</span>
+                </div>
+              )}
             </div>
 
             {/* Citations */}
@@ -225,12 +232,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
                   </Tooltip>
                 )}
 
-                {message.status === "failed" && onRetry && (
+                {(message.status === "failed" || message.status === "interrupted") && onRetry && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
                         onClick={onRetry}
-                        className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] text-red-400 hover:bg-red-500/10 transition-colors text-[10px] font-medium cursor-pointer"
+                        className={cn(
+                          "flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] transition-colors text-[10px] font-medium cursor-pointer",
+                          message.status === "failed"
+                            ? "text-red-400 hover:bg-red-500/10"
+                            : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+                        )}
                         aria-label="Retry query"
                       >
                         <RefreshCw size={11} />

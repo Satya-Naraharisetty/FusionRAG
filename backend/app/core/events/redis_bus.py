@@ -29,7 +29,7 @@ class RedisEventBus(BaseEventBus):
             self._redis.xadd(
                 "stream:events",
                 {"event_type": event_name, "payload": payload},
-                max_len=10000,  # Approximate size capping
+                maxlen=10000,  # Approximate size capping
                 approximate=True,
             )
         except Exception as e:
@@ -76,8 +76,19 @@ class RedisEventBus(BaseEventBus):
                     block=1000,
                 )
                 if streams:
-                    for _, messages in streams:
-                        for msg_id, data in messages:
+                    for stream_data in streams:
+                        # stream_data is (stream_name, [(message_id, fields_dict), ...])
+                        if not isinstance(stream_data, (tuple, list)):
+                            continue
+                        messages = stream_data[1] if len(stream_data) > 1 else []
+                        if not isinstance(messages, (tuple, list)):
+                            continue
+                        for msg in messages:
+                            if not isinstance(msg, (tuple, list)) or len(msg) < 2:
+                                continue
+                            msg_id, data = msg[0], msg[1]
+                            if not isinstance(data, dict):
+                                continue
                             event_name = data.get("event_type")
                             payload_str = data.get("payload")
                             last_id = msg_id

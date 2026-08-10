@@ -9,6 +9,25 @@ logger = logging.getLogger(__name__)
 
 
 class PromptBuilder:
+    # Appended to the system prompt when the user explicitly asked to
+    # prioritize their uploaded documents (used @documents): the assistant may
+    # fall back to general knowledge, but must call out when the question is
+    # not covered by the uploaded documents.
+    _DOCUMENTS_PRIORITY_NOTE = (
+        "\n\nThe user explicitly asked to prioritize their uploaded documents "
+        "(they used @documents). If the information needed to answer the question "
+        "is not present in the provided context, answer from your general knowledge "
+        "and clearly state that the information was not found in the uploaded "
+        "documents."
+    )
+    # Appended when no document context is available at all (e.g. the user has
+    # no documents or none matched): relax the "ONLY use the provided context"
+    # rule so the assistant answers from general knowledge instead of refusing.
+    _NO_CONTEXT_NOTE = (
+        "\n\nNo document context is available for this question. "
+        "Answer the question from your general knowledge."
+    )
+
     def __init__(self, system_prompt_path: str) -> None:
         self.system_prompt_path = system_prompt_path
         self._default_system_prompt = (
@@ -59,6 +78,7 @@ class PromptBuilder:
         token_estimator: Any,
         max_context_tokens: int,
         max_memory_tokens: int = 3000,
+        document_priority: bool = False,
     ) -> tuple[list[ChatMessage], list[RetrievedChunk]]:
         """
         Assemble and budget the final chat messages list.
@@ -67,6 +87,13 @@ class PromptBuilder:
         2. Current Question baseline
         3. History messages (within MAX_MEMORY_TOKENS & remaining budget)
         4. Retrieved document context (from remaining budget)
+
+        When ``document_priority`` is True (the user used @documents), the
+        system prompt instructs the assistant to answer from general knowledge
+        when the retrieved context is insufficient, explicitly noting that the
+        information was not found in the uploaded documents. When no context is
+        available at all and documents were not prioritized, the assistant is
+        told to answer from general knowledge instead of refusing.
         """
         from app.chat.domain.models import ChatMessage, ChatRole, MessageRole
 
@@ -76,6 +103,8 @@ class PromptBuilder:
             system_content += (
                 f"\n\nConversation Summary:\n{context_obj.summary.summary}"
             )
+        if document_priority:
+            system_content += self._DOCUMENTS_PRIORITY_NOTE
 
         system_tokens = token_estimator.estimate(system_content)
 
@@ -140,6 +169,12 @@ class PromptBuilder:
             accumulated_chunk_tokens += chunk_tokens
 
         concatenated_context = "".join(concatenated_parts).strip()
+
+        # If no document context made it into the prompt and the user did not
+        # explicitly prioritize documents, tell the assistant to answer from
+        # general knowledge so an empty knowledge base never yields a refusal.
+        if not chunk_references and not document_priority:
+            system_content += self._NO_CONTEXT_NOTE
 
         # 5. Assemble final prompt messages
         final_messages = [ChatMessage(role=ChatRole.SYSTEM, content=system_content)]

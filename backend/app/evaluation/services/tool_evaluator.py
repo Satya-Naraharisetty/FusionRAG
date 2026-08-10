@@ -57,8 +57,8 @@ class ToolEvaluator:
                 timeouts=timeouts,
                 retries=retries,
                 latency=latency,
-                correct_tool_chosen=m_choice.passed,
-                passed=m_success.passed and m_choice.passed and (timeouts == 0),
+                correct_tool_chosen=m_choice.passed or False,
+                passed=bool(m_success.passed and m_choice.passed and (timeouts == 0)),
             )
 
             sample_metadata = dict(sample.metadata)

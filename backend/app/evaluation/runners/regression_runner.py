@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -20,7 +21,7 @@ class RegressionRunner:
         db: Session,
         candidate_run_id: uuid.UUID,
         baseline_run_id: uuid.UUID,
-        delta_thresholds: dict[str, float] = None,
+        delta_thresholds: dict[str, float] | None = None,
     ) -> RegressionRun:
         """
         Compare candidate run scores with baseline run scores.
@@ -64,7 +65,7 @@ class RegressionRunner:
 
         metric_deltas = {}
         passed = True
-        details = {
+        details: dict[str, Any] = {
             "candidate_metrics": candidate_averages,
             "baseline_metrics": baseline_averages,
             "regressions": [],

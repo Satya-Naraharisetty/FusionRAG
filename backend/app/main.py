@@ -53,6 +53,12 @@ from app.core.logger import (
     setup_logging,
 )
 from app.core.security import PromptInjectionError
+
+# Register every ORM model on Base.metadata at import time.
+# Without this, the chat tables (conversations, conversation_messages,
+# conversation_summaries) referenced by the documents.conversation_id FK
+# are missing and any Document flush crashes with NoReferencedTableError.
+from app.db.models import Base  # noqa: F401  (side-effect: full model registration)
 from app.documents.domain.exceptions import (
     DocumentCorrupted,
     DocumentExtractionFailed,
@@ -75,7 +81,7 @@ def run_startup_validations() -> None:
     Validates that required system settings are non-empty and well-formed.
     """
     logger.info("Auditing environment settings configurations...")
-    required_vars = {
+    required_vars: dict[str, str | None] = {
         "JWT_SECRET": settings.JWT_SECRET,
     }
     if not settings.DATABASE_URL:
@@ -162,8 +168,6 @@ def verify_alembic_migrations(engine) -> None:
         return
 
     logger.info("Verifying database schema migrations are up-to-date...")
-    import os
-
     from alembic.config import Config
     from alembic.runtime.migration import MigrationContext
     from alembic.script import ScriptDirectory
@@ -219,6 +223,9 @@ async def lifespan(app: FastAPI):
     try:
         app.state.is_draining = False
         app.state.active_requests_count = 0
+        app.state.request_count = 0
+        app.state.error_count = 0
+        app.state.started_at = time.time()
 
         run_startup_validations()
 
@@ -229,7 +236,7 @@ async def lifespan(app: FastAPI):
             init_redis_client,
         )
 
-        engine = init_postgres_engine(settings.DATABASE_URL)
+        engine = init_postgres_engine(settings.DATABASE_URL or "")
         verify_postgres_connectivity(engine)
         verify_alembic_migrations(engine)
 
@@ -333,6 +340,9 @@ class ProductionMiddleware(BaseHTTPMiddleware):
             request.app.state.active_requests_count += 1
         except AttributeError:
             request.app.state.active_requests_count = 1
+        request.app.state.request_count = (
+            getattr(request.app.state, "request_count", 0) + 1
+        )
 
         # 2. Resolve request ID
         req_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
@@ -380,6 +390,10 @@ class ProductionMiddleware(BaseHTTPMiddleware):
             duration_ms = (time.perf_counter() - start_time) * 1000
             request_status_ctx.set(response.status_code)
             request_duration_ctx.set(round(duration_ms, 2))
+            if response.status_code >= 500:
+                request.app.state.error_count = (
+                    getattr(request.app.state, "error_count", 0) + 1
+                )
 
             logger.info(f"Request processing completed - Duration: {duration_ms:.2f}ms")
 
@@ -683,16 +697,27 @@ app.include_router(admin_router, prefix=settings.API_V1_STR)
 
 @app.get("/metrics")
 def metrics_endpoint():
-    """Prometheus scraping endpoint."""
-    metrics_data = (
-        "# HELP http_requests_total Total HTTP Requests\n"
-        "# TYPE http_requests_total counter\n"
-        "http_requests_total 42\n"
-        "# HELP active_sse_streams Total Active SSE Streaming Connections\n"
-        "# TYPE active_sse_streams gauge\n"
-        "active_sse_streams 0\n"
-    )
-    return Response(content=metrics_data, media_type="text/plain")
+    """Prometheus scraping endpoint backed by live request counters."""
+    request_count = getattr(app.state, "request_count", 0)
+    error_count = getattr(app.state, "error_count", 0)
+    active_requests = getattr(app.state, "active_requests_count", 0)
+    started_at = getattr(app.state, "started_at", None)
+    uptime = max(0.0, time.time() - started_at) if started_at else 0.0
+    metrics_lines = [
+        "# HELP http_requests_total Total HTTP requests processed",
+        "# TYPE http_requests_total counter",
+        f"http_requests_total {request_count}",
+        "# HELP http_requests_failed_total HTTP requests returning 5xx responses",
+        "# TYPE http_requests_failed_total counter",
+        f"http_requests_failed_total {error_count}",
+        "# HELP http_active_requests Current in-flight HTTP requests",
+        "# TYPE http_active_requests gauge",
+        f"http_active_requests {active_requests}",
+        "# HELP process_uptime_seconds Seconds elapsed since application start",
+        "# TYPE process_uptime_seconds gauge",
+        f"process_uptime_seconds {uptime:.2f}",
+    ]
+    return Response(content="\n".join(metrics_lines) + "\n", media_type="text/plain")
 
 
 @app.get("/")

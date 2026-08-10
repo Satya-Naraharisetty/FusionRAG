@@ -29,14 +29,15 @@ export const useSSEChat = () => {
       abortControllerRef.current.abort();
       setIsStreaming(false);
       
-      // Update last message status to completed when stopped by user
+      // Update last message status to interrupted when stopped by user — the
+      // backend persists the partial answer with the same INTERRUPTED status.
       setChatMessages((prev) => {
         if (prev.length === 0) return prev;
         const last = prev[prev.length - 1];
         if (last.role === "assistant" && last.status !== "completed") {
           return [
             ...prev.slice(0, -1),
-            { ...last, status: "completed" as const },
+            { ...last, status: "interrupted" as const },
           ];
         }
         return prev;
@@ -76,13 +77,22 @@ export const useSSEChat = () => {
       setConnectionLost(false);
       setIsStreaming(true);
 
+      // Streamed messages need stable ids so list rendering stays keyed
+      // (and message actions like reactions can reference them).
+      const newClientMessageId = () =>
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `msg-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
       const userMsg: ChatMessage = {
+        id: newClientMessageId(),
         role: "user" as const,
         content: question,
         created_at: new Date().toISOString(),
       };
 
       const assistantMsg: ChatMessage = {
+        id: newClientMessageId(),
         role: "assistant" as const,
         content: "",
         status: "pending" as const,
@@ -207,6 +217,25 @@ export const useSSEChat = () => {
             setIsStreaming(false);
           }
         }
+
+        // The stream ended without a terminal event (done/error) — e.g. the
+        // server closed it after detecting a disconnect. Reflect the persisted
+        // INTERRUPTED status so the cursor stops instead of spinning forever.
+        setChatMessages((prev) => {
+          if (prev.length === 0) return prev;
+          const last = prev[prev.length - 1];
+          if (
+            last.role === "assistant" &&
+            (last.status === "pending" || last.status === "streaming")
+          ) {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, status: "interrupted" as const },
+            ];
+          }
+          return prev;
+        });
+        setIsStreaming(false);
       } catch (err: unknown) {
         setIsStreaming(false);
         const isAbort = err instanceof DOMException && err.name === "AbortError";
@@ -270,13 +299,13 @@ export const useSSEChat = () => {
   const cancel = useCallback(() => {
     setStreamError(null);
     setConnectionLost(false);
-    // Mark last failed message as completed
+    // Mark last message as interrupted (partial output preserved)
     setChatMessages((prev) => {
       if (prev.length === 0) return prev;
       const last = prev[prev.length - 1];
       return [
         ...prev.slice(0, -1),
-        { ...last, status: "completed" as const },
+        { ...last, status: "interrupted" as const },
       ];
     });
   }, []);

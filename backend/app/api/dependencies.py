@@ -200,7 +200,7 @@ def get_checksum_generator() -> SHA256ChecksumGenerator:
     return SHA256ChecksumGenerator()
 
 
-def get_storage_provider(db: Session = Depends(get_db)) -> Any:
+def get_storage_provider(db: Session | None = None) -> Any:
     from app.core.config import settings
     from app.documents.infrastructure.storage import (
         DatabaseStorageProvider,
@@ -220,6 +220,10 @@ def get_storage_provider(db: Session = Depends(get_db)) -> Any:
     elif provider_type == "local":
         return LocalStorageProvider(upload_dir=settings.UPLOAD_DIR)
     else:
+        if db is None:
+            raise RuntimeError(
+                "Database session is required when using the database storage provider."
+            )
         return DatabaseStorageProvider(db)
 
 
@@ -282,7 +286,7 @@ def get_embedding_generator() -> EmbeddingGenerator:
         )
 
 
-def get_vector_store(request: Request = None) -> VectorStore:
+def get_vector_store(request: Request = None) -> VectorStore:  # type: ignore[assignment]  # FastAPI injects Request
     from app.documents.infrastructure.persistence.vector_store import QdrantVectorStore
 
     if (
@@ -346,10 +350,11 @@ def get_embedding_service(
 def get_document_processing_service(
     db: Session = Depends(get_db),
     embedding_service: EmbeddingService = Depends(get_embedding_service),
-    request: Request = None,
+    request: Request = None,  # type: ignore[assignment]  # FastAPI injects Request
 ) -> DocumentProcessingService:
     dispatcher = SimpleEventDispatcher()
 
+    task_queue: Any
     if request and hasattr(request, "background_tasks"):
         task_queue = FastAPIBackgroundTasksQueue(request.background_tasks)
     else:
@@ -399,9 +404,11 @@ def get_document_service(
             task_queue.enqueue(embedding_service.generate_embeddings, event.document_id)
 
         # Clear and re-register to use the correct request background tasks queue
-        processing_service._event_dispatcher._handlers[DocumentProcessingCompleted] = [
-            handle_document_completed
-        ]
+        event_dispatcher = processing_service._event_dispatcher
+        if event_dispatcher is not None:
+            event_dispatcher._handlers[  # type: ignore[attr-defined]
+                DocumentProcessingCompleted
+            ] = [handle_document_completed]
 
     return DocumentService(
         document_repo=SQLAlchemyDocumentRepository(db),
@@ -598,7 +605,7 @@ def get_conversation_memory(
     )
 
 
-def get_history_rewrite_cache(request: Request = None) -> Any:
+def get_history_rewrite_cache(request: Request = None) -> Any:  # type: ignore[assignment]  # FastAPI injects Request
     from app.chat.infrastructure.cache import MemoryRewriteCache, RedisRewriteCache
 
     redis_client = None
@@ -704,7 +711,7 @@ async def run_background_summarization(
 
 
 def get_event_dispatcher(
-    request: Request = None,
+    request: Request = None,  # type: ignore[assignment]  # FastAPI injects Request
     llm_provider=Depends(get_llm_provider),
 ) -> Any:
     global _dispatcher_instance
@@ -717,6 +724,7 @@ def get_event_dispatcher(
 
         def handle_message_added(event: ConversationMessageCreated) -> None:
             # Resolve task queue
+            task_queue: Any
             if request and hasattr(request, "background_tasks"):
                 task_queue = FastAPIBackgroundTasksQueue(request.background_tasks)
             else:
@@ -734,7 +742,8 @@ def get_event_dispatcher(
 
                 from app.db.session import init_postgres_engine
 
-                engine = init_postgres_engine(settings.DATABASE_URL)
+                database_url = settings.DATABASE_URL or ""
+                engine = init_postgres_engine(database_url)
                 session_factory = sessionmaker(bind=engine)
 
             task_queue.enqueue(
@@ -811,6 +820,7 @@ def get_answer_generation_service(
 
 def get_tool_registry(retrieval_service=Depends(get_retrieval_service)) -> Any:
     from app.chat.services.tool_registry import ToolRegistry
+    from app.chat.services.tools.base import Tool
     from app.chat.services.tools.calculator import CalculatorTool
     from app.chat.services.tools.chunk_retrieval import RetrieveChunkTool
     from app.chat.services.tools.citation_lookup import CitationLookupTool
@@ -818,7 +828,7 @@ def get_tool_registry(retrieval_service=Depends(get_retrieval_service)) -> Any:
     from app.chat.services.tools.document_retrieval import RetrieveDocumentTool
     from app.chat.services.tools.semantic_search import SearchKnowledgeTool
 
-    tools = [
+    tools: list[Tool] = [
         SearchKnowledgeTool(retrieval_service),
         RetrieveDocumentTool(),
         RetrieveChunkTool(),
@@ -993,10 +1003,10 @@ def get_report_generator():
 
 # --- Production Backend Layer Dependency Providers ---
 
-_cache_instance = None
+_cache_instance: Any = None
 
 
-def get_cache(request: Request = None) -> Any:
+def get_cache(request: Request = None) -> Any:  # type: ignore[assignment]  # FastAPI injects Request
     global _cache_instance
     if _cache_instance is None:
         from app.core.cache.memory_cache import InMemoryCache
@@ -1019,7 +1029,7 @@ def get_cache(request: Request = None) -> Any:
     return _cache_instance
 
 
-def get_distributed_lock(request: Request = None) -> Any:
+def get_distributed_lock(request: Request = None) -> Any:  # type: ignore[assignment]  # FastAPI injects Request
     from app.core.cache.lock import InMemoryDistributedLock, RedisDistributedLock
 
     redis_client = None
@@ -1033,23 +1043,7 @@ def get_distributed_lock(request: Request = None) -> Any:
     return InMemoryDistributedLock()
 
 
-def get_rate_limiter(request: Request = None) -> Any:
-    from app.core.security.rate_limiter import RateLimiter
-
-    redis_client = None
-    if request:
-        try:
-            redis_client = getattr(request.app.state, "redis", None)
-        except Exception:
-            pass
-    return RateLimiter(
-        redis_client=redis_client,
-        requests_per_minute=settings.RATE_LIMIT_REQUESTS_PER_MINUTE,
-        burst=settings.RATE_LIMIT_BURST,
-    )
-
-
-def get_idempotency_manager(request: Request = None) -> Any:
+def get_idempotency_manager(request: Request = None) -> Any:  # type: ignore[assignment]  # FastAPI injects Request
     from app.core.security.idempotency import IdempotencyManager
 
     redis_client = None
@@ -1064,7 +1058,8 @@ def get_idempotency_manager(request: Request = None) -> Any:
 
 
 def get_resource_quota_service(
-    db: Session = Depends(get_db), request: Request = None
+    db: Session = Depends(get_db),
+    request: Request = None,  # type: ignore[assignment]  # FastAPI injects Request
 ) -> Any:
     from app.core.security.quotas import ResourceQuotaService
 
@@ -1110,10 +1105,10 @@ def get_feature_flag_service() -> Any:
     return _feature_flag_service
 
 
-_event_bus_instance = None
+_event_bus_instance: Any = None
 
 
-def get_event_bus(request: Request = None) -> Any:
+def get_event_bus(request: Request = None) -> Any:  # type: ignore[assignment]  # FastAPI injects Request
     global _event_bus_instance
     if _event_bus_instance is None:
         from app.core.events.redis_bus import RedisEventBus

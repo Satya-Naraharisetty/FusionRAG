@@ -69,6 +69,7 @@ class MessageStatus(str, Enum):
     STREAMING = "streaming"
     COMPLETED = "completed"
     FAILED = "failed"
+    INTERRUPTED = "interrupted"  # Client stopped the stream mid-generation; partial content preserved
 
 
 class ConversationSettings(BaseModel):

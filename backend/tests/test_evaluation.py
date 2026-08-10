@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.db.session import Base
+from app.db.models import Base
 from app.evaluation.datasets.dataset_loader import DatasetLoader
 from app.evaluation.infrastructure.persistence.models import (
     SQLAlchemyEvaluationResult,

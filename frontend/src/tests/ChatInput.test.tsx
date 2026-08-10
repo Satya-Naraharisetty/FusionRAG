@@ -53,6 +53,28 @@ describe("ChatInput", () => {
     expect(handleSend).toHaveBeenCalledWith("Hello assistant", undefined);
   });
 
+  it("shows the document-mode indicator when @documents is typed", () => {
+    renderWithQueryClient(
+      <ChatInput
+        conversationId={null}
+        onSend={() => {}}
+        onStop={() => {}}
+        isStreaming={false}
+      />
+    );
+
+    const textarea = screen.getByPlaceholderText(/Message Hybrid RAG/i);
+    expect(screen.queryByText(/Document mode/i)).not.toBeInTheDocument();
+
+    fireEvent.change(textarea, {
+      target: { value: "@documents What is RAG?" },
+    });
+    expect(screen.getByText(/Document mode/i)).toBeInTheDocument();
+
+    fireEvent.change(textarea, { target: { value: "What is RAG?" } });
+    expect(screen.queryByText(/Document mode/i)).not.toBeInTheDocument();
+  });
+
   it("renders stop button instead of send when streaming", () => {
     const handleStop = vi.fn();
     renderWithQueryClient(

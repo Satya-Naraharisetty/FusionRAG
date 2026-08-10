@@ -5,7 +5,7 @@ from typing import Any
 
 class SafeCalculator:
     # Map AST operators to standard python operator functions
-    _OPERATORS: dict[type[ast.operator], Any] = {
+    _OPERATORS: dict[type[Any], Any] = {
         ast.Add: operator.add,
         ast.Sub: operator.sub,
         ast.Mult: operator.mul,
@@ -42,7 +42,7 @@ class SafeCalculator:
         elif isinstance(node, ast.BinOp):
             left = cls._eval_node(node.left)
             right = cls._eval_node(node.right)
-            op_type = type(node.op)
+            op_type: type[Any] = type(node.op)
             if op_type in cls._OPERATORS:
                 # Prevent unsafe operations
                 if op_type == ast.Div and right == 0:

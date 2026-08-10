@@ -117,12 +117,15 @@ class ConversationManager:
 
         # 5. Update last_message_at and message count in conversation details
         conversation = await self._conversation_repo.get_conversation(conversation_id)
-        if conversation:
-            conversation.last_message_at = datetime.now(UTC)
-            conversation.metadata.message_count = (
-                await self._message_repo.count_messages(conversation_id)
+        if conversation is None:
+            raise ConversationNotFoundException(
+                f"Conversation {conversation_id} not found."
             )
-            await self._conversation_repo.update_conversation(conversation)
+        conversation.last_message_at = datetime.now(UTC)
+        conversation.metadata.message_count = await self._message_repo.count_messages(
+            conversation_id
+        )
+        await self._conversation_repo.update_conversation(conversation)
 
         # Build Context containing loaded memory
         context = ConversationContext(
@@ -146,12 +149,15 @@ class ConversationManager:
         Completes the assistant's message in the DB and dispatches domain events to trigger background summarization.
         Auto-generates the conversation title if this is the first turn.
         """
-        # 1. Complete the message in database
+        # 1. Complete the message in database. Content is applied here for the
+        # synchronous path; the streaming path already accumulated it via
+        # append_stream_chunk (and passing the same value is idempotent).
         await self._message_repo.complete_message(
             message_id=message_id,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             citations=citations,
+            content=assistant_content,
         )
 
         # 2. Check if we need to auto-generate the title (if conversation only has first user + assistant messages)

@@ -1,9 +1,9 @@
 import json
 import os
-from typing import Any
+from typing import Annotated, Any, Literal
 
 from pydantic import ValidationInfo, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class ConfigurationError(RuntimeError):
@@ -109,7 +109,10 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
 
     # CORS Configurations
-    BACKEND_CORS_ORIGINS: list[str] = [
+    # NoDecode disables pydantic-settings' eager JSON decoding so that both
+    # comma-separated ("http://a,http://b") and JSON-array values are handled
+    # by assemble_cors_origins below instead of raising SettingsError.
+    BACKEND_CORS_ORIGINS: Annotated[list[str], NoDecode] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost",
@@ -156,7 +159,7 @@ class Settings(BaseSettings):
     COOKIE_DOMAIN: str | None = None
     COOKIE_PATH: str = "/api/v1/auth"
     COOKIE_SECURE: bool = True
-    COOKIE_SAMESITE: str = "lax"
+    COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
     COOKIE_MAX_AGE: int = 7 * 24 * 60 * 60
 
     # Logging Configurations
@@ -207,7 +210,6 @@ class Settings(BaseSettings):
     SYSTEM_PROMPT_TOKENS: int = 1000
     RESERVED_COMPLETION_TOKENS: int = 500
     ENABLE_STREAMING: bool = True
-    OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
 
     # Conversation Memory & History-Aware Retrieval Configurations
@@ -323,4 +325,4 @@ class Settings(BaseSettings):
 
 
 # Instantiate settings singleton
-settings = Settings()
+settings = Settings()  # type: ignore[call-arg]  # populated from env by pydantic-settings

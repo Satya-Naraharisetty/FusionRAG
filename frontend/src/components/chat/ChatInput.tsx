@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Square, AlertCircle, Paperclip, Mic, X, ArrowUp, History, Trash2 } from "lucide-react";
+import { Square, AlertCircle, Paperclip, Mic, X, ArrowUp, History, Trash2, FileText } from "lucide-react";
 import { Button } from "../ui/Button";
 import { useDraft } from "../../hooks/useDrafts";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus";
@@ -31,6 +31,7 @@ interface ChatInputProps {
 }
 
 const SLASH_COMMANDS = [
+  { id: "documents", label: "Documents priority", description: "Prioritize your uploaded documents", icon: "📎", shortcut: "@documents" },
   { id: "search", label: "Search documents", description: "Query your knowledge base", icon: "🔍", shortcut: "/search" },
   { id: "summarize", label: "Summarize", description: "Summarize selected documents", icon: "📄", shortcut: "/summarize" },
   { id: "explain", label: "Explain concept", description: "Get detailed explanation", icon: "💡", shortcut: "/explain" },
@@ -227,6 +228,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     );
   }, [commandSearch]);
 
+  // Active when the user typed the @documents priority mention. Matches the
+  // backend's (?<!\w)@documents\b so e.g. "email@documents.com" doesn't count.
+  const isDocMode = useMemo(() => /(?<!\w)@documents\b/i.test(text), [text]);
+
   const isNearingLimit = charCount > 3000;
   const isOverLimit = charCount > 4000;
   const hasContent = text.trim().length > 0 || attachments.length > 0;
@@ -253,6 +258,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           <div className="flex items-center gap-1.5 rounded-[10px] border border-[rgba(248,113,113,0.15)] bg-[rgba(248,113,113,0.08)] px-3 py-2 text-xs font-semibold text-red-400">
             <AlertCircle size={13} />
             <span>Sending disabled — you are offline.</span>
+          </div>
+        )}
+
+        {/* Document-priority indicator (active when @documents is in the message) */}
+        {isDocMode && (
+          <div className="flex items-center gap-1.5 self-start rounded-[10px] border border-(--accent-primary)/25 bg-(--accent-primary)/8 px-3 py-1.5 text-xs font-medium text-(--accent-primary)">
+            <FileText size={12} />
+            <span>Document mode — answers will prioritize your uploaded documents</span>
           </div>
         )}
 

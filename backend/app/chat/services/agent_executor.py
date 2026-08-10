@@ -434,7 +434,7 @@ class AgentExecutor:
                 pass
 
             # Define a thread-safe callback generator
-            queue = asyncio.Queue()
+            queue: asyncio.Queue[dict | None] = asyncio.Queue()
 
             async def event_callback(event_type: str, event_data: dict):
                 await queue.put({"event": event_type, "data": event_data})

@@ -70,7 +70,7 @@ async def get_operational_status(
     _admin: dict[str, Any] = Depends(check_admin_user),
 ) -> dict[str, Any]:
     """Retrieve operational metrics including circuit breaker states and system health."""
-    status_report = {
+    status_report: dict[str, Any] = {
         "status": "operational",
         "circuit_breakers": {},
     }

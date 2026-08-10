@@ -118,7 +118,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
             return (
               <div
-                key={msg.id}
+                key={msg.id ?? `msg-${virtualItem.index}`}
                 ref={virtualizer.measureElement}
                 data-index={virtualItem.index}
                 style={{

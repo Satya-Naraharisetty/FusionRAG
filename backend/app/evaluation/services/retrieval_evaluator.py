@@ -1,5 +1,7 @@
 import logging
 import time
+from typing import Any
+from uuid import UUID
 
 from app.documents.services.retrieval_service import RetrievalService
 from app.evaluation.domain.models import (
@@ -28,7 +30,7 @@ class RetrievalEvaluator:
 
         for sample in samples:
             start_time = time.perf_counter()
-            retrieved_chunks = []
+            retrieved_chunks: list[dict[str, Any]] = []
 
             # 1. Execute retrieval
             if mock:
@@ -56,25 +58,31 @@ class RetrievalEvaluator:
                 )
             else:
                 try:
-                    filters = sample.metadata.get("filters")
-                    document_ids = sample.metadata.get("document_ids")
+                    filters = sample.metadata.get("filters") or None
+                    document_ids = sample.metadata.get("document_ids") or None
+                    user_id = sample.metadata.get("user_id")
+                    try:
+                        resolved_user_id = (
+                            UUID(str(user_id)) if user_id else UUID(int=0)
+                        )
+                    except (ValueError, TypeError):
+                        resolved_user_id = UUID(int=0)
 
-                    chunks = await self.retrieval_service.retrieve(
+                    search_result = await self.retrieval_service.retrieve(
                         query=sample.question,
+                        user_id=resolved_user_id,
                         top_k=top_k,
                         document_ids=document_ids,
-                        filters=filters,
+                        filter_metadata=filters,
                     )
 
-                    for c in chunks:
+                    for c in search_result.retrieved_chunks:
                         retrieved_chunks.append(
                             {
                                 "text": c.text,
-                                "score": c.score if hasattr(c, "score") else 1.0,
-                                "chunk_id": str(c.id) if hasattr(c, "id") else "",
-                                "document_id": str(c.document_id)
-                                if hasattr(c, "document_id")
-                                else "",
+                                "score": c.similarity_score,
+                                "chunk_id": str(c.chunk_id),
+                                "document_id": str(c.document_id),
                             }
                         )
                 except Exception as e:

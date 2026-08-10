@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -7,8 +8,8 @@ from uuid import UUID
 
 from app.chat.domain.agents import ToolContext
 from app.chat.domain.exceptions import (
-    NoRelevantContext,
     PromptTooLarge,
+    StreamingCancelled,
     TokenBudgetExceeded,
 )
 from app.chat.domain.models import (
@@ -32,6 +33,30 @@ logger = logging.getLogger(__name__)
 
 
 class ChatOrchestrator:
+    # Case-insensitive mention that marks a question as "documents first": the
+    # uploaded documents become the priority source and, if the question is not
+    # covered by them, the assistant must say so in its reply.
+    _DOCUMENTS_MENTION_PATTERN = re.compile(r"(?<!\w)@documents\b", re.IGNORECASE)
+
+    @classmethod
+    def _parse_documents_mention(cls, question: str) -> tuple[str, bool]:
+        """
+        Detect and strip the @documents priority mention from a question.
+
+        Returns ``(cleaned_question, documents_priority)``. The mention is a
+        control directive, so it is removed before retrieval, prompt building
+        and persistence.
+        """
+        priority = bool(cls._DOCUMENTS_MENTION_PATTERN.search(question))
+        cleaned = cls._DOCUMENTS_MENTION_PATTERN.sub(" ", question)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        if not cleaned:
+            # The message was only the mention itself (e.g. "@documents"). Keep
+            # the raw text so an empty question never reaches persistence,
+            # retrieval or the LLM prompt.
+            return question, False
+        return cleaned, priority
+
     def __init__(
         self,
         retrieval_service: RetrievalService,
@@ -78,6 +103,10 @@ class ChatOrchestrator:
         filters: dict[str, Any] | None = None,
     ) -> AnswerResponse:
         start_time = time.perf_counter()
+
+        # Strip the @documents priority mention (if present) before any
+        # processing so it never leaks into retrieval, prompts or history.
+        question, documents_priority = self._parse_documents_mention(question)
 
         # 1. Resolve / Create conversation session
         conversation = await self.conversation_manager.get_or_create_conversation(
@@ -130,11 +159,9 @@ class ChatOrchestrator:
         )
         retrieval_time_ms = (time.perf_counter() - retrieval_start) * 1000
 
-        # Check if we have no chunks
-        if not search_result.retrieved_chunks:
-            raise NoRelevantContext(
-                "No relevant document context found for the question."
-            )
+        # Note: an empty retrieval does NOT abort the request. The prompt is
+        # built with an empty context and the assistant answers from general
+        # knowledge (calling out the gap when @documents was used).
 
         # 4. Gather Diagnostics
         dense_count = (
@@ -168,12 +195,11 @@ class ChatOrchestrator:
             token_estimator=self.token_estimator,
             max_context_tokens=self.max_context_tokens,
             max_memory_tokens=self.max_memory_tokens,
+            document_priority=documents_priority,
         )
 
-        if not final_chunks:
-            raise NoRelevantContext(
-                "No relevant document context fits within the token budget."
-            )
+        # If final_chunks is empty, citations will be empty and the assistant
+        # answers from general knowledge (see PromptBuilder instructions).
 
         # 7. Create assistant message in database (status = PENDING)
         assistant_message_id = uuid.uuid4()
@@ -186,12 +212,12 @@ class ChatOrchestrator:
         # 8. Call LLM or Agent Loop
         gen_start_time = time.perf_counter()
         try:
-            if self.enable_tool_calling:
+            if self.enable_tool_calling and final_chunks:
                 # Instantiate thread-safe execution context
                 tool_context = ToolContext(
                     user_id=user_id,
                     conversation_id=conversation_id,
-                    db_session=self.conversation_manager._conversation_repo._db,  # access underlying SQLAlchemy Session
+                    db_session=self.conversation_manager._conversation_repo._db,  # type: ignore[attr-defined]  # access underlying SQLAlchemy Session
                 )
                 agent_resp = await self.agent_executor.execute(
                     messages=messages,
@@ -295,6 +321,10 @@ class ChatOrchestrator:
     ) -> AsyncIterator[dict]:
         start_time = time.perf_counter()
 
+        # Strip the @documents priority mention (if present) before any
+        # processing so it never leaks into retrieval, prompts or history.
+        question, documents_priority = self._parse_documents_mention(question)
+
         # 1. Resolve / Create conversation session
         conversation = await self.conversation_manager.get_or_create_conversation(
             conversation_id, user_id
@@ -346,11 +376,9 @@ class ChatOrchestrator:
         )
         retrieval_time_ms = (time.perf_counter() - retrieval_start) * 1000
 
-        # Check if we have no chunks
-        if not search_result.retrieved_chunks:
-            raise NoRelevantContext(
-                "No relevant document context found for the question."
-            )
+        # Note: an empty retrieval does NOT abort the request. The prompt is
+        # built with an empty context and the assistant answers from general
+        # knowledge (calling out the gap when @documents was used).
 
         # 4. Gather Diagnostics
         dense_count = (
@@ -384,12 +412,11 @@ class ChatOrchestrator:
             token_estimator=self.token_estimator,
             max_context_tokens=self.max_context_tokens,
             max_memory_tokens=self.max_memory_tokens,
+            document_priority=documents_priority,
         )
 
-        if not final_chunks:
-            raise NoRelevantContext(
-                "No relevant document context fits within the token budget."
-            )
+        # If final_chunks is empty, citations will be empty and the assistant
+        # answers from general knowledge (see PromptBuilder instructions).
 
         # 7. Create assistant message in database (status = PENDING)
         assistant_message_id = uuid.uuid4()
@@ -419,98 +446,164 @@ class ChatOrchestrator:
             for cit in citations
         ]
 
-        # Yield metadata first event
-        yield {
-            "event": "metadata",
-            "data": {
-                "citations": citations_data,
-                "retrieval_time_ms": round(retrieval_time_ms, 2),
-                "conversation_id": str(conversation_id),
-                "diagnostics": diagnostics.model_dump(),
-            },
-        }
+        message_finalized = False
 
-        # 9. Execute streaming flow (Agent or Standard)
-        gen_start_time = time.perf_counter()
-        full_answer_list = []
-        final_usage = None
+        async def _mark_interrupted_if_incomplete() -> None:
+            """
+            Persist any partially streamed assistant output in a terminal state
+            when the stream ends abnormally (client disconnect, task
+            cancellation, or any other unexpected exit).
+            """
+            if message_finalized:
+                return
+            try:
+                await self.conversation_manager._message_repo.interrupt_message(
+                    assistant_message_id, reason="client_disconnected"
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to mark interrupted assistant message %s",
+                    assistant_message_id,
+                )
 
         try:
-            if self.enable_tool_calling:
-                tool_context = ToolContext(
-                    user_id=user_id,
-                    conversation_id=conversation_id,
-                    db_session=self.conversation_manager._conversation_repo._db,
-                )
-                async for event in self.agent_executor.execute_stream(
-                    messages=messages,
-                    model=self.model,
-                    temperature=self.temperature,
-                    max_tokens=self.max_response_tokens,
-                    context=tool_context,
-                ):
-                    # Intercept text chunks to update pending DB record
-                    if event["event"] == "text":
-                        text_val = event["data"]["text"]
-                        full_answer_list.append(text_val)
-                        await (
-                            self.conversation_manager._message_repo.append_stream_chunk(
+            # Yield metadata first event
+            yield {
+                "event": "metadata",
+                "data": {
+                    "citations": citations_data,
+                    "retrieval_time_ms": round(retrieval_time_ms, 2),
+                    "conversation_id": str(conversation_id),
+                    "diagnostics": diagnostics.model_dump(),
+                },
+            }
+
+            # 9. Execute streaming flow (Agent or Standard)
+            gen_start_time = time.perf_counter()
+            full_answer_list = []
+            final_usage = None
+
+            try:
+                if self.enable_tool_calling and final_chunks:
+                    tool_context = ToolContext(
+                        user_id=user_id,
+                        conversation_id=conversation_id,
+                        db_session=self.conversation_manager._conversation_repo._db,  # type: ignore[attr-defined]
+                    )
+                    async for event in self.agent_executor.execute_stream(
+                        messages=messages,
+                        model=self.model,
+                        temperature=self.temperature,
+                        max_tokens=self.max_response_tokens,
+                        context=tool_context,
+                    ):
+                        # Intercept text chunks to update pending DB record
+                        if event["event"] == "text":
+                            text_val = event["data"]["text"]
+                            full_answer_list.append(text_val)
+                            await self.conversation_manager._message_repo.append_stream_chunk(
                                 assistant_message_id, text_val
                             )
-                        )
-                    # Propagate event
-                    yield event
+                        # Propagate event
+                        yield event
 
-                    if event["event"] == "done":
-                        final_usage = Usage(
-                            prompt_tokens=event["data"]["usage"]["prompt_tokens"],
-                            completion_tokens=event["data"]["usage"][
-                                "completion_tokens"
-                            ],
-                            total_tokens=event["data"]["usage"]["total_tokens"],
-                        )
-            else:
-                async for chunk in self.llm_generation_service.stream(
-                    messages=messages,
-                    model=self.model,
-                    temperature=self.temperature,
-                    max_tokens=self.max_response_tokens,
-                ):
-                    from app.chat.domain.interfaces import StreamChunk
+                        if event["event"] == "done":
+                            final_usage = Usage(
+                                prompt_tokens=event["data"]["usage"]["prompt_tokens"],
+                                completion_tokens=event["data"]["usage"][
+                                    "completion_tokens"
+                                ],
+                                total_tokens=event["data"]["usage"]["total_tokens"],
+                            )
+                else:
+                    async for chunk in self.llm_generation_service.stream(
+                        messages=messages,
+                        model=self.model,
+                        temperature=self.temperature,
+                        max_tokens=self.max_response_tokens,
+                    ):
+                        from app.chat.domain.interfaces import StreamChunk
 
-                    if isinstance(chunk, tuple) and not hasattr(chunk, "text_delta"):
-                        chunk = StreamChunk(text_delta=chunk[0], usage=chunk[1])
-                    text_delta = chunk.text_delta
-                    if text_delta:
-                        full_answer_list.append(text_delta)
-                        await (
-                            self.conversation_manager._message_repo.append_stream_chunk(
+                        if isinstance(chunk, tuple) and not hasattr(
+                            chunk, "text_delta"
+                        ):
+                            chunk = StreamChunk(text_delta=chunk[0], usage=chunk[1])
+                        text_delta = chunk.text_delta
+                        if text_delta:
+                            full_answer_list.append(text_delta)
+                            await self.conversation_manager._message_repo.append_stream_chunk(
                                 assistant_message_id, text_delta
                             )
+                            yield {
+                                "event": "text",
+                                "data": {
+                                    "text": text_delta,
+                                },
+                            }
+                        if chunk.usage:
+                            final_usage = chunk.usage
+
+                    generation_time_ms = (time.perf_counter() - gen_start_time) * 1000
+                    total_time_ms = (time.perf_counter() - start_time) * 1000
+                    full_answer = "".join(full_answer_list)
+
+                    if not final_usage:
+                        prompt_tokens_est = self.token_estimator.estimate(str(messages))
+                        completion_tokens_est = self.token_estimator.estimate(
+                            full_answer
                         )
-                        yield {
-                            "event": "text",
-                            "data": {
-                                "text": text_delta,
-                            },
-                        }
-                    if chunk.usage:
-                        final_usage = chunk.usage
+                        final_usage = Usage(
+                            prompt_tokens=prompt_tokens_est,
+                            completion_tokens=completion_tokens_est,
+                            total_tokens=prompt_tokens_est + completion_tokens_est,
+                        )
 
-                generation_time_ms = (time.perf_counter() - gen_start_time) * 1000
-                total_time_ms = (time.perf_counter() - start_time) * 1000
-                full_answer = "".join(full_answer_list)
-
-                if not final_usage:
-                    prompt_tokens_est = self.token_estimator.estimate(str(messages))
-                    completion_tokens_est = self.token_estimator.estimate(full_answer)
-                    final_usage = Usage(
-                        prompt_tokens=prompt_tokens_est,
-                        completion_tokens=completion_tokens_est,
-                        total_tokens=prompt_tokens_est + completion_tokens_est,
+                    # Persist standard completion details
+                    await self.conversation_manager.finalize_message(
+                        conversation_id=conversation_id,
+                        message_id=assistant_message_id,
+                        assistant_content=full_answer,
+                        prompt_tokens=final_usage.prompt_tokens,
+                        completion_tokens=final_usage.completion_tokens,
+                        citations=citations_data,
                     )
+                    message_finalized = True
 
-                # Persist standard completion details
+                    # Yield done event
+                    yield {
+                        "event": "done",
+                        "data": {
+                            "answer": full_answer,
+                            "citations": [cit.model_dump() for cit in citations],
+                            "generation_time_ms": round(generation_time_ms, 2),
+                            "total_time_ms": round(total_time_ms, 2),
+                            "model": self.model,
+                            "usage": final_usage.model_dump(),
+                            "conversation_id": str(conversation_id),
+                            "diagnostics": diagnostics.model_dump(),
+                        },
+                    }
+            except StreamingCancelled:
+                # Client-initiated disconnect. Let the outer finally persist the
+                # partial answer as INTERRUPTED rather than marking it FAILED.
+                raise
+            except Exception as e:
+                await self.conversation_manager._message_repo.fail_message(
+                    assistant_message_id, str(e)
+                )
+                message_finalized = True
+                yield {
+                    "event": "error",
+                    "data": {
+                        "code": "GENERATION_FAILED",
+                        "message": f"Error during streaming generation: {e}",
+                    },
+                }
+                raise
+
+            # Finalize message database record if using agentic tool calling
+            if self.enable_tool_calling and final_usage:
+                full_answer = "".join(full_answer_list)
                 await self.conversation_manager.finalize_message(
                     conversation_id=conversation_id,
                     message_id=assistant_message_id,
@@ -519,49 +612,12 @@ class ChatOrchestrator:
                     completion_tokens=final_usage.completion_tokens,
                     citations=citations_data,
                 )
-
-                # Yield done event
-                yield {
-                    "event": "done",
-                    "data": {
-                        "answer": full_answer,
-                        "citations": [cit.model_dump() for cit in citations],
-                        "generation_time_ms": round(generation_time_ms, 2),
-                        "total_time_ms": round(total_time_ms, 2),
-                        "model": self.model,
-                        "usage": final_usage.model_dump(),
-                        "conversation_id": str(conversation_id),
-                        "diagnostics": diagnostics.model_dump(),
-                    },
-                }
-
-        except Exception as e:
-            await self.conversation_manager._message_repo.fail_message(
-                assistant_message_id, str(e)
-            )
-            yield {
-                "event": "error",
-                "data": {
-                    "code": "GENERATION_FAILED",
-                    "message": f"Error during streaming generation: {e}",
-                },
-            }
-            raise
+                message_finalized = True
+        finally:
+            await _mark_interrupted_if_incomplete()
 
         generation_time_ms = (time.perf_counter() - gen_start_time) * 1000
         total_time_ms = (time.perf_counter() - start_time) * 1000
-        full_answer = "".join(full_answer_list)
-
-        # Finalize message database record if using agentic tool calling
-        if self.enable_tool_calling and final_usage:
-            await self.conversation_manager.finalize_message(
-                conversation_id=conversation_id,
-                message_id=assistant_message_id,
-                assistant_content=full_answer,
-                prompt_tokens=final_usage.prompt_tokens,
-                completion_tokens=final_usage.completion_tokens,
-                citations=citations_data,
-            )
 
         # Log Observability Metrics
         req_id = request_id_ctx.get() or "N/A"

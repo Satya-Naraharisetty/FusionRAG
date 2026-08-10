@@ -9,7 +9,7 @@ class InMemoryIndexCache(IndexCache):
     def __init__(self) -> None:
         self._lock = threading.Lock()
         # Structure: user_id -> {"index_data": Any, "stats": dict[str, Any]}
-        self._cache = {}
+        self._cache: dict[UUID, dict[str, Any]] = {}
 
     def get(self, user_id: UUID) -> Any | None:
         with self._lock:

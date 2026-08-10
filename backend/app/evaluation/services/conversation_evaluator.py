@@ -53,7 +53,7 @@ class ConversationEvaluator:
                 memory_retention_score=memory_retention_score,
                 summary_quality_score=summary_quality,
                 context_budget_utilization=m_budget.score,
-                passed=m_rewrite.passed and m_budget.passed,
+                passed=bool(m_rewrite.passed and m_budget.passed),
             )
 
             sample_metadata = dict(sample.metadata)

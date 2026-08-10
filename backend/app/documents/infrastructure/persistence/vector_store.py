@@ -9,6 +9,7 @@ from qdrant_client.models import (
     FieldCondition,
     Filter,
     MatchValue,
+    PayloadSchemaType,
     PointIdsList,
     PointStruct,
     VectorParams,
@@ -31,6 +32,46 @@ class QdrantVectorStore(VectorStore):
         self._client = client
         self._collection_name = collection_name
         self._dimension = dimension
+        # Fields whose payload indexes have been successfully ensured on the
+        # Qdrant collection. Qdrant create_payload_index is idempotent
+        # server-side, but re-calling it on every request would add extra
+        # round-trips; tracking per-field success means a transient failure is
+        # retried on the next operation without re-paying for the successes.
+        self._indexed_fields: set[str] = (
+            set()
+        )  # Fields filtered on by _search_sync / delete_document. They must be
+
+    # indexed in Qdrant or filtered searches fail with
+    # "Index required but not found" errors.
+    _FILTERABLE_FIELDS = ("user_id", "document_id", "tags", "metadata")
+
+    def _ensure_payload_indexes(self) -> None:
+        """
+        Idempotently create keyword payload indexes for filterable fields.
+
+        Qdrant refuses filtered queries on unindexed payload fields, so the
+        collection must have indexes on every key used in FieldCondition.
+        This runs even when the collection already exists so that collections
+        created by older code (or other environments) are self-healed. Each
+        field is only attempted until it succeeds once per store instance;
+        a failed field is retried on the next operation.
+        """
+        for field in self._FILTERABLE_FIELDS:
+            if field in self._indexed_fields:
+                continue
+            try:
+                self._client.create_payload_index(
+                    collection_name=self._collection_name,
+                    field_name=field,
+                    field_schema=PayloadSchemaType.KEYWORD,
+                )
+            except Exception as e:
+                # create_payload_index is idempotent for an identical schema;
+                # a failure here means filtered searches on this field will
+                # 500, so log at warning rather than silently swallowing it.
+                logger.warning(f"Payload index for field {field!r} not created: {e}")
+            else:
+                self._indexed_fields.add(field)
 
     def _ensure_collection(self) -> None:
         try:
@@ -46,6 +87,8 @@ class QdrantVectorStore(VectorStore):
                     distance=Distance.COSINE,
                 ),
             )
+        if not self._indexed_fields.issuperset(self._FILTERABLE_FIELDS):
+            self._ensure_payload_indexes()
 
     def upsert(
         self,
@@ -102,10 +145,12 @@ class QdrantVectorStore(VectorStore):
             vectors_config = collection_info.config.params.vectors
 
             # Qdrant client vectors config can be multiple vectors or single vector config
-            if hasattr(vectors_config, "size"):
-                vector_size = vectors_config.size
+            if vectors_config is None:
+                vector_size = None
+            elif isinstance(vectors_config, dict):
+                first_config = next(iter(vectors_config.values()), None)
+                vector_size = getattr(first_config, "size", None)
             else:
-                # Fallback if config matches different Qdrant schema structure
                 vector_size = getattr(vectors_config, "size", None)
 
             if vector_size != self._dimension:
@@ -131,7 +176,7 @@ class QdrantVectorStore(VectorStore):
     ) -> list[dict[str, Any]]:
         self._ensure_collection()
 
-        must_conditions = [
+        must_conditions: list[Any] = [
             FieldCondition(
                 key="user_id",
                 match=MatchValue(value=str(user_id)),
@@ -144,7 +189,7 @@ class QdrantVectorStore(VectorStore):
             must_conditions.append(
                 FieldCondition(
                     key="document_id",
-                    match=MatchAny(any_of=[str(d_id) for d_id in document_ids]),
+                    match=MatchAny(any=[str(d_id) for d_id in document_ids]),
                 )
             )
 
@@ -154,7 +199,7 @@ class QdrantVectorStore(VectorStore):
             must_conditions.append(
                 FieldCondition(
                     key="tags",
-                    match=MatchAny(any_of=tags),
+                    match=MatchAny(any=tags),
                 )
             )
 

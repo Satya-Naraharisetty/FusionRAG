@@ -49,6 +49,10 @@ jobs:
         working-directory: ./backend
         run: ruff format --check .
 
+      - name: Run Mypy Type Check
+        working-directory: ./backend
+        run: mypy app
+
       - name: Run Pytest Tests
         working-directory: ./backend
         run: pytest
@@ -62,7 +66,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install dependencies
         run: |

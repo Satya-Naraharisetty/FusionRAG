@@ -3,6 +3,7 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 from enum import Enum
+from typing import Any
 
 import httpx
 
@@ -30,18 +31,18 @@ class GeminiProvider(LLMProvider):
         max_tokens: int,
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
-    ) -> dict:
-        contents = []
-        system_instruction_content = ""
+    ) -> dict[str, Any]:
+        contents: list[dict[str, Any]] = []
+        system_instruction_content: str = ""
 
         for msg in messages:
             role_str = msg.role.value if isinstance(msg.role, Enum) else str(msg.role)
             if role_str == "system":
-                system_instruction_content = msg.content
+                system_instruction_content = msg.content or ""
                 continue
 
             # Map user/assistant/tool to Gemini roles
-            parts = []
+            parts: list[dict[str, Any]] = []
             if role_str == "tool":
                 role = "tool"
                 parts.append(

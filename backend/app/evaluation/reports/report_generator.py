@@ -59,21 +59,21 @@ class ReportGenerator:
         """
         Builds the canonical JSON dict representation of the run and results.
         """
-        results_list = []
-        for r in run.results:
+        results_list: list[dict[str, Any]] = []
+        for result_item in run.results:
             results_list.append(
                 {
-                    "sample_id": r.sample_id,
-                    "question": r.question,
-                    "expected_answer": r.expected_answer,
-                    "actual_answer": r.actual_answer,
-                    "latency": r.latency,
-                    "input_tokens": r.input_tokens,
-                    "output_tokens": r.output_tokens,
-                    "cost": r.cost,
-                    "error_category": r.error_category,
-                    "metrics": r.metrics,
-                    "retrieved_contexts": r.retrieved_contexts,
+                    "sample_id": result_item.sample_id,
+                    "question": result_item.question,
+                    "expected_answer": result_item.expected_answer,
+                    "actual_answer": result_item.actual_answer,
+                    "latency": result_item.latency,
+                    "input_tokens": result_item.input_tokens,
+                    "output_tokens": result_item.output_tokens,
+                    "cost": result_item.cost,
+                    "error_category": result_item.error_category,
+                    "metrics": result_item.metrics,
+                    "retrieved_contexts": result_item.retrieved_contexts,
                 }
             )
 
@@ -81,8 +81,8 @@ class ReportGenerator:
         if results_list:
             sums: dict[str, float] = {}
             counts: dict[str, int] = {}
-            for r in results_list:
-                for name, data in r["metrics"].items():
+            for row in results_list:
+                for name, data in row["metrics"].items():
                     score = data.get("score")
                     if score is not None:
                         sums[name] = sums.get(name, 0.0) + float(score)
@@ -225,7 +225,7 @@ class ReportGenerator:
             md.append("")
 
         md.append("## Error Category Analysis")
-        categories = {}
+        categories: dict[str, int] = {}
         for r in run.results:
             cat = r.error_category
             categories[cat] = categories.get(cat, 0) + 1
@@ -279,7 +279,7 @@ class ReportGenerator:
             </div>
             """
 
-        errors = {}
+        errors: dict[str, int] = {}
         for r in run.results:
             errors[r.error_category] = errors.get(r.error_category, 0) + 1
         error_rows = "".join(

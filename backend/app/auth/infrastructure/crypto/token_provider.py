@@ -30,7 +30,7 @@ class JWTTokenProvider(TokenProvider):
 
         return jwt.encode(payload, self._secret, algorithm=self._algorithm)
 
-    def create_refresh_token(self, claims: dict[str, Any] = None) -> str:
+    def create_refresh_token(self, claims: dict[str, Any] | None = None) -> str:
         """
         Create a cryptographically secure random refresh token string (URL-safe).
         """

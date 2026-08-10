@@ -97,7 +97,7 @@ class BenchmarkRunner:
         db: Session,
         dataset: EvaluationDataset,
         profile: str = "quick",
-        pipelines: list[str] = None,
+        pipelines: list[str] | None = None,
         mock: bool = False,
     ) -> SQLAlchemyEvaluationRun:
         """
@@ -182,12 +182,12 @@ class BenchmarkRunner:
 
         # 4. Execute After Hooks
         logger.info("Executing after-benchmark lifecycle hooks...")
-        for hook in self._after_hooks:
+        for after_hook in self._after_hooks:
             try:
-                if asyncio.iscoroutinefunction(hook):
-                    await hook(run_record)
+                if asyncio.iscoroutinefunction(after_hook):
+                    await after_hook(run_record)
                 else:
-                    hook(run_record)
+                    after_hook(run_record)
             except Exception as e:
                 logger.error(f"Error executing after_benchmark hook: {e}")
 

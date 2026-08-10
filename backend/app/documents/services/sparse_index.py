@@ -43,8 +43,8 @@ class BM25:
             if self.corpus_size > 0
             else 0
         )
-        self.doc_freqs = Counter()
-        self.doc_lengths = []
+        self.doc_freqs: Counter[str] = Counter()
+        self.doc_lengths: list[int] = []
         self.doc_term_counts = []
 
         for doc in corpus:

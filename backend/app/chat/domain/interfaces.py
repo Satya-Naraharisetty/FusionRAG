@@ -163,8 +163,15 @@ class MessageRepository(ABC):
         prompt_tokens: int,
         completion_tokens: int,
         citations: list[dict[str, Any]] | None = None,
+        content: str | None = None,
     ) -> ConversationMessage:
-        """Transition an assistant message to COMPLETED status and set tokens & citations."""
+        """
+        Transition an assistant message to COMPLETED status and set tokens & citations.
+
+        ``content`` is applied only when provided (the streaming path already
+        accumulated the answer via append_stream_chunk; the synchronous path
+        needs it here).
+        """
         pass
 
     @abstractmethod
@@ -172,6 +179,19 @@ class MessageRepository(ABC):
         self, message_id: UUID, error_message: str | None = None
     ) -> ConversationMessage:
         """Transition a message to FAILED status and attach error metadata."""
+        pass
+
+    @abstractmethod
+    async def interrupt_message(
+        self, message_id: UUID, reason: str | None = None
+    ) -> ConversationMessage:
+        """
+        Transition an in-progress message (PENDING/STREAMING) to INTERRUPTED.
+
+        Used when a streaming client disconnects mid-generation so partial
+        content is persisted in a terminal state. No-op for messages that are
+        already in a terminal status (COMPLETED/FAILED/INTERRUPTED).
+        """
         pass
 
 

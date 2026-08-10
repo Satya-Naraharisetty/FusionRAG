@@ -35,7 +35,7 @@ export interface ConversationMetadata {
 
 // Messages
 export type MessageRole = "user" | "assistant" | "system" | "tool" | "developer" | "function";
-export type MessageStatus = "pending" | "streaming" | "completed" | "failed";
+export type MessageStatus = "pending" | "streaming" | "completed" | "failed" | "interrupted";
 
 export interface Message {
   id: string;

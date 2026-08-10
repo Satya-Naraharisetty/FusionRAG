@@ -29,7 +29,7 @@ class DocumentProcessingService:
         chunking_service: ChunkingService,
         uow: UnitOfWork,
         time_provider: TimeProvider,
-        event_dispatcher: EventDispatcher = None,
+        event_dispatcher: EventDispatcher | None = None,
     ) -> None:
         self._document_repo = document_repo
         self._chunk_repo = chunk_repo

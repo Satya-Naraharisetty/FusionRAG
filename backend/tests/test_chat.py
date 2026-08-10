@@ -132,6 +132,66 @@ def test_prompt_builder_caching_and_messages(tmp_path):
     assert "RAG content text." in messages[1].content
 
 
+def test_prompt_builder_document_priority_and_no_context_notes():
+    """
+    document_priority=True appends the @documents instruction to the system
+    prompt; with no chunks at all, the assistant is instead told to answer from
+    general knowledge (never a bare refusal).
+    """
+    from datetime import UTC, datetime
+
+    from app.chat.domain.models import (
+        Conversation,
+        ConversationContext,
+        ConversationState,
+        RetrievalDiagnostics,
+    )
+
+    builder = PromptBuilder("")
+    estimator = CharacterTokenEstimator()
+    conversation = Conversation(
+        id=uuid4(),
+        user_id=uuid4(),
+        title="Chat",
+        state=ConversationState.ACTIVE,
+        version=1,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_message_at=datetime.now(UTC),
+    )
+    context_obj = ConversationContext(
+        conversation=conversation,
+        recent_messages=[],
+        summary=None,
+        retrieved_chunks=[],
+        diagnostics=RetrievalDiagnostics(),
+    )
+
+    # @documents priority: explicit "not found in uploaded documents" note.
+    messages, chunks = builder.build_prompt(
+        context_obj=context_obj,
+        question="What is RAG?",
+        token_estimator=estimator,
+        max_context_tokens=1000,
+        document_priority=True,
+    )
+    assert chunks == []
+    assert "not found in the uploaded documents" in messages[0].content
+
+    # No priority + no context: plain general-knowledge override, no @documents
+    # language.
+    messages2, chunks2 = builder.build_prompt(
+        context_obj=context_obj,
+        question="What is RAG?",
+        token_estimator=estimator,
+        max_context_tokens=1000,
+        document_priority=False,
+    )
+    assert chunks2 == []
+    assert "general knowledge" in messages2[0].content
+    assert "@documents" not in messages2[0].content
+
+
 # --- 4. AnswerGenerationService Tests ---
 class MockRetrievalService:
     def __init__(self, chunks=None):
@@ -154,11 +214,14 @@ class MockLLMProvider:
         self.usage = usage or Usage(
             prompt_tokens=10, completion_tokens=5, total_tokens=15
         )
+        self.last_messages = []
 
     async def generate(self, messages, model, temperature, max_tokens):
+        self.last_messages = messages
         return self.response_text, self.usage
 
     async def stream(self, messages, model, temperature, max_tokens):
+        self.last_messages = messages
         # yields two text deltas and final usage
         yield "Mocked ", None
         yield "Answer", self.usage
@@ -279,7 +342,11 @@ async def test_answer_generation_service_success():
 @pytest.mark.filterwarnings(
     "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
 )
-async def test_answer_generation_service_empty_retrieval():
+async def test_answer_generation_service_empty_retrieval_answers_generally():
+    """
+    No documents uploaded / nothing matched must NOT raise: the chatbot falls
+    back to a general-knowledge answer with empty citations.
+    """
     retrieval_service = MockRetrievalService([])
     estimator = CharacterTokenEstimator()
     from app.chat.services.conversation_context_builder import (
@@ -306,8 +373,120 @@ async def test_answer_generation_service_empty_retrieval():
         enable_conversation_memory=False,
     )
 
-    with pytest.raises(NoRelevantContext):
-        await service.generate_answer("How are you?", uuid4(), 10)
+    response = await service.generate_answer("How are you?", uuid4(), 10)
+    assert response.answer == "Mocked Answer"
+    assert response.citations == []
+
+    # The fallback prompt relaxes the "ONLY use provided context" rule.
+    system_prompt = llm_provider.last_messages[0].content
+    assert "general knowledge" in system_prompt
+
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
+async def test_answer_generation_service_documents_mention_notes_missing_context():
+    """
+    When the user includes @documents but nothing relevant is found, the
+    mention is stripped from the question, no citations are returned, and the
+    system prompt instructs the assistant to note that the information was not
+    found in the uploaded documents.
+    """
+    retrieval_service = MockRetrievalService([])
+    estimator = CharacterTokenEstimator()
+    from app.chat.services.conversation_context_builder import (
+        ConversationContextBuilder,
+    )
+
+    context_builder = ConversationContextBuilder()
+    prompt_builder = PromptBuilder("")
+    llm_provider = MockLLMProvider()
+
+    service = AnswerGenerationService(
+        retrieval_service=retrieval_service,
+        context_builder=context_builder,
+        prompt_builder=prompt_builder,
+        llm_provider=llm_provider,
+        token_estimator=estimator,
+        conversation_manager=MockConversationManager(),
+        model="gpt-4o-mini",
+        temperature=0.0,
+        max_response_tokens=100,
+        system_prompt_tokens_limit=500,
+        max_context_tokens=1000,
+        reserved_completion_tokens=50,
+        enable_conversation_memory=False,
+    )
+
+    response = await service.generate_answer("@documents How are you?", uuid4(), 10)
+    assert response.answer == "Mocked Answer"
+    assert response.citations == []
+
+    # The @documents instruction is present in the system prompt...
+    system_prompt = llm_provider.last_messages[0].content
+    assert "not found in the uploaded documents" in system_prompt
+    # ...and the mention itself never leaks into the user turn.
+    user_prompt = llm_provider.last_messages[-1].content
+    assert "@documents" not in user_prompt
+
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
+async def test_answer_generation_service_documents_mention_keeps_grounded_answer():
+    """
+    @documents with a relevant match behaves like a normal grounded answer:
+    citations are returned and no "not found" instruction is injected.
+    """
+    doc_id = uuid4()
+    chunk_id = uuid4()
+    chunks = [
+        RetrievedChunk(
+            chunk_id=chunk_id,
+            document_id=doc_id,
+            document_name="doc.txt",
+            text="Python was created in 1991.",
+            similarity_score=0.9,
+            normalized_score=0.95,
+            chunk_index=0,
+        )
+    ]
+    retrieval_service = MockRetrievalService(chunks)
+    estimator = CharacterTokenEstimator()
+    from app.chat.services.conversation_context_builder import (
+        ConversationContextBuilder,
+    )
+
+    context_builder = ConversationContextBuilder()
+    prompt_builder = PromptBuilder("")
+    llm_provider = MockLLMProvider()
+
+    service = AnswerGenerationService(
+        retrieval_service=retrieval_service,
+        context_builder=context_builder,
+        prompt_builder=prompt_builder,
+        llm_provider=llm_provider,
+        token_estimator=estimator,
+        conversation_manager=MockConversationManager(),
+        model="gpt-4o-mini",
+        temperature=0.0,
+        max_response_tokens=100,
+        system_prompt_tokens_limit=500,
+        max_context_tokens=1000,
+        reserved_completion_tokens=50,
+        enable_conversation_memory=False,
+    )
+
+    response = await service.generate_answer(
+        "@documents When was Python created?", uuid4(), 10
+    )
+    assert response.answer == "Mocked Answer"
+    assert len(response.citations) == 1
+    assert response.citations[0].chunk_id == chunk_id
+    # The mention is stripped from the user turn even when chunks are found.
+    assert "@documents" not in llm_provider.last_messages[-1].content
 
 
 @pytest.mark.asyncio

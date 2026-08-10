@@ -31,6 +31,10 @@ def get_db(request: Request):
     db = session_factory()
     try:
         yield db
+        # Commit the unit of work on successful request completion. Repositories
+        # that only flush() (e.g. the chat conversation/message stores) depend on
+        # this commit; without it their writes are rolled back on close().
+        db.commit()
     finally:
         db.close()
 
@@ -127,7 +131,7 @@ def init_qdrant_client(
     Instantiates the Qdrant approximate nearest neighbor client.
     """
     if url:
-        return QdrantClient(url=url, api_key=api_key, timeout=3.0)
+        return QdrantClient(url=url, api_key=api_key, timeout=3)
     if host and (host.startswith("http://") or host.startswith("https://")):
-        return QdrantClient(url=host, api_key=api_key, timeout=3.0)
-    return QdrantClient(host=host, port=port, api_key=api_key, timeout=3.0)
+        return QdrantClient(url=host, api_key=api_key, timeout=3)
+    return QdrantClient(host=host, port=port, api_key=api_key, timeout=3)

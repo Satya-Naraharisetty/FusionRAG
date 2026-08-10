@@ -6,7 +6,7 @@
       "destination": "https://hybrid-rag-gilt.vercel.app/api/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!.*\\.(?:js|css|png|svg|ico|woff2|webmanifest)$).*)",
       "destination": "/index.html"
     }
   ]

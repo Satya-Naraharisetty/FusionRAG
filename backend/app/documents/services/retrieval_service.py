@@ -104,6 +104,8 @@ class RetrievalService:
 
         # 1. Chunk Repository
         self._chunk_repo = chunk_repo
+        self._dense_retriever: DenseRetriever | None = None
+        self._sparse_retriever: SparseRetriever | None = None
 
         # 2. Query Processor
         if query_processor:
@@ -126,8 +128,6 @@ class RetrievalService:
                 similarity_threshold=similarity_threshold,
                 search_timeout=search_timeout,
             )
-        else:
-            self._dense_retriever = None
 
         # 4. Sparse Retriever
         if sparse_retriever:
@@ -141,8 +141,6 @@ class RetrievalService:
             cache = InMemoryIndexCache()
             sparse_index = InMemoryBM25Index(chunk_repo=chunk_repo, index_cache=cache)
             self._sparse_retriever = BM25Retriever(sparse_index=sparse_index)
-        else:
-            self._sparse_retriever = None
 
         # 5. Fusion Engine
         if fusion_engine:
@@ -187,6 +185,10 @@ class RetrievalService:
 
         # 1. Ownership Verification (Never trust incoming document IDs)
         if document_ids:
+            if self._chunk_repo is None:
+                raise RuntimeError(
+                    "Chunk repository is not configured; cannot verify document ownership."
+                )
             unique_doc_ids = list(set(document_ids))
             ownership_ok = await self._chunk_repo.verify_document_ownership(
                 unique_doc_ids, user_id

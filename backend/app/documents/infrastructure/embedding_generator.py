@@ -128,6 +128,10 @@ class OpenAIEmbeddingGenerator(EmbeddingGenerator):
                     continue
                 raise
 
+        raise RuntimeError(
+            "OpenAI embedding generation failed after all retry attempts."
+        )
+
 
 class GeminiEmbeddingGenerator(EmbeddingGenerator):
     """
@@ -208,3 +212,7 @@ class GeminiEmbeddingGenerator(EmbeddingGenerator):
                     time.sleep(sleep_time)
                     continue
                 raise
+
+        raise RuntimeError(
+            "Gemini embedding generation failed after all retry attempts."
+        )
