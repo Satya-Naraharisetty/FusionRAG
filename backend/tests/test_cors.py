@@ -45,9 +45,7 @@ def test_cors_preflight_allows_localhost_ip_dev_server(client):
     """
     response = _preflight(client, "http://127.0.0.1:5173")
     assert response.status_code == status.HTTP_200_OK
-    assert (
-        response.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
-    )
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
     assert response.headers["access-control-allow-credentials"] == "true"
 
 
