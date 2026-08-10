@@ -215,7 +215,7 @@ tokenizers==0.22.2
     # via
     #   sentence-transformers
     #   transformers
-torch==2.13.0
+torch==2.13.0.*  # wildcard allows the +cpu local build used by requirements.cpu.txt
     # via sentence-transformers
 tqdm==4.70.0
     # via
