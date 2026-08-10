@@ -3,6 +3,7 @@ import { chatApi, ChatRequest } from "../api/chat";
 import { ChatMessage, Citation } from "../types";
 import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "../lib/constants";
+import { maybeNotifyStreamComplete } from "../lib/notifications";
 
 interface StreamError {
   code: string;
@@ -184,6 +185,16 @@ export const useSSEChat = () => {
           } else if (eventType === "done") {
             const conversation_id = data.conversation_id as string;
             setCurrentConversationId(conversation_id);
+
+            // Fire configured completion alerts (desktop notification / chime)
+            const answer = (data.answer as string) || "";
+            if (answer) {
+              maybeNotifyStreamComplete({
+                title: "Response ready",
+                body: answer.length > 80 ? `${answer.slice(0, 80)}…` : answer,
+              });
+            }
+
             setChatMessages((prev) => {
               if (prev.length === 0) return prev;
               const last = prev[prev.length - 1];

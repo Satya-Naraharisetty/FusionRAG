@@ -39,12 +39,11 @@ export interface AnswerResponse {
 }
 
 export const chatApi = {
-  async sendChat(payload: ChatRequest): Promise<AnswerResponse> {
-    const response = await api.post<AnswerResponse>("/chat", {
+  sendChat(payload: ChatRequest): Promise<AnswerResponse> {
+    return api.post<AnswerResponse>("/chat", {
       ...payload,
       stream: false,
     });
-    return response.data;
   },
 
   streamChat(payload: ChatRequest, signal?: AbortSignal): AsyncGenerator<SSEEvent> {

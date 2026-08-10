@@ -1,0 +1,132 @@
+name: E2E Login Smoke Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: e2e-login-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  login-smoke:
+    name: Login flow (browser smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Pin the compose project name so the pre-built backend image tag
+    # (hybrid_rag-backend:latest) is deterministic regardless of the checkout
+    # directory name.
+    env:
+      COMPOSE_PROJECT_NAME: hybrid_rag
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # backend/.env is gitignored but required by docker-compose.yml
+      # (env_file). The login flow needs no LLM/embedding keys; it only needs
+      # a JWT_SECRET (required at startup) and COOKIE_SECURE=False so the
+      # refresh cookie is stored over plain http://localhost — otherwise the
+      # session-persistence check in the e2e script fails.
+      - name: Create backend .env for CI
+        run: |
+          JWT_SECRET="ci_$(openssl rand -hex 32)"
+          cat > backend/.env <<EOF
+          JWT_SECRET=$JWT_SECRET
+          COOKIE_SECURE=False
+          EOF
+
+      # The backend image is heavy (multi-stage CPU PyTorch, ~2 GB), so build it
+      # once with a GitHub Actions build cache — subsequent runs on the same
+      # branch are warm and skip most of the build.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image (cached)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          load: true
+          tags: hybrid_rag-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Boot only the services the login flow needs. The frontend runs as the
+      # Vite dev server on :5173 (which is also the CORS-whitelisted origin)
+      # instead of building the nginx image.
+      - name: Boot docker compose (postgres, redis, qdrant, backend)
+        run: docker compose up -d --no-build postgres redis qdrant backend
+
+      - name: Wait for backend health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8000/api/v1/health/liveness >/dev/null 2>&1; then
+              echo "backend is healthy after ~$((i * 5))s"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::backend did not become healthy within 300s"
+          docker compose logs --no-color backend | tail -60
+          exit 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install --include=optional
+          npm rebuild @tailwindcss/oxide
+
+      - name: Run browser login smoke test
+        run: |
+          cd frontend
+          npm run dev > vite.log 2>&1 &
+          VITE_PID=$!
+          trap 'kill "$VITE_PID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:5173 >/dev/null 2>&1 && break
+            sleep 2
+          done
+          if ! curl -sf http://localhost:5173 >/dev/null 2>&1; then
+            echo "::error::Vite dev server did not start within 60s"
+            cat vite.log
+            exit 1
+          fi
+          # ubuntu-latest ships Google Chrome at /usr/bin/google-chrome; the
+          # e2e script drives it via puppeteer-core (it never downloads one).
+          CHROME_PATH=/usr/bin/google-chrome npm run e2e:login
+
+      # DELETE /auth/account coverage — a pure API assertion (register →
+      # delete → verify the credentials and stale refresh cookie are rejected
+      # with 401), independent of the browser flow. It needs no Chrome or Vite
+      # dev server, only the backend from the health-wait step. `!cancelled()`
+      # keeps the two signals independent (runs even when the browser step
+      # failed, but not on a cancelled run): a browser regression here can't
+      # mask a delete-endpoint regression and vice versa.
+      - name: Run delete-account API smoke test
+        if: ${{ !cancelled() }}
+        run: |
+          cd frontend
+          npm run e2e:account-delete
+
+      - name: Save logs for debugging
+        if: always()
+        run: |
+          mkdir -p e2e-logs
+          cp frontend/vite.log e2e-logs/vite.log 2>/dev/null || true
+          docker compose logs --no-color > e2e-logs/docker-compose.log 2>&1 || true
+
+      - name: Upload e2e logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: e2e-logs/
+          if-no-files-found: ignore

@@ -15,25 +15,24 @@ export interface TokenResponse {
 }
 
 export const authApi = {
-  async register(email: string, password: string): Promise<UserResponse> {
-    const response = await api.post<UserResponse>("/auth/register", {
+  register(email: string, password: string): Promise<UserResponse> {
+    return api.post<UserResponse>("/auth/register", {
       email,
       password,
     });
-    return response.data;
   },
 
   async login(email: string, password: string): Promise<TokenResponse> {
-    const response = await api.post<TokenResponse>("/auth/login", {
+    const data = await api.post<TokenResponse>("/auth/login", {
       email,
       password,
     });
     // Store in-memory access token
-    setAccessToken(response.data.access_token);
-    return response.data;
+    setAccessToken(data.access_token);
+    return data;
   },
 
-  async refresh(): Promise<TokenResponse> {
+  refresh(): Promise<TokenResponse> {
     return executeRefresh();
   },
 
@@ -46,8 +45,15 @@ export const authApi = {
     }
   },
 
-  async getMe(): Promise<UserResponse> {
-    const response = await api.get<UserResponse>("/auth/me");
-    return response.data;
+  getMe(): Promise<UserResponse> {
+    return api.get<UserResponse>("/auth/me");
+  },
+
+  deleteAccount(password: string): Promise<void> {
+    // The backend requires the password to be re-entered (account-takeover
+    // protection). `api.delete` passes the body through raw, so stringify here.
+    return api.delete("/auth/account", {
+      body: JSON.stringify({ password }),
+    });
   },
 };

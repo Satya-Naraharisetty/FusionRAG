@@ -38,8 +38,79 @@ export function relativeTime(dateString: string | Date): string {
   }
 }
 
+const startOfDay = (d: Date): number =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+/** True if `date` is the current calendar day (local time). */
+export function isToday(date: Date): boolean {
+  return startOfDay(date) === startOfDay(new Date());
+}
+
+/** True if `date` is the previous calendar day (local time). */
+export function isYesterday(date: Date): boolean {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return startOfDay(date) === startOfDay(yesterday);
+}
+
+/** True if `date` is strictly after `reference`. */
+export function isAfter(date: Date, reference: Date): boolean {
+  return date.getTime() > reference.getTime();
+}
+
+/** Subtract `amount` days (DST-safe via setDate). */
+export function subDays(date: Date, amount: number): Date {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() - amount);
+  return copy;
+}
+
 export function truncate(str: string, maxLength: number): string {
   if (!str) return "";
   if (str.length <= maxLength) return str;
   return str.slice(0, maxLength) + "...";
+}
+
+export interface LruCache<K, V> {
+  get(key: K): V | undefined;
+  has(key: K): boolean;
+  set(key: K, value: V): void;
+  clear(): void;
+  readonly size: number;
+}
+
+/**
+ * Minimal least-recently-used cache backed by a Map. `get`/`set` refresh
+ * recency; once full, the least-recently-used entry is evicted.
+ */
+export function createLruCache<K, V>(capacity: number): LruCache<K, V> {
+  const map = new Map<K, V>();
+  return {
+    get(key) {
+      const value = map.get(key);
+      if (value === undefined) return undefined;
+      // Refresh recency: delete + re-insert moves the entry to the newest slot.
+      map.delete(key);
+      map.set(key, value);
+      return value;
+    },
+    has(key) {
+      return map.has(key);
+    },
+    set(key, value) {
+      if (map.has(key)) map.delete(key);
+      map.set(key, value);
+      while (map.size > capacity) {
+        const oldest = map.keys().next().value;
+        if (oldest === undefined) break;
+        map.delete(oldest);
+      }
+    },
+    clear() {
+      map.clear();
+    },
+    get size() {
+      return map.size;
+    },
+  };
 }

@@ -139,7 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           {Array.from({ length: 6 }).map((_, idx) => (
             <div
               key={idx}
-              className="h-8 bg-[var(--bg-tertiary)]/40 border border-[var(--border-subtle)] rounded-[var(--radius-md)] animate-pulse"
+              className="h-8 bg-[var(--bg-tertiary)]/40 border border-[var(--border-subtle)] rounded-[var(--radius-md)] skeleton-shimmer"
             />
           ))}
         </div>

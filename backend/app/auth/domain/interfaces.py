@@ -67,6 +67,14 @@ class UserRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    def delete(self, user_id: UUID) -> None:
+        """
+        Permanently delete a user. Dependent rows (sessions, conversations,
+        documents) are removed by the database ON DELETE CASCADE constraints.
+        """
+        pass
+
 
 class SessionRepository(ABC):
     @abstractmethod

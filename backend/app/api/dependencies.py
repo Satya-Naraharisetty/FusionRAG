@@ -139,7 +139,8 @@ async def get_current_user_context(
 # --- Security & Rate Limiting ---
 
 
-def get_rate_limiter(request: Request) -> Any:
+def _build_rate_limiter(request: Request, requests_per_minute: int, burst: int) -> Any:
+    """Create a Redis-backed RateLimiter (falling back to in-memory), honoring ENABLE_RATE_LIMITER."""
     from app.core.security.rate_limiter import RateLimiter
     from app.db.session import get_redis
 
@@ -153,43 +154,81 @@ def get_rate_limiter(request: Request) -> Any:
 
     return RateLimiter(
         redis_client=redis_client,
-        requests_per_minute=settings.RATE_LIMIT_REQUESTS_PER_MINUTE,
-        burst=settings.RATE_LIMIT_BURST,
+        requests_per_minute=requests_per_minute,
+        burst=burst,
     )
+
+
+def get_rate_limiter(request: Request) -> Any:
+    return _build_rate_limiter(
+        request,
+        settings.RATE_LIMIT_REQUESTS_PER_MINUTE,
+        settings.RATE_LIMIT_BURST,
+    )
+
+
+def _resolve_rate_limit_identifier(request: Request) -> str:
+    """
+    Resolve the rate-limit key: the authenticated user id when present, the
+    client IP otherwise. Decodes the Bearer token directly so it also works
+    for endpoints whose auth guard has not run yet.
+    """
+    from app.core.context.request_context import current_request_context
+
+    ctx = current_request_context.get()
+    if ctx and ctx.user_id:
+        return f"user:{ctx.user_id}"
+    try:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            claims = jwt.decode(
+                token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
+            )
+            sub = claims.get("sub")
+            if sub:
+                return f"user:{sub}"
+    except Exception:
+        pass
+    ip = request.client.host if request.client else "unknown"
+    return f"ip:{ip}"
 
 
 async def check_rate_limit(
     request: Request,
     rate_limiter: Any = Depends(get_rate_limiter),
 ) -> None:
-    from app.core.context.request_context import current_request_context
-
-    ctx = current_request_context.get()
-    identifier = None
-    if ctx and ctx.user_id:
-        identifier = f"user:{ctx.user_id}"
-    else:
-        try:
-            auth_header = request.headers.get("Authorization")
-            if auth_header and auth_header.startswith("Bearer "):
-                token = auth_header.split(" ")[1]
-                claims = jwt.decode(
-                    token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
-                )
-                sub = claims.get("sub")
-                if sub:
-                    identifier = f"user:{sub}"
-        except Exception:
-            pass
-
-    if not identifier:
-        ip = request.client.host if request.client else "unknown"
-        identifier = f"ip:{ip}"
-
+    identifier = _resolve_rate_limit_identifier(request)
     if await rate_limiter.is_rate_limited(identifier):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many requests. Please try again later.",
+        )
+
+
+def get_account_delete_rate_limiter(request: Request) -> Any:
+    """
+    Strict per-user limiter for the password-gated DELETE /auth/account.
+
+    Account deletion re-verifies the password, so a compromised access token
+    must not permit unlimited guesses against that re-entry field.
+    """
+    return _build_rate_limiter(
+        request,
+        settings.ACCOUNT_DELETE_RATE_LIMIT_PER_MINUTE,
+        burst=0,
+    )
+
+
+async def check_account_delete_rate_limit(
+    request: Request,
+    rate_limiter: Any = Depends(get_account_delete_rate_limiter),
+) -> None:
+    identifier = _resolve_rate_limit_identifier(request)
+    if await rate_limiter.is_rate_limited(identifier):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts. Please try again later.",
         )
 
 

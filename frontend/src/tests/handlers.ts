@@ -31,6 +31,10 @@ const handlers = [
     return HttpResponse.json({ message: "Successfully logged out" });
   }),
 
+  http.delete("*/api/v1/auth/account", () => {
+    return new HttpResponse(null, { status: 204 });
+  }),
+
   http.get("*/api/v1/auth/me", () => {
     return HttpResponse.json({
       id: "user-123",

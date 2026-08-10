@@ -1,5 +1,5 @@
 import React from "react";
-import { PanelLeftOpen, Wifi, WifiOff } from "lucide-react";
+import { PanelLeftOpen, WifiOff } from "lucide-react";
 import { useSidebarState } from "../../hooks/useSidebarState";
 
 interface ChatToolbarProps {
@@ -41,16 +41,15 @@ export const ChatToolbar: React.FC<ChatToolbarProps> = ({
           {model}
         </span>
 
-        {/* Connection status */}
-        {connectionLost ? (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-red-400 animate-pulse">
+        {/* Stream connection loss — browser offline is covered by OfflineBanner */}
+        {connectionLost && (
+          <span
+            className="inline-flex items-center gap-1 text-xs font-medium text-red-400 animate-pulse"
+            role="status"
+            aria-live="polite"
+          >
             <WifiOff size={12} />
-            <span className="hidden sm:inline">Offline</span>
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--text-muted)]">
-            <Wifi size={12} className="text-emerald-400" />
-            <span className="hidden sm:inline">Connected</span>
+            <span className="hidden sm:inline">Stream disconnected</span>
           </span>
         )}
       </div>

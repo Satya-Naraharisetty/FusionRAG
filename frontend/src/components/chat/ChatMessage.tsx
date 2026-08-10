@@ -1,13 +1,28 @@
-import React, { useState, useRef } from "react";
+import React, { lazy, Suspense, useState, useRef } from "react";
 import { Copy, Check, RefreshCw, Clock, ThumbsUp, ThumbsDown, Flag, Sparkles } from "lucide-react";
 import { ChatMessage as ChatMessageType } from "../../types";
-import { MarkdownRenderer } from "./MarkdownRenderer";
 import { CitationCard } from "./CitationCard";
 import { ToolCallCard } from "./ToolCallCard";
 import { StreamingCursor } from "./StreamingCursor";
 import { Avatar, AvatarFallback } from "../ui/Avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "../../lib/utils";
+
+/*
+ * Markdown rendering pulls in the whole react-markdown stack (~250 kB). It is
+ * lazy-loaded so the ChatPage chunk stays lean; the stack only downloads when
+ * the first message with content actually renders.
+ */
+const MarkdownRenderer = lazy(() =>
+  import("./MarkdownRenderer").then((m) => ({ default: m.MarkdownRenderer }))
+);
+
+const MarkdownFallback: React.FC = () => (
+  <div className="flex flex-col gap-2 py-1" aria-hidden>
+    <div className="h-3 w-3/4 rounded bg-[var(--bg-tertiary)] skeleton-shimmer" />
+    <div className="h-3 w-1/2 rounded bg-[var(--bg-tertiary)] skeleton-shimmer" />
+  </div>
+);
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -19,7 +34,7 @@ interface ChatMessageProps {
 const actionBtn =
   "p-1.5 rounded-[var(--radius-md)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer";
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onReact }) => {
+const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onRetry, onReact }) => {
   const [copied, setCopied]           = useState(false);
   const [showActions, setShowActions] = useState(false);
   const contentRef                    = useRef<HTMLDivElement>(null);
@@ -42,7 +57,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
       <TooltipProvider>
         <div
           ref={contentRef}
-          className="flex w-full py-4 group justify-center bg-transparent select-none"
+          className="flex w-full py-[calc(var(--space-factor,1)*16px)] group justify-center bg-transparent select-none"
           role="article"
           aria-label="User message"
         >
@@ -50,7 +65,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
             <div className="flex flex-col items-end gap-1.5 max-w-[72%]">
               {/* Bubble */}
               <div className="px-4 py-3 rounded-[18px] bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-[var(--text-primary)] text-[15px] leading-relaxed select-text">
-                {message.content && <MarkdownRenderer content={message.content} />}
+                {message.content && (
+                  <Suspense fallback={<MarkdownFallback />}>
+                    <MarkdownRenderer content={message.content} />
+                  </Suspense>
+                )}
               </div>
               {/* Timestamp */}
               <Tooltip>
@@ -73,7 +92,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
     <TooltipProvider>
       <div
         ref={contentRef}
-        className="flex w-full py-6 group bg-transparent justify-center transition-colors select-none"
+        className="flex w-full py-[calc(var(--space-factor,1)*24px)] group bg-transparent justify-center transition-colors select-none"
         role="article"
         aria-label="Assistant response"
         onMouseEnter={() => setShowActions(true)}
@@ -103,7 +122,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
               className="flex flex-col gap-1.5 select-text text-[var(--text-primary)] text-[15px] leading-[1.65]"
             >
               {message.content ? (
-                <MarkdownRenderer content={message.content} />
+                <Suspense fallback={<MarkdownFallback />}>
+                  <MarkdownRenderer content={message.content} />
+                </Suspense>
               ) : message.status === "pending" ? (
                 /* Typing indicator */
                 <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-xs py-2">
@@ -260,5 +281,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onRe
     </TooltipProvider>
   );
 };
+
+/* Memoized so only the actively-streaming message re-renders per token. */
+export const ChatMessage = React.memo(ChatMessageComponent);
 
 export default ChatMessage;

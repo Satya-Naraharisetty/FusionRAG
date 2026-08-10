@@ -177,7 +177,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           onClick={isEditing ? undefined : onSelect}
           style={{ transform: `translateX(${swipeOffset}px)` }}
           className={cn(
-            "relative flex items-center justify-between gap-2 px-2.5 py-2 rounded-[var(--radius-md)] text-xs cursor-pointer transition-colors",
+            "relative flex items-center justify-between gap-2 px-2.5 py-[calc(var(--space-factor,1)*8px)] rounded-[var(--radius-md)] text-xs cursor-pointer transition-colors",
             isActive
               ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] font-medium"
               : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60"

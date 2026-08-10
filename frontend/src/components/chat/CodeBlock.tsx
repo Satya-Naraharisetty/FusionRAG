@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Copy, Check } from "lucide-react";
-import { codeToHtml } from "shiki";
+import { escapeHtml, highlightCode } from "../../lib/highlighter";
 import { cn } from "../../lib/utils";
 
 interface CodeBlockProps {
@@ -16,13 +16,11 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
     let active = true;
     async function highlight() {
       try {
-        const out = await codeToHtml(code, {
-          lang: language || "text",
-          theme: "github-dark",
-        });
+        const out = await highlightCode(code, language);
         if (active) setHtml(out);
-      } catch (_e) {
-        if (active) setHtml(`<pre class="shiki"><code>${escapeHtml(code)}</code></pre>`);
+      } catch {
+        // highlightCode falls back internally; this guards against unforeseen failures.
+        if (active) setHtml(`<pre class="shiki" tabindex="0"><code>${escapeHtml(code)}</code></pre>`);
       }
     }
     highlight();
@@ -76,12 +74,4 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
   );
 };
 
-function escapeHtml(text: string) {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
 

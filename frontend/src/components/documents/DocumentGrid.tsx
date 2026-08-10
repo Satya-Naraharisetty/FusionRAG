@@ -64,11 +64,11 @@ export const DocumentGrid: React.FC<DocumentGridProps> = ({
   /* ── Loading skeleton ── */
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[calc(var(--space-factor,1)*12px)]">
         {Array.from({ length: 6 }).map((_, idx) => (
           <div
             key={idx}
-            className="h-36 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-[var(--radius-xl)] p-4 space-y-3"
+            className="h-36 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-[var(--radius-xl)] p-[calc(var(--space-factor,1)*16px)] space-y-[calc(var(--space-factor,1)*12px)]"
           >
             <div className="flex items-center gap-3">
               <Skeleton className="h-9 w-9 rounded-[var(--radius-lg)]" />
@@ -117,7 +117,7 @@ export const DocumentGrid: React.FC<DocumentGridProps> = ({
   /* ── Grid view ── */
   if (viewMode === "grid") {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[calc(var(--space-factor,1)*12px)]">
         {filteredAndSortedDocs.map((doc) => (
           <DocumentCard
             key={doc.id}

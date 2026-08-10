@@ -65,6 +65,9 @@ services:
       - ENV=development
       - SKIP_DB_MIGRATION_CHECK=false
       - HF_HOME=/cache/huggingface
+      # CORS origins: single source of truth is backend/app/core/config.py.
+      # Do not set BACKEND_CORS_ORIGINS here; override only for a genuinely
+      # different deployment (e.g. a production domain).
     volumes:
       - hf_cache:/cache/huggingface
 

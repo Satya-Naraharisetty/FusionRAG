@@ -4,11 +4,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.api.dependencies import (
+    check_account_delete_rate_limit,
     check_rate_limit,
     get_auth_service,
     get_current_user_context,
 )
 from app.auth.domain.schemas import (
+    DeleteAccountSchema,
     TokenResponseSchema,
     UserCreateSchema,
     UserLoginSchema,
@@ -161,3 +163,38 @@ def get_me(
             detail="User account no longer exists",
         )
     return user
+
+
+@router.delete(
+    "/account",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(check_account_delete_rate_limit)],
+)
+def delete_account(
+    response: Response,
+    payload: DeleteAccountSchema,
+    current_user: dict[str, Any] = Depends(get_current_user_context),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    Permanently delete the authenticated user's account.
+
+    Requires the account password to be re-entered so a stolen access token
+    alone cannot destroy the account (account-takeover protection), and
+    rate-limits attempts per user so the re-entry field cannot be
+    brute-forced. The database ON DELETE CASCADE constraints remove the
+    user's sessions, conversations, and documents. The client's refresh
+    cookie is cleared so the browser no longer holds a stale session.
+    """
+    user_id = UUID(current_user["user_id"])
+    auth_service.verify_user_password(user_id, payload.password)
+    auth_service.delete_user(user_id)
+
+    response.delete_cookie(
+        key=settings.COOKIE_NAME,
+        path=settings.COOKIE_PATH,
+        domain=settings.COOKIE_DOMAIN,
+        secure=settings.COOKIE_SECURE,
+        httponly=True,
+        samesite=settings.COOKIE_SAMESITE,
+    )

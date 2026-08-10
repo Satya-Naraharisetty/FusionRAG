@@ -58,3 +58,17 @@ class SQLAlchemyUserRepository(UserRepository):
 
         self._db.flush()
         return UserDomain.model_validate(db_user)
+
+    def delete(self, user_id: UUID) -> None:
+        """
+        Permanently delete a user by UUID.
+
+        The database ON DELETE CASCADE constraints remove the user's sessions,
+        conversations, and documents.
+        """
+        db_user = (
+            self._db.query(SQLAlchemyUser).filter(SQLAlchemyUser.id == user_id).first()
+        )
+        if db_user:
+            self._db.delete(db_user)
+            self._db.flush()

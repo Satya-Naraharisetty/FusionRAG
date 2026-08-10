@@ -5,10 +5,19 @@ from fastapi import status
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
+from app.api.dependencies import get_account_delete_rate_limiter
 from app.core.config import settings
+from app.core.security.rate_limiter import RateLimiter
 from app.db.models import Base
 
 TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
+
+
+def _truncate_auth_tables(session) -> None:
+    """Delete every user and session so tests start from (and end on) a clean slate."""
+    session.execute(text("TRUNCATE TABLE refresh_sessions CASCADE;"))
+    session.execute(text("TRUNCATE TABLE users CASCADE;"))
+    session.commit()
 
 
 @pytest.fixture(scope="function")
@@ -25,9 +34,7 @@ def test_db(client):
     # Clean the tables to guarantee test isolation
     db = session_local()
     try:
-        db.execute(text("TRUNCATE TABLE refresh_sessions CASCADE;"))
-        db.execute(text("TRUNCATE TABLE users CASCADE;"))
-        db.commit()
+        _truncate_auth_tables(db)
     finally:
         db.close()
 
@@ -35,6 +42,17 @@ def test_db(client):
     client.app.state.db_session_factory = session_local
 
     yield session_local
+
+    # Teardown: truncate again so no test (not even the last one in the file)
+    # leaves users/sessions behind in the shared dev database. The pre-test
+    # truncation above alone leaks whatever the final test creates — e.g.
+    # test_refresh_concurrency_fails registered concurrent@example.com and the
+    # row survived the suite.
+    db = session_local()
+    try:
+        _truncate_auth_tables(db)
+    finally:
+        db.close()
 
 
 def test_register_user_success(client, test_db):
@@ -224,6 +242,194 @@ def test_refresh_token_reuse_detection_mitigates_threat(client, test_db):
     client.cookies.set(settings.COOKIE_NAME, cookie_other)
     verify_other = client.post("/api/v1/auth/refresh")
     assert verify_other.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_delete_account_success_cascades(client, test_db):
+    """
+    DELETE /auth/account removes the user and cascades refresh sessions.
+    """
+    register_res = client.post(
+        "/api/v1/auth/register",
+        json={"email": "delete@example.com", "password": "SecurePassword123!"},
+    )
+    user_id = register_res.json()["id"]
+    login_res = client.post(
+        "/api/v1/auth/login",
+        json={"email": "delete@example.com", "password": "SecurePassword123!"},
+    )
+    token = login_res.json()["access_token"]
+    cookie = login_res.cookies[settings.COOKIE_NAME]
+
+    # Delete the account (password re-entry is required)
+    response = client.request(
+        "DELETE",
+        "/api/v1/auth/account",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"password": "SecurePassword123!"},
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    # The refresh cookie must be cleared so the browser drops the stale session
+    assert "refresh_token=" in response.headers.get("set-cookie", "")
+
+    # The user row and its sessions must be gone (DB-level cascade)
+    db = client.app.state.db_session_factory()
+    try:
+        user_count = db.execute(
+            text("SELECT count(*) FROM users WHERE id = :uid"),
+            {"uid": user_id},
+        ).scalar()
+        session_count = db.execute(
+            text("SELECT count(*) FROM refresh_sessions WHERE user_id = :uid"),
+            {"uid": user_id},
+        ).scalar()
+    finally:
+        db.close()
+    assert user_count == 0
+    assert session_count == 0
+
+    # Login with the same credentials now fails
+    relogin = client.post(
+        "/api/v1/auth/login",
+        json={"email": "delete@example.com", "password": "SecurePassword123!"},
+    )
+    assert relogin.status_code == status.HTTP_401_UNAUTHORIZED
+    assert relogin.json()["error"]["code"] == "INVALID_CREDENTIALS"
+
+    # Refresh with the old cookie fails (session was cascaded away)
+    client.cookies.set(settings.COOKIE_NAME, cookie)
+    refresh_response = client.post("/api/v1/auth/refresh")
+    assert refresh_response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    # /me with the old access token reports the account no longer exists
+    me_response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert me_response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_delete_account_unauthorized_fails(client, test_db):
+    response = client.request("DELETE", "/api/v1/auth/account", json={"password": "x"})
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_delete_account_wrong_password_fails(client, test_db):
+    """
+    DELETE /auth/account with the wrong password is rejected (401) and the
+    account survives — a stolen access token alone cannot delete the account.
+    """
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "reenter@example.com", "password": "SecurePassword123!"},
+    )
+    login_res = client.post(
+        "/api/v1/auth/login",
+        json={"email": "reenter@example.com", "password": "SecurePassword123!"},
+    )
+    token = login_res.json()["access_token"]
+
+    # Wrong password -> 401 INVALID_CREDENTIALS
+    denied = client.request(
+        "DELETE",
+        "/api/v1/auth/account",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"password": "WrongPassword!"},
+    )
+    assert denied.status_code == status.HTTP_401_UNAUTHORIZED
+    assert denied.json()["error"]["code"] == "INVALID_CREDENTIALS"
+
+    # Account still exists: login with the correct password still succeeds
+    relogin = client.post(
+        "/api/v1/auth/login",
+        json={"email": "reenter@example.com", "password": "SecurePassword123!"},
+    )
+    assert relogin.status_code == status.HTTP_200_OK
+
+    # Correct password then succeeds
+    granted = client.request(
+        "DELETE",
+        "/api/v1/auth/account",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"password": "SecurePassword123!"},
+    )
+    assert granted.status_code == status.HTTP_204_NO_CONTENT
+
+
+def test_delete_account_rate_limited(client, test_db):
+    """
+    DELETE /auth/account is rate-limited per user so the password re-entry
+    field cannot be brute-forced with a compromised access token.
+
+    The real limiter is Redis-backed; here we inject a persistent in-memory
+    limiter (2 per minute) so the 429 behavior is deterministic regardless of
+    whether Redis is reachable from the test runner.
+    """
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "ratelimit@example.com", "password": "SecurePassword123!"},
+    )
+    login_res = client.post(
+        "/api/v1/auth/login",
+        json={"email": "ratelimit@example.com", "password": "SecurePassword123!"},
+    )
+    token = login_res.json()["access_token"]
+
+    shared_limiter = RateLimiter(redis_client=None, requests_per_minute=2, burst=0)
+    client.app.dependency_overrides[get_account_delete_rate_limiter] = lambda: (
+        shared_limiter
+    )
+    try:
+        statuses = []
+        for _ in range(3):
+            res = client.request(
+                "DELETE",
+                "/api/v1/auth/account",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"password": "WrongPassword!"},
+            )
+            statuses.append(res.status_code)
+
+        # First two attempts are checked (401 wrong password); the third is
+        # blocked by the rate limiter before the handler runs.
+        assert statuses[:2] == [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_401_UNAUTHORIZED,
+        ]
+        assert statuses[2] == status.HTTP_429_TOO_MANY_REQUESTS
+    finally:
+        client.app.dependency_overrides.pop(get_account_delete_rate_limiter, None)
+
+
+def test_delete_account_missing_user_returns_not_found(client, test_db):
+    """
+    Deleting an already-deleted account returns 404 with a USER_NOT_FOUND code.
+    """
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "twice@example.com", "password": "SecurePassword123!"},
+    )
+    login_res = client.post(
+        "/api/v1/auth/login",
+        json={"email": "twice@example.com", "password": "SecurePassword123!"},
+    )
+    token = login_res.json()["access_token"]
+
+    first = client.request(
+        "DELETE",
+        "/api/v1/auth/account",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"password": "SecurePassword123!"},
+    )
+    assert first.status_code == status.HTTP_204_NO_CONTENT
+
+    second = client.request(
+        "DELETE",
+        "/api/v1/auth/account",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"password": "SecurePassword123!"},
+    )
+    assert second.status_code == status.HTTP_404_NOT_FOUND
+    assert second.json()["error"]["code"] == "USER_NOT_FOUND"
 
 
 def test_refresh_concurrency_fails(client, test_db):

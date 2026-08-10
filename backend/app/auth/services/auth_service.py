@@ -7,6 +7,7 @@ from app.auth.domain.exceptions import (
     DuplicateAccountException,
     InvalidCredentialsException,
     InvalidSessionException,
+    UserNotFoundException,
 )
 from app.auth.domain.interfaces import (
     PasswordHasher,
@@ -217,6 +218,42 @@ class AuthService:
         """
         try:
             self._session_repo.revoke(raw_refresh_token)
+            self._uow.commit()
+        except Exception:
+            self._uow.rollback()
+            raise
+
+    def verify_user_password(self, user_id: UUID, password: str) -> None:
+        """
+        Re-verify a user's password before a destructive action (account deletion).
+
+        Unlike authenticate_user, this intentionally does not check is_active:
+        a deactivated account may still be deleted by its owner when the
+        correct password is supplied.
+
+        Raises UserNotFoundException if the account no longer exists and
+        InvalidCredentialsException if the password does not match, so the API
+        layer responds with the standard error codes.
+        """
+        user = self._user_repo.get_by_id(user_id)
+        if not user:
+            raise UserNotFoundException("User account no longer exists.")
+        if not self._hasher.verify(password, user.hashed_password):
+            raise InvalidCredentialsException("Invalid email or password.")
+
+    def delete_user(self, user_id: UUID) -> None:
+        """
+        Permanently delete a user account.
+
+        The database ON DELETE CASCADE constraints remove the user's refresh
+        sessions (and any conversations, documents, etc.). Raises
+        UserNotFoundException if the account no longer exists.
+        """
+        try:
+            user = self._user_repo.get_by_id(user_id)
+            if not user:
+                raise UserNotFoundException("User account no longer exists.")
+            self._user_repo.delete(user_id)
             self._uow.commit()
         except Exception:
             self._uow.rollback()

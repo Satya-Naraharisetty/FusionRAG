@@ -1,8 +1,18 @@
 import React, { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme, Theme, Density } from "../context/ThemeContext";
+import { useConversations, useDeleteConversation } from "../hooks/useConversations";
+import {
+  ensureNotificationPermission,
+  getNotificationPrefs,
+  isNotificationSupported,
+  NotificationPrefs,
+  playChime,
+  setNotificationPrefs,
+} from "../lib/notifications";
 import {
   User,
+  UserX,
   Sliders,
   ShieldAlert,
   RotateCcw,
@@ -14,6 +24,7 @@ import {
   Upload,
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
 import { Avatar, AvatarFallback } from "../components/ui/Avatar";
 import {
   Dialog,
@@ -58,7 +69,7 @@ const SectionHeader: React.FC<{
   description?: string;
   action?: React.ReactNode;
 }> = ({ icon, title, description, action }) => (
-  <div className="flex items-start justify-between gap-4 border-b border-(--border-subtle) pb-4">
+  <div className="flex items-start justify-between gap-4 border-b border-(--border-subtle) pb-[calc(var(--space-factor,1)*16px)]">
     <div>
       <h3 className="flex items-center gap-2 text-sm font-semibold text-(--text-primary)">
         <span className="text-(--text-muted)">{icon}</span>
@@ -79,7 +90,7 @@ const SettingRow: React.FC<{
   control: React.ReactNode;
   className?: string;
 }> = ({ label, description, control, className = "" }) => (
-  <div className={`flex items-center justify-between gap-6 border-b border-(--border-subtle) py-4 last:border-0 ${className}`}>
+  <div className={`flex items-center justify-between gap-6 border-b border-(--border-subtle) py-[calc(var(--space-factor,1)*16px)] last:border-0 ${className}`}>
     <div className="min-w-0">
       <span className="block text-sm font-medium text-(--text-primary)">{label}</span>
       {description && (
@@ -95,12 +106,17 @@ const ToggleCheckbox: React.FC<{
   checked: boolean;
   onChange: (val: boolean) => void;
   label: string;
-}> = ({ checked, onChange, label }) => (
-  <label className="relative inline-flex items-center cursor-pointer select-none" aria-label={label}>
+  disabled?: boolean;
+}> = ({ checked, onChange, label, disabled = false }) => (
+  <label
+    className={`relative inline-flex items-center cursor-pointer select-none ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+    aria-label={label}
+  >
     <input
       type="checkbox"
       checked={checked}
       onChange={(e) => onChange(e.target.checked)}
+      disabled={disabled}
       className="sr-only"
     />
     <div
@@ -118,10 +134,15 @@ const ToggleCheckbox: React.FC<{
 );
 
 const SettingsPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, deleteAccount } = useAuth();
   const { theme, setTheme, fontSize, setFontSize, density, setDensity } = useTheme();
+  const { data: conversationsData } = useConversations();
+  const deleteConversation = useDeleteConversation();
 
   const [activeTab, setActiveTab] = useState<TabId>("profile");
+
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(() => getNotificationPrefs());
+  const [isClearingHistory, setIsClearingHistory] = useState(false);
 
   const [defaults, setDefaults] = useState<ConversationDefaults>(() => {
     try {
@@ -134,6 +155,10 @@ const SettingsPage: React.FC = () => {
 
   const [showClearHistoryDialog, setShowClearHistoryDialog]   = useState(false);
   const [showResetConfigDialog,  setShowResetConfigDialog]    = useState(false);
+  const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail]           = useState("");
+  const [deletePassword, setDeletePassword]                   = useState("");
+  const [isDeletingAccount, setIsDeletingAccount]             = useState(false);
 
   const updateSetting = <K extends keyof ConversationDefaults>(key: K, value: ConversationDefaults[K]) => {
     const updated = { ...defaults, [key]: value };
@@ -179,11 +204,83 @@ const SettingsPage: React.FC = () => {
     reader.readAsText(file);
   };
 
+  const handleDesktopNotificationsChange = async (enabled: boolean) => {
+    if (enabled && isNotificationSupported()) {
+      const permission = await ensureNotificationPermission();
+      if (permission === "denied") {
+        toast.error("Notifications are blocked in your browser settings.");
+        return;
+      }
+      if (permission !== "granted") {
+        toast("Notification permission not granted — enable it in your browser to see alerts.");
+      }
+    }
+    const next = { ...notifPrefs, desktop: enabled };
+    setNotifPrefs(next);
+    setNotificationPrefs(next);
+  };
+
+  const handleSoundAlertsChange = (enabled: boolean) => {
+    const next = { ...notifPrefs, sound: enabled };
+    setNotifPrefs(next);
+    setNotificationPrefs(next);
+    if (enabled) playChime(); // instant audible preview
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmEmail.trim().toLowerCase() !== user?.email?.toLowerCase()) return;
+    if (!deletePassword) return;
+    setIsDeletingAccount(true);
+    try {
+      await deleteAccount(deletePassword);
+      // Session state cleared → ProtectedRoute redirects to /login
+      setShowDeleteAccountDialog(false);
+      setDeleteConfirmEmail("");
+      setDeletePassword("");
+      toast.success("Your account has been deleted.");
+    } catch (err) {
+      const e = err as { data?: { error?: { code?: string } }; status?: number };
+      if (e.data?.error?.code === "INVALID_CREDENTIALS") {
+        // Password re-entry failed — keep the dialog open so the user can retry.
+        setDeletePassword("");
+        toast.error("Incorrect password. Please try again.");
+      } else if (e.status === 429) {
+        // Rate-limited on the delete endpoint — the re-entry field is locked
+        // for a minute, so the user needs to wait before retrying.
+        toast.error("Too many attempts. Please try again in a minute.");
+      } else {
+        toast.error("Failed to delete account. Please try again.");
+      }
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    const conversations = conversationsData?.conversations || [];
+    setIsClearingHistory(true);
+    const toastId = toast.loading(
+      conversations.length === 0 ? "Checking history…" : `Deleting ${conversations.length} conversation(s)…`
+    );
+    try {
+      await Promise.all(conversations.map((c) => deleteConversation.mutateAsync(c.id)));
+      toast.success(
+        conversations.length === 0 ? "Conversation history is already empty." : "Conversation history cleared.",
+        { id: toastId }
+      );
+    } catch {
+      toast.error("Failed to clear some conversations.", { id: toastId });
+    } finally {
+      setIsClearingHistory(false);
+      setShowClearHistoryDialog(false);
+    }
+  };
+
   const userInitials = user?.email ? user.email.slice(0, 2).toUpperCase() : "US";
 
   return (
     <div className="flex-1 overflow-y-auto bg-(--bg-primary) text-(--text-primary)">
-      <div className="max-w-3xl mx-auto px-4 py-8 md:px-8">
+      <div className="max-w-3xl mx-auto px-4 py-[calc(var(--space-factor,1)*32px)] md:px-8">
 
         {/* ── Page header ── */}
         <div className="mb-8">
@@ -224,7 +321,7 @@ const SettingsPage: React.FC = () => {
             {activeTab === "profile" && (
               <div className="space-y-0">
                 <SectionHeader icon={<User size={14} />} title="User Profile" description="Your identity and account details." />
-                <div className="flex items-center gap-4 border-b border-(--border-subtle) py-6">
+                <div className="flex items-center gap-4 border-b border-(--border-subtle) py-[calc(var(--space-factor,1)*24px)]">
                   <Avatar className="h-12 w-12 border border-(--border-default) bg-(--bg-tertiary)">
                     <AvatarFallback className="text-sm font-semibold">{userInitials}</AvatarFallback>
                   </Avatar>
@@ -252,7 +349,7 @@ const SettingsPage: React.FC = () => {
                 <SectionHeader icon={<Palette size={14} />} title="Appearance" description="Customize theme, font size, and interface density." />
 
                 {/* Theme */}
-                <div className="border-b border-(--border-subtle) py-5">
+                <div className="border-b border-(--border-subtle) py-[calc(var(--space-factor,1)*20px)]">
                   <p className="mb-3 text-xs font-medium text-(--text-secondary)">Theme Mode</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {(["dark", "light", "system", "high-contrast"] as Theme[]).map((opt) => (
@@ -273,7 +370,7 @@ const SettingsPage: React.FC = () => {
                 </div>
 
                 {/* Font size */}
-                <div className="border-b border-(--border-subtle) py-5">
+                <div className="border-b border-(--border-subtle) py-[calc(var(--space-factor,1)*20px)]">
                   <div className="mb-3 flex items-center justify-between">
                     <p className="text-xs font-medium text-(--text-secondary)">Base Font Size</p>
                     <span className="font-mono text-xs text-(--text-muted)">{fontSize}px</span>
@@ -293,7 +390,7 @@ const SettingsPage: React.FC = () => {
                 </div>
 
                 {/* Density */}
-                <div className="py-5">
+                <div className="py-[calc(var(--space-factor,1)*20px)]">
                   <p className="mb-3 text-xs font-medium text-(--text-secondary)">Interface Density</p>
                   <div className="grid grid-cols-3 gap-2">
                     {(["comfortable", "cozy", "compact"] as Density[]).map((opt) => (
@@ -324,8 +421,9 @@ const SettingsPage: React.FC = () => {
                   description="Show browser push notifications when responses complete."
                   control={
                     <ToggleCheckbox
-                      checked={true}
-                      onChange={() => {}}
+                      checked={notifPrefs.desktop}
+                      onChange={handleDesktopNotificationsChange}
+                      disabled={!isNotificationSupported()}
                       label="Toggle desktop notifications"
                     />
                   }
@@ -335,8 +433,8 @@ const SettingsPage: React.FC = () => {
                   description="Play a soft chime when the model finishes responding."
                   control={
                     <ToggleCheckbox
-                      checked={false}
-                      onChange={() => {}}
+                      checked={notifPrefs.sound}
+                      onChange={handleSoundAlertsChange}
                       label="Toggle sound alerts"
                     />
                   }
@@ -360,7 +458,7 @@ const SettingsPage: React.FC = () => {
                 />
 
                 {/* Temperature */}
-                <div className="border-b border-(--border-subtle) py-5">
+                <div className="border-b border-(--border-subtle) py-[calc(var(--space-factor,1)*20px)]">
                   <div className="mb-3 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-(--text-primary)">Temperature</p>
@@ -384,7 +482,7 @@ const SettingsPage: React.FC = () => {
                 </div>
 
                 {/* Top K */}
-                <div className="border-b border-(--border-subtle) py-5">
+                <div className="border-b border-(--border-subtle) py-[calc(var(--space-factor,1)*20px)]">
                   <div className="mb-3 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-(--text-primary)">Retrieval Top K</p>
@@ -489,7 +587,7 @@ const SettingsPage: React.FC = () => {
                 />
 
                 {/* Danger zone */}
-                <div className="mt-2 border-t border-(--border-subtle) pt-6">
+                <div className="mt-2 border-t border-(--border-subtle) pt-[calc(var(--space-factor,1)*24px)]">
                   <div className="flex items-center gap-2 mb-4">
                     <ShieldAlert size={14} className="text-(--accent-error)" />
                     <span className="text-sm font-semibold text-(--accent-error)">Danger Zone</span>
@@ -526,6 +624,22 @@ const SettingsPage: React.FC = () => {
                       </Button>
                     }
                   />
+
+                  <SettingRow
+                    label="Delete Account"
+                    description="Permanently delete your account, all conversations, and documents. This cannot be undone."
+                    control={
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setShowDeleteAccountDialog(true)}
+                        className="gap-1.5"
+                      >
+                        <UserX size={13} />
+                        Delete
+                      </Button>
+                    }
+                  />
                 </div>
               </div>
             )}
@@ -551,9 +665,75 @@ const SettingsPage: React.FC = () => {
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => { toast.success("History cleared."); setShowClearHistoryDialog(false); }}
+              onClick={handleClearHistory}
+              disabled={isClearingHistory}
+              loading={isClearingHistory}
             >
-              Confirm Clear
+              {isClearingHistory ? "Clearing…" : "Confirm Clear"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Confirm: delete account ── */}
+      <Dialog
+        open={showDeleteAccountDialog}
+        onOpenChange={(open) => {
+          setShowDeleteAccountDialog(open);
+          if (!open) {
+            setDeleteConfirmEmail("");
+            setDeletePassword("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <UserX size={15} className="text-(--accent-error)" />
+              Delete Account?
+            </DialogTitle>
+            <DialogDescription>
+              This permanently deletes your account, all conversations, and documents. Type{" "}
+              <span className="font-mono text-(--text-primary)">{user?.email}</span> and your password to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            id="delete-account-confirm-email"
+            value={deleteConfirmEmail}
+            onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+            placeholder={user?.email}
+            label="Type your email to confirm"
+            autoComplete="off"
+            className="mt-1"
+          />
+          <Input
+            id="delete-account-confirm-password"
+            type="password"
+            value={deletePassword}
+            onChange={(e) => setDeletePassword(e.target.value)}
+            label="Re-enter your password"
+            autoComplete="current-password"
+            className="mt-1"
+          />
+          <DialogFooter className="gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowDeleteAccountDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={
+                deleteConfirmEmail.trim().toLowerCase() !== user?.email?.toLowerCase() ||
+                !deletePassword
+              }
+              loading={isDeletingAccount}
+              onClick={handleDeleteAccount}
+            >
+              {isDeletingAccount ? "Deleting…" : "Delete Account"}
             </Button>
           </DialogFooter>
         </DialogContent>

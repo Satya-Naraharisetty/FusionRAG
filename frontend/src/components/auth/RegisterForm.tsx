@@ -41,8 +41,8 @@ export const RegisterForm: React.FC = () => {
       await register(email, password);
       toast.success("Account created!");
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      setError(e.response?.data?.message || "Registration failed. Try again.");
+      const e = err as { data?: { message?: string } };
+      setError(e.data?.message || "Registration failed. Try again.");
     } finally {
       setIsSubmitting(false);
     }

@@ -1,15 +1,8 @@
-import axios from "axios";
 import { SSEEvent, SSEEventType } from "../types";
 
 // Base API configuration
-const api = axios.create({
-  baseURL:
-    (import.meta.env.VITE_API_URL || "http://localhost:8000") + "/api/v1",
-  withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+const BASE_URL =
+  (import.meta.env.VITE_API_URL || "http://localhost:8000") + "/api/v1";
 
 export interface TokenResponse {
   access_token: string;
@@ -41,29 +34,60 @@ export const executeRefresh = async (): Promise<TokenResponse> => {
   }
 
   activeRefreshPromise = (async () => {
-    try {
-      const response = await api.post<TokenResponse>("/auth/refresh");
-      setAccessToken(response.data.access_token);
-      return response.data;
-    } finally {
-      activeRefreshPromise = null;
+    const response = await fetch(`${BASE_URL}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
-  })();
+    const data = (await response.json()) as TokenResponse;
+    setAccessToken(data.access_token);
+    return data;
+  })().finally(() => {
+    activeRefreshPromise = null;
+  });
 
   return activeRefreshPromise;
 };
 
-// Request Interceptor to inject bearer token
-api.interceptors.request.use(
-  (config) => {
-    const token = getAccessToken();
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+/**
+ * Error thrown by the API layer. `data` carries the parsed response body and
+ * `status` the HTTP code, so callers can show the backend's message.
+ */
+export interface ApiError extends Error {
+  status: number;
+  data: unknown;
+}
+
+function toApiError(status: number, data: unknown, fallback: string): ApiError {
+  const detail = (data as { detail?: unknown } | null)?.detail;
+  const message =
+    (data as { message?: string } | null)?.message ||
+    // FastAPI validation errors carry `detail` as an array — only use it when it's a string.
+    (typeof detail === "string" ? detail : undefined) ||
+    (data as { error?: { message?: string } } | null)?.error?.message ||
+    fallback;
+  const err = new Error(message) as ApiError;
+  err.status = status;
+  err.data = data;
+  return err;
+}
+
+async function parseError(response: Response): Promise<ApiError> {
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    data = undefined;
+  }
+  return toApiError(response.status, data, `HTTP ${response.status}`);
+}
+
+interface RequestOptions extends RequestInit {
+  params?: Record<string, string | number | boolean | null | undefined>;
+}
 
 let isRefreshing = false;
 let failedQueue: Array<{
@@ -82,61 +106,106 @@ const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Response Interceptor for handling 401 and silent refresh
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
+  const { params, ...requestInit } = init;
+  let url = `${BASE_URL}${path}`;
+  if (params) {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) search.set(key, String(value));
+    });
+    const qs = search.toString();
+    if (qs) url += `?${qs}`;
+  }
 
-    // Do not attempt to refresh if the request failed was the refresh endpoint itself
-    if (originalRequest.url?.includes("/auth/refresh")) {
-      return Promise.reject(error);
+  const doFetch = (token: string | null): Promise<Response> => {
+    const headers = new Headers(requestInit.headers);
+    // JSON bodies are stringified by the api helpers; never override the
+    // Content-Type for FormData/other body types.
+    if (typeof requestInit.body === "string" && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
     }
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+    return fetch(url, { ...requestInit, headers, credentials: "include" });
+  };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
+  let response = await doFetch(getAccessToken());
 
-      if (isRefreshing) {
-        return new Promise<string>((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return api(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
-      }
-
+  // Single 401 retry: refresh the token once, then replay. Requests arriving
+  // while a refresh is in flight wait for its token instead of refreshing again.
+  if (response.status === 401 && !path.includes("/auth/refresh")) {
+    if (isRefreshing) {
+      const token = await new Promise<string>((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      });
+      response = await doFetch(token);
+    } else {
       isRefreshing = true;
-
       try {
         const tokenResponse = await executeRefresh();
-        const access_token = tokenResponse.access_token;
-
-        originalRequest.headers.Authorization = `Bearer ${access_token}`;
-
+        processQueue(null, tokenResponse.access_token);
         if (onTokenRefreshed) {
-          onTokenRefreshed(access_token);
+          onTokenRefreshed(tokenResponse.access_token);
         }
-
-        processQueue(null, access_token);
-        isRefreshing = false;
-
-        return api(originalRequest);
+        response = await doFetch(tokenResponse.access_token);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        isRefreshing = false;
-
         if (onAuthFailure) {
           onAuthFailure();
         }
-        return Promise.reject(refreshError);
+        throw refreshError;
+      } finally {
+        isRefreshing = false;
       }
     }
-
-    return Promise.reject(error);
   }
-);
+
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+  if (response.status === 204) {
+    return undefined as T;
+  }
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return undefined as T;
+  }
+}
+
+/** Minimal fetch-based HTTP client mirroring the old axios surface. */
+export const api = {
+  get: <T>(path: string, options?: RequestOptions) =>
+    request<T>(path, { ...options, method: "GET" }),
+  post: <T>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>(path, {
+      ...options,
+      method: "POST",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+  put: <T>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>(path, {
+      ...options,
+      method: "PUT",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+  patch: <T>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>(path, {
+      ...options,
+      method: "PATCH",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+  delete: <T = void>(path: string, options?: RequestOptions) =>
+    request<T>(path, { ...options, method: "DELETE" }),
+};
+
+export default api;
 
 /**
  * Creates an SSE Stream generator using native fetch, attaching the Authorization header.
@@ -150,12 +219,12 @@ export async function* createSSEStream(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  
+
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const url = ((import.meta.env.VITE_API_URL || "http://localhost:8000") + "/api/v1" + path);
+  const url = BASE_URL + path;
 
   const response = await fetch(url, {
     method: "POST",
@@ -238,5 +307,3 @@ export async function* createSSEStream(
     }
   }
 }
-
-export default api;

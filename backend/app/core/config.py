@@ -112,10 +112,22 @@ class Settings(BaseSettings):
     # NoDecode disables pydantic-settings' eager JSON decoding so that both
     # comma-separated ("http://a,http://b") and JSON-array values are handled
     # by assemble_cors_origins below instead of raising SettingsError.
+    #
+    # SINGLE SOURCE OF TRUTH: this list is the canonical set of allowed CORS
+    # origins. It must not be duplicated in docker-compose.yml, backend/.env,
+    # or any other config file - per-deployment overrides via the
+    # BACKEND_CORS_ORIGINS environment variable are supported, but the tracked
+    # default here is what should be edited when origins change.
     BACKEND_CORS_ORIGINS: Annotated[list[str], NoDecode] = [
+        # Vite dev server
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        # Dockerized frontend (nginx on port 80)
         "http://localhost",
+        "http://localhost:80",
+        "http://127.0.0.1",
+        "http://127.0.0.1:80",
+        # Legacy / alternate local ports
         "http://localhost:8080",
     ]
 
@@ -272,6 +284,9 @@ class Settings(BaseSettings):
     # Rate Limiting settings
     RATE_LIMIT_REQUESTS_PER_MINUTE: int = 60
     RATE_LIMIT_BURST: int = 10
+    # Stricter per-user limit for the password-gated DELETE /auth/account so a
+    # compromised access token cannot be used to brute-force the re-entry field.
+    ACCOUNT_DELETE_RATE_LIMIT_PER_MINUTE: int = 10
 
     # Reliability settings
     LLM_PROVIDER_BACKUP: str = "openai"

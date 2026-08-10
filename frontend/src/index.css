@@ -21,7 +21,8 @@
   /* ── Text ── */
   --text-primary:   #F5F5F5;
   --text-secondary: #A3A3A3;
-  --text-muted:     #737373;
+  /* #808080 ≈ 4.9:1 on --bg-primary (#0D0D0D) — passes WCAG AA for small text */
+  --text-muted:     #808080;
   --text-disabled:  rgba(255, 255, 255, 0.35);
 
   /* ── Borders ── */
@@ -371,10 +372,51 @@ button:active:not(:disabled),
 }
 .animate-fade-in-up { animation: fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
+/* Drag-and-drop overlay entrance (was previously undefined) */
+@keyframes enter {
+  from { opacity: 0; transform: scale(0.985); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.animate-enter { animation: enter 0.2s var(--ease-standard) both; }
+
+/* Loading shimmer — a soft accent-tinted sweep across the surface */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary) 25%,
+    var(--bg-elevated) 50%,
+    var(--bg-tertiary) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s var(--ease-standard) infinite;
+}
+
+/* Streaming cursor — smooth accent blink (decorative, aria-hidden in markup) */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.2; }
+}
+.streaming-cursor {
+  display: inline-block;
+  width: 3px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -2px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-primary);
+  animation: cursor-blink 1s ease-in-out infinite;
+}
+
 .stagger-1 { animation-delay: 50ms; }
 .stagger-2 { animation-delay: 100ms; }
 .stagger-3 { animation-delay: 150ms; }
 .stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+.stagger-6 { animation-delay: 300ms; }
 
 /* GPU layer for animated elements */
 .gpu-layer {
@@ -482,7 +524,7 @@ input[type="range"]::-moz-range-thumb {
   font-size: 0.8125rem; /* 13 px */
 }
 .doc-table th {
-  padding: 10px 14px;
+  padding: calc(var(--space-factor, 1) * 10px) 14px;
   font-size: 0.6875rem; /* 11 px */
   font-weight: 600;
   text-transform: uppercase;
@@ -492,7 +534,7 @@ input[type="range"]::-moz-range-thumb {
   background: transparent;
 }
 .doc-table td {
-  padding: 11px 14px;
+  padding: calc(var(--space-factor, 1) * 11px) 14px;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-subtle);
   vertical-align: middle;

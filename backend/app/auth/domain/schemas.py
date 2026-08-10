@@ -35,6 +35,17 @@ class UserLoginSchema(BaseModel):
     password: str
 
 
+class DeleteAccountSchema(BaseModel):
+    """
+    Body for DELETE /auth/account.
+
+    Requires the account password to be re-entered so that a stolen access
+    token alone cannot destroy the account (account-takeover protection).
+    """
+
+    password: str
+
+
 class UserResponseSchema(BaseModel):
     id: UUID
     email: EmailStr

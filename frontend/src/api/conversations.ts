@@ -14,34 +14,30 @@ export interface MessagesListResponse {
 }
 
 export const conversationsApi = {
-  async listConversations(limit = 20, offset = 0): Promise<ConversationsListResponse> {
-    const response = await api.get<ConversationsListResponse>("/conversations", {
+  listConversations(limit = 20, offset = 0): Promise<ConversationsListResponse> {
+    return api.get<ConversationsListResponse>("/conversations", {
       params: { limit, offset },
     });
-    return response.data;
   },
 
-  async getConversation(id: string): Promise<Conversation> {
-    const response = await api.get<Conversation>(`/conversations/${id}`);
-    return response.data;
+  getConversation(id: string): Promise<Conversation> {
+    return api.get<Conversation>(`/conversations/${id}`);
   },
 
-  async patchConversation(
+  patchConversation(
     id: string,
     payload: { title?: string; settings?: Partial<Conversation["settings"]> }
   ): Promise<Conversation> {
-    const response = await api.patch<Conversation>(`/conversations/${id}`, payload);
-    return response.data;
+    return api.patch<Conversation>(`/conversations/${id}`, payload);
   },
 
-  async deleteConversation(id: string): Promise<void> {
-    await api.delete(`/conversations/${id}`);
+  deleteConversation(id: string): Promise<void> {
+    return api.delete(`/conversations/${id}`);
   },
 
-  async listMessages(id: string, limit = 50, offset = 0): Promise<MessagesListResponse> {
-    const response = await api.get<MessagesListResponse>(`/conversations/${id}/messages`, {
+  listMessages(id: string, limit = 50, offset = 0): Promise<MessagesListResponse> {
+    return api.get<MessagesListResponse>(`/conversations/${id}/messages`, {
       params: { limit, offset },
     });
-    return response.data;
   },
 };

@@ -325,7 +325,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           )}
         >
           {/* Paperclip button with Recent Attachments dropdown */}
-          <div className="flex items-center justify-center pl-3 pr-1 pb-2.5 pt-2.5">
+          <div className="flex items-center justify-center pl-3 pr-1 pb-[calc(var(--space-factor,1)*10px)] pt-[calc(var(--space-factor,1)*10px)]">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -398,7 +398,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               }
               rows={1}
               disabled={!isOnline || isStreaming}
-              className="min-h-13 max-h-50 w-full flex-1 resize-none border-0 bg-transparent px-2 py-4 text-[15px] leading-[1.55] text-(--text-primary) shadow-none outline-none placeholder:text-(--text-muted) disabled:opacity-50 scrollbar-none"
+              className="min-h-[calc(var(--space-factor,1)*52px)] max-h-50 w-full flex-1 resize-none border-0 bg-transparent px-2 py-[calc(var(--space-factor,1)*16px)] text-[15px] leading-[1.55] text-(--text-primary) shadow-none outline-none placeholder:text-(--text-muted) disabled:opacity-50 scrollbar-none"
               aria-label="Message prompt input"
             />
 
@@ -435,7 +435,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
 
           {/* Right Action buttons: Voice & Send */}
-          <div className="flex items-center gap-1.5 px-3 pl-1 pt-2.5 pb-2.5">
+          <div className="flex items-center gap-1.5 px-3 pl-1 pt-[calc(var(--space-factor,1)*10px)] pb-[calc(var(--space-factor,1)*10px)]">
             {/* Voice Input */}
             {onVoiceInput && (
               <Button
@@ -476,7 +476,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 className={cn(
                   "h-9 w-9 shrink-0 rounded-full border transition-all active:scale-95",
                   hasContent && isOnline
-                    ? "border-(--border-subtle) bg-(--bg-elevated) text-(--text-primary) hover:bg-(--bg-tertiary)"
+                    ? "border-transparent bg-[image:var(--gradient-main)] text-white shadow-[var(--elevation-glow)] hover:shadow-[var(--elevation-glow)] hover:brightness-110"
                     : "border-(--border-subtle) bg-(--bg-tertiary) text-(--text-muted) cursor-not-allowed"
                 )}
                 aria-label="Send query"

@@ -36,3 +36,11 @@ class InvalidSessionException(AuthException):
     """
 
     pass
+
+
+class UserNotFoundException(AuthException):
+    """
+    Raised when an operation targets a user account that no longer exists.
+    """
+
+    pass

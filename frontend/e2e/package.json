@@ -1,0 +1,14 @@
+{
+  "name": "hybrid-rag-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Browser E2E smoke tests for Hybrid RAG (login flow, session persistence).",
+  "type": "commonjs",
+  "scripts": {
+    "login": "node login-flow.js",
+    "account-delete": "node account-delete.js"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^23.11.1"
+  }
+}

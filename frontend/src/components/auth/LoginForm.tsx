@@ -41,8 +41,8 @@ export const LoginForm: React.FC = () => {
       else            localStorage.removeItem("login-remember-email");
       toast.success("Welcome back!");
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      setError(e.response?.data?.message || "Invalid email or password.");
+      const e = err as { data?: { message?: string } };
+      setError(e.data?.message || "Invalid email or password.");
     } finally {
       setIsSubmitting(false);
     }

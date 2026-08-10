@@ -121,12 +121,19 @@ export default defineConfig(({ mode }) => {
       }
     },
     build: {
+      // The cpp grammar is ~797 kB minified (55 kB gzip) — inherently the largest
+      // shiki grammar. It is now lazy-loaded (only fetched when a C++ block
+      // renders), so it never hits the initial bundle; the threshold is raised
+      // to keep builds clean while still flagging regressions in eager chunks.
+      chunkSizeWarningLimit: 850,
       rollupOptions: {
         output: {
           manualChunks: {
             vendor: ['react', 'react-dom', 'react-router-dom'],
             'react-query': ['@tanstack/react-query'],
-            shiki: ['shiki']
+            // Only the shiki core + JS regex engine ship in the initial bundle;
+            // language grammars are dynamic imports loaded on first use.
+            shiki: ['shiki/core', 'shiki/engine/javascript']
           }
         }
       }

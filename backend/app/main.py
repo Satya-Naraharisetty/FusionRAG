@@ -30,6 +30,7 @@ from app.auth.domain.exceptions import (
     DuplicateAccountException,
     InvalidCredentialsException,
     InvalidSessionException,
+    UserNotFoundException,
 )
 from app.auth.infrastructure.crypto.token_provider import JWTTokenProvider
 from app.chat.domain.exceptions import (
@@ -514,6 +515,18 @@ async def account_disabled_exception_handler(
         code="ACCOUNT_DISABLED",
         message="Account has been deactivated.",
         status_code=status.HTTP_401_UNAUTHORIZED,
+    )
+
+
+@app.exception_handler(UserNotFoundException)
+async def user_not_found_exception_handler(
+    _request: Request, exc: UserNotFoundException
+):
+    logger.info(f"Account operation rejected: {exc}")
+    return format_error_response(
+        code="USER_NOT_FOUND",
+        message="User account no longer exists.",
+        status_code=status.HTTP_404_NOT_FOUND,
     )
 
 

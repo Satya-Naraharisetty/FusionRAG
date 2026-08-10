@@ -104,7 +104,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             : "border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-tertiary)]/40"
         )}
       >
-        <div className="p-4 flex flex-col gap-3 h-full">
+        <div className="p-[calc(var(--space-factor,1)*16px)] flex flex-col gap-[calc(var(--space-factor,1)*12px)] h-full">
           {/* Header: drag handle, checkbox, type badge, title */}
           <div className="flex items-start gap-2">
             <div className="flex items-center gap-1 flex-shrink-0 pt-0.5">
@@ -246,7 +246,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           </div>
 
           {/* Footer: status badge + quick actions */}
-          <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-3 mt-auto">
+          <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-[calc(var(--space-factor,1)*12px)] mt-auto">
             <span
               className={cn(
                 "inline-flex items-center text-[9px] px-2 py-0.5 rounded-[var(--radius-pill)] font-bold uppercase tracking-wider",

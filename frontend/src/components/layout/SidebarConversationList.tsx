@@ -3,7 +3,7 @@ import { Pin } from "lucide-react";
 import { Conversation } from "../../types";
 import { ConversationItem } from "../sidebar/ConversationItem";
 import { Folder, Tag } from "../../hooks/useLocalConversationMetadata";
-import { isToday, isYesterday, subDays, isAfter } from "date-fns";
+import { isToday, isYesterday, subDays, isAfter } from "../../lib/utils";
 import { SidebarFolders } from "./SidebarFolders";
 
 interface SidebarConversationListProps {

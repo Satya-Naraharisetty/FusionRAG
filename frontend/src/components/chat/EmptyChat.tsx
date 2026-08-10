@@ -1,4 +1,5 @@
 import React from "react";
+import { ArrowRight } from "lucide-react";
 
 interface EmptyChatProps {
   onSelectPrompt: (prompt: string) => void;
@@ -13,21 +14,25 @@ const EXAMPLES = [
 
 export const EmptyChat: React.FC<EmptyChatProps> = ({ onSelectPrompt }) => {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8 select-none animate-in fade-in duration-300">
+    <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8 select-none">
       <div className="w-full max-w-[580px] flex flex-col items-center text-center">
 
-        {/* Logo badge */}
-        <div className="mb-6 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-sm transition-transform duration-200 hover:scale-105">
-          <span className="font-title text-xl font-bold leading-none text-[var(--accent-primary)]">H</span>
+        {/* Logo badge — gradient tile with glow */}
+        <div className="animate-fade-in-up mb-6 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[14px] bg-[image:var(--gradient-main)] text-white shadow-[0_8px_24px_rgba(124,58,237,0.35)] transition-transform duration-200 hover:scale-105">
+          <span className="font-title text-xl font-bold leading-none">H</span>
         </div>
 
-        {/* Heading */}
-        <h2 className="text-[28px] font-semibold tracking-tight text-[var(--text-primary)] font-title leading-tight mb-3">
-          How can I help you today?
+        {/* Heading with gradient accent */}
+        <h2 className="animate-fade-in-up stagger-1 text-[28px] font-semibold tracking-tight text-[var(--text-primary)] font-title leading-tight mb-3">
+          How can I{" "}
+          <span className="bg-[image:var(--gradient-main)] bg-clip-text text-transparent">
+            help you
+          </span>{" "}
+          today?
         </h2>
 
         {/* Supporting text */}
-        <p className="text-[15px] leading-relaxed text-[var(--text-secondary)] max-w-[440px] mb-8">
+        <p className="animate-fade-in-up stagger-2 text-[15px] leading-relaxed text-[var(--text-secondary)] max-w-[440px] mb-8">
           Upload PDF, TXT, DOCX, or MD files to your library, then ask questions to retrieve grounded insights.
         </p>
 
@@ -37,13 +42,18 @@ export const EmptyChat: React.FC<EmptyChatProps> = ({ onSelectPrompt }) => {
             <button
               key={idx}
               onClick={() => onSelectPrompt(item.prompt)}
-              className="flex items-center gap-3 px-4 py-3.5 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-[var(--radius-xl)] cursor-pointer text-left transition-all duration-150 hover:bg-[var(--bg-tertiary)] hover:border-[var(--border-hover)] min-h-[52px]"
+              className={`animate-fade-in-up stagger-${idx + 3} group flex items-center gap-3 px-4 py-3.5 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-[var(--radius-xl)] cursor-pointer text-left transition-all duration-150 hover:-translate-y-0.5 hover:bg-[var(--bg-tertiary)] hover:border-[var(--border-hover)] hover:shadow-[var(--elevation-3)] min-h-[52px]`}
               aria-label={item.label}
             >
               <span className="text-base flex-shrink-0 leading-none">{item.icon}</span>
-              <span className="text-sm font-medium text-[var(--text-primary)] leading-snug">
+              <span className="flex-1 text-sm font-medium text-[var(--text-primary)] leading-snug">
                 {item.label}
               </span>
+              <ArrowRight
+                size={14}
+                className="flex-shrink-0 text-[var(--accent-primary)] opacity-0 -translate-x-1 transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0"
+                aria-hidden="true"
+              />
             </button>
           ))}
         </div>

@@ -20,6 +20,7 @@ export interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -116,6 +117,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [clearRefreshTimer]);
 
+  const deleteAccount = useCallback(async (password: string) => {
+    setIsLoading(true);
+    try {
+      await authApi.deleteAccount(password);
+      // Session state is now invalid server-side; clear it locally so
+      // ProtectedRoute immediately bounces the user back to /login.
+      // Errors propagate to the caller so the UI can show a failure toast.
+      setUser(null);
+      setAccessTokenState(null);
+      setAccessToken(null);
+      clearRefreshTimer();
+    } finally {
+      setIsLoading(false);
+    }
+  }, [clearRefreshTimer]);
+
   // Handle initialization and callback sync from Axios interceptors
   useEffect(() => {
     let active = true;
@@ -174,6 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     login,
     register,
     logout,
+    deleteAccount,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

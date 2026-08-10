@@ -43,7 +43,10 @@ class RateLimiter:
 
                 _, count, _, _ = pipe.execute()
 
-                if count > (self.requests_per_minute + self.burst):
+                # Block when the window is already full (>=), matching the
+                # in-memory fallback so both paths allow exactly
+                # requests_per_minute + burst requests per window.
+                if count >= (self.requests_per_minute + self.burst):
                     return True
                 return False
             except Exception as e:

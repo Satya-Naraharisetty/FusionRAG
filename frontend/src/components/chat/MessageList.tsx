@@ -101,6 +101,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         style={{ contain: "layout paint" }}
         role="log"
         aria-live="polite"
+        aria-busy={isStreaming}
       >
         <div
           style={{
@@ -139,18 +140,18 @@ export const MessageList: React.FC<MessageListProps> = ({
           })}
         </div>
         {/* Scroll anchor spacer positioned outside the absolute virtual container */}
-        <div ref={bottomRef} className="h-36 w-full flex-shrink-0" />
+        <div ref={bottomRef} className="h-[calc(var(--space-factor,1)*144px)] w-full flex-shrink-0" />
       </div>
 
       {showScrollBtn && (
         <Button
           onClick={handleScrollBtnClick}
           size="icon"
-          className="absolute bottom-4 right-4 z-10 h-10 w-10 cursor-pointer rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 text-[var(--text-secondary)] shadow-lg backdrop-blur-sm transition-all duration-300 ease-emphasized hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+          className="absolute bottom-4 right-4 z-10 h-10 w-10 animate-fade-in-up cursor-pointer rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 text-[var(--text-secondary)] shadow-lg backdrop-blur-sm transition-all duration-300 ease-emphasized hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
           aria-label={scrollDirection === "down" ? "Scroll to bottom" : "Scroll to top"}
         >
           {scrollDirection === "down" ? (
-            <ArrowDown size={18} className="animate-bounce" />
+            <ArrowDown size={18} />
           ) : (
             <ArrowUp size={18} />
           )}
