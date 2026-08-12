@@ -1,7 +1,15 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, ConfigDict
 
 from app.api.dependencies import (
@@ -72,13 +80,9 @@ async def upload_document(
         try:
             await conversation_access_service.verify_owner(conversation_id, user_id)
         except ConversationNotFoundException as e:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
         except UnauthorizedConversationAccessException as e:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail=str(e)
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
     file_bytes = await file.read()
 
@@ -108,9 +112,7 @@ def list_documents(
     """
     user_id = UUID(current_user["user_id"])
     if conversation_id is not None:
-        return document_service.list_documents_by_conversation(
-            conversation_id, user_id
-        )
+        return document_service.list_documents_by_conversation(conversation_id, user_id)
     return document_service.list_documents(user_id)
 
 

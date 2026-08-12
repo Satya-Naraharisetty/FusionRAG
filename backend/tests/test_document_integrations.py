@@ -382,9 +382,7 @@ def test_reprocess_document_success(client, doc_test_db):
     assert get_res.json()["status"] == "completed"
 
 
-def test_conversation_scoped_documents_isolated_from_global_list(
-    client, doc_test_db
-):
+def test_conversation_scoped_documents_isolated_from_global_list(client, doc_test_db):
     """
     Chat-scoped documents (uploaded with a conversation_id) must be listable
     via ?conversation_id= but must never appear in the user's global document
@@ -441,9 +439,7 @@ def test_conversation_scoped_documents_isolated_from_global_list(
     assert global_id not in conv_ids
 
     # Deleting the chat-scoped document removes it from the conversation list.
-    res_del = client.delete(
-        f"/api/v1/documents/{scoped_id}", headers=headers
-    )
+    res_del = client.delete(f"/api/v1/documents/{scoped_id}", headers=headers)
     assert res_del.status_code == status.HTTP_204_NO_CONTENT
     res_conv_after = client.get(
         f"/api/v1/documents?conversation_id={conversation_id}",
@@ -499,9 +495,7 @@ def test_upload_to_foreign_conversation_rejected(client, doc_test_db):
     assert res_own.status_code == status.HTTP_201_CREATED
 
 
-def test_delete_conversation_removes_scoped_docs_but_keeps_global(
-    client, doc_test_db
-):
+def test_delete_conversation_removes_scoped_docs_but_keeps_global(client, doc_test_db):
     """
     Deleting a conversation must cascade away its chat-scoped documents —
     including their chunks and embedding metadata — while the user's global
@@ -546,7 +540,9 @@ def test_delete_conversation_removes_scoped_docs_but_keeps_global(
         try:
             if table == "document_chunks":
                 return db.execute(
-                    text("SELECT COUNT(*) FROM document_chunks WHERE document_id = :id"),
+                    text(
+                        "SELECT COUNT(*) FROM document_chunks WHERE document_id = :id"
+                    ),
                     {"id": doc_id},
                 ).first()[0]
             return db.execute(
@@ -567,16 +563,12 @@ def test_delete_conversation_removes_scoped_docs_but_keeps_global(
     assert _count("document_embeddings", scoped_id) > 0
 
     # Delete the conversation — the chat-scoped document must die with it.
-    res_del = client.delete(
-        f"/api/v1/conversations/{conversation_id}", headers=headers
-    )
+    res_del = client.delete(f"/api/v1/conversations/{conversation_id}", headers=headers)
     assert res_del.status_code == status.HTTP_204_NO_CONTENT
 
     # Chat-scoped document: gone from the API and its conversation list.
     assert (
-        client.get(
-            f"/api/v1/documents/{scoped_id}", headers=headers
-        ).status_code
+        client.get(f"/api/v1/documents/{scoped_id}", headers=headers).status_code
         == status.HTTP_404_NOT_FOUND
     )
     res_conv = client.get(
@@ -590,9 +582,7 @@ def test_delete_conversation_removes_scoped_docs_but_keeps_global(
     assert _count("document_embeddings", scoped_id) == 0
 
     # Global document: fully intact — API, library list, chunks, embeddings.
-    res_global_get = client.get(
-        f"/api/v1/documents/{global_id}", headers=headers
-    )
+    res_global_get = client.get(f"/api/v1/documents/{global_id}", headers=headers)
     assert res_global_get.status_code == status.HTTP_200_OK
     res_list = client.get("/api/v1/documents", headers=headers)
     assert global_id in [d["id"] for d in res_list.json()]

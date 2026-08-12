@@ -79,9 +79,7 @@ class SearchKnowledgeTool(BuiltinTool):
             allowed_set = set(allowed)
             if parsed_doc_ids is not None:
                 parsed_doc_ids = [
-                    doc_id
-                    for doc_id in parsed_doc_ids
-                    if doc_id in allowed_set
+                    doc_id for doc_id in parsed_doc_ids if doc_id in allowed_set
                 ]
             else:
                 parsed_doc_ids = list(allowed)

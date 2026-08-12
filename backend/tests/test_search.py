@@ -516,9 +516,7 @@ def test_api_search_scopes_to_two_tier_document_model(client, mocker):
 
     global_doc_id = uuid4()
     scoped_doc_id = uuid4()
-    doc_service = _mock_document_service(
-        mocker, [global_doc_id], [scoped_doc_id]
-    )
+    doc_service = _mock_document_service(mocker, [global_doc_id], [scoped_doc_id])
     client.app.dependency_overrides[get_document_service] = lambda: doc_service
 
     mock_retrieval_service = mocker.MagicMock()

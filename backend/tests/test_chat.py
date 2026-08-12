@@ -632,9 +632,7 @@ async def test_chat_scoped_documents_always_retrieved():
         llm_provider=llm_provider,
         token_estimator=estimator,
         conversation_manager=MockConversationManager(
-            document_service=MockDocumentService(
-                scoped_docs=[_stub_doc(doc_id)]
-            )
+            document_service=MockDocumentService(scoped_docs=[_stub_doc(doc_id)])
         ),
         model="gpt-4o-mini",
         temperature=0.0,

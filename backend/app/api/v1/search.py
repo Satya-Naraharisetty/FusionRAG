@@ -109,9 +109,7 @@ async def search_documents(
             )
         ]
     else:
-        retrieval_doc_ids = [
-            doc.id for doc in document_service.list_documents(user_id)
-        ]
+        retrieval_doc_ids = [doc.id for doc in document_service.list_documents(user_id)]
 
     # The resolution above mirrors ChatOrchestrator._resolve_retrieval_scope.
     if not retrieval_doc_ids:

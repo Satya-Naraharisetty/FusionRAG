@@ -524,9 +524,7 @@ async def test_retrieval_service_skips_pipeline_when_user_has_no_chunks():
         enable_hybrid_search=True,
     )
 
-    result = await service.retrieve(
-        query="hello world", user_id=uuid4(), top_k=5
-    )
+    result = await service.retrieve(query="hello world", user_id=uuid4(), top_k=5)
 
     assert result.retrieved_chunks == []
     assert result.total_matches == 0
@@ -572,9 +570,7 @@ async def test_retrieval_service_still_retrieves_when_user_has_chunks():
         enable_reranker=False,
     )
 
-    result = await service.retrieve(
-        query="hello world", user_id=uuid4(), top_k=5
-    )
+    result = await service.retrieve(query="hello world", user_id=uuid4(), top_k=5)
 
     dense_retriever.retrieve.assert_awaited_once()
     assert result.retrieved_chunks == [chunk]
