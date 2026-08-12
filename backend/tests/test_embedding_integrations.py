@@ -9,8 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from app.api.dependencies import get_embedding_generator, get_vector_store
 from app.db.models import Base
 from app.documents.domain.models import ExtractionResult
-
-TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
+from tests.db import TEST_DATABASE_URL
 
 
 @pytest.fixture(scope="function")

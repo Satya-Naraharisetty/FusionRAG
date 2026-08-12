@@ -22,10 +22,18 @@ import {
   Trash2,
   Download,
   Upload,
+  Languages,
 } from "lucide-react";
+import {
+  getLocale,
+  setLocale,
+  SUPPORTED_LOCALES,
+  t,
+  type Locale,
+} from "../lib/messages";
 import { Button } from "../components/ui/Button";
-import { Input } from "../components/ui/Input";
 import { Avatar, AvatarFallback } from "../components/ui/Avatar";
+import ReauthDialog from "../components/auth/ReauthDialog";
 import {
   Dialog,
   DialogContent,
@@ -144,6 +152,10 @@ const SettingsPage: React.FC = () => {
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(() => getNotificationPrefs());
   const [isClearingHistory, setIsClearingHistory] = useState(false);
 
+  // Seeded from the module (which already honored a persisted choice or the
+  // browser language); kept in state so the switcher reflects the selection.
+  const [locale, setLocaleUi] = useState<Locale>(() => getLocale());
+
   const [defaults, setDefaults] = useState<ConversationDefaults>(() => {
     try {
       const saved = localStorage.getItem("conversation-defaults");
@@ -156,9 +168,6 @@ const SettingsPage: React.FC = () => {
   const [showClearHistoryDialog, setShowClearHistoryDialog]   = useState(false);
   const [showResetConfigDialog,  setShowResetConfigDialog]    = useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
-  const [deleteConfirmEmail, setDeleteConfirmEmail]           = useState("");
-  const [deletePassword, setDeletePassword]                   = useState("");
-  const [isDeletingAccount, setIsDeletingAccount]             = useState(false);
 
   const updateSetting = <K extends keyof ConversationDefaults>(key: K, value: ConversationDefaults[K]) => {
     const updated = { ...defaults, [key]: value };
@@ -225,35 +234,6 @@ const SettingsPage: React.FC = () => {
     setNotifPrefs(next);
     setNotificationPrefs(next);
     if (enabled) playChime(); // instant audible preview
-  };
-
-  const handleDeleteAccount = async () => {
-    if (deleteConfirmEmail.trim().toLowerCase() !== user?.email?.toLowerCase()) return;
-    if (!deletePassword) return;
-    setIsDeletingAccount(true);
-    try {
-      await deleteAccount(deletePassword);
-      // Session state cleared → ProtectedRoute redirects to /login
-      setShowDeleteAccountDialog(false);
-      setDeleteConfirmEmail("");
-      setDeletePassword("");
-      toast.success("Your account has been deleted.");
-    } catch (err) {
-      const e = err as { data?: { error?: { code?: string } }; status?: number };
-      if (e.data?.error?.code === "INVALID_CREDENTIALS") {
-        // Password re-entry failed — keep the dialog open so the user can retry.
-        setDeletePassword("");
-        toast.error("Incorrect password. Please try again.");
-      } else if (e.status === 429) {
-        // Rate-limited on the delete endpoint — the re-entry field is locked
-        // for a minute, so the user needs to wait before retrying.
-        toast.error("Too many attempts. Please try again in a minute.");
-      } else {
-        toast.error("Failed to delete account. Please try again.");
-      }
-    } finally {
-      setIsDeletingAccount(false);
-    }
   };
 
   const handleClearHistory = async () => {
@@ -390,7 +370,7 @@ const SettingsPage: React.FC = () => {
                 </div>
 
                 {/* Density */}
-                <div className="py-[calc(var(--space-factor,1)*20px)]">
+                <div className="border-b border-(--border-subtle) py-[calc(var(--space-factor,1)*20px)]">
                   <p className="mb-3 text-xs font-medium text-(--text-secondary)">Interface Density</p>
                   <div className="grid grid-cols-3 gap-2">
                     {(["comfortable", "cozy", "compact"] as Density[]).map((opt) => (
@@ -408,6 +388,34 @@ const SettingsPage: React.FC = () => {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Language */}
+                <div className="py-[calc(var(--space-factor,1)*20px)]">
+                  <p className="mb-3 text-xs font-medium text-(--text-secondary)">{t("settings.language")}</p>
+                  <div className="grid max-w-72 grid-cols-2 gap-2">
+                    {SUPPORTED_LOCALES.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          setLocale(opt.value);
+                          setLocaleUi(opt.value);
+                        }}
+                        className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium transition-colors ${
+                          locale === opt.value
+                            ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
+                            : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
+                        }`}
+                        data-active={locale === opt.value}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 flex items-center gap-1 text-[10px] text-(--text-muted)">
+                    <Languages size={11} className="flex-shrink-0" />
+                    {t("settings.languageDescription")}
+                  </p>
                 </div>
               </div>
             )}
@@ -675,69 +683,29 @@ const SettingsPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ── Confirm: delete account ── */}
-      <Dialog
+      {/* ── Confirm: delete account (reusable reauth gate) ── */}
+      <ReauthDialog
         open={showDeleteAccountDialog}
-        onOpenChange={(open) => {
-          setShowDeleteAccountDialog(open);
-          if (!open) {
-            setDeleteConfirmEmail("");
-            setDeletePassword("");
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-sm">
-              <UserX size={15} className="text-(--accent-error)" />
-              Delete Account?
-            </DialogTitle>
-            <DialogDescription>
-              This permanently deletes your account, all conversations, and documents. Type{" "}
-              <span className="font-mono text-(--text-primary)">{user?.email}</span> and your password to confirm.
-            </DialogDescription>
-          </DialogHeader>
-          <Input
-            id="delete-account-confirm-email"
-            value={deleteConfirmEmail}
-            onChange={(e) => setDeleteConfirmEmail(e.target.value)}
-            placeholder={user?.email}
-            label="Type your email to confirm"
-            autoComplete="off"
-            className="mt-1"
-          />
-          <Input
-            id="delete-account-confirm-password"
-            type="password"
-            value={deletePassword}
-            onChange={(e) => setDeletePassword(e.target.value)}
-            label="Re-enter your password"
-            autoComplete="current-password"
-            className="mt-1"
-          />
-          <DialogFooter className="gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowDeleteAccountDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={
-                deleteConfirmEmail.trim().toLowerCase() !== user?.email?.toLowerCase() ||
-                !deletePassword
-              }
-              loading={isDeletingAccount}
-              onClick={handleDeleteAccount}
-            >
-              {isDeletingAccount ? "Deleting…" : "Delete Account"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={setShowDeleteAccountDialog}
+        title="Delete Account?"
+        icon={<UserX size={15} className="text-(--accent-error)" />}
+        description={
+          <>
+            This permanently deletes your account, all conversations, and documents. Type{" "}
+            <span className="font-mono text-(--text-primary)">{user?.email}</span> and your
+            password to confirm.
+          </>
+        }
+        accountEmail={user?.email}
+        requireEmail
+        confirmLabel="Delete Account"
+        submittingLabel="Deleting…"
+        successMessage="Your account has been deleted."
+        emailInputId="delete-account-confirm-email"
+        passwordInputId="delete-account-confirm-password"
+        onConfirm={deleteAccount}
+        errorMessages={{ UNKNOWN: "Failed to delete account. Please try again." }}
+      />
 
       {/* ── Confirm: factory reset ── */}
       <Dialog open={showResetConfigDialog} onOpenChange={setShowResetConfigDialog}>

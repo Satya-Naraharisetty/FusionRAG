@@ -347,6 +347,18 @@ class IndexCache(ABC):
         pass
 
     @abstractmethod
+    def get_fresh_stats(
+        self, user_id: UUID, max_age_seconds: float
+    ) -> dict[str, Any] | None:
+        """
+        Returns the user's cached stats only when the cache entry is younger
+        than ``max_age_seconds``, otherwise None. Lets callers trust short-lived
+        facts (e.g. "this user has no chunks") without disturbing the long-lived
+        index data, which is drift-checked against the DB instead.
+        """
+        pass
+
+    @abstractmethod
     def invalidate(self, user_id: UUID) -> None:
         """
         Invalidates a user's cached index.

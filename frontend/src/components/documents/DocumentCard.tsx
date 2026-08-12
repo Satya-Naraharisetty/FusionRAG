@@ -13,8 +13,10 @@ import {
   Download,
   FolderOpen,
   Eye,
+  AlertTriangle,
 } from "lucide-react";
 import { Document } from "../../types";
+import { UploadStage, VECTORIZATION_FAILED_MESSAGE } from "../../lib/uploadStages";
 import { FileTypeBadge } from "../ui/FileTypeBadge";
 import { formatBytes, relativeTime, cn } from "../../lib/utils";
 import {
@@ -39,6 +41,10 @@ import {
 
 interface DocumentCardProps {
   document: Document;
+  /** Current ingestion-pipeline step (Extracting/Chunking/Indexing…), or null when idle. */
+  processingStep?: UploadStage | null;
+  /** True when chunking finished but the embedding job failed — shows the amber regenerate banner. */
+  embeddingFailed?: boolean;
   onDelete: (id: string) => Promise<unknown>;
   onReprocess: (id: string) => Promise<unknown>;
   onRegenerateEmbeddings: (id: string) => Promise<unknown>;
@@ -63,6 +69,8 @@ const STATUS_CLASSES: Record<Document["status"], string> = {
 
 export const DocumentCard: React.FC<DocumentCardProps> = ({
   document,
+  processingStep = null,
+  embeddingFailed = false,
   onDelete,
   onReprocess,
   onRegenerateEmbeddings,
@@ -79,6 +87,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
 }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting]             = useState(false);
+  const [isRegenerating, setIsRegenerating]     = useState(false);
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -87,6 +96,15 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
       setShowDeleteDialog(false);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    setIsRegenerating(true);
+    try {
+      await onRegenerateEmbeddings(document.id);
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -245,6 +263,50 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             )}
           </div>
 
+          {/* Amber banner: chunking finished but vectorization failed — the
+              file is on disk but unsearchable until embeddings are rebuilt. */}
+          {embeddingFailed && (
+            <div
+              className="flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-400"
+              role="alert"
+            >
+              <AlertTriangle size={13} className="shrink-0" />
+              <span
+                className="min-w-0 flex-1 truncate"
+                title={VECTORIZATION_FAILED_MESSAGE}
+              >
+                {VECTORIZATION_FAILED_MESSAGE}
+              </span>
+              <button
+                type="button"
+                onClick={handleRegenerate}
+                disabled={isRegenerating}
+                className="shrink-0 inline-flex items-center gap-1 rounded-md border border-amber-500/30 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider cursor-pointer transition-colors hover:bg-amber-500/15 disabled:opacity-50"
+              >
+                <RefreshCw
+                  size={10}
+                  className={isRegenerating ? "animate-spin" : undefined}
+                />
+                {isRegenerating ? "Queuing…" : "Regenerate"}
+              </button>
+            </div>
+          )}
+
+          {/* Live pipeline step — same stage text as the upload queue */}
+          {processingStep && (
+            <div
+              className="flex items-center gap-1.5 text-[11px] text-[var(--accent-primary)]"
+              role="status"
+              aria-live="polite"
+            >
+              <span
+                className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--accent-primary)] animate-pulse"
+                aria-hidden
+              />
+              <span className="truncate">{processingStep.detail}</span>
+            </div>
+          )}
+
           {/* Footer: status badge + quick actions */}
           <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-[calc(var(--space-factor,1)*12px)] mt-auto">
             <span
@@ -255,6 +317,11 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             >
               {document.status}
             </span>
+            {processingStep && (
+              <span className="text-[10px] text-[var(--text-muted)] font-medium tabular-nums">
+                {processingStep.progress}%
+              </span>
+            )}
 
             <div className="flex items-center gap-1">
               <Button

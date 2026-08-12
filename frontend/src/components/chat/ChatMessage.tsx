@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, useRef } from "react";
-import { Copy, Check, RefreshCw, Clock, ThumbsUp, ThumbsDown, Flag, Sparkles } from "lucide-react";
+import { Copy, Check, RefreshCw, Clock, ThumbsUp, ThumbsDown, Flag, Sparkles, FileQuestion } from "lucide-react";
 import { ChatMessage as ChatMessageType } from "../../types";
 import { CitationCard } from "./CitationCard";
 import { ToolCallCard } from "./ToolCallCard";
@@ -155,6 +155,18 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onRetry, on
                 </div>
               )}
             </div>
+
+            {/* General-knowledge hint: retrieval was skipped because the user
+                has no uploaded documents. Only shown while the answer streams
+                or once completed — a failed/interrupted reply must not claim
+                it was answered from general knowledge. */}
+            {message.retrievalSkipped &&
+              (message.status === "streaming" || message.status === "completed") && (
+                <div className="flex items-center gap-1.5 w-fit rounded-full border border-[var(--border-default)] bg-[var(--bg-tertiary)] px-2.5 py-1 text-[11px] text-[var(--text-muted)] mt-1 select-text animate-fade-in">
+                  <FileQuestion size={12} className="flex-shrink-0 text-[var(--text-secondary)]" />
+                  <span>Answering from general knowledge — attach files here or use @documents for your library</span>
+                </div>
+              )}
 
             {/* Citations */}
             {message.citations && message.citations.length > 0 && (

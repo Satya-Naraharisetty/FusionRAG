@@ -203,6 +203,11 @@ class Settings(BaseSettings):
 
     # Hybrid Search Settings
     ENABLE_HYBRID_SEARCH: bool = True
+    # How long (seconds) the shared index cache holds a user's "no chunks yet"
+    # determination before re-querying the DB. Bounds staleness when an upload
+    # happens outside the normal invalidation path (direct DB writes, admin
+    # tooling); uploads themselves invalidate the entry immediately.
+    EMPTY_KB_CACHE_TTL_SECONDS: float = 60.0
     ENABLE_MMR: bool = True
     ENABLE_RERANKER: bool = True
     BM25_TOP_K: int = 20

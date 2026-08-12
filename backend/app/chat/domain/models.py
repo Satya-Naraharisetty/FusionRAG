@@ -159,6 +159,11 @@ class ConversationSummary(BaseModel):
 
 class RetrievalDiagnostics(BaseModel):
     rewritten: bool = False
+    # True when retrieval (and the query rewrite that only serves it) was
+    # skipped entirely because the user has no uploaded documents — the answer
+    # is generated from general knowledge. Lets the frontend surface a hint
+    # like "Answering from general knowledge — no documents uploaded".
+    retrieval_skipped: bool = False
     dense_count: int = 0
     sparse_count: int = 0
     fusion_count: int = 0

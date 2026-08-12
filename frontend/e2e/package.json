@@ -6,7 +6,10 @@
   "type": "commonjs",
   "scripts": {
     "login": "node login-flow.js",
-    "account-delete": "node account-delete.js"
+    "account-delete": "node account-delete.js",
+    "redis-fallback": "node redis-fallback.js",
+    "redis-fallback-login": "node redis-fallback-login.js",
+    "two-tier": "node verify-two-tier.js"
   },
   "devDependencies": {
     "puppeteer-core": "^23.11.1"

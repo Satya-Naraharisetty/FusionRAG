@@ -109,6 +109,9 @@ export interface ChatMessage {
   status?: MessageStatus;
   toolCalls?: ToolCallEvent[];
   error?: string;
+  // True when the backend skipped retrieval because the user has no uploaded
+  // documents — the answer comes from general knowledge. Rendered as a hint.
+  retrievalSkipped?: boolean;
   created_at?: string;
 }
 
@@ -121,13 +124,3 @@ export interface ToolCallEvent {
   status: "running" | "done" | "failed";
 }
 
-// Chat Attachment
-export interface ChatAttachment {
-  id: string;
-  file: File;
-  preview?: string;
-  status: "uploading" | "completed" | "error";
-  progress: number;
-  documentId?: string;
-  error?: string;
-}

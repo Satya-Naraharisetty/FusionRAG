@@ -13,11 +13,12 @@ function uploadWithProgress(
   path: string,
   formData: FormData,
   onProgress?: (progressEvent: { loaded: number; total: number }) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  query = ""
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", BASE_URL + path);
+    xhr.open("POST", BASE_URL + path + (query ? `?${query}` : ""));
     xhr.withCredentials = true;
     const token = getAccessToken();
     if (token) {
@@ -76,21 +77,34 @@ export const documentsApi = {
   uploadDocument(
     file: File,
     onUploadProgress?: (progressEvent: unknown) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    conversationId?: string | null
   ): Promise<Document> {
     const formData = new FormData();
     formData.append("file", file);
+    // Chat-composer uploads are scoped to their conversation: the document
+    // only participates in that chat's retrieval and is deleted with it.
+    const query = conversationId
+      ? `conversation_id=${encodeURIComponent(conversationId)}`
+      : "";
     // (unknown) => void is assignable to ({loaded,total}) => void, so no cast needed.
     return uploadWithProgress(
       "/documents/upload",
       formData,
       onUploadProgress,
-      signal
+      signal,
+      query
     ) as Promise<Document>;
   },
 
-  listDocuments(): Promise<Document[]> {
-    return api.get<Document[]>("/documents");
+  /**
+   * Global library by default; pass a conversation id for that conversation's
+   * chat-scoped documents (chat attachments) instead.
+   */
+  listDocuments(conversationId?: string | null): Promise<Document[]> {
+    return api.get<Document[]>("/documents", {
+      params: conversationId ? { conversation_id: conversationId } : undefined,
+    });
   },
 
   getDocument(id: string): Promise<Document> {

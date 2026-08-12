@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   Upload,
@@ -10,137 +10,134 @@ import {
   GripVertical,
   CheckCircle2,
 } from "lucide-react";
-import { useUploadDocument } from "../../hooks/useDocuments";
+import { useDocuments } from "../../hooks/useDocuments";
+import {
+  useUploadQueue,
+  type QueueFile,
+} from "../../context/UploadQueueContext";
+import { deriveUploadStage, rowProgress } from "../../lib/uploadStages";
 import { UPLOAD_LIMITS } from "../../lib/constants";
+import { type Document, type EmbeddingStatus } from "../../types";
 import { Button } from "../ui/Button";
 import { FileTypeBadge } from "../ui/FileTypeBadge";
 import { UploadProgress } from "../ui/UploadProgress";
 import toast from "react-hot-toast";
 
-interface QueueFile {
-  id: string;
-  file: File;
-  status: "queued" | "uploading" | "paused" | "completed" | "error";
-  progress: number;
-  controller?: AbortController;
-}
+/**
+ * Progress widget for one queue row. While the row is `processing` the ring +
+ * footer are derived from live server state (document status for chunking,
+ * embedding status for the vector-DB stage) instead of a stored percentage.
+ */
+const UploadRowProgress: React.FC<{
+  item: QueueFile;
+  docById: Map<string, Document>;
+  embeddingStatus: Record<string, EmbeddingStatus>;
+}> = ({ item, docById, embeddingStatus }) => {
+  if (item.status === "processing") {
+    const doc = item.documentId ? docById.get(item.documentId) : undefined;
+    const emb = item.documentId ? embeddingStatus[item.documentId] : undefined;
+    const stage = deriveUploadStage(doc?.status, emb, item.startedAt ?? null);
+    return (
+      <UploadProgress
+        progress={stage.progress}
+        status="processing"
+        size="sm"
+        showLabel
+        footer={stage.detail}
+      />
+    );
+  }
+  return (
+    <UploadProgress
+      progress={item.progress}
+      status={item.status}
+      size="sm"
+      showLabel
+      footer={item.detail}
+    />
+  );
+};
 
 export const UploadDropzone: React.FC = () => {
-  const uploadMutation = useUploadDocument();
-  const [queue, setQueue]           = useState<QueueFile[]>([]);
+  // The queue lives in UploadQueueContext (mounted at app root), so in-flight
+  // uploads and their progress survive navigation between pages.
+  const {
+    queue,
+    embeddingStatus,
+    addFiles,
+    startUpload,
+    pauseUpload,
+    cancelUpload,
+    clearCompleted,
+    moveItem,
+  } = useUploadQueue();
+  // Shares the same query/cache as the Documents page: refetches every 5s
+  // while any document is pending/processing, so rows track the chunking
+  // pipeline live.
+  const { data: documents = [] } = useDocuments();
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const newItems: QueueFile[] = [];
-    acceptedFiles.forEach((file) => {
-      if (file.size > UPLOAD_LIMITS.MAX_FILE_SIZE) {
-        toast.error(`"${file.name}" exceeds the 50 MB size limit.`);
-        return;
-      }
-      const ext = file.name.split(".").pop()?.toLowerCase() || "";
-      if (!["pdf", "txt", "docx", "doc", "md"].includes(ext)) {
-        toast.error(`".${ext}" is not a supported format.`);
-        return;
-      }
-      newItems.push({
-        id: `upload-${Math.random().toString(36).substring(2, 9)}`,
-        file,
-        status: "queued",
-        progress: 0,
-      });
-    });
-    if (newItems.length > 0) {
-      setQueue((prev) => [...prev, ...newItems]);
-      toast.success(`Added ${newItems.length} file${newItems.length > 1 ? "s" : ""} to queue.`);
-    }
-  }, []);
+  const docById = useMemo(
+    () => new Map(documents.map((d) => [d.id, d])),
+    [documents]
+  );
 
-  const startUpload = async (item: QueueFile) => {
-    if (item.status === "uploading" || item.status === "completed") return;
-    const controller = new AbortController();
-    setQueue((prev) =>
-      prev.map((q) => (q.id === item.id ? { ...q, status: "uploading", controller } : q))
-    );
-    try {
-      await uploadMutation.mutateAsync({
-        file: item.file,
-        onProgress: (progressEvent: unknown) => {
-          const pe = progressEvent as { loaded: number; total?: number };
-          const progress = pe.total ? Math.round((pe.loaded * 100) / pe.total) : 0;
-          setQueue((prev) =>
-            prev.map((q) => (q.id === item.id ? { ...q, progress } : q))
-          );
-        },
-        signal: controller.signal,
-      });
-      setQueue((prev) =>
-        prev.map((q) => (q.id === item.id ? { ...q, status: "completed", progress: 100 } : q))
-      );
-      toast.success(`Uploaded "${item.file.name}"`);
-    } catch (err: unknown) {
-      const isAborted =
-        (err as Error)?.name === "CanceledError" || (err as Error)?.name === "AbortError";
-      if (!isAborted) {
-        setQueue((prev) =>
-          prev.map((q) => (q.id === item.id ? { ...q, status: "error" } : q))
-        );
-        toast.error(`Failed to upload "${item.file.name}".`);
-      }
-    }
-  };
+  // Chat-composer attachments share the same app-level queue (so they survive
+  // navigation), but this Documents queue only renders document rows.
+  const docQueue = useMemo(
+    () => queue.filter((q) => q.source !== "chat"),
+    [queue]
+  );
+  // The sidebar indicator counts chat uploads too and links here — surface
+  // them so a click-through never lands on a confusingly empty queue.
+  const activeChatCount = useMemo(
+    () => queue.filter((q) => q.source === "chat" && q.status !== "completed").length,
+    [queue]
+  );
 
-  const handlePause = (id: string) => {
-    const item = queue.find((q) => q.id === id);
-    if (item?.status === "uploading" && item.controller) {
-      item.controller.abort();
-      setQueue((prev) =>
-        prev.map((q) => (q.id === id ? { ...q, status: "paused", controller: undefined } : q))
-      );
-    }
-  };
-
-  const handleResume = (id: string) => {
-    const item = queue.find((q) => q.id === id);
-    if (item?.status === "paused") startUpload(item);
-  };
-
-  const handleCancel = (id: string) => {
-    const item = queue.find((q) => q.id === id);
-    if (item) {
-      item.controller?.abort();
-      setQueue((prev) => prev.filter((q) => q.id !== id));
-    }
-  };
+  // An error row without `detail` is a plain upload failure (safe to retry);
+  // one with `detail` failed server-side, so retrying would duplicate the
+  // document — those are only cancellable from the queue.
+  const isRetryableError = (q: QueueFile) => q.status === "error" && !q.detail;
 
   const uploadAll = () => {
-    const pending = queue.filter(
-      (q) => q.status === "queued" || q.status === "paused" || q.status === "error"
+    const pending = docQueue.filter(
+      (q) => q.status === "queued" || q.status === "paused" || isRetryableError(q)
     );
-    if (pending.length === 0) { toast.error("No pending files to upload."); return; }
-    pending.forEach((item) => startUpload(item));
+    if (pending.length === 0) {
+      toast.error("No pending files to upload.");
+      return;
+    }
+    pending.forEach((item) => startUpload(item.id));
   };
 
   const batchSummary = useMemo(() => {
-    if (queue.length === 0) return { completed: 0, total: 0, overallProgress: 0 };
-    const completed = queue.filter((q) => q.status === "completed").length;
-    const totalProgress = queue.reduce((sum, q) => sum + q.progress, 0);
-    return { completed, total: queue.length, overallProgress: Math.round(totalProgress / queue.length) };
-  }, [queue]);
+    if (docQueue.length === 0) return { completed: 0, total: 0, overallProgress: 0 };
+    const completed = docQueue.filter((q) => q.status === "completed").length;
+    const totalProgress = docQueue.reduce((sum, q) => {
+      const doc = q.documentId ? docById.get(q.documentId) : undefined;
+      const emb = q.documentId ? embeddingStatus[q.documentId] : undefined;
+      return sum + rowProgress(q.status, q.progress, doc, emb, q.startedAt ?? null);
+    }, 0);
+    return { completed, total: docQueue.length, overallProgress: Math.round(totalProgress / docQueue.length) };
+  }, [docQueue, docById, embeddingStatus]);
 
   const handleDragStart = (idx: number) => setDraggedIdx(idx);
 
   const handleDragOver = (e: React.DragEvent, targetIdx: number) => {
     e.preventDefault();
     if (draggedIdx === null || draggedIdx === targetIdx) return;
-    const updated = [...queue];
-    const item = updated.splice(draggedIdx, 1)[0];
-    updated.splice(targetIdx, 0, item);
-    setQueue(updated);
+    // The queue is shared with chat rows; map this surface's (filtered)
+    // indices back to the full queue before reordering.
+    const fromOriginal = queue.findIndex((q) => q.id === docQueue[draggedIdx]?.id);
+    const toOriginal = queue.findIndex((q) => q.id === docQueue[targetIdx]?.id);
+    if (fromOriginal === -1 || toOriginal === -1) return;
+    moveItem(fromOriginal, toOriginal);
     setDraggedIdx(targetIdx);
   };
 
   const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
-    onDrop,
+    onDrop: (accepted) => addFiles(accepted),
     maxSize: UPLOAD_LIMITS.MAX_FILE_SIZE,
     accept: UPLOAD_LIMITS.ACCEPTED_TYPES,
   });
@@ -176,15 +173,25 @@ export const UploadDropzone: React.FC = () => {
         </div>
       )}
 
-      {/* Upload queue */}
-      {queue.length > 0 && (
+      {/* Chat-composer uploads share this queue but render in the composer
+          tray — note them so the sidebar indicator's link isn't a dead end. */}
+      {activeChatCount > 0 && docQueue.length === 0 && (
+        <p className="flex items-center gap-1.5 px-1 text-[11px] text-[var(--text-muted)]">
+          <Upload size={11} className="shrink-0" />
+          {activeChatCount} upload{activeChatCount === 1 ? "" : "s"} in progress from the chat
+          composer — back in the conversation to see them.
+        </p>
+      )}
+
+      {/* Upload queue (document rows only — chat attachments live in the composer tray) */}
+      {docQueue.length > 0 && (
         <div className="bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-[var(--radius-2xl)] p-4 space-y-3">
           {/* Queue header */}
           <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
-                  Upload Queue ({queue.length})
+                  Upload Queue ({docQueue.length})
                 </h4>
                 {batchSummary.completed === batchSummary.total && (
                   <span className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-success)]">
@@ -196,12 +203,25 @@ export const UploadDropzone: React.FC = () => {
                 {batchSummary.completed}/{batchSummary.total} completed · {batchSummary.overallProgress}%
               </p>
             </div>
-            {queue.some((q) => ["queued", "paused", "error"].includes(q.status)) && (
-              <Button size="sm" onClick={uploadAll} className="gap-1.5 text-xs">
-                <ArrowUp size={12} />
-                Upload All
-              </Button>
-            )}
+            <div className="flex items-center gap-1.5">
+              {batchSummary.completed > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearCompleted}
+                  className="text-xs"
+                  title="Remove completed rows"
+                >
+                  Clear done
+                </Button>
+              )}
+              {docQueue.some((q) => ["queued", "paused"].includes(q.status) || isRetryableError(q)) && (
+                <Button size="sm" onClick={uploadAll} className="gap-1.5 text-xs">
+                  <ArrowUp size={12} />
+                  Upload All
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Batch progress bar */}
@@ -214,7 +234,7 @@ export const UploadDropzone: React.FC = () => {
 
           {/* File rows */}
           <div className="space-y-1.5 pt-1">
-            {queue.map((item, idx) => (
+            {docQueue.map((item, idx) => (
               <div
                 key={item.id}
                 draggable="true"
@@ -231,16 +251,20 @@ export const UploadDropzone: React.FC = () => {
                     <GripVertical size={13} />
                   </div>
 
-                  <FileTypeBadge filename={item.file.name} variant="card" className="w-8 h-8 flex-shrink-0" />
+                  <FileTypeBadge filename={item.fileName} variant="card" className="w-8 h-8 flex-shrink-0" />
 
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-medium text-[var(--text-primary)] truncate">
-                        {item.file.name}
+                        {item.fileName}
                       </p>
-                      <FileTypeBadge filename={item.file.name} variant="minimal" size="sm" className="flex-shrink-0" />
+                      <FileTypeBadge filename={item.fileName} variant="minimal" size="sm" className="flex-shrink-0" />
                     </div>
-                    <UploadProgress progress={item.progress} status={item.status} size="sm" showLabel />
+                    <UploadRowProgress
+                      item={item}
+                      docById={docById}
+                      embeddingStatus={embeddingStatus}
+                    />
                   </div>
                 </div>
 
@@ -249,7 +273,7 @@ export const UploadDropzone: React.FC = () => {
                     <Button
                       variant="ghost"
                       size="iconSm"
-                      onClick={() => handlePause(item.id)}
+                      onClick={() => pauseUpload(item.id)}
                       className="h-7 w-7"
                       title="Pause"
                       aria-label="Pause upload"
@@ -261,7 +285,7 @@ export const UploadDropzone: React.FC = () => {
                     <Button
                       variant="ghost"
                       size="iconSm"
-                      onClick={() => handleResume(item.id)}
+                      onClick={() => startUpload(item.id)}
                       className="h-7 w-7"
                       title="Resume"
                       aria-label="Resume upload"
@@ -269,11 +293,21 @@ export const UploadDropzone: React.FC = () => {
                       <Play size={11} className="fill-current" />
                     </Button>
                   )}
-                  {item.status !== "completed" && (
+                  {item.status === "processing" && (
+                    <span
+                      className="relative flex h-2 w-2 flex-shrink-0 mx-0.5"
+                      title="Processing in the background"
+                      aria-hidden="true"
+                    >
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--accent-primary)]/40" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--accent-primary)]" />
+                    </span>
+                  )}
+                  {item.status !== "completed" && item.status !== "processing" && (
                     <Button
                       variant="ghost"
                       size="iconSm"
-                      onClick={() => handleCancel(item.id)}
+                      onClick={() => cancelUpload(item.id)}
                       className="h-7 w-7 hover:text-[var(--accent-error)]"
                       title="Cancel"
                       aria-label="Cancel upload"

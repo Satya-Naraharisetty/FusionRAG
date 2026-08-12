@@ -1,5 +1,7 @@
+import { useContext } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { conversationsApi, ConversationsListResponse } from "../api/conversations";
+import { UploadQueueContext } from "../context/UploadQueueContext";
 import { QUERY_KEYS } from "../lib/constants";
 import { Conversation } from "../types";
 import toast from "react-hot-toast";
@@ -38,7 +40,11 @@ export const useRenameConversation = () => {
       queryClient.setQueriesData<ConversationsListResponse>(
         { queryKey: [QUERY_KEYS.CONVERSATIONS] },
         (old) => {
-          if (!old) return old;
+          // Guard against list-shaped caches only: setQueriesData's partial key
+          // [CONVERSATIONS] also matches the single-conversation cache
+          // [CONVERSATIONS, id], whose data is a bare Conversation object with
+          // no .conversations array.
+          if (!old || !Array.isArray(old.conversations)) return old;
           return {
             ...old,
             conversations: old.conversations.map((c) =>
@@ -85,10 +91,16 @@ export const useRenameConversation = () => {
 
 export const useDeleteConversation = () => {
   const queryClient = useQueryClient();
+  // The upload queue drops chat-scoped rows (and their in-flight uploads) when
+  // their conversation is deleted — chat attachments die with their chat. Raw
+  // context (not the throwing hook) so callers outside the provider, e.g.
+  // isolated tests, degrade gracefully to "no queue to clean".
+  const queueContext = useContext(UploadQueueContext);
 
   return useMutation({
     mutationFn: (id: string) => conversationsApi.deleteConversation(id),
     onMutate: async (id) => {
+      queueContext?.discardConversationRows(id);
       await queryClient.cancelQueries({ queryKey: [QUERY_KEYS.CONVERSATIONS] });
 
       const previousLists = queryClient.getQueriesData<ConversationsListResponse>({
@@ -99,7 +111,10 @@ export const useDeleteConversation = () => {
       queryClient.setQueriesData<ConversationsListResponse>(
         { queryKey: [QUERY_KEYS.CONVERSATIONS] },
         (old) => {
-          if (!old) return old;
+          // Guard against list-shaped caches only — see useRenameConversation:
+          // the partial key also matches the single-conversation cache, whose
+          // data has no .conversations array.
+          if (!old || !Array.isArray(old.conversations)) return old;
           return {
             ...old,
             conversations: old.conversations.filter((c) => c.id !== id),

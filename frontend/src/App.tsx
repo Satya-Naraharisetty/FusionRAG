@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { UploadQueueProvider } from "./context/UploadQueueContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { LoginForm } from "./components/auth/LoginForm";
 import { RegisterForm } from "./components/auth/RegisterForm";
@@ -33,6 +34,10 @@ function App() {
       <ThemeProvider>
         <BrowserRouter>
           <AuthProvider>
+            {/* Above <Routes> (and the lazy-page Suspense) so the upload queue
+                survives navigation — in-flight uploads keep processing in the
+                background wherever the user goes. */}
+            <UploadQueueProvider>
             <Suspense
               fallback={
                 <div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -96,6 +101,7 @@ function App() {
                 <Route path="*" element={<ErrorPage status={404} />} />
               </Routes>
             </Suspense>
+            </UploadQueueProvider>
             <Toaster
               position="bottom-right"
               toastOptions={{

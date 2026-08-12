@@ -19,6 +19,28 @@ export const useDocuments = () => {
   });
 };
 
+/**
+ * Documents scoped to a single conversation (chat attachments). The global
+ * documents list deliberately excludes these, so they have their own query,
+ * keyed by conversation. Refetches every 5s while any doc is still ingesting
+ * so newly-attached uploads and their pipeline states appear in the chat.
+ */
+export const useConversationDocuments = (conversationId: string | null) => {
+  return useQuery<Document[]>({
+    queryKey: [QUERY_KEYS.DOCUMENTS, "conversation", conversationId],
+    queryFn: () => documentsApi.listDocuments(conversationId),
+    enabled: Boolean(conversationId),
+    refetchInterval: (query) => {
+      const docs = query.state.data;
+      if (!Array.isArray(docs)) return false;
+      const busy = docs.some(
+        (d) => d.status === "pending" || d.status === "processing"
+      );
+      return busy ? 5000 : false;
+    },
+  });
+};
+
 export const useUploadDocument = () => {
   const queryClient = useQueryClient();
 
@@ -27,15 +49,23 @@ export const useUploadDocument = () => {
       file,
       onProgress,
       signal,
+      conversationId,
     }: {
       file: File;
       onProgress?: (progressEvent: unknown) => void;
       signal?: AbortSignal;
-    }) => documentsApi.uploadDocument(file, onProgress, signal),
-    onMutate: async ({ file }) => {
+      /** Chat-composer uploads are scoped to a conversation (two-tier model). */
+      conversationId?: string | null;
+    }) => documentsApi.uploadDocument(file, onProgress, signal, conversationId),
+    onMutate: async ({ file, conversationId }) => {
       await queryClient.cancelQueries({ queryKey: [QUERY_KEYS.DOCUMENTS] });
 
       const previousDocs = queryClient.getQueryData<Document[]>([QUERY_KEYS.DOCUMENTS]) || [];
+
+      // Chat-composer uploads belong to their conversation, never to the
+      // Documents library — no optimistic row there (the composer tray is the
+      // feedback) and the Documents list must not flicker a chat doc.
+      if (conversationId) return { previousDocs, tempId: null };
 
       // Create a temporary optimistic document
       const tempId = Math.random().toString();
@@ -75,6 +105,13 @@ export const useUploadDocument = () => {
       }
     },
     onSuccess: (data, _variables, context) => {
+      if (!context?.tempId) {
+        // Chat-scoped upload: nothing optimistic to replace; the composer tray
+        // is the feedback, so keep it quiet (matching the pre-queue behaviour)
+        // and let the invalidation below reconcile the library list.
+        queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.DOCUMENTS] });
+        return;
+      }
       // Replace optimistic temp file with actual uploaded document
       queryClient.setQueryData<Document[]>([QUERY_KEYS.DOCUMENTS], (old) => {
         if (!old) return [data];
@@ -153,9 +190,17 @@ export const useReprocessDocument = () => {
 };
 
 export const useRegenerateEmbeddings = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (id: string) => documentsApi.regenerateEmbeddings(id),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      // The regeneration job is queued; restart the embedding-status poll for
+      // this document so a "failed" status (and the card banner) clears once
+      // the job starts producing pending/generating rows.
+      queryClient.invalidateQueries({
+        queryKey: [QUERY_KEYS.EMBEDDING_STATUS, id],
+      });
       toast.success("Embedding regeneration task queued.");
     },
     onError: (err) => {

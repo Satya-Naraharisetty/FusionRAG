@@ -9,8 +9,7 @@ from app.api.dependencies import get_account_delete_rate_limiter
 from app.core.config import settings
 from app.core.security.rate_limiter import RateLimiter
 from app.db.models import Base
-
-TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
+from tests.db import TEST_DATABASE_URL
 
 
 def _truncate_auth_tables(session) -> None:
@@ -43,11 +42,11 @@ def test_db(client):
 
     yield session_local
 
-    # Teardown: truncate again so no test (not even the last one in the file)
-    # leaves users/sessions behind in the shared dev database. The pre-test
-    # truncation above alone leaks whatever the final test creates — e.g.
-    # test_refresh_concurrency_fails registered concurrent@example.com and the
-    # row survived the suite.
+    # Teardown: truncate again as hygiene so no test (not even the last one in
+    # the file) leaves users/sessions behind. This is the dedicated
+    # hybrid_rag_test database, so leftovers would be harmless anyway — the
+    # pre-test truncation above alone would leak whatever the final test
+    # creates, e.g. concurrent@example.com from test_refresh_concurrency_fails.
     db = session_local()
     try:
         _truncate_auth_tables(db)

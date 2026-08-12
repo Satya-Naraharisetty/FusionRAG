@@ -167,9 +167,17 @@ class DocumentService:
 
     def list_documents(self, user_id: UUID) -> list[Document]:
         """
-        Lists all documents belonging to a user.
+        Lists the user's GLOBAL documents — the ones uploaded from the Documents
+        section (``conversation_id`` is NULL). Chat-scoped documents belong to
+        their conversation only and must never surface in the shared library,
+        so they are excluded here. They are reachable via
+        ``list_documents_by_conversation`` and ``get_document_by_id``.
         """
-        return self._document_repo.list_by_user(user_id)
+        return [
+            doc
+            for doc in self._document_repo.list_by_user(user_id)
+            if doc.conversation_id is None
+        ]
 
     def list_documents_by_conversation(
         self, conversation_id: UUID, user_id: UUID

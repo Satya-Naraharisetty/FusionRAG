@@ -213,6 +213,148 @@ async def test_in_memory_rate_limiter():
     assert await limiter.is_rate_limited("client_ip") is True
 
 
+@pytest.mark.asyncio
+async def test_in_memory_rate_limiter_shared_across_instances():
+    """
+    The in-memory fallback must survive instance churn: dependencies.py
+    builds a brand-new RateLimiter per request, so without a shared store the
+    counters reset between requests and the limit never fires when Redis is
+    unavailable. Two separate instances with the same config must share the
+    same sliding-window counters.
+    """
+    limiter_a = RateLimiter(redis_client=None, requests_per_minute=2, burst=0)
+    limiter_b = RateLimiter(redis_client=None, requests_per_minute=2, burst=0)
+    assert limiter_a is not limiter_b  # genuinely different instances
+
+    # Calls 1 & 2 (across both instances): allowed
+    assert await limiter_a.is_rate_limited("shared_ip") is False
+    assert await limiter_b.is_rate_limited("shared_ip") is False
+    # Call 3 (on the other instance): the shared counter blocks it
+    assert await limiter_a.is_rate_limited("shared_ip") is True
+
+
+@pytest.mark.asyncio
+async def test_in_memory_rate_limiter_configs_isolated():
+    """
+    The shared store is keyed by (requests_per_minute, burst): two limiters
+    with different configs must not leak counters into each other, even for
+    the same identifier.
+    """
+    strict = RateLimiter(redis_client=None, requests_per_minute=2, burst=0)
+    lenient = RateLimiter(redis_client=None, requests_per_minute=5, burst=0)
+
+    # Exhaust the strict limiter while the lenient one still allows requests.
+    assert await strict.is_rate_limited("isolated_ip") is False
+    assert await lenient.is_rate_limited("isolated_ip") is False
+    assert await strict.is_rate_limited("isolated_ip") is False
+    assert await lenient.is_rate_limited("isolated_ip") is False
+    assert await strict.is_rate_limited("isolated_ip") is True  # 3rd strict
+    assert await lenient.is_rate_limited("isolated_ip") is False  # only 3rd lenient
+
+
+@pytest.mark.asyncio
+async def test_in_memory_rate_limiter_redis_outage_circuit_breaker(monkeypatch):
+    """
+    A Redis outage must not stall every request: the first failed Redis attempt
+    trips a short-lived circuit breaker, after which the limiter skips Redis
+    entirely and uses the shared in-memory store directly (microseconds per
+    request instead of the full socket/DNS timeout) — while still enforcing
+    the budget. When the TTL expires, the next request probes Redis once more.
+    """
+    import redis as redis_lib
+
+    import app.core.security.rate_limiter as rate_limiter_module
+
+    monkeypatch.setattr(rate_limiter_module, "_REDIS_UNHEALTHY_TTL_SECONDS", 0.05)
+    rate_limiter_module._redis_unhealthy_until = 0.0
+
+    # A Redis client whose pipeline always fails (simulates Redis being down).
+    broken_redis = MagicMock()
+    broken_redis.pipeline.side_effect = redis_lib.ConnectionError("redis down")
+    limiter = RateLimiter(redis_client=broken_redis, requests_per_minute=2, burst=0)
+
+    # Attempt 1 tries Redis (fails fast) and falls back to memory: allowed.
+    assert await limiter.is_rate_limited("breaker_ip") is False
+    assert broken_redis.pipeline.call_count == 1
+
+    # Within the TTL, Redis is skipped entirely; the memory store enforces the
+    # budget (3rd call is blocked) with no further Redis attempts.
+    assert await limiter.is_rate_limited("breaker_ip") is False
+    assert await limiter.is_rate_limited("breaker_ip") is True  # 3rd → blocked
+    assert broken_redis.pipeline.call_count == 1  # no further Redis attempts
+
+    # After the TTL expires, the next request probes Redis once more (and,
+    # finding it still down, falls back to memory — which is still full). The
+    # sleep margin is deliberately generous (0.12s vs a 0.05s TTL) so a loaded
+    # CI runner's timer jitter can never skip the probe.
+    await asyncio.sleep(0.12)
+    assert await limiter.is_rate_limited("breaker_ip") is True
+    assert broken_redis.pipeline.call_count == 2  # exactly one probe attempt
+
+    # The failed probe re-arms the breaker: the next call skips Redis again.
+    assert await limiter.is_rate_limited("breaker_ip") is True  # memory still full
+    assert broken_redis.pipeline.call_count == 2  # still no further Redis attempts
+
+
+@pytest.mark.asyncio
+async def test_in_memory_rate_limiter_sweeps_stale_identifiers():
+    """
+    Identifiers whose newest timestamp has aged out of the 60s window must be
+    dropped when a new identifier triggers the periodic sweep — otherwise
+    identifiers that never come back would leak memory for the process's life.
+    """
+    import time
+
+    limiter = RateLimiter(redis_client=None, requests_per_minute=2, burst=0)
+    store = limiter._memory_db
+
+    # White-box: seed two identifiers that stopped being seen >60s ago.
+    old = time.time() - 120.0
+    store["ip:stale1"] = [old, old + 1.0]
+    store["ip:stale2"] = [old]
+
+    # The first new identifier triggers the sweep (fresh store, deadline 0).
+    assert await limiter.is_rate_limited("ip:fresh") is False
+
+    assert "ip:stale1" not in store
+    assert "ip:stale2" not in store
+    assert "ip:fresh" in store
+
+    # Amortized: a second new identifier within the interval does NOT re-sweep,
+    # so an identifier that aged out after the last sweep survives until the
+    # next deadline (bounded work per insert, not a sweep per insert).
+    store["ip:stale3"] = [time.time() - 120.0]
+    assert await limiter.is_rate_limited("ip:fresh2") is False
+    assert "ip:stale3" in store  # sweep skipped — interval not elapsed
+
+
+@pytest.mark.asyncio
+async def test_in_memory_rate_limiter_caps_identifier_count(monkeypatch):
+    """
+    A burst of brand-new identifiers must not grow a store past
+    _MEMORY_MAX_IDENTIFIERS: the least-recently-active identifiers are evicted,
+    hard-bounding memory even between periodic sweeps. An evicted identifier
+    gets a fresh window (the documented trade-off of the bound).
+    """
+    import app.core.security.rate_limiter as rate_limiter_module
+
+    monkeypatch.setattr(rate_limiter_module, "_MEMORY_MAX_IDENTIFIERS", 3)
+
+    limiter = RateLimiter(redis_client=None, requests_per_minute=2, burst=0)
+    store = limiter._memory_db
+
+    for ip in ("ip:1", "ip:2", "ip:3", "ip:4", "ip:5"):
+        assert await limiter.is_rate_limited(ip) is False
+    assert len(store) <= 3
+
+    # The oldest-seen identifier was evicted first, so "ip:1" has a fresh
+    # window again while the retained identifiers keep their counters.
+    assert await limiter.is_rate_limited("ip:1") is False
+    assert await limiter.is_rate_limited("ip:1") is False
+    assert await limiter.is_rate_limited("ip:1") is True  # 3rd again
+    assert len(store) <= 3
+
+
 # --- Decoupled Provider Router Tests ---
 
 

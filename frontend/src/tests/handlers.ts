@@ -110,6 +110,7 @@ const handlers = [
       {
         id: "doc-1",
         user_id: "user-123",
+        conversation_id: null,
         filename: "test.pdf",
         original_filename: "test.pdf",
         content_type: "application/pdf",
@@ -117,10 +118,52 @@ const handlers = [
         checksum: "abcdef",
         status: "completed",
         extractor_version: "1.0",
+        failure_reason: null,
+        page_count: null,
+        word_count: null,
+        language: null,
+        processing_started_at: new Date().toISOString(),
+        processing_completed_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
     ]);
+  }),
+
+  http.post("*/api/v1/documents/upload", () => {
+    return HttpResponse.json({
+      id: "doc-1",
+      user_id: "user-123",
+      conversation_id: null,
+      filename: "test.pdf",
+      original_filename: "test.pdf",
+      content_type: "application/pdf",
+      file_size: 1024,
+      checksum: "abcdef",
+      status: "completed",
+      extractor_version: "1.0",
+      failure_reason: null,
+      page_count: null,
+      word_count: null,
+      language: null,
+      processing_started_at: new Date().toISOString(),
+      processing_completed_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+  }),
+
+  // Default: the mocked document is fully indexed, so pipeline surfaces
+  // render idle. Tests that exercise the live steps override this per-test.
+  http.get("*/api/v1/documents/:id/embeddings/status", () => {
+    return HttpResponse.json({
+      status: "completed",
+      chunks_total: 5,
+      embedded_chunks: 5,
+      failed_chunks: 0,
+      provider: "mock",
+      model: "mock",
+    });
   }),
 ];
 

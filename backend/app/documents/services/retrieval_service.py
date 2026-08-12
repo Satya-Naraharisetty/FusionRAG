@@ -9,6 +9,7 @@ from app.documents.domain.interfaces import (
     ChunkRepository,
     DenseRetriever,
     FusionEngine,
+    IndexCache,
     MMRSelector,
     QueryProcessor,
     Reranker,
@@ -41,6 +42,8 @@ class RetrievalService:
         mmr_selector: MMRSelector | None = None,
         reranker: Reranker | None = None,
         chunk_repo: ChunkRepository | None = None,
+        index_cache: IndexCache | None = None,
+        empty_kb_cache_ttl_seconds: float | None = None,
         # Backwards compatible parameters for old construction in tests
         embedding_generator: Any | None = None,
         vector_store: Any | None = None,
@@ -101,9 +104,15 @@ class RetrievalService:
             if rerank_top_k is not None
             else getattr(settings, "RERANK_TOP_K", 5)
         )
+        self._empty_kb_cache_ttl_seconds = (
+            empty_kb_cache_ttl_seconds
+            if empty_kb_cache_ttl_seconds is not None
+            else getattr(settings, "EMPTY_KB_CACHE_TTL_SECONDS", 60.0)
+        )
 
         # 1. Chunk Repository
         self._chunk_repo = chunk_repo
+        self._index_cache = index_cache
         self._dense_retriever: DenseRetriever | None = None
         self._sparse_retriever: SparseRetriever | None = None
 
@@ -138,7 +147,9 @@ class RetrievalService:
             from app.documents.services.sparse_retriever import BM25Retriever
 
             # Construct a default cache and index since we are in fallback constructor
-            cache = InMemoryIndexCache()
+            cache = index_cache or InMemoryIndexCache()
+            if self._index_cache is None:
+                self._index_cache = cache
             sparse_index = InMemoryBM25Index(chunk_repo=chunk_repo, index_cache=cache)
             self._sparse_retriever = BM25Retriever(sparse_index=sparse_index)
 
@@ -170,6 +181,50 @@ class RetrievalService:
 
         # Backwards compatible ranker fallback if someone calls self._ranker (or tests mock it)
         self._ranker = ranker
+
+    async def user_has_chunks(self, user_id: UUID) -> bool:
+        """
+        Best-effort check for whether the user has any indexed chunks.
+
+        The negative answer ("no chunks") is cached briefly in the shared
+        index cache so chat requests from document-less users skip the DB
+        count query on every message. The entry is invalidated when the user
+        uploads a document (DocumentProcessingService) and expires after
+        ``_empty_kb_cache_ttl_seconds`` as a safety net for writes that bypass
+        the normal invalidation path. Positive answers are never cached: a
+        stale "has chunks" could outlive a full knowledge-base wipe and would
+        silently defeat the empty fast path.
+
+        Returns ``True`` (i.e. "assume documents exist") when the chunk
+        repository is unavailable or cannot answer, so callers keep their
+        normal retrieval behavior rather than skipping it on a false negative.
+        """
+        if self._chunk_repo is None:
+            return True
+
+        # Fast path: a fresh cached entry with count == 0 means the user
+        # definitively had no chunks a moment ago — no DB query needed.
+        if self._index_cache is not None:
+            cached_stats = self._index_cache.get_fresh_stats(
+                user_id, self._empty_kb_cache_ttl_seconds
+            )
+            if (
+                isinstance(cached_stats, dict)
+                and int(cached_stats.get("count") or 0) == 0
+            ):
+                return False
+
+        try:
+            stats = await self._chunk_repo.get_chunks_metadata_stats(user_id)
+        except Exception:
+            return True
+
+        has_chunks = isinstance(stats, dict) and int(stats.get("count") or 0) > 0
+        if not has_chunks and self._index_cache is not None:
+            # Seed the empty determination so subsequent calls short-circuit
+            # until the entry is invalidated (upload) or expires (TTL).
+            self._index_cache.set(user_id, index_data=None, stats=stats)
+        return has_chunks
 
     async def retrieve(
         self,
@@ -227,6 +282,28 @@ class RetrievalService:
                 RetrievalMode.HYBRID
                 if self._enable_hybrid_search
                 else RetrievalMode.SEMANTIC
+            )
+
+        # 2b. Empty knowledge base fast path. When no document_ids were
+        # requested, a user with zero chunks can only ever receive an empty
+        # result, so skip the entire retrieval pipeline (query embedding,
+        # vector-store search, BM25 build/search, fusion, MMR, rerank) and let
+        # the caller fall back to a plain LLM answer. This also keeps chat
+        # working for document-less users even when the vector infra is down.
+        if not unique_doc_ids and not await self.user_has_chunks(user_id):
+            logger.info(
+                "Retrieval skipped: user has no uploaded chunks. "
+                "Caller will fall back to a general-knowledge LLM answer."
+            )
+            return SearchResult(
+                original_query=query,
+                retrieval_time=time.perf_counter() - start_time,
+                total_matches=0,
+                retrieved_chunks=[],
+                search_strategy=retrieval_mode.value,
+                retrieval_strategy=retrieval_mode,
+                dense_matches=[],
+                sparse_matches=[],
             )
 
         # 3. Concurrent Retrieval

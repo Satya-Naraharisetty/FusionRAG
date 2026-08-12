@@ -10,6 +10,7 @@ export const KEYBOARD_SHORTCUTS = {
 export const UPLOAD_LIMITS = {
   MAX_FILE_SIZE: 50 * 1024 * 1024, // 50MB
   CHAT_MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB for chat attachments
+  CHAT_MAX_ATTACHMENTS: 5, // max files per chat message
   ACCEPTED_TYPES: {
     "application/pdf": [".pdf"],
     "text/plain": [".txt"],
@@ -32,5 +33,5 @@ export const QUERY_KEYS = {
   CONVERSATIONS: "conversations",
   MESSAGES: "messages",
   DOCUMENTS: "documents",
-  EMBEDDING_STATUS: "embedding_status",
+  EMBEDDING_STATUS: "embedding-status",
 };

@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from app.api.dependencies import (
     get_conversation_manager,
     get_current_user_context,
+    get_document_service,
     get_retrieval_service,
 )
 from app.auth.infrastructure.persistence.models import Base, SQLAlchemyUser
@@ -24,8 +25,7 @@ from app.documents.infrastructure.persistence.repositories.chunk_repository impo
 )
 from app.documents.services.ranking import SemanticSearchRanker
 from app.documents.services.retrieval_service import RetrievalService
-
-TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
+from tests.db import TEST_DATABASE_URL
 
 
 # --- DB Mock/Fixtures for Repository Integration Tests ---
@@ -351,14 +351,8 @@ async def test_retrieval_service_empty_results(mocker):
 
 
 # --- 4. API /search Endpoint Integration Tests ---
-def test_api_search_validation_and_capping(client, mocker):
-    user_id = uuid4()
-    client.app.dependency_overrides[get_current_user_context] = lambda: {
-        "user_id": str(user_id),
-        "role": "user",
-    }
-
-    # Mock ConversationManager
+def _mock_conversation_manager(mocker, user_id):
+    """Shared mock: get_or_create returns a fresh conversation, no history."""
     from app.chat.domain.models import (
         Conversation,
         ConversationState,
@@ -388,8 +382,42 @@ def test_api_search_validation_and_capping(client, mocker):
             rewrite_applied=False,
         )
     )
+    return mock_conv_manager
+
+
+def _mock_document_service(mocker, global_doc_ids, scoped_doc_ids):
+    """Shared mock: list_documents -> global docs, list_by_conversation -> scoped."""
+    doc_service = mocker.MagicMock()
+
+    def _make_doc(doc_id):
+        doc = mocker.MagicMock()
+        doc.id = doc_id
+        return doc
+
+    doc_service.list_documents.return_value = [
+        _make_doc(doc_id) for doc_id in global_doc_ids
+    ]
+    doc_service.list_documents_by_conversation.return_value = [
+        _make_doc(doc_id) for doc_id in scoped_doc_ids
+    ]
+    return doc_service
+
+
+def test_api_search_validation_and_capping(client, mocker):
+    user_id = uuid4()
+    client.app.dependency_overrides[get_current_user_context] = lambda: {
+        "user_id": str(user_id),
+        "role": "user",
+    }
     client.app.dependency_overrides[get_conversation_manager] = lambda: (
-        mock_conv_manager
+        _mock_conversation_manager(mocker, user_id)
+    )
+
+    # The scope resolution consults the document service: a global search is
+    # pinned to the user's global docs.
+    global_doc_id = uuid4()
+    client.app.dependency_overrides[get_document_service] = lambda: (
+        _mock_document_service(mocker, [global_doc_id], [])
     )
 
     # Mock the RetrievalService dependency
@@ -414,13 +442,15 @@ def test_api_search_validation_and_capping(client, mocker):
     )
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
-    # Scenario B: Test top_k is capped at MAX_TOP_K
+    # Scenario B: Test top_k is capped at MAX_TOP_K and the search is pinned
+    # to the user's GLOBAL documents (chat-scoped docs excluded).
     client.post(
         "/api/v1/search",
         json={"query": "test query", "top_k": 500},
     )
     _, kwargs = mock_retrieval_service.retrieve.call_args
     assert kwargs["top_k"] == settings.MAX_TOP_K
+    assert kwargs["document_ids"] == [global_doc_id]
 
     # Scenario C: Clean up dependency overrides
     client.app.dependency_overrides.clear()
@@ -432,39 +462,14 @@ def test_api_search_unauthorized_document(client, mocker):
         "user_id": str(user_id),
         "role": "user",
     }
-
-    # Mock ConversationManager
-    from app.chat.domain.models import (
-        Conversation,
-        ConversationState,
-        HistoryRewriteResult,
-    )
-
-    mock_conv = Conversation(
-        id=uuid4(),
-        user_id=user_id,
-        title="Mock",
-        state=ConversationState.ACTIVE,
-        version=1,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-        last_message_at=datetime.now(UTC),
-    )
-    mock_conv_manager = mocker.MagicMock()
-    mock_conv_manager.get_or_create_conversation = mocker.AsyncMock(
-        return_value=mock_conv
-    )
-    mock_conv_manager._memory.load_memory = mocker.AsyncMock(return_value=([], None))
-    mock_conv_manager._rewriter.rewrite = mocker.AsyncMock(
-        return_value=HistoryRewriteResult(
-            original_query="test",
-            rewritten_query="test",
-            rewrite_reason="No history",
-            rewrite_applied=False,
-        )
-    )
     client.app.dependency_overrides[get_conversation_manager] = lambda: (
-        mock_conv_manager
+        _mock_conversation_manager(mocker, user_id)
+    )
+    # Explicit document_ids are honored as-is, so the document service is
+    # never consulted for scope resolution — but FastAPI still instantiates
+    # the dependency, so it must be overridden too.
+    client.app.dependency_overrides[get_document_service] = lambda: (
+        _mock_document_service(mocker, [], [])
     )
 
     # Mock retrieval service to raise UnauthorizedDocumentAccess
@@ -483,5 +488,85 @@ def test_api_search_unauthorized_document(client, mocker):
     )
     # The global handler or the endpoint translates this to 403 Forbidden
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    client.app.dependency_overrides.clear()
+
+
+def test_api_search_scopes_to_two_tier_document_model(client, mocker):
+    """
+    The /search endpoint must enforce the two-tier document model:
+
+    * A global search (no conversation_id) searches only the user's global
+      Documents-section documents — chat-scoped attachments never leak out.
+    * A conversation-scoped search is pinned to that conversation's own
+      attachments — global docs never leak in without explicit ids.
+    * Explicit document_ids are honored as-is.
+    * An empty scope skips retrieval entirely (the retrieval service treats
+      a falsy document_ids as "search everything", which would defeat the
+      isolation).
+    """
+    user_id = uuid4()
+    client.app.dependency_overrides[get_current_user_context] = lambda: {
+        "user_id": str(user_id),
+        "role": "user",
+    }
+    client.app.dependency_overrides[get_conversation_manager] = lambda: (
+        _mock_conversation_manager(mocker, user_id)
+    )
+
+    global_doc_id = uuid4()
+    scoped_doc_id = uuid4()
+    doc_service = _mock_document_service(
+        mocker, [global_doc_id], [scoped_doc_id]
+    )
+    client.app.dependency_overrides[get_document_service] = lambda: doc_service
+
+    mock_retrieval_service = mocker.MagicMock()
+    mock_retrieval_service.retrieve = mocker.AsyncMock(
+        return_value=SearchResult(
+            original_query="query",
+            retrieval_time=0.01,
+            total_matches=0,
+            retrieved_chunks=[],
+        )
+    )
+    client.app.dependency_overrides[get_retrieval_service] = lambda: (
+        mock_retrieval_service
+    )
+
+    # 1. Global search -> pinned to global docs only (chat-scoped excluded),
+    # and the conversation scoping API is never consulted.
+    client.post("/api/v1/search", json={"query": "q"})
+    _, kwargs = mock_retrieval_service.retrieve.call_args
+    assert kwargs["document_ids"] == [global_doc_id]
+    doc_service.list_documents_by_conversation.assert_not_called()
+
+    # 2. Conversation search -> pinned to that conversation's attachments.
+    client.post(
+        "/api/v1/search",
+        json={"query": "q", "conversation_id": str(uuid4())},
+    )
+    _, kwargs = mock_retrieval_service.retrieve.call_args
+    assert kwargs["document_ids"] == [scoped_doc_id]
+
+    # 3. Explicit document_ids -> honored as-is, no scope resolution.
+    explicit_id = uuid4()
+    response = client.post(
+        "/api/v1/search",
+        json={"query": "q", "document_ids": [str(explicit_id)]},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    _, kwargs = mock_retrieval_service.retrieve.call_args
+    assert kwargs["document_ids"] == [explicit_id]
+
+    # 4. Nothing in scope -> retrieval skipped, empty result returned.
+    calls_before = mock_retrieval_service.retrieve.call_count
+    doc_service.list_documents.return_value = []
+    response = client.post("/api/v1/search", json={"query": "q"})
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["results"] == []
+    assert body["total_matches"] == 0
+    assert mock_retrieval_service.retrieve.call_count == calls_before
 
     client.app.dependency_overrides.clear()

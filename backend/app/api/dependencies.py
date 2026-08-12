@@ -287,42 +287,55 @@ def get_chunking_service() -> ChunkingService:
     )
 
 
+_embedding_generator_instance: EmbeddingGenerator | None = None
+
+
 def get_embedding_generator() -> EmbeddingGenerator:
+    global _embedding_generator_instance
+
     from app.core.config import settings
 
-    # Use local embedder for development - zero cost, fast, no API key needed
-    if settings.ENV == "development":
-        from app.documents.infrastructure.embedding_generator import (
-            LocalEmbeddingGenerator,
-        )
+    # The embedding generator is stateless after construction (the local model
+    # is loaded once, encode() is read-only), so share a single process-wide
+    # instance. Without this, every documents/chat request in development
+    # rebuilt a fresh SentenceTransformer — re-fetching model metadata from the
+    # HuggingFace Hub (dozens of blocking HEAD requests, 5-13s per request, and
+    # a hard hang when the network stalls). Same singleton pattern as
+    # get_cache / get_index_cache below.
+    if _embedding_generator_instance is None:
+        # Use local embedder for development - zero cost, fast, no API key needed
+        if settings.ENV == "development":
+            from app.documents.infrastructure.embedding_generator import (
+                LocalEmbeddingGenerator,
+            )
 
-        logger.info("Using LocalEmbeddingGenerator for development environment")
-        return LocalEmbeddingGenerator(
-            model_name=settings.LOCAL_EMBEDDING_MODEL,
-            device=settings.LOCAL_EMBEDDING_DEVICE,
-        )
+            logger.info("Using LocalEmbeddingGenerator for development environment")
+            _embedding_generator_instance = LocalEmbeddingGenerator(
+                model_name=settings.LOCAL_EMBEDDING_MODEL,
+                device=settings.LOCAL_EMBEDDING_DEVICE,
+            )
+        elif settings.EMBEDDING_PROVIDER.lower() == "gemini":
+            from app.documents.infrastructure.embedding_generator import (
+                GeminiEmbeddingGenerator,
+            )
 
-    # Production: use configured provider (gemini or openai)
-    if settings.EMBEDDING_PROVIDER.lower() == "gemini":
-        from app.documents.infrastructure.embedding_generator import (
-            GeminiEmbeddingGenerator,
-        )
+            _embedding_generator_instance = GeminiEmbeddingGenerator(
+                api_key=settings.GEMINI_API_KEY,
+                model=settings.EMBEDDING_MODEL,
+                dimension=settings.EMBEDDING_DIMENSION,
+            )
+        else:
+            from app.documents.infrastructure.embedding_generator import (
+                OpenAIEmbeddingGenerator,
+            )
 
-        return GeminiEmbeddingGenerator(
-            api_key=settings.GEMINI_API_KEY,
-            model=settings.EMBEDDING_MODEL,
-            dimension=settings.EMBEDDING_DIMENSION,
-        )
-    else:
-        from app.documents.infrastructure.embedding_generator import (
-            OpenAIEmbeddingGenerator,
-        )
+            _embedding_generator_instance = OpenAIEmbeddingGenerator(
+                api_key=settings.OPENAI_API_KEY,
+                model=settings.EMBEDDING_MODEL,
+                dimension=settings.EMBEDDING_DIMENSION,
+            )
 
-        return OpenAIEmbeddingGenerator(
-            api_key=settings.OPENAI_API_KEY,
-            model=settings.EMBEDDING_MODEL,
-            dimension=settings.EMBEDDING_DIMENSION,
-        )
+    return _embedding_generator_instance
 
 
 def get_vector_store(request: Request = None) -> VectorStore:  # type: ignore[assignment]  # FastAPI injects Request
@@ -391,6 +404,10 @@ def get_document_processing_service(
     embedding_service: EmbeddingService = Depends(get_embedding_service),
     request: Request = None,  # type: ignore[assignment]  # FastAPI injects Request
 ) -> DocumentProcessingService:
+    # Resolved lazily (not as a Depends default) because get_index_cache is
+    # defined later in this module — module-level defaults are evaluated at
+    # import time, function bodies only when called.
+    index_cache = get_index_cache()
     dispatcher = SimpleEventDispatcher()
 
     task_queue: Any
@@ -417,6 +434,7 @@ def get_document_processing_service(
         uow=SQLAlchemyUnitOfWork(db),
         time_provider=SystemTimeProvider(),
         event_dispatcher=dispatcher,
+        index_cache=index_cache,
     )
 
 
@@ -479,16 +497,25 @@ def get_search_ranker() -> SearchRanker:
     return SemanticSearchRanker()
 
 
+_index_cache_instance: Any = None
+
+
 def get_index_cache():
-    from functools import lru_cache
+    """
+    Returns the single process-wide InMemoryIndexCache instance.
 
-    from app.documents.services.index_cache import InMemoryIndexCache
+    Note: this deliberately does NOT use the lru_cache-on-nested-function idiom
+    (each call to the outer function would create a fresh wrapper with a fresh
+    cache, silently defeating the caching). A module-global singleton is the
+    pattern used by get_cache / get_pricing_provider in this file.
+    """
+    global _index_cache_instance
 
-    @lru_cache
-    def _get_cache():
-        return InMemoryIndexCache()
+    if _index_cache_instance is None:
+        from app.documents.services.index_cache import InMemoryIndexCache
 
-    return _get_cache()
+        _index_cache_instance = InMemoryIndexCache()
+    return _index_cache_instance
 
 
 def get_retrieval_service(
@@ -537,6 +564,7 @@ def get_retrieval_service(
         mmr_selector=mmr_selector,
         reranker=reranker,
         chunk_repo=chunk_repo,
+        index_cache=index_cache,
         enable_hybrid_search=settings.ENABLE_HYBRID_SEARCH,
         enable_mmr=settings.ENABLE_MMR,
         enable_reranker=settings.ENABLE_RERANKER,

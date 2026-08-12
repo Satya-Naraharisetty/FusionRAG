@@ -6,6 +6,7 @@ from app.documents.domain.events import DocumentProcessingCompleted, EventDispat
 from app.documents.domain.interfaces import (
     ChunkRepository,
     DocumentRepository,
+    IndexCache,
     StorageProvider,
 )
 from app.documents.domain.models import DocumentStatus
@@ -30,6 +31,7 @@ class DocumentProcessingService:
         uow: UnitOfWork,
         time_provider: TimeProvider,
         event_dispatcher: EventDispatcher | None = None,
+        index_cache: IndexCache | None = None,
     ) -> None:
         self._document_repo = document_repo
         self._chunk_repo = chunk_repo
@@ -41,6 +43,7 @@ class DocumentProcessingService:
         self._uow = uow
         self._time_provider = time_provider
         self._event_dispatcher = event_dispatcher
+        self._index_cache = index_cache
 
     def process_document(self, document_id: UUID) -> None:
         """
@@ -124,6 +127,12 @@ class DocumentProcessingService:
 
             self._uow.commit()
             logger.info(f"Ingestion completed successfully for document {document_id}")
+
+            # Invalidate the user's index-cache entry (BM25 index AND the cached
+            # "no chunks" determination) so the next retrieval/chat request sees
+            # the freshly committed chunks instead of the pre-upload state.
+            if self._index_cache is not None:
+                self._index_cache.invalidate(document.user_id)
 
             # Transactional Event Dispatch: dispatch only after successful commit.
             if self._event_dispatcher:

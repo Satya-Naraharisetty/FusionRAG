@@ -15,9 +15,14 @@ import { FileTypeBadge } from "../ui/FileTypeBadge";
 import { UploadProgress } from "../ui/UploadProgress";
 import { useFileValidation } from "../../hooks/useFileValidation";
 import { useRecentAttachments } from "../../hooks/useRecentAttachments";
-import { useUploadDocument } from "../../hooks/useDocuments";
-import { ChatAttachment } from "../../types";
+import { useDocuments } from "../../hooks/useDocuments";
+import {
+  useUploadQueue,
+  type QueueFile,
+} from "../../context/UploadQueueContext";
+import { getDocumentProcessingStep } from "../../lib/uploadStages";
 import { UPLOAD_LIMITS } from "../../lib/constants";
+import { t } from "../../lib/messages";
 import toast from "react-hot-toast";
 import { cn } from "../../lib/utils";
 
@@ -30,15 +35,19 @@ interface ChatInputProps {
   droppedFiles?: File[];
 }
 
-const SLASH_COMMANDS = [
-  { id: "documents", label: "Documents priority", description: "Prioritize your uploaded documents", icon: "📎", shortcut: "@documents" },
-  { id: "search", label: "Search documents", description: "Query your knowledge base", icon: "🔍", shortcut: "/search" },
-  { id: "summarize", label: "Summarize", description: "Summarize selected documents", icon: "📄", shortcut: "/summarize" },
-  { id: "explain", label: "Explain concept", description: "Get detailed explanation", icon: "💡", shortcut: "/explain" },
-  { id: "compare", label: "Compare", description: "Compare two documents", icon: "⚖️", shortcut: "/compare" },
-  { id: "code", label: "Code helper", description: "Generate or explain code", icon: "💻", shortcut: "/code" },
-  { id: "settings", label: "Settings", description: "Open settings panel", icon: "⚙️", shortcut: "/settings" },
-];
+// Static per-command data — ids, icons, and shortcuts aren't translatable.
+// Labels and descriptions resolve through messages.ts on every render (see
+// the slashCommands map in the component) so a locale change is reflected
+// immediately.
+const SLASH_COMMAND_DEFS = [
+  { id: "documents", labelKey: "commands.documents.label", descriptionKey: "commands.documents.description", icon: "📎", shortcut: "@documents" },
+  { id: "search", labelKey: "commands.search.label", descriptionKey: "commands.search.description", icon: "🔍", shortcut: "/search" },
+  { id: "summarize", labelKey: "commands.summarize.label", descriptionKey: "commands.summarize.description", icon: "📄", shortcut: "/summarize" },
+  { id: "explain", labelKey: "commands.explain.label", descriptionKey: "commands.explain.description", icon: "💡", shortcut: "/explain" },
+  { id: "compare", labelKey: "commands.compare.label", descriptionKey: "commands.compare.description", icon: "⚖️", shortcut: "/compare" },
+  { id: "code", labelKey: "commands.code.label", descriptionKey: "commands.code.description", icon: "💻", shortcut: "/code" },
+  { id: "settings", labelKey: "commands.settings.label", descriptionKey: "commands.settings.description", icon: "⚙️", shortcut: "/settings" },
+] as const;
 
 export const ChatInput: React.FC<ChatInputProps> = ({
   conversationId,
@@ -53,69 +62,92 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [text, setText] = useState(draft);
   const [showCommands, setShowCommands] = useState(false);
   const [commandSearch, setCommandSearch] = useState("");
-  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isRecording, setIsRecording] = useState(false);
-  const [charCount, setCharCount] = useState(0);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // The queue (app-level) owns the uploads — progress, the processing→done
+  // flip, and persistence across navigation — so this tray is a scoped view
+  // of its rows for the current conversation.
+  const {
+    queue,
+    embeddingStatus,
+    addFiles,
+    cancelUpload,
+    removeItems,
+  } = useUploadQueue();
+  // Shared cache (deduped with the Documents page/sidebar): refetches every 5s
+  // while documents are pending/processing, plus the embedding-status poll.
+  const { data: documents = [] } = useDocuments();
+
+  // Rows this composer created (chat rows), scoped to its conversation.
+  const chatRows = useMemo(
+    () =>
+      queue.filter(
+        (q) =>
+          q.source === "chat" &&
+          (q.conversationId ?? null) === (conversationId ?? null)
+      ),
+    [queue, conversationId]
+  );
+
+  const chatExtensions = useMemo(
+    () =>
+      Object.values(UPLOAD_LIMITS.CHAT_ACCEPTED_TYPES)
+        .flat()
+        .map((ext) => ext.replace(/^\./, "")),
+    []
+  );
+
   const { validateFiles } = useFileValidation({
     maxSize: UPLOAD_LIMITS.CHAT_MAX_FILE_SIZE,
     acceptedTypes: UPLOAD_LIMITS.CHAT_ACCEPTED_TYPES,
-    existingFiles: attachments,
+    existingFiles: chatRows
+      .filter((row): row is QueueFile & { file: File } => Boolean(row.file))
+      .map((row) => ({ file: row.file })),
     checkDuplicates: true,
   });
 
   const { recents, addRecent, clearRecents } = useRecentAttachments();
-  const uploadMutation = useUploadDocument();
 
   const handleAddFiles = useCallback(
     (files: File[]) => {
       const { valid } = validateFiles(files);
       if (valid.length === 0) return;
-
-      const newAttachments: ChatAttachment[] = valid.map((file) => ({
-        id: `att-${Math.random().toString(36).substring(2, 9)}`,
-        file,
-        preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
-        status: "uploading",
-        progress: 0,
-      }));
-
-      setAttachments((prev) => [...prev, ...newAttachments].slice(0, 5));
-
-      newAttachments.forEach(async (att) => {
-        try {
-          const doc = await uploadMutation.mutateAsync({
-            file: att.file,
-            onProgress: (evt: unknown) => {
-              const pe = evt as { loaded: number; total?: number };
-              const progress = pe.total ? Math.round((pe.loaded * 100) / pe.total) : 0;
-              setAttachments((prev) =>
-                prev.map((a) => (a.id === att.id ? { ...a, progress } : a))
-              );
-            },
-          });
-
-          setAttachments((prev) =>
-            prev.map((a) =>
-              a.id === att.id
-                ? { ...a, status: "completed", progress: 100, documentId: doc.id }
-                : a
-            )
-          );
-          addRecent(att.file);
-        } catch (err: unknown) {
-          setAttachments((prev) =>
-            prev.map((a) => (a.id === att.id ? { ...a, status: "error", error: "Upload failed" } : a))
-          );
-          toast.error(`Failed to upload "${att.file.name}"`);
-        }
+      const room = UPLOAD_LIMITS.CHAT_MAX_ATTACHMENTS - chatRows.length;
+      if (room <= 0) {
+        toast.error(
+          t("chat.uploadLimit", { max: UPLOAD_LIMITS.CHAT_MAX_ATTACHMENTS })
+        );
+        return;
+      }
+      if (valid.length > room) {
+        toast.error(
+          t(room === 1 ? "chat.uploadRoomOne" : "chat.uploadRoomOther", {
+            room,
+            max: UPLOAD_LIMITS.CHAT_MAX_ATTACHMENTS,
+          })
+        );
+      }
+      addFiles(valid.slice(0, room), {
+        source: "chat",
+        conversationId: conversationId ?? undefined,
+        maxSize: UPLOAD_LIMITS.CHAT_MAX_FILE_SIZE,
+        acceptedExtensions: chatExtensions,
+        // A brand-new chat has no conversation yet (the backend creates it on
+        // the first message), so its attachments can't be scoped — they stay
+        // queued and are handed to the conversation once it exists (see
+        // ChatWindow's flush). Existing conversations upload immediately.
+        autoUpload: Boolean(conversationId),
+        silent: true,
+        getPreview: (file) =>
+          file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+        onUploaded: addRecent,
       });
     },
-    [validateFiles, uploadMutation, addRecent]
+    [validateFiles, chatRows.length, conversationId, chatExtensions, addFiles, addRecent]
   );
 
   useEffect(() => {
@@ -124,32 +156,42 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   }, [droppedFiles, handleAddFiles]);
 
+  // Shared documents cache, used to derive the live pipeline step for rows
+  // currently ingesting server-side. (The processing→done flip itself lives
+  // in the queue provider.)
+  const docById = useMemo(
+    () => new Map(documents.map((d) => [d.id, d])),
+    [documents]
+  );
+
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
     handleAddFiles(Array.from(files));
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const removeAttachment = (id: string) => {
-    setAttachments((prev) => {
-      const item = prev.find((a) => a.id === id);
-      if (item?.preview) {
-        URL.revokeObjectURL(item.preview);
-      }
-      return prev.filter((a) => a.id !== id);
-    });
-  };
+  // Cancelling removes the row from the queue (aborting an in-flight upload
+  // and revoking its preview), matching the old tray's remove behavior.
+  const removeAttachment = (id: string) => cancelUpload(id);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
     const trimmed = text.trim();
-    if ((!trimmed && attachments.length === 0) || isStreaming || !isOnline) return;
+    if ((!trimmed && chatRows.length === 0) || isStreaming || !isOnline) return;
 
-    const rawFiles = attachments.map((a) => a.file);
+    const rawFiles = chatRows
+      .map((a) => a.file)
+      .filter((f): f is File => Boolean(f));
     onSend(trimmed, rawFiles.length > 0 ? rawFiles : undefined);
 
     setText("");
-    setAttachments([]);
+    // The uploads keep running server-side; the rows are dismissed from the
+    // tray now that they've been attached to the message. In a brand-new chat
+    // the conversation doesn't exist yet — those rows stay queued so they can
+    // be handed to the conversation once it's created (not lost here).
+    if (conversationId) {
+      removeItems(chatRows.map((r) => r.id));
+    }
     clearDraft();
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -166,7 +208,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   useEffect(() => {
     adjustHeight();
-    setCharCount(text.length);
   }, [text, adjustHeight]);
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -191,7 +232,27 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  const handleCommandSelect = (cmd: typeof SLASH_COMMANDS[0]) => {
+  // Resolve translatable command copy on every render so the next render
+  // after a locale change (Settings → Appearance → Language) picks up the new
+  // locale. t() itself is not reactive — the module has no subscription — so
+  // labels refresh on re-render, not instantly.
+  const slashCommands = SLASH_COMMAND_DEFS.map((def) => ({
+    id: def.id,
+    label: t(def.labelKey),
+    description: t(def.descriptionKey),
+    icon: def.icon,
+    shortcut: def.shortcut,
+  }));
+
+  const filteredCommands = commandSearch
+    ? slashCommands.filter(
+        (c) =>
+          c.label.toLowerCase().includes(commandSearch.toLowerCase()) ||
+          c.description.toLowerCase().includes(commandSearch.toLowerCase())
+      )
+    : slashCommands;
+
+  const handleCommandSelect = (cmd: (typeof slashCommands)[number]) => {
     setText(cmd.shortcut + " ");
     setShowCommands(false);
     textareaRef.current?.focus();
@@ -219,22 +280,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  const filteredCommands = useMemo(() => {
-    if (!commandSearch) return SLASH_COMMANDS;
-    return SLASH_COMMANDS.filter(
-      (c) =>
-        c.label.toLowerCase().includes(commandSearch.toLowerCase()) ||
-        c.description.toLowerCase().includes(commandSearch.toLowerCase())
-    );
-  }, [commandSearch]);
-
   // Active when the user typed the @documents priority mention. Matches the
   // backend's (?<!\w)@documents\b so e.g. "email@documents.com" doesn't count.
   const isDocMode = useMemo(() => /(?<!\w)@documents\b/i.test(text), [text]);
 
+  // Pure derivation from the draft — no effect-driven state copy (the old
+  // setCharCount-in-effect scheduled an update during every passive flush,
+  // which React's nested-passive-update detector counted across keystrokes
+  // and eventually flagged as "Maximum update depth exceeded").
+  const charCount = text.length;
   const isNearingLimit = charCount > 3000;
   const isOverLimit = charCount > 4000;
-  const hasContent = text.trim().length > 0 || attachments.length > 0;
+  const hasContent = text.trim().length > 0 || chatRows.length > 0;
 
   return (
     <form
@@ -245,7 +302,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         ref={fileInputRef}
         type="file"
         multiple
-        accept={Object.values(UPLOAD_LIMITS.CHAT_ACCEPTED_TYPES).flat().map((ext) => `.${ext}`).join(",")}
+        accept={Object.values(UPLOAD_LIMITS.CHAT_ACCEPTED_TYPES)
+          .flat()
+          .map((ext) => (ext.startsWith(".") ? ext : `.${ext}`))
+          .join(",")}
         onChange={(e) => handleFileSelect(e.target.files)}
         className="hidden"
         id="chat-file-input"
@@ -257,7 +317,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         {!isOnline && (
           <div className="flex items-center gap-1.5 rounded-[10px] border border-[rgba(248,113,113,0.15)] bg-[rgba(248,113,113,0.08)] px-3 py-2 text-xs font-semibold text-red-400">
             <AlertCircle size={13} />
-            <span>Sending disabled — you are offline.</span>
+            <span>{t("chat.offlineWarning")}</span>
           </div>
         )}
 
@@ -265,50 +325,95 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         {isDocMode && (
           <div className="flex items-center gap-1.5 self-start rounded-[10px] border border-(--accent-primary)/25 bg-(--accent-primary)/8 px-3 py-1.5 text-xs font-medium text-(--accent-primary)">
             <FileText size={12} />
-            <span>Document mode — answers will prioritize your uploaded documents</span>
+            <span>{t("chat.documentMode")}</span>
           </div>
         )}
 
-        {/* Attachments Preview Tray */}
-        {attachments.length > 0 && (
+        {/* Attachments Preview Tray — rows live in the app-level queue, so
+            uploads keep running (and stay visible) after navigating away. */}
+        {chatRows.length > 0 && (
+          <div className="space-y-1.5">
           <div className="flex flex-wrap gap-2 px-1">
-            {attachments.map((att) => (
-              <div
-                key={att.id}
-                className="flex items-center gap-2 rounded-xl border border-(--border-default) bg-(--bg-tertiary) p-1.5 pr-2.5 transition-colors"
-              >
-                {att.preview ? (
-                  <img
-                    src={att.preview}
-                    alt={att.file.name}
-                    className="h-8 w-8 shrink-0 rounded-md border border-(--border-subtle) object-cover"
-                  />
-                ) : (
-                  <FileTypeBadge filename={att.file.name} variant="card" className="h-8 w-8 text-[8px]" />
-                )}
-
-                <div className="min-w-0 max-w-32.5 space-y-0.5">
-                  <p className="truncate text-xs font-medium leading-none text-(--text-primary)">
-                    {att.file.name}
-                  </p>
-                  <p className="font-mono text-[10px] leading-none text-(--text-muted)">
-                    {(att.file.size / 1024).toFixed(0)} KB
-                  </p>
-                </div>
-
-                <UploadProgress progress={att.progress} status={att.status} size="sm" showLabel={att.status === "uploading"} />
-
-                <button
-                  type="button"
-                  onClick={() => removeAttachment(att.id)}
-                  className="ml-0.5 cursor-pointer rounded-sm p-1 text-(--text-muted) transition-colors hover:text-(--accent-error)"
-                  aria-label={`Remove ${att.file.name}`}
+            {chatRows.map((att) => {
+              // While the document ingests server-side, derive the live
+              // pipeline step (Extracting/Chunking/Indexing) from shared state.
+              const docId = att.documentId;
+              const doc = docId ? docById.get(docId) : undefined;
+              const stage =
+                att.status === "processing" && doc && docId
+                  ? getDocumentProcessingStep(doc, embeddingStatus[docId])
+                  : null;
+              return (
+                <div
+                  key={att.id}
+                  className="flex items-center gap-2 rounded-xl border border-(--border-default) bg-(--bg-tertiary) p-1.5 pr-2.5 transition-colors"
                 >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
+                  {att.preview ? (
+                    <img
+                      src={att.preview}
+                      alt={att.fileName}
+                      className="h-8 w-8 shrink-0 rounded-md border border-(--border-subtle) object-cover"
+                    />
+                  ) : (
+                    <FileTypeBadge filename={att.fileName} variant="card" className="h-8 w-8 text-[8px]" />
+                  )}
+
+                  <div className="min-w-0 max-w-32.5 space-y-0.5">
+                    <p className="truncate text-xs font-medium leading-none text-(--text-primary)">
+                      {att.fileName}
+                    </p>
+                    {att.file && (
+                      <p className="font-mono text-[10px] leading-none text-(--text-muted)">
+                        {(att.file.size / 1024).toFixed(0)} KB
+                      </p>
+                    )}
+                  </div>
+
+                  <UploadProgress
+                    progress={stage ? stage.progress : att.progress}
+                    status={stage ? "processing" : att.status}
+                    size="sm"
+                    showLabel={
+                      att.status === "uploading" || att.status === "processing"
+                    }
+                    footer={
+                      stage
+                        ? stage.detail
+                        : att.status === "error" && !att.detail
+                        ? t("chat.uploadFailed")
+                        : att.detail
+                    }
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(att.id)}
+                    className="ml-0.5 cursor-pointer rounded-sm p-1 text-(--text-muted) transition-colors hover:text-(--accent-error)"
+                    aria-label={t("chatFiles.removeAria", {
+                      filename: att.fileName,
+                    })}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
+          {/* Same lifecycle hint as the persisted chips strip: these files are
+              scoped to this chat, never the global library, and die with the
+              conversation. */}
+          <p className="px-1.5 text-[11px] leading-snug text-(--text-muted)">
+            {t("chatFiles.caption")}
+          </p>
+          </div>
+        )}
+
+        {/* Brand-new chat with nothing attached yet — the same lifecycle note.
+            (For existing conversations the chips strip owns this hint.) */}
+        {conversationId === null && chatRows.length === 0 && (
+          <p className="px-1.5 text-[11px] leading-snug text-(--text-muted)">
+            {t("chatFiles.caption")}
+          </p>
         )}
 
         {/* Input Wrapper — Premium composer with Drag & Drop */}
@@ -332,7 +437,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  disabled={isStreaming || attachments.length >= 5}
+                  disabled={
+                    isStreaming ||
+                    chatRows.length >= UPLOAD_LIMITS.CHAT_MAX_ATTACHMENTS
+                  }
                   className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-(--text-muted) transition-colors hover:bg-(--bg-tertiary) hover:text-(--text-primary)"
                   aria-label="Attach files options"
                 >
@@ -391,10 +499,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               onKeyDown={handleKeyDown}
               placeholder={
                 isDraggingOver
-                  ? "Drop files here to attach..."
+                  ? t("chat.placeholderDrop")
                   : isStreaming
-                  ? "AI is responding..."
-                  : "Message Hybrid RAG..."
+                  ? t("chat.placeholderStreaming")
+                  : t("chat.placeholderDefault")
               }
               rows={1}
               disabled={!isOnline || isStreaming}
@@ -407,11 +515,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 <CommandInput
                   value={commandSearch}
                   onValueChange={setCommandSearch}
-                  placeholder="Search commands…"
+                  placeholder={t("chat.commandSearchPlaceholder")}
                   className="h-10 bg-transparent border-0 text-sm focus-visible:ring-0 focus:outline-none"
                   autoFocus
                 />
-                <CommandEmpty className="py-4 text-center text-xs text-(--text-muted)">No commands found.</CommandEmpty>
+                <CommandEmpty className="py-4 text-center text-xs text-(--text-muted)">
+                  {t("chat.commandEmpty")}
+                </CommandEmpty>
                 <CommandGroup>
                   {filteredCommands.map((cmd) => (
                     <CommandItem
@@ -488,12 +598,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
 
         {/* Character count */}
-        {(isNearingLimit || attachments.length > 0) && (
+        {(isNearingLimit || chatRows.length > 0) && (
           <div className={cn(
             "self-end px-1 text-right font-mono text-[11px] transition-colors",
             isOverLimit ? "font-semibold text-(--accent-error)" : "text-(--text-muted)"
           )}>
-            {charCount} / 4000 {attachments.length > 0 && `· ${attachments.length} files`}
+            {charCount} / 4000 {chatRows.length > 0 && `· ${chatRows.length} files`}
           </div>
         )}
       </div>

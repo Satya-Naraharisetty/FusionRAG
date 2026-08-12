@@ -54,6 +54,11 @@ class ToolContext(BaseModel):
     user_id: UUID
     conversation_id: UUID
     db_session: Any
+    # Documents the agent is allowed to search in this conversation. None means
+    # "no restriction" (pre-mention behaviour); when set, tools scope their
+    # retrieval to these ids so chat-scoped attachments stay in their chat and
+    # global documents only participate after an explicit @documents mention.
+    allowed_document_ids: list[UUID] | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

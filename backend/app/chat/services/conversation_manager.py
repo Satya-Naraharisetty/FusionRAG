@@ -89,11 +89,20 @@ class ConversationManager:
         return saved_conv
 
     async def prepare_context(
-        self, conversation_id: UUID, user_id: UUID, question: str
+        self,
+        conversation_id: UUID,
+        user_id: UUID,
+        question: str,
+        skip_rewrite: bool = False,
     ) -> tuple[ConversationContext, HistoryRewriteResult]:
         """
         Orchestrates memory loading and query rewriting, saves the incoming user message,
         and returns the ConversationContext before generating assistant responses.
+
+        When ``skip_rewrite`` is True (e.g. the user has no uploaded documents
+        to retrieve from), the LLM query-rewrite call is skipped and the
+        original question is used as-is — the rewrite only exists to improve
+        retrieval, so the extra LLM call would be wasted.
         """
         # 1. Ownership validation
         await self._access_service.verify_owner(conversation_id, user_id)
@@ -102,7 +111,15 @@ class ConversationManager:
         recent_messages, summary = await self._memory.load_memory(conversation_id)
 
         # 3. Rewrite follow-up question
-        rewrite_result = await self._rewriter.rewrite(question, recent_messages)
+        if skip_rewrite:
+            rewrite_result = HistoryRewriteResult(
+                original_query=question,
+                rewritten_query=question,
+                rewrite_reason="No documents uploaded; query rewrite skipped.",
+                rewrite_applied=False,
+            )
+        else:
+            rewrite_result = await self._rewriter.rewrite(question, recent_messages)
 
         # 4. Save user message to database
         user_message = ConversationMessage(

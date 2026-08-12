@@ -68,6 +68,24 @@ class SearchKnowledgeTool(BuiltinTool):
         if doc_ids:
             parsed_doc_ids = [uuid.UUID(d) for d in doc_ids]
 
+        # Conversation scope enforcement: the orchestrator pins the documents
+        # this conversation may search (chat-scoped attachments always, global
+        # docs only after an @documents mention). Any model-supplied ids are
+        # intersected with that set; with no ids supplied the search is
+        # restricted to it outright. With no pinned scope (None) the pre-
+        # mention behaviour of a user-wide search is preserved.
+        allowed = context.allowed_document_ids
+        if allowed:
+            allowed_set = set(allowed)
+            if parsed_doc_ids is not None:
+                parsed_doc_ids = [
+                    doc_id
+                    for doc_id in parsed_doc_ids
+                    if doc_id in allowed_set
+                ]
+            else:
+                parsed_doc_ids = list(allowed)
+
         search_result = await self.retrieval_service.retrieve(
             query=query,
             user_id=context.user_id,

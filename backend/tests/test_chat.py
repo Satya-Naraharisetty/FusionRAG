@@ -194,12 +194,20 @@ def test_prompt_builder_document_priority_and_no_context_notes():
 
 # --- 4. AnswerGenerationService Tests ---
 class MockRetrievalService:
-    def __init__(self, chunks=None):
+    def __init__(self, chunks=None, user_has_chunks=True):
         self.chunks = chunks or []
+        self._user_has_chunks = user_has_chunks
+        self.retrieve_calls = 0
+        self.last_document_ids = None
+
+    async def user_has_chunks(self, user_id):
+        return self._user_has_chunks
 
     async def retrieve(
         self, query, user_id, top_k, document_ids=None, filter_metadata=None
     ):
+        self.retrieve_calls += 1
+        self.last_document_ids = document_ids
         return SearchResult(
             original_query=query,
             retrieval_time=0.005,
@@ -251,9 +259,29 @@ class MockMessageRepository:
         pass
 
 
+def _stub_doc(doc_id):
+    """Minimal document stand-in — the orchestrator only reads ``.id``."""
+    return type("Doc", (), {"id": doc_id})()
+
+
+class MockDocumentService:
+    """Stands in for DocumentService under the two-tier document model."""
+
+    def __init__(self, global_docs=None, scoped_docs=None):
+        self._global = global_docs or []
+        self._scoped = scoped_docs or []
+
+    def list_documents(self, user_id):
+        return self._global
+
+    def list_documents_by_conversation(self, conversation_id, user_id):
+        return self._scoped
+
+
 class MockConversationManager:
-    def __init__(self):
+    def __init__(self, document_service=None):
         self._message_repo = MockMessageRepository()
+        self._document_service = document_service
 
     async def get_or_create_conversation(self, conversation_id, user_id):
         from datetime import UTC, datetime
@@ -313,13 +341,17 @@ async def test_answer_generation_service_success():
     prompt_builder = PromptBuilder("")
     llm_provider = MockLLMProvider()
 
+    # The @documents mention gates global retrieval: the document service
+    # reports the chunk's document as a global (Documents-section) document.
     service = AnswerGenerationService(
         retrieval_service=retrieval_service,
         context_builder=context_builder,
         prompt_builder=prompt_builder,
         llm_provider=llm_provider,
         token_estimator=estimator,
-        conversation_manager=MockConversationManager(),
+        conversation_manager=MockConversationManager(
+            document_service=MockDocumentService(global_docs=[_stub_doc(doc_id)])
+        ),
         model="gpt-4o-mini",
         temperature=0.0,
         max_response_tokens=100,
@@ -329,7 +361,7 @@ async def test_answer_generation_service_success():
         enable_conversation_memory=False,
     )
 
-    response = await service.generate_answer("How are you?", uuid4(), 10)
+    response = await service.generate_answer("@documents How are you?", uuid4(), 10)
     assert response.answer == "Mocked Answer"
     assert len(response.citations) == 1
     assert response.citations[0].chunk_id == chunk_id
@@ -469,7 +501,9 @@ async def test_answer_generation_service_documents_mention_keeps_grounded_answer
         prompt_builder=prompt_builder,
         llm_provider=llm_provider,
         token_estimator=estimator,
-        conversation_manager=MockConversationManager(),
+        conversation_manager=MockConversationManager(
+            document_service=MockDocumentService(global_docs=[_stub_doc(doc_id)])
+        ),
         model="gpt-4o-mini",
         temperature=0.0,
         max_response_tokens=100,
@@ -487,6 +521,195 @@ async def test_answer_generation_service_documents_mention_keeps_grounded_answer
     assert response.citations[0].chunk_id == chunk_id
     # The mention is stripped from the user turn even when chunks are found.
     assert "@documents" not in llm_provider.last_messages[-1].content
+
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
+async def test_global_documents_not_retrieved_without_mention():
+    """
+    Two-tier model: a user with GLOBAL documents gets a plain general-knowledge
+    answer when they don't use the @documents mention — retrieval (and the
+    rewrite that feeds it) is skipped entirely. The mention flips it on.
+    """
+    doc_id = uuid4()
+    chunk_id = uuid4()
+    chunks = [
+        RetrievedChunk(
+            chunk_id=chunk_id,
+            document_id=doc_id,
+            document_name="doc.txt",
+            text="Python was created in 1991.",
+            similarity_score=0.9,
+            normalized_score=0.95,
+            chunk_index=0,
+        )
+    ]
+    retrieval_service = MockRetrievalService(chunks)
+    estimator = CharacterTokenEstimator()
+    from app.chat.services.conversation_context_builder import (
+        ConversationContextBuilder,
+    )
+
+    context_builder = ConversationContextBuilder()
+    prompt_builder = PromptBuilder("")
+    llm_provider = MockLLMProvider()
+
+    service = AnswerGenerationService(
+        retrieval_service=retrieval_service,
+        context_builder=context_builder,
+        prompt_builder=prompt_builder,
+        llm_provider=llm_provider,
+        token_estimator=estimator,
+        conversation_manager=MockConversationManager(
+            document_service=MockDocumentService(global_docs=[_stub_doc(doc_id)])
+        ),
+        model="gpt-4o-mini",
+        temperature=0.0,
+        max_response_tokens=100,
+        system_prompt_tokens_limit=500,
+        max_context_tokens=1000,
+        reserved_completion_tokens=50,
+        enable_conversation_memory=False,
+    )
+
+    # No mention: global documents are NOT searched.
+    response = await service.generate_answer("When was Python created?", uuid4(), 10)
+    assert response.citations == []
+    assert retrieval_service.retrieve_calls == 0
+    assert response.diagnostics is not None
+    assert response.diagnostics.retrieval_skipped is True
+
+    # With the mention, the same global document is searched.
+    response2 = await service.generate_answer(
+        "@documents When was Python created?", uuid4(), 10
+    )
+    assert retrieval_service.retrieve_calls == 1
+    assert retrieval_service.last_document_ids == [doc_id]
+    assert len(response2.citations) == 1
+    assert response2.diagnostics.retrieval_skipped is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
+async def test_chat_scoped_documents_always_retrieved():
+    """
+    Two-tier model: chat-scoped documents (uploaded in this conversation) are
+    retrieved on every message with no @documents mention — even when the user
+    has zero global chunks.
+    """
+    doc_id = uuid4()
+    chunk_id = uuid4()
+    conv_id = uuid4()
+    chunks = [
+        RetrievedChunk(
+            chunk_id=chunk_id,
+            document_id=doc_id,
+            document_name="chat-notes.txt",
+            text="Meeting minutes: the deadline moved to Friday.",
+            similarity_score=0.9,
+            normalized_score=0.95,
+            chunk_index=0,
+        )
+    ]
+    retrieval_service = MockRetrievalService(chunks, user_has_chunks=False)
+    estimator = CharacterTokenEstimator()
+    from app.chat.services.conversation_context_builder import (
+        ConversationContextBuilder,
+    )
+
+    context_builder = ConversationContextBuilder()
+    prompt_builder = PromptBuilder("")
+    llm_provider = MockLLMProvider()
+
+    service = AnswerGenerationService(
+        retrieval_service=retrieval_service,
+        context_builder=context_builder,
+        prompt_builder=prompt_builder,
+        llm_provider=llm_provider,
+        token_estimator=estimator,
+        conversation_manager=MockConversationManager(
+            document_service=MockDocumentService(
+                scoped_docs=[_stub_doc(doc_id)]
+            )
+        ),
+        model="gpt-4o-mini",
+        temperature=0.0,
+        max_response_tokens=100,
+        system_prompt_tokens_limit=500,
+        max_context_tokens=1000,
+        reserved_completion_tokens=50,
+        enable_conversation_memory=False,
+    )
+
+    response = await service.generate_answer(
+        "When is the deadline?", uuid4(), 10, conversation_id=conv_id
+    )
+    assert retrieval_service.retrieve_calls == 1
+    assert retrieval_service.last_document_ids == [doc_id]
+    assert len(response.citations) == 1
+    assert response.diagnostics is not None
+    assert response.diagnostics.retrieval_skipped is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
+async def test_documents_mention_combines_scoped_and_global_ids():
+    """
+    With both chat-scoped and global documents, the @documents mention searches
+    the union — and the scoped ids are always present, so an explicit mention
+    never hides the conversation's own attachments.
+    """
+    scoped_doc_id = uuid4()
+    global_doc_id = uuid4()
+    conv_id = uuid4()
+    retrieval_service = MockRetrievalService([])
+    estimator = CharacterTokenEstimator()
+    from app.chat.services.conversation_context_builder import (
+        ConversationContextBuilder,
+    )
+
+    context_builder = ConversationContextBuilder()
+    prompt_builder = PromptBuilder("")
+    llm_provider = MockLLMProvider()
+
+    service = AnswerGenerationService(
+        retrieval_service=retrieval_service,
+        context_builder=context_builder,
+        prompt_builder=prompt_builder,
+        llm_provider=llm_provider,
+        token_estimator=estimator,
+        conversation_manager=MockConversationManager(
+            document_service=MockDocumentService(
+                global_docs=[_stub_doc(global_doc_id)],
+                scoped_docs=[_stub_doc(scoped_doc_id)],
+            )
+        ),
+        model="gpt-4o-mini",
+        temperature=0.0,
+        max_response_tokens=100,
+        system_prompt_tokens_limit=500,
+        max_context_tokens=1000,
+        reserved_completion_tokens=50,
+        enable_conversation_memory=False,
+    )
+
+    await service.generate_answer(
+        "@documents Summarize the meeting.",
+        uuid4(),
+        10,
+        conversation_id=conv_id,
+    )
+    assert retrieval_service.retrieve_calls == 1
+    assert set(retrieval_service.last_document_ids) == {
+        scoped_doc_id,
+        global_doc_id,
+    }
 
 
 @pytest.mark.asyncio

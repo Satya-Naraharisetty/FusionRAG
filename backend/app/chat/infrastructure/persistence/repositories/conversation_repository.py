@@ -49,6 +49,12 @@ class SQLAlchemyConversationRepository(ConversationRepository):
             last_message_at=conversation.last_message_at,
         )
         self._db.add(orm)
+        # Flush-only by design: the chat caller (ChatOrchestrator) commits a
+        # brand-new conversation BEFORE its id leaves the process — the first
+        # SSE metadata event triggers the frontend's attachment flush, whose
+        # verify_owner would 404 an uncommitted row. The /search caller relies
+        # on the request-scoped session's commit at teardown (its id only
+        # leaves at request end), as does everything else.
         self._db.flush()
         return self._to_domain(orm)
 

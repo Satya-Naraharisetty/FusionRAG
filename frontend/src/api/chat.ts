@@ -30,6 +30,7 @@ export interface AnswerResponse {
   conversation_id: string;
   diagnostics?: {
     rewritten: boolean;
+    retrieval_skipped: boolean;
     dense_count: number;
     sparse_count: number;
     fusion_count: number;

@@ -56,14 +56,22 @@ def test_index_cache_operations():
 
     assert cache.get(user_id) is None
     assert cache.get_stats(user_id) is None
+    assert cache.get_fresh_stats(user_id, 60.0) is None
 
     cache.set(user_id, index_data, stats)
     assert cache.get(user_id) == "mock_bm25_instance"
+    assert cache.get_stats(user_id) == stats
+    # A fresh entry returns stats while within the TTL window.
+    assert cache.get_fresh_stats(user_id, 60.0) == stats
+    # An expired entry is treated as missing (None) but is not evicted:
+    # long-lived index data stays available for the BM25 drift check.
+    assert cache.get_fresh_stats(user_id, -1.0) is None
     assert cache.get_stats(user_id) == stats
 
     cache.invalidate(user_id)
     assert cache.get(user_id) is None
     assert cache.get_stats(user_id) is None
+    assert cache.get_fresh_stats(user_id, 60.0) is None
 
 
 # --- 3. SparseIndex & BM25Retriever Tests ---
@@ -421,6 +429,9 @@ async def test_retrieval_orchestrator_integration(mocker):
 
     chunk_repo = MagicMock()
     chunk_repo.verify_document_ownership = AsyncMock(return_value=True)
+    chunk_repo.get_chunks_metadata_stats = AsyncMock(
+        return_value={"count": 1, "max_created_at": datetime.now(UTC)}
+    )
 
     # Initialize Service
     service = RetrievalService(
@@ -484,3 +495,209 @@ async def test_retrieval_orchestrator_integration(mocker):
     assert result.dense_matches == dense_result
     assert result.sparse_matches == sparse_result
     assert result.reranker is not None
+
+
+@pytest.mark.asyncio
+async def test_retrieval_service_skips_pipeline_when_user_has_no_chunks():
+    """
+    A user with no uploaded chunks (empty knowledge base) and no document_ids
+    restriction must short-circuit retrieve() with an empty result — the
+    dense/sparse retrievers (and therefore embedding generation, Qdrant and
+    BM25) are never touched. The chat layer then answers from general
+    knowledge via the LLM.
+    """
+    processor = DefaultQueryProcessor()
+    dense_retriever = MagicMock()
+    dense_retriever.retrieve = AsyncMock()
+    sparse_retriever = MagicMock()
+    sparse_retriever.retrieve = AsyncMock()
+    chunk_repo = MagicMock()
+    chunk_repo.get_chunks_metadata_stats = AsyncMock(
+        return_value={"count": 0, "max_created_at": None}
+    )
+
+    service = RetrievalService(
+        query_processor=processor,
+        dense_retriever=dense_retriever,
+        sparse_retriever=sparse_retriever,
+        chunk_repo=chunk_repo,
+        enable_hybrid_search=True,
+    )
+
+    result = await service.retrieve(
+        query="hello world", user_id=uuid4(), top_k=5
+    )
+
+    assert result.retrieved_chunks == []
+    assert result.total_matches == 0
+    assert result.dense_matches == []
+    assert result.sparse_matches == []
+    chunk_repo.get_chunks_metadata_stats.assert_awaited_once()
+    dense_retriever.retrieve.assert_not_called()
+    sparse_retriever.retrieve.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_retrieval_service_still_retrieves_when_user_has_chunks():
+    """
+    The fast path must only fire for a truly empty knowledge base: when the
+    user has chunks, the normal pipeline (dense + sparse retrieval) runs.
+    """
+    processor = DefaultQueryProcessor()
+    chunk = RetrievedChunk(
+        chunk_id=uuid4(),
+        document_id=uuid4(),
+        document_name="doc.txt",
+        text="context chunk",
+        similarity_score=0.9,
+        normalized_score=0.95,
+        chunk_index=0,
+    )
+    dense_retriever = MagicMock()
+    dense_retriever.retrieve = AsyncMock(return_value=[chunk])
+    sparse_retriever = MagicMock()
+    sparse_retriever.retrieve = AsyncMock(return_value=[])
+    chunk_repo = MagicMock()
+    chunk_repo.get_chunks_metadata_stats = AsyncMock(
+        return_value={"count": 1, "max_created_at": datetime.now(UTC)}
+    )
+
+    service = RetrievalService(
+        query_processor=processor,
+        dense_retriever=dense_retriever,
+        sparse_retriever=sparse_retriever,
+        chunk_repo=chunk_repo,
+        enable_hybrid_search=False,
+        enable_mmr=False,
+        enable_reranker=False,
+    )
+
+    result = await service.retrieve(
+        query="hello world", user_id=uuid4(), top_k=5
+    )
+
+    dense_retriever.retrieve.assert_awaited_once()
+    assert result.retrieved_chunks == [chunk]
+    assert result.total_matches == 1
+
+
+@pytest.mark.asyncio
+async def test_retrieval_service_user_has_chunks():
+    """
+    user_has_chunks reflects the user's chunk count and falls back to True
+    (run retrieval normally) whenever the repository cannot answer — a false
+    negative must never silently skip retrieval.
+    """
+    chunk_repo = MagicMock()
+    chunk_repo.get_chunks_metadata_stats = AsyncMock(
+        return_value={"count": 3, "max_created_at": datetime.now(UTC)}
+    )
+    service = RetrievalService(chunk_repo=chunk_repo)
+    assert await service.user_has_chunks(uuid4()) is True
+
+    chunk_repo.get_chunks_metadata_stats.return_value = {
+        "count": 0,
+        "max_created_at": None,
+    }
+    assert await service.user_has_chunks(uuid4()) is False
+
+    # Repository failure: assume documents exist rather than skipping retrieval.
+    chunk_repo.get_chunks_metadata_stats.side_effect = RuntimeError("db down")
+    assert await service.user_has_chunks(uuid4()) is True
+
+    # No repository configured: assume documents exist.
+    assert await RetrievalService().user_has_chunks(uuid4()) is True
+
+
+@pytest.mark.asyncio
+async def test_user_has_chunks_caches_empty_answer():
+    """
+    The empty-knowledge-base determination is cached in the shared index
+    cache: after the first DB count (count == 0), subsequent calls for the
+    same user are answered from the cache with no further DB query — until
+    the upload pipeline invalidates the entry.
+    """
+    chunk_repo = MagicMock()
+    chunk_repo.get_chunks_metadata_stats = AsyncMock(
+        return_value={"count": 0, "max_created_at": None}
+    )
+    cache = InMemoryIndexCache()
+    service = RetrievalService(
+        chunk_repo=chunk_repo,
+        index_cache=cache,
+        empty_kb_cache_ttl_seconds=60.0,
+    )
+    user_id = uuid4()
+
+    assert await service.user_has_chunks(user_id) is False
+    assert chunk_repo.get_chunks_metadata_stats.await_count == 1
+
+    # Second call: served from the cache, the DB is not touched.
+    assert await service.user_has_chunks(user_id) is False
+    assert chunk_repo.get_chunks_metadata_stats.await_count == 1
+
+    # A fresh entry is also visible to a second RetrievalService sharing the
+    # same cache (the DI wiring shares one instance process-wide).
+    other_service = RetrievalService(
+        chunk_repo=chunk_repo,
+        index_cache=cache,
+        empty_kb_cache_ttl_seconds=60.0,
+    )
+    assert await other_service.user_has_chunks(user_id) is False
+    assert chunk_repo.get_chunks_metadata_stats.await_count == 1
+
+    # The upload pipeline invalidates the entry → the DB is consulted again.
+    cache.invalidate(user_id)
+    assert await service.user_has_chunks(user_id) is False
+    assert chunk_repo.get_chunks_metadata_stats.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_user_has_chunks_does_not_cache_positive():
+    """
+    Positive answers ("user has chunks") are deliberately NOT cached: a stale
+    positive could outlive a knowledge-base wipe and silently defeat the empty
+    fast path. The DB count runs on every call for users with documents.
+    """
+    chunk_repo = MagicMock()
+    chunk_repo.get_chunks_metadata_stats = AsyncMock(
+        return_value={"count": 2, "max_created_at": datetime.now(UTC)}
+    )
+    service = RetrievalService(
+        chunk_repo=chunk_repo,
+        index_cache=InMemoryIndexCache(),
+        empty_kb_cache_ttl_seconds=60.0,
+    )
+
+    assert await service.user_has_chunks(uuid4()) is True
+    assert await service.user_has_chunks(uuid4()) is True
+    assert chunk_repo.get_chunks_metadata_stats.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_user_has_chunks_empty_cache_expires():
+    """
+    The cached empty determination expires after the TTL: once the entry is no
+    longer fresh, the DB is consulted again so an upload that bypassed the
+    normal invalidation path is picked up within one TTL window.
+    """
+    chunk_repo = MagicMock()
+    chunk_repo.get_chunks_metadata_stats = AsyncMock(
+        return_value={"count": 0, "max_created_at": None}
+    )
+    service = RetrievalService(
+        chunk_repo=chunk_repo,
+        index_cache=InMemoryIndexCache(),
+        empty_kb_cache_ttl_seconds=60.0,
+    )
+    user_id = uuid4()
+
+    assert await service.user_has_chunks(user_id) is False
+    assert await service.user_has_chunks(user_id) is False
+    assert chunk_repo.get_chunks_metadata_stats.await_count == 1
+
+    # Expire the entry: a non-positive TTL means nothing is ever fresh, so the
+    # next call re-checks the DB (deterministic stand-in for wall-clock expiry).
+    service._empty_kb_cache_ttl_seconds = -1.0
+    assert await service.user_has_chunks(user_id) is False
+    assert chunk_repo.get_chunks_metadata_stats.await_count == 2

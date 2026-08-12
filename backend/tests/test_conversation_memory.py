@@ -46,8 +46,7 @@ from app.chat.services.rolling_memory import RollingConversationMemory
 from app.chat.services.token_estimator import CharacterTokenEstimator
 from app.db.models import Base
 from app.documents.domain.models import RetrievedChunk, SearchResult
-
-TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
+from tests.db import TEST_DATABASE_URL
 
 
 @pytest.fixture(scope="function")
@@ -142,8 +141,13 @@ class MockLLMProvider:
 
 
 class MockRetrievalService:
-    def __init__(self, chunks):
-        self.chunks = chunks
+    def __init__(self, chunks=None, user_has_chunks=True):
+        self.chunks = chunks or []
+        self._user_has_chunks = user_has_chunks
+        self.retrieve_calls = 0
+
+    async def user_has_chunks(self, user_id):
+        return self._user_has_chunks
 
     async def retrieve(
         self,
@@ -155,6 +159,7 @@ class MockRetrievalService:
         tags=None,
         retrieval_mode=None,
     ):
+        self.retrieve_calls += 1
         return SearchResult(
             original_query=query,
             retrieval_time=0.01,
@@ -636,6 +641,22 @@ def test_prompt_builder_budgeting():
     assert len(final_chunks) < 2
 
 
+# --- 5b. Stub document service (two-tier document model) ---
+
+
+class _StubDocService:
+    """Minimal DocumentService stand-in: the orchestrator only reads ``.id``."""
+
+    def __init__(self, doc_id):
+        self._doc_id = doc_id
+
+    def list_documents(self, user_id):
+        return [type("Doc", (), {"id": self._doc_id})()]
+
+    def list_documents_by_conversation(self, conversation_id, user_id):
+        return []
+
+
 # --- 6. End-to-End RAG Answer Generation Tests ---
 
 
@@ -706,6 +727,7 @@ async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
         rewriter=rewriter,
         title_generator=title_generator,
         event_dispatcher=dispatcher,
+        document_service=_StubDocService(doc_id),
     )
 
     service = AnswerGenerationService(
@@ -724,9 +746,11 @@ async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
         enable_conversation_memory=True,
     )
 
-    # 1. Test generate_answer (Sync)
+    # 1. Test generate_answer (Sync). Global documents are only retrieved on
+    # the @documents mention (two-tier model), which also exercises the
+    # mention-stripping path.
     response = await service.generate_answer(
-        question="When was Python created?",
+        question="@documents When was Python created?",
         user_id=user_id,
         top_k=10,
         conversation_id=conv_id,
@@ -736,6 +760,8 @@ async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
     assert response.conversation_id == conv_id
     assert response.diagnostics is not None
     assert response.diagnostics.fusion_count == 1
+    # Retrieval ran normally (documents exist) — the skip marker stays False.
+    assert response.diagnostics.retrieval_skipped is False
     assert len(response.citations) == 1
     assert response.citations[0].document_name == "doc.txt"
 
@@ -746,7 +772,7 @@ async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
     # 2. Test generate_answer_stream (Streaming compatibility)
     events = []
     async for event in service.generate_answer_stream(
-        question="What about Java?",
+        question="@documents What about Java?",
         user_id=user_id,
         top_k=10,
         conversation_id=conv_id,
@@ -1299,6 +1325,111 @@ async def test_message_repository_interrupt_lifecycle(chat_test_db, test_users):
 # --- 9. No-Documents Fallback & @documents Mention ---
 
 
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings(
+    "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
+)
+async def test_answer_generation_skips_rewrite_and_retrieval_without_documents(
+    chat_test_db, test_users
+):
+    """
+    When the user has no uploaded documents, the LLM query-rewrite step is
+    skipped (no wasted LLM call) and retrieval is skipped entirely — the bot
+    answers from general knowledge with empty citations.
+    """
+    db = chat_test_db()
+    conv_repo = SQLAlchemyConversationRepository(db)
+    msg_repo = SQLAlchemyMessageRepository(db)
+    sum_repo = SQLAlchemySummaryRepository(db)
+    user_id, _ = test_users
+
+    llm = MockLLMProvider("General knowledge answer.")
+    estimator = CharacterTokenEstimator()
+    prompt_builder = PromptBuilder("")
+    context_builder = ConversationContextBuilder()
+
+    retrieval_service = MockRetrievalService([], user_has_chunks=False)
+
+    class RecordingRewriter:
+        """Fails the test if the rewrite LLM call is ever invoked."""
+
+        def __init__(self):
+            self.calls = 0
+
+        async def rewrite(self, question, history):
+            self.calls += 1
+            return HistoryRewriteResult(
+                original_query=question,
+                rewritten_query=question,
+                rewrite_reason="should not be reached",
+                rewrite_applied=True,
+            )
+
+    from app.chat.services.title_generator import FallbackConversationTitleGenerator
+    from app.documents.infrastructure.event_dispatcher import SimpleEventDispatcher
+
+    rewriter = RecordingRewriter()
+    manager = ConversationManager(
+        conversation_repo=conv_repo,
+        message_repo=msg_repo,
+        summary_repo=sum_repo,
+        access_service=ConversationAccessService(conv_repo),
+        memory=RollingConversationMemory(msg_repo, sum_repo, max_messages=12),
+        rewriter=rewriter,
+        title_generator=FallbackConversationTitleGenerator(),
+        event_dispatcher=SimpleEventDispatcher(),
+    )
+
+    service = AnswerGenerationService(
+        retrieval_service=retrieval_service,
+        prompt_builder=prompt_builder,
+        llm_provider=llm,
+        token_estimator=estimator,
+        conversation_manager=manager,
+        context_builder=context_builder,
+        model="gemini-1.5-flash",
+        temperature=0.0,
+        max_response_tokens=100,
+        system_prompt_tokens_limit=500,
+        max_context_tokens=1000,
+        reserved_completion_tokens=50,
+        enable_conversation_memory=True,
+    )
+
+    response = await service.generate_answer(
+        question="Who created Python?", user_id=user_id, top_k=10
+    )
+
+    assert response.answer == "General knowledge answer."
+    assert response.citations == []
+    assert rewriter.calls == 0  # rewrite LLM call skipped
+    assert retrieval_service.retrieve_calls == 0  # retrieval skipped
+    # The marker tells the frontend this answer came from general knowledge.
+    assert response.diagnostics is not None
+    assert response.diagnostics.retrieval_skipped is True
+    # The fallback prompt relaxes the "ONLY use provided context" rule.
+    system_prompt = llm.last_messages[0].content
+    assert "general knowledge" in system_prompt
+
+    # The streaming path uses the same skip logic.
+    events = []
+    async for event in service.generate_answer_stream(
+        question="Tell me about the moon.", user_id=user_id, top_k=10
+    ):
+        events.append(event)
+
+    assert rewriter.calls == 0  # still no rewrite LLM call
+    assert retrieval_service.retrieve_calls == 0  # still no retrieval
+    assert events[0]["event"] == "metadata"
+    assert events[0]["data"]["diagnostics"]["retrieval_skipped"] is True
+    assert events[-1]["event"] == "done"
+    assert events[-1]["data"]["citations"] == []
+    assert events[-1]["data"]["diagnostics"]["retrieval_skipped"] is True
+    assert "Mocked Answer" in events[-1]["data"]["answer"]
+
+    db.close()
+
+
 def _override_empty_retrieval(client):
     from app.api.dependencies import get_retrieval_service
 
@@ -1328,6 +1459,10 @@ def test_api_chat_without_documents_answers_generally(client, real_chat_wiring):
     data = resp.json()
     assert data["answer"] == "Mocked Answer"
     assert data["citations"] == []
+    # Two-tier model: without the @documents mention (and with no chat-scoped
+    # documents), the global knowledge base is NOT searched — the skip marker
+    # fires and the bot answers from general knowledge.
+    assert data["diagnostics"]["retrieval_skipped"] is True
 
 
 @pytest.mark.filterwarnings(

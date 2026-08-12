@@ -27,6 +27,7 @@ from app.chat.services.conversation_manager import ConversationManager
 from app.chat.services.llm_generation_service import LLMGenerationService
 from app.chat.services.prompt_builder import PromptBuilder
 from app.core.logger import request_id_ctx
+from app.documents.domain.models import SearchResult
 from app.documents.services.retrieval_service import RetrievalService
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,113 @@ class ChatOrchestrator:
             # retrieval or the LLM prompt.
             return question, False
         return cleaned, priority
+
+    def _ensure_conversation_durable(self) -> None:
+        """
+        Make a just-created conversation durable BEFORE its id leaves this
+        process. The streaming path announces the id in the first SSE metadata
+        event, and the frontend flushes its queued chat attachments the moment
+        that id arrives — their upload request verifies ownership and would
+        404 on an uncommitted row (the request-scoped session only commits at
+        teardown, which for a StreamingResponse is after the stream
+        finishes). The repository is deliberately flush-only; committing here,
+        at the point the orchestrator is about to expose the id, is the
+        caller's job.
+
+        No-op when the conversation already existed (nothing is pending in the
+        session at this point) and when the manager is not backed by a
+        SQLAlchemy repository (unit tests use session-less fakes). If the
+        manager IS repo-backed but the session can't be resolved, log a
+        warning instead of failing — a wiring mistake must stay observable
+        rather than silently resurrect the 404.
+        """
+        repo = getattr(self.conversation_manager, "_conversation_repo", None)
+        db = getattr(repo, "_db", None)
+        if db is not None:
+            db.commit()
+        elif repo is not None:
+            logger.warning(
+                "Could not resolve DB session to commit a new conversation "
+                "(repo has no _db); its id is leaving the process uncommitted."
+            )
+
+    async def _resolve_retrieval_scope(
+        self,
+        conversation_id: UUID | None,
+        user_id: UUID,
+        document_ids: list[UUID] | None,
+        documents_priority: bool,
+    ) -> list[UUID]:
+        """
+        Decide what to retrieve under the two-tier document model.
+
+        Returns the explicit document ids to search (empty means "skip
+        retrieval entirely"):
+
+        * Chat-scoped documents (``conversation_id`` set on the document) are
+          ALWAYS retrieved in their own conversation — no @documents mention
+          needed.
+        * The user's global documents are only included when the @documents
+          mention was used (``documents_priority``) or explicit
+          ``document_ids`` were passed.
+
+        Always returning an explicit id list (instead of None for "everything")
+        keeps chat-scoped documents isolated: a mention can never spill another
+        conversation's attachments into this one.
+        """
+        scoped_doc_ids = await self._load_conversation_documents(
+            conversation_id, user_id
+        )
+
+        if documents_priority or document_ids:
+            if document_ids:
+                global_doc_ids = list(document_ids)
+            else:
+                global_doc_ids = await self._load_global_documents(user_id)
+        else:
+            global_doc_ids = []
+
+        # Deduplicate while preserving order (chat-scoped first).
+        return list(dict.fromkeys([*scoped_doc_ids, *global_doc_ids]))
+
+    async def _load_conversation_documents(
+        self, conversation_id: UUID | None, user_id: UUID
+    ) -> list[UUID]:
+        """
+        Ids of documents scoped to the given conversation. Best-effort: any
+        failure (or a missing document service, e.g. in tests) degrades to
+        "no scoped documents" rather than failing the chat request.
+        """
+        if not conversation_id:
+            return []
+        doc_service = getattr(self.conversation_manager, "_document_service", None)
+        if doc_service is None:
+            return []
+        try:
+            docs = doc_service.list_documents_by_conversation(conversation_id, user_id)
+        except Exception:
+            logger.exception(
+                "Failed to load conversation-scoped documents for %s",
+                conversation_id,
+            )
+            return []
+        return [doc.id for doc in docs]
+
+    async def _load_global_documents(self, user_id: UUID) -> list[UUID]:
+        """
+        Ids of the user's global (Documents-section) documents. Best-effort:
+        a failure degrades to "no global documents" rather than failing the
+        request.
+        """
+        doc_service = getattr(self.conversation_manager, "_document_service", None)
+        if doc_service is None:
+            return []
+        try:
+            docs = doc_service.list_documents(user_id)
+        except Exception:
+            logger.exception("Failed to load global documents for %s", user_id)
+            return []
+        return [doc.id for doc in docs]
 
     def __init__(
         self,
@@ -113,6 +221,10 @@ class ChatOrchestrator:
             conversation_id, user_id
         )
         conversation_id = conversation.id
+        # A brand-new conversation must be committed before its id leaves this
+        # process (the streaming path announces it in the first SSE metadata
+        # event, which triggers the frontend's attachment flush).
+        self._ensure_conversation_durable()
 
         # Enforce budget checks on system prompt and baseline question size
         system_prompt = self.prompt_builder.get_system_prompt()
@@ -127,13 +239,29 @@ class ChatOrchestrator:
         if system_tokens + question_tokens > self.max_context_tokens:
             raise PromptTooLarge("Prompt size exceeds maximum context token budget.")
 
-        # 2. Memory context preparation and query rewriting
+        # 2. Resolve the retrieval scope under the two-tier document model.
+        # Chat-scoped documents (uploaded in THIS conversation) are always part
+        # of its retrieval — no @documents mention needed. The user's global
+        # documents (Documents section) are only searched when the @documents
+        # mention was used (or explicit document_ids were passed). Everything
+        # else answers from general knowledge: retrieval and the LLM
+        # query-rewrite that feeds it are both skipped (see PromptBuilder
+        # _NO_CONTEXT_NOTE). Resolving the scope here (before prepare_context)
+        # lets skip_rewrite match the retrieval decision.
+        retrieval_doc_ids = await self._resolve_retrieval_scope(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            document_ids=document_ids,
+            documents_priority=documents_priority,
+        )
+        skip_retrieval = not bool(retrieval_doc_ids)
+
         if self.enable_conversation_memory:
             (
                 context_obj,
                 rewrite_result,
             ) = await self.conversation_manager.prepare_context(
-                conversation_id, user_id, question
+                conversation_id, user_id, question, skip_rewrite=skip_retrieval
             )
             query_to_retrieve = rewrite_result.rewritten_query
         else:
@@ -150,13 +278,26 @@ class ChatOrchestrator:
 
         # 3. Retrieve chunks using the standalone query
         retrieval_start = time.perf_counter()
-        search_result = await self.retrieval_service.retrieve(
-            query=query_to_retrieve,
-            user_id=user_id,
-            top_k=top_k,
-            document_ids=document_ids,
-            filter_metadata=filters,
-        )
+        if skip_retrieval:
+            # Nothing to search (no chat-scoped documents and no @documents
+            # mention): the prompt builder relaxes the context rule so the LLM
+            # answers from general knowledge.
+            search_result = SearchResult(
+                original_query=query_to_retrieve,
+                retrieval_time=0.0,
+                total_matches=0,
+                retrieved_chunks=[],
+                dense_matches=[],
+                sparse_matches=[],
+            )
+        else:
+            search_result = await self.retrieval_service.retrieve(
+                query=query_to_retrieve,
+                user_id=user_id,
+                top_k=top_k,
+                document_ids=retrieval_doc_ids,
+                filter_metadata=filters,
+            )
         retrieval_time_ms = (time.perf_counter() - retrieval_start) * 1000
 
         # Note: an empty retrieval does NOT abort the request. The prompt is
@@ -172,6 +313,7 @@ class ChatOrchestrator:
         )
         diagnostics = RetrievalDiagnostics(
             rewritten=rewrite_result.rewrite_applied,
+            retrieval_skipped=skip_retrieval,
             dense_count=dense_count,
             sparse_count=sparse_count,
             fusion_count=len(search_result.retrieved_chunks),
@@ -218,6 +360,10 @@ class ChatOrchestrator:
                     user_id=user_id,
                     conversation_id=conversation_id,
                     db_session=self.conversation_manager._conversation_repo._db,  # type: ignore[attr-defined]  # access underlying SQLAlchemy Session
+                    # Agent tool calls may only search this conversation's
+                    # scope — chat-scoped attachments stay in their chat and
+                    # global docs require the @documents mention.
+                    allowed_document_ids=retrieval_doc_ids or None,
                 )
                 agent_resp = await self.agent_executor.execute(
                     messages=messages,
@@ -330,6 +476,10 @@ class ChatOrchestrator:
             conversation_id, user_id
         )
         conversation_id = conversation.id
+        # A brand-new conversation must be committed before its id leaves this
+        # process (the streaming path announces it in the first SSE metadata
+        # event, which triggers the frontend's attachment flush).
+        self._ensure_conversation_durable()
 
         # Enforce budget checks on system prompt and baseline question size
         system_prompt = self.prompt_builder.get_system_prompt()
@@ -344,13 +494,27 @@ class ChatOrchestrator:
         if system_tokens + question_tokens > self.max_context_tokens:
             raise PromptTooLarge("Prompt size exceeds maximum context token budget.")
 
-        # 2. Memory context preparation and query rewriting
+        # 2. Resolve the retrieval scope under the two-tier document model.
+        # Chat-scoped documents (uploaded in THIS conversation) are always part
+        # of its retrieval — no @documents mention needed. The user's global
+        # documents (Documents section) are only searched when the @documents
+        # mention was used (or explicit document_ids were passed). Everything
+        # else answers from general knowledge: retrieval and the LLM
+        # query-rewrite that feeds it are both skipped.
+        retrieval_doc_ids = await self._resolve_retrieval_scope(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            document_ids=document_ids,
+            documents_priority=documents_priority,
+        )
+        skip_retrieval = not bool(retrieval_doc_ids)
+
         if self.enable_conversation_memory:
             (
                 context_obj,
                 rewrite_result,
             ) = await self.conversation_manager.prepare_context(
-                conversation_id, user_id, question
+                conversation_id, user_id, question, skip_rewrite=skip_retrieval
             )
             query_to_retrieve = rewrite_result.rewritten_query
         else:
@@ -367,13 +531,26 @@ class ChatOrchestrator:
 
         # 3. Retrieve chunks
         retrieval_start = time.perf_counter()
-        search_result = await self.retrieval_service.retrieve(
-            query=query_to_retrieve,
-            user_id=user_id,
-            top_k=top_k,
-            document_ids=document_ids,
-            filter_metadata=filters,
-        )
+        if skip_retrieval:
+            # Nothing to search (no chat-scoped documents and no @documents
+            # mention): the prompt builder relaxes the context rule so the LLM
+            # answers from general knowledge.
+            search_result = SearchResult(
+                original_query=query_to_retrieve,
+                retrieval_time=0.0,
+                total_matches=0,
+                retrieved_chunks=[],
+                dense_matches=[],
+                sparse_matches=[],
+            )
+        else:
+            search_result = await self.retrieval_service.retrieve(
+                query=query_to_retrieve,
+                user_id=user_id,
+                top_k=top_k,
+                document_ids=retrieval_doc_ids,
+                filter_metadata=filters,
+            )
         retrieval_time_ms = (time.perf_counter() - retrieval_start) * 1000
 
         # Note: an empty retrieval does NOT abort the request. The prompt is
@@ -389,6 +566,7 @@ class ChatOrchestrator:
         )
         diagnostics = RetrievalDiagnostics(
             rewritten=rewrite_result.rewrite_applied,
+            retrieval_skipped=skip_retrieval,
             dense_count=dense_count,
             sparse_count=sparse_count,
             fusion_count=len(search_result.retrieved_chunks),
@@ -489,6 +667,10 @@ class ChatOrchestrator:
                         user_id=user_id,
                         conversation_id=conversation_id,
                         db_session=self.conversation_manager._conversation_repo._db,  # type: ignore[attr-defined]
+                        # Agent tool calls may only search this conversation's
+                        # scope — chat-scoped attachments stay in their chat
+                        # and global docs require the @documents mention.
+                        allowed_document_ids=retrieval_doc_ids or None,
                     )
                     async for event in self.agent_executor.execute_stream(
                         messages=messages,

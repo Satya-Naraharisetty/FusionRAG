@@ -165,12 +165,20 @@ Once both servers are running, walk through these steps to manually test the app
 
 To ensure code stability during changes, you can run the automated tests at any time.
 
-### Backend Tests (131 tests)
+### Backend Tests (154 tests)
 
 ```powershell
 # In the root folder with virtual env active
 .venv\Scripts\python -m pytest
 ```
+
+> The integration tests (auth, documents, embeddings, search, conversation
+> memory) run against a **dedicated** Postgres database — `hybrid_rag_test` on
+> the `postgres-test` compose service (port **5433**) — never the dev
+> `hybrid_rag` DB. Boot it once with `docker compose up -d postgres-test`; the
+> suite creates and truncates its own tables, so no migrations are needed.
+> Point the suite elsewhere with `TEST_DATABASE_URL` (see
+> `backend/.env.example`).
 
 ### Frontend Tests (9 tests)
 

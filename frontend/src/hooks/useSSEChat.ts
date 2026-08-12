@@ -123,7 +123,11 @@ export const useSSEChat = () => {
           if (eventType === "metadata") {
             const conversation_id = data.conversation_id as string;
             setCurrentConversationId(conversation_id);
-            
+
+            const diagnostics = data.diagnostics as
+              | { retrieval_skipped?: boolean }
+              | undefined;
+
             setChatMessages((prev) => {
               if (prev.length === 0) return prev;
               const last = prev[prev.length - 1];
@@ -132,6 +136,9 @@ export const useSSEChat = () => {
                 {
                   ...last,
                   citations: (data.citations as Citation[]) || [],
+                  // Set up front so the "general knowledge" hint shows while
+                  // the answer streams in.
+                  retrievalSkipped: diagnostics?.retrieval_skipped ?? false,
                   status: "streaming" as const,
                 },
               ];
@@ -195,6 +202,10 @@ export const useSSEChat = () => {
               });
             }
 
+            const doneDiagnostics = data.diagnostics as
+              | { retrieval_skipped?: boolean }
+              | undefined;
+
             setChatMessages((prev) => {
               if (prev.length === 0) return prev;
               const last = prev[prev.length - 1];
@@ -204,6 +215,10 @@ export const useSSEChat = () => {
                   ...last,
                   content: (data.answer as string) || last.content,
                   citations: (data.citations as Citation[]) || last.citations,
+                  // Fallback: the done event also carries diagnostics in case
+                  // the metadata event was missed.
+                  retrievalSkipped:
+                    doneDiagnostics?.retrieval_skipped ?? last.retrievalSkipped ?? false,
                   status: "completed" as const,
                 },
               ];

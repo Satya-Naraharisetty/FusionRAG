@@ -30,6 +30,36 @@ app.main.run_startup_validations = MagicMock()
 from fastapi.testclient import TestClient  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _reset_process_global_state():
+    """
+    Reset process-level singletons between tests so no test inherits state from
+    a previous one, keeping the suite order-independent:
+
+    * The in-memory rate-limit fallback store (and its sweep-deadline
+      bookkeeping) plus the Redis health circuit breaker. The store is a
+      module-level singleton shared across requests by design (it must survive
+      the per-request RateLimiter instances), which makes it process-global.
+    * The shared InMemoryIndexCache (user_has_chunks / BM25 cache). It is a
+      module-level singleton so the cached "no chunks" determination actually
+      survives between requests; clearing it keeps tests isolated.
+
+    The shared embedding generator is NOT reset: it is stateless after
+    construction and loading its model is the expensive step we deliberately
+    pay only once per process.
+    """
+    import app.core.security.rate_limiter as rate_limiter_module
+
+    rate_limiter_module._MEMORY_STORES.clear()
+    rate_limiter_module._MEMORY_PRUNE_AT.clear()
+    rate_limiter_module._redis_unhealthy_until = 0.0
+
+    import app.api.dependencies as dependencies_module
+
+    dependencies_module._index_cache_instance = None
+    yield
+
+
 @pytest.fixture(scope="module")
 def client():
     """

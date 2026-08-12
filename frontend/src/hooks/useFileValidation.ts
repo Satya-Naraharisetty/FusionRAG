@@ -1,19 +1,20 @@
 import { useCallback, useMemo } from "react";
-import { ChatAttachment } from "../types";
 import { UPLOAD_LIMITS } from "../lib/constants";
 import toast from "react-hot-toast";
 
 interface FileValidationOptions {
   maxSize?: number;
   acceptedTypes?: Record<string, string[]>;
-  existingFiles?: ChatAttachment[];
+  // Only the File matters for duplicate detection — callers may pass rows
+  // (e.g. queue rows) that carry other UI-only fields.
+  existingFiles?: Array<{ file: File }>;
   checkDuplicates?: boolean;
 }
 
 interface ValidationResult {
   isValid: boolean;
   error?: string;
-  duplicateOf?: ChatAttachment;
+  duplicateOf?: { file: File };
 }
 
 export const useFileValidation = (options: FileValidationOptions = {}) => {
@@ -24,8 +25,13 @@ export const useFileValidation = (options: FileValidationOptions = {}) => {
     checkDuplicates = true,
   } = options;
 
+  // Constants store extensions WITH a leading dot (".pdf"), while the
+  // comparison below derives the file's extension WITHOUT one ("pdf").
+  // Normalize once so files aren't rejected for the missing dot.
   const acceptedExtensions = useMemo(() => {
-    return Object.values(acceptedTypes).flat();
+    return Object.values(acceptedTypes)
+      .flat()
+      .map((ext) => ext.replace(/^\./, ""));
   }, [acceptedTypes]);
 
   const validateFile = useCallback(

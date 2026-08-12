@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMessages } from "../../hooks/useMessages";
 import { useSSEChat } from "../../hooks/useSSEChat";
@@ -7,7 +7,9 @@ import { EmptyChat } from "./EmptyChat";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 import { ChatToolbar } from "./ChatToolbar";
+import { ConversationDocumentChips } from "./ConversationDocumentChips";
 import { StreamingRecovery } from "./StreamingRecovery";
+import { useUploadQueue } from "../../context/UploadQueueContext";
 import { Skeleton } from "../ui/skeleton";
 import { AlertCircle, Upload } from "lucide-react";
 
@@ -36,6 +38,33 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
     cancel,
     clearChat,
   } = useSSEChat();
+  const { uploadQueuedChatRows, discardQueuedNewChatRows } = useUploadQueue();
+
+  // First message in a brand-new chat: the backend creates the conversation
+  // lazily, so attachments added there are deferred (queued) in the upload
+  // queue until its id is known. Hand them over — scoped to the conversation
+  // — the moment the id arrives, then dismiss them (the uploads continue
+  // server-side, same as a send in an existing chat).
+  useEffect(() => {
+    if (conversationId === null && currentConversationId) {
+      uploadQueuedChatRows(currentConversationId);
+    }
+  }, [conversationId, currentConversationId, uploadQueuedChatRows]);
+
+  // Leaving a brand-new chat without sending abandons its deferred
+  // attachments: when the chat id appears (navigation into a real
+  // conversation), drop queued null-scope rows so they can't be flushed into
+  // a *different* conversation later. The send path flushes them before this
+  // runs, so the just-handed-over rows are already gone — a no-op there.
+  // Staying on the new chat (or returning to it) keeps the draft's rows.
+  const previousConversationIdRef = useRef<string | null>(conversationId);
+  useEffect(() => {
+    const previous = previousConversationIdRef.current;
+    previousConversationIdRef.current = conversationId;
+    if (previous === null && conversationId !== null) {
+      discardQueuedNewChatRows();
+    }
+  }, [conversationId, discardQueuedNewChatRows]);
 
   // Sync URL when a new conversation is created
   useEffect(() => {
@@ -193,17 +222,21 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
         </div>
       )}
 
-      {/* Fixed bottom input wrapper */}
+      {/* Fixed bottom input wrapper — the conversation's chat-scoped files sit
+          above the composer as removable chips, then the composer itself. */}
       <div className="w-full flex-shrink-0 flex justify-center z-10 pt-10 pb-5"
         style={{ background: "linear-gradient(to top, var(--bg-primary) 0%, var(--bg-primary) 65%, transparent 100%)" }}
       >
-        <ChatInput
-          conversationId={conversationId}
-          onSend={handleSend}
-          onStop={stop}
-          isStreaming={isStreaming}
-          droppedFiles={windowDroppedFiles}
-        />
+        <div className="flex w-full flex-col items-center gap-2.5">
+          <ConversationDocumentChips conversationId={conversationId} />
+          <ChatInput
+            conversationId={conversationId}
+            onSend={handleSend}
+            onStop={stop}
+            isStreaming={isStreaming}
+            droppedFiles={windowDroppedFiles}
+          />
+        </div>
       </div>
     </div>
   );

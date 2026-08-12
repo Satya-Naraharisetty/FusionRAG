@@ -5,6 +5,7 @@ import {
   useReprocessDocument,
   useRegenerateEmbeddings,
 } from "../hooks/useDocuments";
+import { useEmbeddingStatus } from "../hooks/useEmbeddingStatus";
 import { Document } from "../types";
 import { UploadDropzone } from "../components/documents/UploadDropzone";
 import {
@@ -33,6 +34,7 @@ interface DocFolder {
 
 const DocumentsPage: React.FC = () => {
   const { data: documents = [], isLoading, error } = useDocuments();
+  const embeddingStatus     = useEmbeddingStatus();
   const deleteMutation       = useDeleteDocument();
   const reprocessMutation    = useReprocessDocument();
   const regenerateMutation   = useRegenerateEmbeddings();
@@ -307,6 +309,7 @@ const DocumentsPage: React.FC = () => {
         {/* ── Document grid / list ── */}
         <DocumentGrid
           filteredAndSortedDocs={filteredAndSortedDocs}
+          embeddingStatus={embeddingStatus}
           isLoading={isLoading}
           error={error}
           viewMode={viewMode}

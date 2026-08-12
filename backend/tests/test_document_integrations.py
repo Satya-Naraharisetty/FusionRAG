@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import patch
 
 import pytest
@@ -7,8 +8,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db.models import Base
 from app.documents.domain.models import ExtractionResult
-
-TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/hybrid_rag"
+from tests.db import TEST_DATABASE_URL
 
 
 @pytest.fixture(scope="function")
@@ -48,6 +48,25 @@ def get_user_token(client, email="user@example.com", password="SecurePassword123
         json={"email": email, "password": password},
     )
     return response.json()["access_token"]
+
+
+def _insert_conversation(db, user_id):
+    """
+    Inserts a conversation row owned by ``user_id`` and returns its id.
+    (The upload endpoint requires the conversation to exist and belong to the
+    caller — FK to ``conversations`` plus the ownership check.)
+    """
+    conversation_id = uuid.uuid4()
+    db.execute(
+        text(
+            "INSERT INTO conversations "
+            "(id, user_id, title, state, settings, metadata, version, created_at, updated_at, last_message_at) "
+            "VALUES (:id, :user_id, 'Chat', 'active', '{}'::json, '{}'::json, 1, NOW(), NOW(), NOW())"
+        ),
+        {"id": conversation_id, "user_id": user_id},
+    )
+    db.commit()
+    return conversation_id
 
 
 # --- Document Upload & Processing Pipeline Integration Tests ---
@@ -363,6 +382,225 @@ def test_reprocess_document_success(client, doc_test_db):
     assert get_res.json()["status"] == "completed"
 
 
+def test_conversation_scoped_documents_isolated_from_global_list(
+    client, doc_test_db
+):
+    """
+    Chat-scoped documents (uploaded with a conversation_id) must be listable
+    via ?conversation_id= but must never appear in the user's global document
+    list — and vice versa.
+    """
+    token = get_user_token(client)
+
+    db_session = doc_test_db()
+    try:
+        user_id = db_session.execute(
+            text("SELECT id FROM users WHERE email='user@example.com'")
+        ).first()[0]
+        conversation_id = _insert_conversation(db_session, user_id)
+    finally:
+        db_session.close()
+
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # A global document (Documents section)…
+    res_global = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("global.txt", b"global content", "text/plain")},
+        headers=headers,
+    )
+    assert res_global.status_code == status.HTTP_201_CREATED
+    global_id = res_global.json()["id"]
+
+    # …and a chat-scoped document (attached in the conversation).
+    res_scoped = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("chat.txt", b"chat content", "text/plain")},
+        params={"conversation_id": str(conversation_id)},
+        headers=headers,
+    )
+    assert res_scoped.status_code == status.HTTP_201_CREATED
+    scoped_id = res_scoped.json()["id"]
+    assert res_scoped.json()["conversation_id"] == str(conversation_id)
+
+    # Global list: only the global document.
+    res_list = client.get("/api/v1/documents", headers=headers)
+    assert res_list.status_code == status.HTTP_200_OK
+    listed_ids = [d["id"] for d in res_list.json()]
+    assert global_id in listed_ids
+    assert scoped_id not in listed_ids
+
+    # Conversation-scoped list: only the chat document.
+    res_conv = client.get(
+        f"/api/v1/documents?conversation_id={conversation_id}",
+        headers=headers,
+    )
+    assert res_conv.status_code == status.HTTP_200_OK
+    conv_ids = [d["id"] for d in res_conv.json()]
+    assert scoped_id in conv_ids
+    assert global_id not in conv_ids
+
+    # Deleting the chat-scoped document removes it from the conversation list.
+    res_del = client.delete(
+        f"/api/v1/documents/{scoped_id}", headers=headers
+    )
+    assert res_del.status_code == status.HTTP_204_NO_CONTENT
+    res_conv_after = client.get(
+        f"/api/v1/documents?conversation_id={conversation_id}",
+        headers=headers,
+    )
+    assert res_conv_after.json() == []
+
+
+def test_upload_to_foreign_conversation_rejected(client, doc_test_db):
+    """
+    Chat-scoped uploads must verify the conversation belongs to the caller.
+    Attaching a file into another user's conversation (403) or referencing an
+    unknown conversation (404) is rejected — otherwise any authenticated user
+    could pollute someone else's chat with documents.
+    """
+    token_owner = get_user_token(client, email="owner@example.com")
+    token_attacker = get_user_token(client, email="attacker@example.com")
+
+    db_session = doc_test_db()
+    try:
+        owner_id = db_session.execute(
+            text("SELECT id FROM users WHERE email='owner@example.com'")
+        ).first()[0]
+        foreign_conversation_id = _insert_conversation(db_session, owner_id)
+    finally:
+        db_session.close()
+
+    # A different user cannot attach a document into owner's conversation.
+    res_foreign = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("evil.txt", b"evil content", "text/plain")},
+        params={"conversation_id": str(foreign_conversation_id)},
+        headers={"Authorization": f"Bearer {token_attacker}"},
+    )
+    assert res_foreign.status_code == status.HTTP_403_FORBIDDEN
+
+    # An unknown conversation id is rejected too.
+    res_unknown = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("ghost.txt", b"ghost content", "text/plain")},
+        params={"conversation_id": str(uuid.uuid4())},
+        headers={"Authorization": f"Bearer {token_attacker}"},
+    )
+    assert res_unknown.status_code == status.HTTP_404_NOT_FOUND
+
+    # The owner can still attach into their own conversation.
+    res_own = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("mine.txt", b"my content", "text/plain")},
+        params={"conversation_id": str(foreign_conversation_id)},
+        headers={"Authorization": f"Bearer {token_owner}"},
+    )
+    assert res_own.status_code == status.HTTP_201_CREATED
+
+
+def test_delete_conversation_removes_scoped_docs_but_keeps_global(
+    client, doc_test_db
+):
+    """
+    Deleting a conversation must cascade away its chat-scoped documents —
+    including their chunks and embedding metadata — while the user's global
+    documents (and their chunks/embeddings) survive untouched. This is the
+    lifecycle contract of the two-tier model: chat attachments die with the
+    chat, library uploads persist.
+    """
+    token = get_user_token(client)
+
+    db_session = doc_test_db()
+    try:
+        user_id = db_session.execute(
+            text("SELECT id FROM users WHERE email='user@example.com'")
+        ).first()[0]
+        conversation_id = _insert_conversation(db_session, user_id)
+    finally:
+        db_session.close()
+
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # A global (library) document and a chat-scoped attachment. Both ingest to
+    # completion — chunks and embeddings — before we delete anything.
+    res_global = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("global.txt", b"global content", "text/plain")},
+        headers=headers,
+    )
+    assert res_global.status_code == status.HTTP_201_CREATED
+    global_id = res_global.json()["id"]
+
+    res_scoped = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("chat.txt", b"chat content", "text/plain")},
+        params={"conversation_id": str(conversation_id)},
+        headers=headers,
+    )
+    assert res_scoped.status_code == status.HTTP_201_CREATED
+    scoped_id = res_scoped.json()["id"]
+
+    def _count(table, doc_id):
+        db = doc_test_db()
+        try:
+            if table == "document_chunks":
+                return db.execute(
+                    text("SELECT COUNT(*) FROM document_chunks WHERE document_id = :id"),
+                    {"id": doc_id},
+                ).first()[0]
+            return db.execute(
+                text(
+                    "SELECT COUNT(*) FROM document_embeddings e "
+                    "JOIN document_chunks c ON c.id = e.chunk_id "
+                    "WHERE c.document_id = :id"
+                ),
+                {"id": doc_id},
+            ).first()[0]
+        finally:
+            db.close()
+
+    # Sanity: both documents fully ingested (chunks + embeddings exist).
+    assert _count("document_chunks", global_id) > 0
+    assert _count("document_chunks", scoped_id) > 0
+    assert _count("document_embeddings", global_id) > 0
+    assert _count("document_embeddings", scoped_id) > 0
+
+    # Delete the conversation — the chat-scoped document must die with it.
+    res_del = client.delete(
+        f"/api/v1/conversations/{conversation_id}", headers=headers
+    )
+    assert res_del.status_code == status.HTTP_204_NO_CONTENT
+
+    # Chat-scoped document: gone from the API and its conversation list.
+    assert (
+        client.get(
+            f"/api/v1/documents/{scoped_id}", headers=headers
+        ).status_code
+        == status.HTTP_404_NOT_FOUND
+    )
+    res_conv = client.get(
+        f"/api/v1/documents?conversation_id={conversation_id}",
+        headers=headers,
+    )
+    assert res_conv.json() == []
+
+    # …and its chunks + embedding metadata were cascaded away.
+    assert _count("document_chunks", scoped_id) == 0
+    assert _count("document_embeddings", scoped_id) == 0
+
+    # Global document: fully intact — API, library list, chunks, embeddings.
+    res_global_get = client.get(
+        f"/api/v1/documents/{global_id}", headers=headers
+    )
+    assert res_global_get.status_code == status.HTTP_200_OK
+    res_list = client.get("/api/v1/documents", headers=headers)
+    assert global_id in [d["id"] for d in res_list.json()]
+    assert scoped_id not in [d["id"] for d in res_list.json()]
+    assert _count("document_chunks", global_id) > 0
+    assert _count("document_embeddings", global_id) > 0
+
+
 def test_delete_document_cascades(client, doc_test_db):
     token = get_user_token(client)
 
@@ -511,3 +749,102 @@ def test_concurrent_processing_guard(mock_extract, client, doc_test_db):
 
     assert thread_a_res[1] == "success"
     assert thread_b_res[1] == "success"
+
+
+def test_document_processing_invalidates_index_cache(client, doc_test_db):
+    """
+    Successfully ingesting a document must invalidate the user's entry in the
+    shared index cache. A chat request made before the upload cached the
+    "no chunks" determination (count == 0); after processing commits chunks,
+    that entry must be gone so the next chat message re-checks the DB and
+    serves the freshly indexed knowledge instead of a general answer.
+    """
+    import uuid
+    from unittest.mock import MagicMock
+
+    from app.auth.infrastructure.providers import (
+        SQLAlchemyUnitOfWork,
+        SystemTimeProvider,
+    )
+    from app.documents.infrastructure.extractors import ExtractorFactory
+    from app.documents.infrastructure.persistence.repositories.chunk_repository import (
+        SQLAlchemyChunkRepository,
+    )
+    from app.documents.infrastructure.persistence.repositories.document_repository import (
+        SQLAlchemyDocumentRepository,
+    )
+    from app.documents.services.chunking import ChunkingService
+    from app.documents.services.document_processing_service import (
+        DocumentProcessingService,
+    )
+    from app.documents.services.index_cache import InMemoryIndexCache
+    from app.documents.services.metadata_extractor import MetadataExtractor
+    from app.documents.services.text_cleaner import TextCleaner
+
+    db_session = doc_test_db()
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "cache@example.com", "password": "SecurePassword123!"},
+    )
+    user_record = db_session.execute(
+        text("SELECT id FROM users WHERE email='cache@example.com'")
+    ).first()
+    user_id = user_record[0]
+
+    # A QUEUED document owned by the user (as the upload endpoint would create).
+    doc_id = uuid.uuid4()
+    db_session.execute(
+        text(
+            "INSERT INTO documents (id, user_id, filename, original_filename, content_type, file_size, checksum, status, extractor_version, created_at, updated_at) "
+            "VALUES (:id, :user_id, 'file.txt', 'file.txt', 'text/plain', 10, 'sum', 'queued', 'v1', NOW(), NOW())"
+        ),
+        {"id": doc_id, "user_id": user_id},
+    )
+    db_session.commit()
+    db_session.close()
+
+    # Shared index cache pre-seeded exactly as a chat request for this
+    # document-less user would have left it.
+    cache = InMemoryIndexCache()
+    cache.set(user_id, index_data=None, stats={"count": 0, "max_created_at": None})
+    assert cache.get_stats(user_id) == {"count": 0, "max_created_at": None}
+
+    engine = create_engine(TEST_DATABASE_URL)
+    session_factory = sessionmaker(bind=engine)
+    db = session_factory()
+    try:
+        storage = MagicMock()
+        storage.get.return_value = b"uploaded plain text content"
+
+        proc_service = DocumentProcessingService(
+            document_repo=SQLAlchemyDocumentRepository(db),
+            chunk_repo=SQLAlchemyChunkRepository(db),
+            storage_provider=storage,
+            extractor_factory=ExtractorFactory(),
+            text_cleaner=TextCleaner(),
+            metadata_extractor=MetadataExtractor(),
+            chunking_service=ChunkingService(),
+            uow=SQLAlchemyUnitOfWork(db),
+            time_provider=SystemTimeProvider(),
+            index_cache=cache,
+        )
+
+        proc_service.process_document(doc_id)
+    finally:
+        db.close()
+
+    # The cached "no chunks" flag must be invalidated after ingestion so the
+    # next chat message re-checks the DB and sees the new chunks.
+    assert cache.get_stats(user_id) is None
+    assert cache.get(user_id) is None
+
+    # Sanity: the pipeline really did commit chunks for the user.
+    verify_db = session_factory()
+    try:
+        row = verify_db.execute(
+            text("SELECT COUNT(*) FROM document_chunks WHERE document_id = :id"),
+            {"id": doc_id},
+        ).first()
+        assert row[0] > 0
+    finally:
+        verify_db.close()

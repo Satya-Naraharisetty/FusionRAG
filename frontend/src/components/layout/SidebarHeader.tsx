@@ -2,7 +2,15 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Database, Search } from "lucide-react";
 import { useDocuments } from "../../hooks/useDocuments";
+import { useDocumentPipelineSummary } from "../../hooks/useDocumentPipelineSummary";
+import { SidebarUploadIndicator } from "./SidebarUploadIndicator";
 import { Conversation } from "../../types";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui/tooltip";
 
 interface SidebarHeaderProps {
   conversations: Conversation[];
@@ -21,6 +29,12 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
 }) => {
   const navigate = useNavigate();
   const { data: documents = [] } = useDocuments();
+  const pipeline = useDocumentPipelineSummary();
+  const busy = pipeline.processing > 0;
+
+  const documentsTooltip = busy
+    ? `${pipeline.detail ?? "Documents are processing…"} · ${pipeline.progress}%`
+    : `Documents — ${documents.length} file${documents.length === 1 ? "" : "s"}`;
 
   if (collapsed) {
     return (
@@ -32,13 +46,28 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
         >
           <Plus size={16} />
         </button>
-        <button
-          onClick={() => navigate("/documents")}
-          className="w-10 h-10 bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-[var(--radius-lg)] flex items-center justify-center cursor-pointer transition-colors"
-          title={`Documents (${documents.length})`}
-        >
-          <Database size={16} />
-        </button>
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => navigate("/documents")}
+                className="relative w-10 h-10 bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-[var(--radius-lg)] flex items-center justify-center cursor-pointer transition-colors"
+                aria-label="Documents"
+              >
+                <Database size={16} />
+                {busy && (
+                  <span className="absolute top-1.5 right-1.5 flex h-2 w-2" aria-hidden="true">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--accent-primary)]/40" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--accent-primary)]" />
+                  </span>
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{documentsTooltip}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        {/* Mini upload-queue indicator (collapsed: icon + count badge) */}
+        <SidebarUploadIndicator collapsed />
       </div>
     );
   }
@@ -55,18 +84,36 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
       </button>
 
       {/* Documents Button */}
-      <button
-        onClick={() => navigate("/documents")}
-        className="w-full h-10 bg-transparent hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-[var(--radius-lg)] flex items-center justify-between px-3 cursor-pointer text-xs font-medium transition-colors text-left"
-      >
-        <div className="flex items-center gap-2.5">
-          <Database size={15} className="flex-shrink-0 text-[var(--text-muted)]" />
-          <span>Documents</span>
-        </div>
-        <span className="text-[11px] font-mono font-medium text-[var(--text-muted)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] px-1.5 py-0.5 rounded-[var(--radius-sm)] flex-shrink-0">
-          {documents.length}
-        </span>
-      </button>
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => navigate("/documents")}
+              className="w-full h-10 bg-transparent hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-[var(--radius-lg)] flex items-center justify-between px-3 cursor-pointer text-xs font-medium transition-colors text-left"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex-shrink-0">
+                  <Database size={15} className="text-[var(--text-muted)]" />
+                  {busy && (
+                    <span className="absolute -top-1 -right-1 flex h-2 w-2" aria-hidden="true">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--accent-primary)]/40" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--accent-primary)]" />
+                    </span>
+                  )}
+                </span>
+                <span>Documents</span>
+              </div>
+              <span className="text-[11px] font-mono font-medium text-[var(--text-muted)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] px-1.5 py-0.5 rounded-[var(--radius-sm)] flex-shrink-0">
+                {documents.length}
+              </span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">{documentsTooltip}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      {/* Mini upload-queue indicator — visible from any page while uploads are in flight */}
+      <SidebarUploadIndicator collapsed={false} />
 
       {/* Section label */}
       <div className="flex items-center justify-between px-1 pt-1 text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">

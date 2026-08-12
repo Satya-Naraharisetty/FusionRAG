@@ -1,6 +1,11 @@
 import React from "react";
-import { AlertCircle, FileText, Trash2 } from "lucide-react";
-import { Document } from "../../types";
+import { AlertCircle, FileText, Trash2, AlertTriangle } from "lucide-react";
+import { Document, EmbeddingStatus } from "../../types";
+import {
+  getDocumentProcessingStep,
+  isVectorizationFailed,
+  VECTORIZATION_FAILED_MESSAGE,
+} from "../../lib/uploadStages";
 import { DocumentCard } from "./DocumentCard";
 import { Skeleton } from "../ui/skeleton";
 import { Button } from "../ui/Button";
@@ -9,6 +14,8 @@ import toast from "react-hot-toast";
 
 interface DocumentGridProps {
   filteredAndSortedDocs: Document[];
+  /** Embedding status per document id, used to derive the vector-DB step. */
+  embeddingStatus: Record<string, EmbeddingStatus>;
   isLoading: boolean;
   error: unknown;
   viewMode: "grid" | "list";
@@ -40,6 +47,7 @@ const STATUS_ROW_CLASSES: Record<Document["status"], string> = {
 
 export const DocumentGrid: React.FC<DocumentGridProps> = ({
   filteredAndSortedDocs,
+  embeddingStatus,
   isLoading,
   error,
   viewMode,
@@ -118,11 +126,15 @@ export const DocumentGrid: React.FC<DocumentGridProps> = ({
   if (viewMode === "grid") {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[calc(var(--space-factor,1)*12px)]">
-        {filteredAndSortedDocs.map((doc) => (
-          <DocumentCard
-            key={doc.id}
-            document={doc}
-            onDelete={onDelete}
+        {filteredAndSortedDocs.map((doc) => {
+          const embedding = embeddingStatus[doc.id];
+          return (
+            <DocumentCard
+              key={doc.id}
+              document={doc}
+              processingStep={getDocumentProcessingStep(doc, embedding)}
+              embeddingFailed={isVectorizationFailed(doc, embedding)}
+              onDelete={onDelete}
             onReprocess={onReprocess}
             onRegenerateEmbeddings={onRegenerateEmbeddings}
             isSelected={selectedIds.includes(doc.id)}
@@ -138,12 +150,13 @@ export const DocumentGrid: React.FC<DocumentGridProps> = ({
               })
             }
             onDuplicate={() => toast.success(`Duplicated "${doc.original_filename}"`)}
-            onExport={() => toast.success(`Exported metadata for "${doc.original_filename}"`)}
-            onDragStart={() => handleDragStart(doc.id)}
-            onDragOver={handleDragOver}
-            onDrop={() => handleDrop(doc.id)}
-          />
-        ))}
+              onExport={() => toast.success(`Exported metadata for "${doc.original_filename}"`)}
+              onDragStart={() => handleDragStart(doc.id)}
+              onDragOver={handleDragOver}
+              onDrop={() => handleDrop(doc.id)}
+            />
+          );
+        })}
       </div>
     );
   }
@@ -176,6 +189,9 @@ export const DocumentGrid: React.FC<DocumentGridProps> = ({
         <tbody>
           {filteredAndSortedDocs.map((doc) => {
             const isChecked = selectedIds.includes(doc.id);
+            const embedding = embeddingStatus[doc.id];
+            const processingStep = getDocumentProcessingStep(doc, embedding);
+            const embeddingFailed = isVectorizationFailed(doc, embedding);
             return (
               <tr
                 key={doc.id}
@@ -200,14 +216,26 @@ export const DocumentGrid: React.FC<DocumentGridProps> = ({
                   {relativeTime(doc.created_at)}
                 </td>
                 <td>
-                  <span
-                    className={cn(
-                      "inline-flex items-center text-[9px] px-2 py-0.5 rounded-[var(--radius-pill)] font-bold uppercase tracking-wider",
-                      STATUS_ROW_CLASSES[doc.status]
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={cn(
+                        "inline-flex items-center text-[9px] px-2 py-0.5 rounded-[var(--radius-pill)] font-bold uppercase tracking-wider",
+                        STATUS_ROW_CLASSES[doc.status]
+                      )}
+                      title={processingStep?.detail}
+                    >
+                      {doc.status}
+                    </span>
+                    {embeddingFailed && (
+                      <span
+                        className="inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-[var(--radius-pill)] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                        title={VECTORIZATION_FAILED_MESSAGE}
+                      >
+                        <AlertTriangle size={9} />
+                        Vectors failed
+                      </span>
                     )}
-                  >
-                    {doc.status}
-                  </span>
+                  </div>
                 </td>
                 <td className="text-right">
                   <Button
