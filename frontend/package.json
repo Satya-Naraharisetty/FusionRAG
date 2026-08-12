@@ -11,7 +11,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e:login": "cd e2e && npm install --no-fund --no-audit && node login-flow.js",
+    "e2e:two-tier": "cd e2e && node verify-two-tier.js",
     "e2e:account-delete": "cd e2e && node account-delete.js",
+    "e2e:redis-fallback": "cd e2e && node redis-fallback.js",
+    "e2e:redis-fallback-login": "cd e2e && node redis-fallback-login.js",
     "build": "npm run typecheck && npm run lint && vite build",
     "preview": "vite preview"
   },
