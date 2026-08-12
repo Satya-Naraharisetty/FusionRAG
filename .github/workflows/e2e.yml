@@ -20,6 +20,7 @@ jobs:
     # directory name.
     env:
       COMPOSE_PROJECT_NAME: hybrid_rag
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -124,7 +125,7 @@ jobs:
       # script transparently uses the leftover one (both serve the same
       # source).
       - name: Run two-tier document model E2E
-        if: ${{ !cancelled() && secrets.GEMINI_API_KEY != '' }}
+        if: ${{ !cancelled() && env.GEMINI_API_KEY != '' }}
         timeout-minutes: 25
         run: |
           cd frontend
