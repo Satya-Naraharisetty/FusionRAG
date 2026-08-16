@@ -314,24 +314,26 @@ class ConversationManager:
         """
         Runs the cleanup jobs in the background.
         """
+        import sys
+
+        from sqlalchemy.orm import sessionmaker
+
         from app.api.dependencies import (
             get_index_cache,
             get_storage_provider,
             get_vector_store,
         )
-        from app.db.session import init_postgres_engine
-        from sqlalchemy.orm import sessionmaker
         from app.core.config import settings
+        from app.db.session import init_postgres_engine
         from app.documents.services.cleanup_worker import DurableCleanupWorker
 
-        import sys
         db_url = settings.DATABASE_URL
         if "pytest" in sys.modules:
             db_url = "postgresql://postgres:postgres@localhost:5433/hybrid_rag_test"
 
         engine = init_postgres_engine(db_url)
-        Session = sessionmaker(bind=engine)
-        db = Session()
+        session_factory = sessionmaker(bind=engine)
+        db = session_factory()
         try:
             storage_provider = get_storage_provider(db)
             vector_store = get_vector_store()

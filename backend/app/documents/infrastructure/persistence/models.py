@@ -27,7 +27,9 @@ class SQLAlchemyDocument(Base):
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    scope: Mapped[str] = mapped_column(String(50), default="LIBRARY", server_default="LIBRARY", nullable=False)
+    scope: Mapped[str] = mapped_column(
+        String(50), default="LIBRARY", server_default="LIBRARY", nullable=False
+    )
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)

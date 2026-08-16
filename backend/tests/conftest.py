@@ -15,13 +15,16 @@ os.environ["JWT_SECRET"] = "mock_secret"
 
 
 # 2. Patch database connection helper functions before app.main imports them
+from sqlalchemy import create_engine
+
 import app.db.session  # noqa: E402
 
-from sqlalchemy import create_engine
 app.db.session.init_postgres_engine = MagicMock(
-    side_effect=lambda url, *args, **kwargs: create_engine(url)
-    if ("test" in str(url) or "5433" in str(url))
-    else MagicMock()
+    side_effect=lambda url: (
+        create_engine(url)
+        if ("test" in str(url) or "5433" in str(url))
+        else MagicMock()
+    )
 )
 app.db.session.init_redis_client = MagicMock(return_value=MagicMock())
 app.db.session.init_qdrant_client = MagicMock(return_value=MagicMock())

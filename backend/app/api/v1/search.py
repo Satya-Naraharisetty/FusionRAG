@@ -124,8 +124,10 @@ async def search_documents(
     retrieval_scope = DocumentRetrievalScope(
         user_id=user_id,
         conversation_id=conversation_id,
-        include_conversation_documents=has_conversation_scope or bool(request.document_ids),
-        include_library_documents=not has_conversation_scope or bool(request.document_ids),
+        include_conversation_documents=has_conversation_scope
+        or bool(request.document_ids),
+        include_library_documents=not has_conversation_scope
+        or bool(request.document_ids),
         document_ids=retrieval_doc_ids,
     )
 

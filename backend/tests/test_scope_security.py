@@ -22,10 +22,10 @@ from app.documents.domain.models import (
     SearchResult,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_tool_context(
     *,
@@ -94,7 +94,10 @@ def test_scope_no_flags_allows_nothing():
 def test_scope_library_flag_is_per_user():
     user_a = uuid.uuid4()
     user_b = uuid.uuid4()
-    assert _make_scope(user_a, include_library=True).user_id != _make_scope(user_b, include_library=True).user_id
+    assert (
+        _make_scope(user_a, include_library=True).user_id
+        != _make_scope(user_b, include_library=True).user_id
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +107,10 @@ def test_scope_library_flag_is_per_user():
 
 @pytest.mark.asyncio
 async def test_get_allowed_ids_no_flags_returns_empty_without_db_query():
-    from app.documents.infrastructure.persistence.repositories.chunk_repository import SQLAlchemyChunkRepository
+    from app.documents.infrastructure.persistence.repositories.chunk_repository import (
+        SQLAlchemyChunkRepository,
+    )
+
     scope = _make_scope(uuid.uuid4(), include_library=False, include_conversation=False)
     mock_db = MagicMock()
     repo = SQLAlchemyChunkRepository(mock_db)
@@ -122,21 +128,38 @@ async def test_get_allowed_ids_no_flags_returns_empty_without_db_query():
 @pytest.mark.asyncio
 async def test_search_tool_passes_library_flag_from_context():
     from app.chat.services.tools.semantic_search import SearchKnowledgeTool
+
     user_id = uuid.uuid4()
     conv_id = uuid.uuid4()
     mock_svc = AsyncMock()
-    mock_svc.retrieve = AsyncMock(return_value=SearchResult(
-        original_query="test", retrieval_time=0.01, total_matches=0, retrieved_chunks=[]))
+    mock_svc.retrieve = AsyncMock(
+        return_value=SearchResult(
+            original_query="test",
+            retrieval_time=0.01,
+            total_matches=0,
+            retrieved_chunks=[],
+        )
+    )
     tool = SearchKnowledgeTool(retrieval_service=mock_svc)
 
     # No @documents: library=False
-    await tool.execute({"query": "q"}, make_tool_context(user_id=user_id, conversation_id=conv_id, include_library_documents=False))
+    await tool.execute(
+        {"query": "q"},
+        make_tool_context(
+            user_id=user_id, conversation_id=conv_id, include_library_documents=False
+        ),
+    )
     scope = mock_svc.retrieve.call_args.kwargs["retrieval_scope"]
     assert scope.include_library_documents is False
     assert scope.include_conversation_documents is True
 
     # With @documents: library=True
-    await tool.execute({"query": "q"}, make_tool_context(user_id=user_id, conversation_id=conv_id, include_library_documents=True))
+    await tool.execute(
+        {"query": "q"},
+        make_tool_context(
+            user_id=user_id, conversation_id=conv_id, include_library_documents=True
+        ),
+    )
     scope = mock_svc.retrieve.call_args.kwargs["retrieval_scope"]
     assert scope.include_library_documents is True
     assert scope.user_id == user_id
@@ -146,11 +169,18 @@ async def test_search_tool_passes_library_flag_from_context():
 async def test_search_tool_model_injected_foreign_doc_id_stays_in_scope_user():
     """The scope carries only user_a's user_id even if model injects a foreign doc ID."""
     from app.chat.services.tools.semantic_search import SearchKnowledgeTool
+
     user_a = uuid.uuid4()
     foreign_doc = uuid.uuid4()
     mock_svc = AsyncMock()
-    mock_svc.retrieve = AsyncMock(return_value=SearchResult(
-        original_query="test", retrieval_time=0.01, total_matches=0, retrieved_chunks=[]))
+    mock_svc.retrieve = AsyncMock(
+        return_value=SearchResult(
+            original_query="test",
+            retrieval_time=0.01,
+            total_matches=0,
+            retrieved_chunks=[],
+        )
+    )
     tool = SearchKnowledgeTool(retrieval_service=mock_svc)
     ctx = make_tool_context(user_id=user_a, include_library_documents=True)
     await tool.execute({"query": "hack", "document_ids": [str(foreign_doc)]}, ctx)
@@ -166,6 +196,7 @@ async def test_search_tool_model_injected_foreign_doc_id_stays_in_scope_user():
 @pytest.mark.asyncio
 async def test_retrieve_chunk_tool_blocks_library_without_mention():
     from app.chat.services.tools.chunk_retrieval import RetrieveChunkTool
+
     user_id = uuid.uuid4()
     mock_doc = MagicMock()
     mock_doc.user_id = user_id  # ownership passes
@@ -191,6 +222,7 @@ async def test_retrieve_chunk_tool_blocks_library_without_mention():
 @pytest.mark.asyncio
 async def test_retrieve_chunk_tool_blocks_wrong_conversation():
     from app.chat.services.tools.chunk_retrieval import RetrieveChunkTool
+
     user_id = uuid.uuid4()
     conv_a = uuid.uuid4()
     conv_b = uuid.uuid4()
@@ -246,7 +278,9 @@ async def test_retrieval_service_cross_user_access_denied():
     user_a = uuid.uuid4()
     foreign_doc = uuid.uuid4()
     mock_repo = AsyncMock()
-    mock_repo.get_allowed_document_ids = AsyncMock(return_value=[])  # foreign doc not allowed
+    mock_repo.get_allowed_document_ids = AsyncMock(
+        return_value=[]
+    )  # foreign doc not allowed
     svc = RetrievalService(chunk_repo=mock_repo)
     scope = DocumentRetrievalScope(
         user_id=user_a,

@@ -432,7 +432,9 @@ async def test_retrieval_orchestrator_integration(mocker):
     chunk_repo.get_chunks_metadata_stats = AsyncMock(
         return_value={"count": 1, "max_created_at": datetime.now(UTC)}
     )
-    chunk_repo.get_allowed_document_ids = AsyncMock(return_value=[fused_chunk.document_id])
+    chunk_repo.get_allowed_document_ids = AsyncMock(
+        return_value=[fused_chunk.document_id]
+    )
 
     # Initialize Service
     service = RetrievalService(
