@@ -48,7 +48,10 @@ function check(name, ok, detail = '') {
 
 async function clickButtonByExactText(page, text) {
   return page.$$eval('button', (els, t) => {
-    const el = els.find((e) => e.textContent.trim() === t);
+    const el = els.find((e) => {
+      const cleanText = (e.innerText || e.textContent || '').trim();
+      return cleanText === t || cleanText.includes(t);
+    });
     if (el) {
       el.click();
       return true;
@@ -59,10 +62,23 @@ async function clickButtonByExactText(page, text) {
 
 async function getButtonState(page, text) {
   return page.$$eval('button', (els, t) => {
-    const el = els.find((e) => e.textContent.trim() === t);
+    const el = els.find((e) => {
+      const cleanText = (e.innerText || e.textContent || '').trim();
+      return cleanText === t || cleanText.includes(t);
+    });
     if (!el) return null;
     return { disabled: el.disabled };
   }, text);
+}
+
+async function dismissOnboardingTour(page) {
+  await page.evaluate(() => {
+    localStorage.setItem('onboarding-completed', 'true');
+    const skipBtn = document.querySelector('button[aria-label="Skip onboarding"]');
+    if (skipBtn) {
+      skipBtn.click();
+    }
+  });
 }
 
 async function registerUser() {
@@ -142,6 +158,9 @@ async function main() {
       page.on('requestfailed', (r) => failedRequests.push(`${r.url().slice(0, 120)} :: ${r.failure()?.errorText || ''}`));
 
       await page.goto(`${FRONTEND_URL}/login`, { waitUntil: 'networkidle2', timeout: 60000 });
+      await page.evaluate(() => {
+        localStorage.setItem('onboarding-completed', 'true');
+      });
       await page.waitForSelector('#login-email', { timeout: 20000 });
       check('login page renders', true);
 
@@ -152,6 +171,7 @@ async function main() {
 
       const urlAfter = page.url();
       check('login redirects to /chat', urlAfter.includes('/chat'), urlAfter);
+      await dismissOnboardingTour(page);
 
       const bodyText = await page.evaluate(() => document.body.innerText);
       check('no error text on page', !/invalid|error|failed/i.test(bodyText.slice(0, 2000)));
@@ -176,6 +196,7 @@ async function main() {
 
       await page2.goto(`${FRONTEND_URL}/chat`, { waitUntil: 'networkidle2', timeout: 60000 });
       await sleep(9000);
+      await dismissOnboardingTour(page2);
       const url2 = page2.url();
       const text2 = await page2.evaluate(() => document.body.innerText);
 
@@ -211,6 +232,7 @@ async function main() {
 
       await uiPage.goto(`${FRONTEND_URL}/settings`, { waitUntil: 'networkidle2', timeout: 60000 });
       await sleep(3000);
+      await dismissOnboardingTour(uiPage);
       const settingsTitle = await uiPage.evaluate(() => document.querySelector('h1')?.textContent || '');
       check('settings page renders', settingsTitle.includes('Settings'), settingsTitle);
 

@@ -3,11 +3,14 @@ import { documentsApi } from "../api/documents";
 import { QUERY_KEYS } from "../lib/constants";
 import { Document } from "../types";
 import toast from "react-hot-toast";
+import { useAuth } from "./useAuth";
 
 export const useDocuments = () => {
+  const { isAuthenticated } = useAuth();
   return useQuery<Document[]>({
     queryKey: [QUERY_KEYS.DOCUMENTS],
     queryFn: () => documentsApi.listDocuments(),
+    enabled: isAuthenticated,
     refetchInterval: (query) => {
       const docs = query.state.data;
       if (!Array.isArray(docs)) return false;
@@ -26,10 +29,11 @@ export const useDocuments = () => {
  * so newly-attached uploads and their pipeline states appear in the chat.
  */
 export const useConversationDocuments = (conversationId: string | null) => {
+  const { isAuthenticated } = useAuth();
   return useQuery<Document[]>({
     queryKey: [QUERY_KEYS.DOCUMENTS, "conversation", conversationId],
     queryFn: () => documentsApi.listDocuments(conversationId),
-    enabled: Boolean(conversationId),
+    enabled: Boolean(conversationId) && isAuthenticated,
     refetchInterval: (query) => {
       const docs = query.state.data;
       if (!Array.isArray(docs)) return false;
