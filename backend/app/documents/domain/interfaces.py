@@ -7,6 +7,7 @@ from app.documents.domain.models import (
     Chunk,
     CleanupJob,
     Document,
+    DocumentRetrievalScope,
     Embedding,
     ExtractionResult,
     ProcessedQuery,
@@ -274,6 +275,7 @@ class VectorStore(ABC):
         tags: list[str] | None = None,
         filter_metadata: dict[str, Any] | None = None,
         timeout: float | None = None,
+        retrieval_scope: DocumentRetrievalScope | None = None,
     ) -> list[dict[str, Any]]:
         """
         Asynchronously searches the vector store using the query vector.

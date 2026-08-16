@@ -521,27 +521,6 @@ def get_search_ranker() -> SearchRanker:
     return SemanticSearchRanker()
 
 
-_index_cache_instance: Any = None
-
-
-def get_index_cache():
-    """
-    Returns the single process-wide InMemoryIndexCache instance.
-
-    Note: this deliberately does NOT use the lru_cache-on-nested-function idiom
-    (each call to the outer function would create a fresh wrapper with a fresh
-    cache, silently defeating the caching). A module-global singleton is the
-    pattern used by get_cache / get_pricing_provider in this file.
-    """
-    global _index_cache_instance
-
-    if _index_cache_instance is None:
-        from app.documents.services.index_cache import InMemoryIndexCache
-
-        _index_cache_instance = InMemoryIndexCache()
-    return _index_cache_instance
-
-
 def get_retrieval_service(
     generator: EmbeddingGenerator = Depends(get_embedding_generator),
     vector_store: VectorStore = Depends(get_vector_store),

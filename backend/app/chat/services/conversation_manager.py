@@ -329,7 +329,15 @@ class ConversationManager:
 
         db_url = settings.DATABASE_URL
         if "pytest" in sys.modules:
-            db_url = "postgresql://postgres:postgres@localhost:5433/hybrid_rag_test"
+            import os
+
+            db_url = os.environ.get(
+                "TEST_DATABASE_URL",
+                "postgresql://postgres:postgres@localhost:5433/hybrid_rag_test",
+            )
+
+        if not db_url:
+            raise ValueError("DATABASE_URL setting is not configured.")
 
         engine = init_postgres_engine(db_url)
         session_factory = sessionmaker(bind=engine)

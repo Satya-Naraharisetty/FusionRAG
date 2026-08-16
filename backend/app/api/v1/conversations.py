@@ -253,7 +253,7 @@ async def upload_conversation_document(
             scope=DocumentScope.CONVERSATION,
             conversation_id=conversation_id,
         )
-        return document
+        return DocumentResponse.model_validate(document)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -278,7 +278,11 @@ async def list_conversation_documents(
         docs = document_service.list_documents_by_conversation(conversation_id, user_id)
         from app.documents.domain.models import DocumentScope
 
-        return [d for d in docs if d.scope == DocumentScope.CONVERSATION]
+        return [
+            DocumentResponse.model_validate(d)
+            for d in docs
+            if d.scope == DocumentScope.CONVERSATION
+        ]
     except ConversationNotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except UnauthorizedConversationAccessException as e:

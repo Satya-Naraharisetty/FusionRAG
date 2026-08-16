@@ -220,7 +220,7 @@ class QdrantVectorStore(VectorStore):
                 )
 
         if retrieval_scope is not None:
-            scope_conditions = []
+            scope_conditions: list[Any] = []
             if retrieval_scope.include_library_documents:
                 scope_conditions.append(
                     FieldCondition(

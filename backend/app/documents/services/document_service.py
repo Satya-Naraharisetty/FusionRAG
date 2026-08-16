@@ -42,7 +42,7 @@ class DocumentService:
         uuid_generator: UUIDGenerator,
         time_provider: TimeProvider,
         max_upload_size: int,
-        index_cache: IndexCache = None,
+        index_cache: IndexCache | None = None,
         malware_scanner: Any = None,
     ) -> None:
         self._document_repo = document_repo
