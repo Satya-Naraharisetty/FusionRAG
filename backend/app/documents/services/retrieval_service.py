@@ -16,6 +16,7 @@ from app.documents.domain.interfaces import (
     SparseRetriever,
 )
 from app.documents.domain.models import (
+    DocumentRetrievalScope,
     FusionMethod,
     RerankerName,
     RetrievalMode,
@@ -235,25 +236,68 @@ class RetrievalService:
         tags: list[str] | None = None,
         filter_metadata: dict[str, Any] | None = None,
         retrieval_mode: RetrievalMode | str | None = None,
+        retrieval_scope: DocumentRetrievalScope | None = None,
     ) -> SearchResult:
         start_time = time.perf_counter()
 
-        # 1. Ownership Verification (Never trust incoming document IDs)
-        if document_ids:
-            if self._chunk_repo is None:
-                raise RuntimeError(
-                    "Chunk repository is not configured; cannot verify document ownership."
-                )
-            unique_doc_ids = list(set(document_ids))
-            ownership_ok = await self._chunk_repo.verify_document_ownership(
-                unique_doc_ids, user_id
+        if self._chunk_repo is None:
+            raise RuntimeError(
+                "Chunk repository is not configured; cannot verify document ownership."
             )
-            if not ownership_ok:
+
+        # Build retrieval_scope if not supplied (for backwards compatibility/tests)
+        if retrieval_scope is None:
+            retrieval_scope = DocumentRetrievalScope(
+                user_id=user_id,
+                conversation_id=None,
+                include_conversation_documents=True,
+                include_library_documents=True,
+                document_ids=document_ids,
+                tags=tags,
+                filter_metadata=filter_metadata,
+            )
+
+        # 1. Resolve and verify allowed document IDs from the database/repository
+        allowed_doc_ids = await self._chunk_repo.get_allowed_document_ids(
+            retrieval_scope
+        )
+
+        # Ownership verification: if explicit document IDs were supplied, they must be a subset of allowed IDs
+        if retrieval_scope.document_ids:
+            unauthorized = set(retrieval_scope.document_ids) - set(allowed_doc_ids)
+            if unauthorized:
                 raise UnauthorizedDocumentAccess(
-                    "Unauthorized document access: one or more specified document IDs do not belong to you."
+                    "Unauthorized document access: one or more specified document IDs do not belong to you or are not in scope."
                 )
-        else:
-            unique_doc_ids = None
+            allowed_doc_ids = [
+                doc_id
+                for doc_id in allowed_doc_ids
+                if doc_id in retrieval_scope.document_ids
+            ]
+
+        if not allowed_doc_ids:
+            logger.info("Retrieval skipped: no documents match the requested scope.")
+            ret_strat = RetrievalMode.SEMANTIC
+            if retrieval_mode:
+                if isinstance(retrieval_mode, str):
+                    try:
+                        ret_strat = RetrievalMode(retrieval_mode.lower())
+                    except ValueError:
+                        pass
+                else:
+                    ret_strat = retrieval_mode
+            return SearchResult(
+                original_query=query,
+                retrieval_time=time.perf_counter() - start_time,
+                total_matches=0,
+                retrieved_chunks=[],
+                search_strategy=ret_strat.value
+                if hasattr(ret_strat, "value")
+                else str(ret_strat),
+                retrieval_strategy=ret_strat,
+                dense_matches=[],
+                sparse_matches=[],
+            )
 
         # 2. Query Preprocessing
         processed_query_obj = self._query_processor.process(query)
@@ -284,28 +328,6 @@ class RetrievalService:
                 else RetrievalMode.SEMANTIC
             )
 
-        # 2b. Empty knowledge base fast path. When no document_ids were
-        # requested, a user with zero chunks can only ever receive an empty
-        # result, so skip the entire retrieval pipeline (query embedding,
-        # vector-store search, BM25 build/search, fusion, MMR, rerank) and let
-        # the caller fall back to a plain LLM answer. This also keeps chat
-        # working for document-less users even when the vector infra is down.
-        if not unique_doc_ids and not await self.user_has_chunks(user_id):
-            logger.info(
-                "Retrieval skipped: user has no uploaded chunks. "
-                "Caller will fall back to a general-knowledge LLM answer."
-            )
-            return SearchResult(
-                original_query=query,
-                retrieval_time=time.perf_counter() - start_time,
-                total_matches=0,
-                retrieved_chunks=[],
-                search_strategy=retrieval_mode.value,
-                retrieval_strategy=retrieval_mode,
-                dense_matches=[],
-                sparse_matches=[],
-            )
-
         # 3. Concurrent Retrieval
         dense_results = []
         sparse_results = []
@@ -330,9 +352,10 @@ class RetrievalService:
                     query=processed_query_obj.cleaned_query,
                     user_id=user_id,
                     top_k=v_top_k,
-                    document_ids=unique_doc_ids,
+                    document_ids=allowed_doc_ids,
                     tags=tags,
                     filter_metadata=filter_metadata,
+                    retrieval_scope=retrieval_scope,
                 )
                 dense_latency = time.perf_counter() - t0
 
@@ -347,9 +370,10 @@ class RetrievalService:
                     query=processed_query_obj.expanded_query,
                     user_id=user_id,
                     top_k=s_top_k,
-                    document_ids=unique_doc_ids,
+                    document_ids=allowed_doc_ids,
                     tags=tags,
                     filter_metadata=filter_metadata,
+                    retrieval_scope=retrieval_scope,
                 )
                 sparse_latency = time.perf_counter() - t0
 

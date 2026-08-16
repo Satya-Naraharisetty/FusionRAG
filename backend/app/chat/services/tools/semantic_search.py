@@ -66,29 +66,31 @@ class SearchKnowledgeTool(BuiltinTool):
 
         parsed_doc_ids = None
         if doc_ids:
-            parsed_doc_ids = [uuid.UUID(d) for d in doc_ids]
+            try:
+                parsed_doc_ids = [uuid.UUID(d) for d in doc_ids]
+            except (ValueError, AttributeError):
+                pass
 
-        # Conversation scope enforcement: the orchestrator pins the documents
-        # this conversation may search (chat-scoped attachments always, global
-        # docs only after an @documents mention). Any model-supplied ids are
-        # intersected with that set; with no ids supplied the search is
-        # restricted to it outright. With no pinned scope (None) the pre-
-        # mention behaviour of a user-wide search is preserved.
-        allowed = context.allowed_document_ids
-        if allowed:
-            allowed_set = set(allowed)
-            if parsed_doc_ids is not None:
-                parsed_doc_ids = [
-                    doc_id for doc_id in parsed_doc_ids if doc_id in allowed_set
-                ]
-            else:
-                parsed_doc_ids = list(allowed)
+        from app.documents.domain.models import DocumentRetrievalScope
+
+        # Determine which document scopes are authorized in this context.
+        # The retrieval scope is the authoritative source — authorization is
+        # enforced inside RetrievalService via the ChunkRepository, never
+        # trusted blindly from model-supplied IDs.
+        retrieval_scope = DocumentRetrievalScope(
+            user_id=context.user_id,
+            conversation_id=context.conversation_id,
+            # Use explicit boolean intent fields, not model-supplied document IDs.
+            include_conversation_documents=context.include_conversation_documents,
+            include_library_documents=context.include_library_documents,
+            document_ids=parsed_doc_ids,
+        )
 
         search_result = await self.retrieval_service.retrieve(
             query=query,
             user_id=context.user_id,
             top_k=top_k,
-            document_ids=parsed_doc_ids,
+            retrieval_scope=retrieval_scope,
         )
 
         serialized_chunks = []

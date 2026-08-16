@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.documents.domain.interfaces import DocumentRepository
-from app.documents.domain.models import Document, DocumentStatus
+from app.documents.domain.models import Document, DocumentScope, DocumentStatus
 from app.documents.infrastructure.persistence.models import SQLAlchemyDocument
 
 
@@ -78,6 +78,9 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
             db_doc = SQLAlchemyDocument(
                 id=document.id,
                 user_id=document.user_id,
+                scope=document.scope.value
+                if hasattr(document.scope, "value")
+                else str(document.scope),
                 conversation_id=document.conversation_id,
                 filename=document.filename,
                 original_filename=document.original_filename,
@@ -124,6 +127,7 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
         return Document(
             id=db_doc.id,
             user_id=db_doc.user_id,
+            scope=DocumentScope(db_doc.scope),
             conversation_id=db_doc.conversation_id,
             filename=db_doc.filename,
             original_filename=db_doc.original_filename,

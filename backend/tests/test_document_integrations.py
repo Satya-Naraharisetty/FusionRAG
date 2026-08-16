@@ -412,9 +412,8 @@ def test_conversation_scoped_documents_isolated_from_global_list(client, doc_tes
 
     # …and a chat-scoped document (attached in the conversation).
     res_scoped = client.post(
-        "/api/v1/documents/upload",
+        f"/api/v1/conversations/{conversation_id}/documents",
         files={"file": ("chat.txt", b"chat content", "text/plain")},
-        params={"conversation_id": str(conversation_id)},
         headers=headers,
     )
     assert res_scoped.status_code == status.HTTP_201_CREATED
@@ -430,7 +429,7 @@ def test_conversation_scoped_documents_isolated_from_global_list(client, doc_tes
 
     # Conversation-scoped list: only the chat document.
     res_conv = client.get(
-        f"/api/v1/documents?conversation_id={conversation_id}",
+        f"/api/v1/conversations/{conversation_id}/documents",
         headers=headers,
     )
     assert res_conv.status_code == status.HTTP_200_OK
@@ -442,7 +441,7 @@ def test_conversation_scoped_documents_isolated_from_global_list(client, doc_tes
     res_del = client.delete(f"/api/v1/documents/{scoped_id}", headers=headers)
     assert res_del.status_code == status.HTTP_204_NO_CONTENT
     res_conv_after = client.get(
-        f"/api/v1/documents?conversation_id={conversation_id}",
+        f"/api/v1/conversations/{conversation_id}/documents",
         headers=headers,
     )
     assert res_conv_after.json() == []
@@ -469,27 +468,24 @@ def test_upload_to_foreign_conversation_rejected(client, doc_test_db):
 
     # A different user cannot attach a document into owner's conversation.
     res_foreign = client.post(
-        "/api/v1/documents/upload",
+        f"/api/v1/conversations/{foreign_conversation_id}/documents",
         files={"file": ("evil.txt", b"evil content", "text/plain")},
-        params={"conversation_id": str(foreign_conversation_id)},
         headers={"Authorization": f"Bearer {token_attacker}"},
     )
     assert res_foreign.status_code == status.HTTP_403_FORBIDDEN
 
     # An unknown conversation id is rejected too.
     res_unknown = client.post(
-        "/api/v1/documents/upload",
+        f"/api/v1/conversations/{uuid.uuid4()}/documents",
         files={"file": ("ghost.txt", b"ghost content", "text/plain")},
-        params={"conversation_id": str(uuid.uuid4())},
         headers={"Authorization": f"Bearer {token_attacker}"},
     )
     assert res_unknown.status_code == status.HTTP_404_NOT_FOUND
 
     # The owner can still attach into their own conversation.
     res_own = client.post(
-        "/api/v1/documents/upload",
+        f"/api/v1/conversations/{foreign_conversation_id}/documents",
         files={"file": ("mine.txt", b"my content", "text/plain")},
-        params={"conversation_id": str(foreign_conversation_id)},
         headers={"Authorization": f"Bearer {token_owner}"},
     )
     assert res_own.status_code == status.HTTP_201_CREATED
@@ -527,9 +523,8 @@ def test_delete_conversation_removes_scoped_docs_but_keeps_global(client, doc_te
     global_id = res_global.json()["id"]
 
     res_scoped = client.post(
-        "/api/v1/documents/upload",
+        f"/api/v1/conversations/{conversation_id}/documents",
         files={"file": ("chat.txt", b"chat content", "text/plain")},
-        params={"conversation_id": str(conversation_id)},
         headers=headers,
     )
     assert res_scoped.status_code == status.HTTP_201_CREATED
@@ -572,7 +567,7 @@ def test_delete_conversation_removes_scoped_docs_but_keeps_global(client, doc_te
         == status.HTTP_404_NOT_FOUND
     )
     res_conv = client.get(
-        f"/api/v1/documents?conversation_id={conversation_id}",
+        f"/api/v1/conversations/{conversation_id}/documents",
         headers=headers,
     )
     assert res_conv.json() == []

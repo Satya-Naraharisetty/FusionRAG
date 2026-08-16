@@ -78,6 +78,26 @@ class CitationLookupTool(BuiltinTool):
                 is_error=True,
             )
 
+        # Enforce scope: CONVERSATION docs must belong to this conversation;
+        # LIBRARY docs are only accessible if the user mentioned @documents.
+        doc_scope = getattr(chunk.document, "scope", None)
+        if doc_scope == "CONVERSATION":
+            if str(chunk.document.conversation_id) != str(context.conversation_id):
+                return ToolResult(
+                    tool_call_id="",
+                    name=self.definition.name,
+                    content="Access Denied: This citation belongs to a different conversation.",
+                    is_error=True,
+                )
+        elif doc_scope == "LIBRARY":
+            if not context.include_library_documents:
+                return ToolResult(
+                    tool_call_id="",
+                    name=self.definition.name,
+                    content="Access Denied: Library documents are not in scope for this chat turn.",
+                    is_error=True,
+                )
+
         data = {
             "chunk_id": str(chunk.id),
             "document_id": str(chunk.document_id),

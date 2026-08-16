@@ -34,6 +34,7 @@ class QdrantDenseRetriever(DenseRetriever):
         document_ids: list[UUID] | None = None,
         tags: list[str] | None = None,
         filter_metadata: dict[str, Any] | None = None,
+        retrieval_scope: Any | None = None,
     ) -> list[RetrievedChunk]:
         # 1. Generate Query Embedding
         query_vector = await asyncio.to_thread(
@@ -49,6 +50,7 @@ class QdrantDenseRetriever(DenseRetriever):
             tags=tags,
             filter_metadata=filter_metadata,
             timeout=self._search_timeout,
+            retrieval_scope=retrieval_scope,
         )
 
         if not search_results:

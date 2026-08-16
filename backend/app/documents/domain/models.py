@@ -1,9 +1,15 @@
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class DocumentScope(str, Enum):
+    LIBRARY = "LIBRARY"
+    CONVERSATION = "CONVERSATION"
 
 
 class DocumentStatus(str, Enum):
@@ -45,6 +51,7 @@ class DocumentMetadata(BaseModel):
 class Document(BaseModel):
     id: UUID
     user_id: UUID
+    scope: DocumentScope = DocumentScope.LIBRARY
     conversation_id: UUID | None = None
     filename: str
     original_filename: str
@@ -64,9 +71,54 @@ class Document(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @model_validator(mode="after")
+    def validate_scope_invariants(self) -> "Document":
+        if self.scope == DocumentScope.LIBRARY:
+            if self.conversation_id is not None:
+                raise ValueError(
+                    "Library-scoped documents must not have a conversation_id."
+                )
+        elif self.scope == DocumentScope.CONVERSATION:
+            if self.conversation_id is None:
+                raise ValueError(
+                    "Conversation-scoped documents must have a conversation_id."
+                )
+        return self
+
     def transition_to(self, target: DocumentStatus) -> None:
         DocumentStateMachine.validate_transition(self.status, target)
         self.status = target
+
+
+class DocumentScopeIntent(BaseModel):
+    cleaned_query: str
+    include_library_documents: bool
+
+
+class DocumentScopeIntentParser:
+    _PATTERN = re.compile(r"(?<!\w)@documents\b", re.IGNORECASE)
+
+    @classmethod
+    def parse(cls, query: str) -> DocumentScopeIntent:
+        has_mention = bool(cls._PATTERN.search(query))
+        cleaned = cls._PATTERN.sub(" ", query)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        if not cleaned:
+            cleaned = query
+        return DocumentScopeIntent(
+            cleaned_query=cleaned,
+            include_library_documents=has_mention,
+        )
+
+
+class DocumentRetrievalScope(BaseModel):
+    user_id: UUID
+    conversation_id: UUID | None = None
+    include_conversation_documents: bool = False
+    include_library_documents: bool = False
+    document_ids: list[UUID] | None = None
+    tags: list[str] | None = None
+    filter_metadata: dict[str, Any] | None = None
 
 
 class Chunk(BaseModel):
@@ -200,3 +252,17 @@ class SearchResult(BaseModel):
     sparse_matches: list[RetrievedChunk] | None = None
     fusion_method: FusionMethod | None = None
     reranker: RerankerName | None = None
+
+
+class CleanupJob(BaseModel):
+    id: UUID
+    resource_type: str
+    resource_id: UUID
+    payload: dict[str, Any]
+    status: str
+    attempts: int
+    last_error: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

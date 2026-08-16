@@ -196,10 +196,14 @@ async def test_retrieval_service_success(mocker):
 
     repo = mocker.MagicMock()
     repo.verify_document_ownership = mocker.AsyncMock(return_value=True)
+    # Generate document_ids to use in the chunks below
+    doc1_id = uuid4()
+    doc2_id = uuid4()
+    repo.get_allowed_document_ids = mocker.AsyncMock(return_value=[doc1_id, doc2_id])
 
     c1 = Chunk(
         id=UUID("11111111-1111-1111-1111-111111111111"),
-        document_id=uuid4(),
+        document_id=doc1_id,
         chunk_index=0,
         text="text 1",
         character_start=0,
@@ -211,7 +215,7 @@ async def test_retrieval_service_success(mocker):
 
     c2 = Chunk(
         id=UUID("22222222-2222-2222-2222-222222222222"),
-        document_id=uuid4(),
+        document_id=doc2_id,
         chunk_index=1,
         text="text 2",
         character_start=5,
@@ -252,6 +256,7 @@ async def test_retrieval_service_ownership_violation(mocker):
     store = mocker.MagicMock()
     repo = mocker.MagicMock()
     repo.verify_document_ownership = mocker.AsyncMock(return_value=False)  # Violation!
+    repo.get_allowed_document_ids = mocker.AsyncMock(return_value=[])
     ranker = mocker.MagicMock()
 
     service = RetrievalService(
@@ -285,9 +290,12 @@ async def test_retrieval_service_similarity_threshold(mocker):
     )
 
     repo = mocker.MagicMock()
+    doc1_id = uuid4()
+    doc2_id = uuid4()
+    repo.get_allowed_document_ids = mocker.AsyncMock(return_value=[doc1_id, doc2_id])
     c1 = Chunk(
         id=UUID("11111111-1111-1111-1111-111111111111"),
-        document_id=uuid4(),
+        document_id=doc1_id,
         chunk_index=0,
         text="text 1",
         character_start=0,
@@ -297,7 +305,7 @@ async def test_retrieval_service_similarity_threshold(mocker):
     )
     c2 = Chunk(
         id=UUID("22222222-2222-2222-2222-222222222222"),
-        document_id=uuid4(),
+        document_id=doc2_id,
         chunk_index=1,
         text="text 2",
         character_start=5,
@@ -333,6 +341,7 @@ async def test_retrieval_service_empty_results(mocker):
     store = mocker.MagicMock()
     store.search = mocker.AsyncMock(return_value=[])  # No matches
     repo = mocker.MagicMock()
+    repo.get_allowed_document_ids = mocker.AsyncMock(return_value=[uuid4()])
     ranker = mocker.MagicMock()
 
     service = RetrievalService(
@@ -450,7 +459,7 @@ def test_api_search_validation_and_capping(client, mocker):
     )
     _, kwargs = mock_retrieval_service.retrieve.call_args
     assert kwargs["top_k"] == settings.MAX_TOP_K
-    assert kwargs["document_ids"] == [global_doc_id]
+    assert kwargs["retrieval_scope"].document_ids == [global_doc_id]
 
     # Scenario C: Clean up dependency overrides
     client.app.dependency_overrides.clear()
@@ -536,7 +545,7 @@ def test_api_search_scopes_to_two_tier_document_model(client, mocker):
     # and the conversation scoping API is never consulted.
     client.post("/api/v1/search", json={"query": "q"})
     _, kwargs = mock_retrieval_service.retrieve.call_args
-    assert kwargs["document_ids"] == [global_doc_id]
+    assert kwargs["retrieval_scope"].document_ids == [global_doc_id]
     doc_service.list_documents_by_conversation.assert_not_called()
 
     # 2. Conversation search -> pinned to that conversation's attachments.
@@ -545,7 +554,7 @@ def test_api_search_scopes_to_two_tier_document_model(client, mocker):
         json={"query": "q", "conversation_id": str(uuid4())},
     )
     _, kwargs = mock_retrieval_service.retrieve.call_args
-    assert kwargs["document_ids"] == [scoped_doc_id]
+    assert kwargs["retrieval_scope"].document_ids == [scoped_doc_id]
 
     # 3. Explicit document_ids -> honored as-is, no scope resolution.
     explicit_id = uuid4()
@@ -555,7 +564,7 @@ def test_api_search_scopes_to_two_tier_document_model(client, mocker):
     )
     assert response.status_code == status.HTTP_200_OK
     _, kwargs = mock_retrieval_service.retrieve.call_args
-    assert kwargs["document_ids"] == [explicit_id]
+    assert kwargs["retrieval_scope"].document_ids == [explicit_id]
 
     # 4. Nothing in scope -> retrieval skipped, empty result returned.
     calls_before = mock_retrieval_service.retrieve.call_count

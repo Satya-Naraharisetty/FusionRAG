@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import ANY, AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -432,6 +432,7 @@ async def test_retrieval_orchestrator_integration(mocker):
     chunk_repo.get_chunks_metadata_stats = AsyncMock(
         return_value={"count": 1, "max_created_at": datetime.now(UTC)}
     )
+    chunk_repo.get_allowed_document_ids = AsyncMock(return_value=[fused_chunk.document_id])
 
     # Initialize Service
     service = RetrievalService(
@@ -466,17 +467,19 @@ async def test_retrieval_orchestrator_integration(mocker):
         query="cleaned query",
         user_id=user_id,
         top_k=10,
-        document_ids=None,
+        document_ids=[fused_chunk.document_id],
         tags=None,
         filter_metadata=None,
+        retrieval_scope=ANY,
     )
     sparse_retriever.retrieve.assert_called_once_with(
         query="expanded query",
         user_id=user_id,
         top_k=10,
-        document_ids=None,
+        document_ids=[fused_chunk.document_id],
         tags=None,
         filter_metadata=None,
+        retrieval_scope=ANY,
     )
     fusion_engine.fuse.assert_called_once_with(dense_result, sparse_result)
     mmr_selector.select.assert_called_once_with(
@@ -515,6 +518,7 @@ async def test_retrieval_service_skips_pipeline_when_user_has_no_chunks():
     chunk_repo.get_chunks_metadata_stats = AsyncMock(
         return_value={"count": 0, "max_created_at": None}
     )
+    chunk_repo.get_allowed_document_ids = AsyncMock(return_value=[])
 
     service = RetrievalService(
         query_processor=processor,
@@ -530,7 +534,7 @@ async def test_retrieval_service_skips_pipeline_when_user_has_no_chunks():
     assert result.total_matches == 0
     assert result.dense_matches == []
     assert result.sparse_matches == []
-    chunk_repo.get_chunks_metadata_stats.assert_awaited_once()
+    chunk_repo.get_allowed_document_ids.assert_awaited_once()
     dense_retriever.retrieve.assert_not_called()
     sparse_retriever.retrieve.assert_not_called()
 
@@ -559,6 +563,7 @@ async def test_retrieval_service_still_retrieves_when_user_has_chunks():
     chunk_repo.get_chunks_metadata_stats = AsyncMock(
         return_value={"count": 1, "max_created_at": datetime.now(UTC)}
     )
+    chunk_repo.get_allowed_document_ids = AsyncMock(return_value=[chunk.document_id])
 
     service = RetrievalService(
         query_processor=processor,

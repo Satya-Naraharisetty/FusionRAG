@@ -37,13 +37,19 @@ class QdrantVectorStore(VectorStore):
         # server-side, but re-calling it on every request would add extra
         # round-trips; tracking per-field success means a transient failure is
         # retried on the next operation without re-paying for the successes.
-        self._indexed_fields: set[str] = (
-            set()
-        )  # Fields filtered on by _search_sync / delete_document. They must be
+        self._indexed_fields: set[str] = set()
 
+    # Fields filtered on by _search_sync / delete_document. They must be
     # indexed in Qdrant or filtered searches fail with
     # "Index required but not found" errors.
-    _FILTERABLE_FIELDS = ("user_id", "document_id", "tags", "metadata")
+    _FILTERABLE_FIELDS = (
+        "user_id",
+        "document_id",
+        "document_scope",
+        "conversation_id",
+        "tags",
+        "metadata",
+    )
 
     def _ensure_payload_indexes(self) -> None:
         """
@@ -173,6 +179,7 @@ class QdrantVectorStore(VectorStore):
         tags: list[str] | None = None,
         filter_metadata: dict[str, Any] | None = None,
         timeout: float | None = None,
+        retrieval_scope: Any | None = None,
     ) -> list[dict[str, Any]]:
         self._ensure_collection()
 
@@ -212,6 +219,38 @@ class QdrantVectorStore(VectorStore):
                     )
                 )
 
+        if retrieval_scope is not None:
+            scope_conditions = []
+            if retrieval_scope.include_library_documents:
+                scope_conditions.append(
+                    FieldCondition(
+                        key="document_scope",
+                        match=MatchValue(value="LIBRARY"),
+                    )
+                )
+            if (
+                retrieval_scope.include_conversation_documents
+                and retrieval_scope.conversation_id
+            ):
+                scope_conditions.append(
+                    Filter(
+                        must=[
+                            FieldCondition(
+                                key="document_scope",
+                                match=MatchValue(value="CONVERSATION"),
+                            ),
+                            FieldCondition(
+                                key="conversation_id",
+                                match=MatchValue(
+                                    value=str(retrieval_scope.conversation_id)
+                                ),
+                            ),
+                        ]
+                    )
+                )
+            if scope_conditions:
+                must_conditions.append(Filter(should=scope_conditions))
+
         results = self._client.search(
             collection_name=self._collection_name,
             query_vector=query_vector,
@@ -238,6 +277,7 @@ class QdrantVectorStore(VectorStore):
         tags: list[str] | None = None,
         filter_metadata: dict[str, Any] | None = None,
         timeout: float | None = None,
+        retrieval_scope: Any | None = None,
     ) -> list[dict[str, Any]]:
         """
         Asynchronously searches the vector store using the query vector.
@@ -251,4 +291,5 @@ class QdrantVectorStore(VectorStore):
             tags=tags,
             filter_metadata=filter_metadata,
             timeout=timeout,
+            retrieval_scope=retrieval_scope,
         )

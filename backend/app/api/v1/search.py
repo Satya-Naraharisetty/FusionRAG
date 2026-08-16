@@ -112,12 +112,27 @@ async def search_documents(
         retrieval_doc_ids = [doc.id for doc in document_service.list_documents(user_id)]
 
     # The resolution above mirrors ChatOrchestrator._resolve_retrieval_scope.
+    # Build a DocumentRetrievalScope so the RetrievalService enforces scope
+    # at the repository layer rather than via the backward-compat fallback.
+    from app.documents.domain.models import DocumentRetrievalScope
+
+    # Determine scope intent based on request context:
+    # - Explicit document_ids -> library OR conversation intent depending on docs
+    # - conversation_id present -> CONVERSATION scope only
+    # - no context -> LIBRARY scope (user's global documents)
+    has_conversation_scope = bool(request.conversation_id)
+    retrieval_scope = DocumentRetrievalScope(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        include_conversation_documents=has_conversation_scope or bool(request.document_ids),
+        include_library_documents=not has_conversation_scope or bool(request.document_ids),
+        document_ids=retrieval_doc_ids,
+    )
+
+    # Nothing in scope (no docs at all for this user/conversation): return an
+    # empty result rather than searching every chunk the user owns. Skipping
+    # before the LLM query rewrite mirrors the chat orchestrator's behaviour.
     if not retrieval_doc_ids:
-        # Nothing in scope (no global docs, or a conversation with no
-        # attachments): return an empty result rather than searching every
-        # chunk the user owns. Skipping before the LLM query rewrite mirrors
-        # the chat orchestrator's skip_rewrite=skip_retrieval — an empty
-        # search must not burn a rewrite call whose output would be discarded.
         return SearchResponse(
             results=[],
             retrieval_time_ms=0.0,
@@ -132,7 +147,7 @@ async def search_documents(
     )
     query_to_retrieve = rewrite_result.rewritten_query
 
-    # 1. Resolve and validate top_k parameter
+    # 2. Resolve and validate top_k parameter
     top_k = request.top_k
     if top_k is None:
         top_k = settings.DEFAULT_TOP_K
@@ -145,7 +160,7 @@ async def search_documents(
         # Cap top_k at MAX_TOP_K setting
         top_k = min(top_k, settings.MAX_TOP_K)
 
-    # 2. Extract tags and generic metadata filters
+    # 3. Extract tags and generic metadata filters
     req_filters = request.filters or {}
     tags = req_filters.pop("tags", None)
     # Ensure tags is a list of strings if provided
@@ -153,15 +168,15 @@ async def search_documents(
         tags = [str(tags)]
 
     try:
-        # 3. Call RetrievalService search pipeline
+        # 4. Call RetrievalService with explicit scope (no backward-compat fallback)
         search_result = await retrieval_service.retrieve(
             query=query_to_retrieve,
             user_id=user_id,
             top_k=top_k,
-            document_ids=retrieval_doc_ids,
             tags=tags,
             filter_metadata=req_filters,
             retrieval_mode=request.retrieval_mode,
+            retrieval_scope=retrieval_scope,
         )
 
         return SearchResponse(

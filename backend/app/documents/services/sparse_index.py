@@ -154,6 +154,7 @@ class InMemoryBM25Index(SparseIndex):
         document_ids: list[UUID] | None = None,
         tags: list[str] | None = None,
         filter_metadata: dict[str, Any] | None = None,
+        retrieval_scope: Any | None = None,
     ) -> list[RetrievedChunk]:
         # 1. Ensure cache is populated and synchronized
         await self._ensure_indexed(user_id)
@@ -179,6 +180,33 @@ class InMemoryBM25Index(SparseIndex):
             # Document ID filter
             if document_ids is not None and chunk.document_id not in document_ids:
                 continue
+
+            # Scope-based filters using retrieval_scope
+            if retrieval_scope is not None:
+                doc_scope = chunk.metadata.get("document_scope")
+                conv_id = chunk.metadata.get("conversation_id")
+
+                # Hard reject chunks with no scope rather than promoting them to
+                # LIBRARY. Missing scope means the point was never migrated.
+                if not doc_scope:
+                    continue
+
+                is_allowed = False
+                if doc_scope == "LIBRARY" and retrieval_scope.include_library_documents:
+                    is_allowed = True
+                elif (
+                    doc_scope == "CONVERSATION"
+                    and retrieval_scope.include_conversation_documents
+                ):
+                    if (
+                        conv_id
+                        and retrieval_scope.conversation_id
+                        and UUID(conv_id) == retrieval_scope.conversation_id
+                    ):
+                        is_allowed = True
+
+                if not is_allowed:
+                    continue
 
             # Tags filter
             if tags:

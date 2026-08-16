@@ -199,15 +199,23 @@ class MockRetrievalService:
         self._user_has_chunks = user_has_chunks
         self.retrieve_calls = 0
         self.last_document_ids = None
+        self.last_retrieval_scope = None
 
     async def user_has_chunks(self, user_id):
         return self._user_has_chunks
 
     async def retrieve(
-        self, query, user_id, top_k, document_ids=None, filter_metadata=None
+        self,
+        query,
+        user_id,
+        top_k,
+        document_ids=None,
+        filter_metadata=None,
+        retrieval_scope=None,
     ):
         self.retrieve_calls += 1
         self.last_document_ids = document_ids
+        self.last_retrieval_scope = retrieval_scope
         return SearchResult(
             original_query=query,
             retrieval_time=0.005,
@@ -586,7 +594,10 @@ async def test_global_documents_not_retrieved_without_mention():
         "@documents When was Python created?", uuid4(), 10
     )
     assert retrieval_service.retrieve_calls == 1
-    assert retrieval_service.last_document_ids == [doc_id]
+    # With scope-based retrieval, the scope includes library documents when
+    # @documents was mentioned (include_library_documents=True).
+    assert retrieval_service.last_retrieval_scope is not None
+    assert retrieval_service.last_retrieval_scope.include_library_documents is True
     assert len(response2.citations) == 1
     assert response2.diagnostics.retrieval_skipped is False
 
@@ -647,7 +658,9 @@ async def test_chat_scoped_documents_always_retrieved():
         "When is the deadline?", uuid4(), 10, conversation_id=conv_id
     )
     assert retrieval_service.retrieve_calls == 1
-    assert retrieval_service.last_document_ids == [doc_id]
+    # Chat-scoped docs are always retrieved; the scope carries conversation context.
+    assert retrieval_service.last_retrieval_scope is not None
+    assert retrieval_service.last_retrieval_scope.include_conversation_documents is True
     assert len(response.citations) == 1
     assert response.diagnostics is not None
     assert response.diagnostics.retrieval_skipped is False
@@ -704,10 +717,10 @@ async def test_documents_mention_combines_scoped_and_global_ids():
         conversation_id=conv_id,
     )
     assert retrieval_service.retrieve_calls == 1
-    assert set(retrieval_service.last_document_ids) == {
-        scoped_doc_id,
-        global_doc_id,
-    }
+    # With @documents mention, scope must include both conversation and library docs.
+    assert retrieval_service.last_retrieval_scope is not None
+    assert retrieval_service.last_retrieval_scope.include_conversation_documents is True
+    assert retrieval_service.last_retrieval_scope.include_library_documents is True
 
 
 @pytest.mark.asyncio
@@ -821,9 +834,7 @@ def test_api_chat_success(client):
         "user_id": str(mock_user_id),
         "role": "user",
     }
-    app.dependency_overrides[get_chat_orchestrator] = lambda: (
-        MockAnswerServiceSync()
-    )
+    app.dependency_overrides[get_chat_orchestrator] = lambda: MockAnswerServiceSync()
 
     payload = {
         "question": "What is RAG?",
@@ -917,9 +928,7 @@ def test_api_chat_streaming(client):
         "user_id": str(mock_user_id),
         "role": "user",
     }
-    app.dependency_overrides[get_chat_orchestrator] = lambda: (
-        MockAnswerServiceStream()
-    )
+    app.dependency_overrides[get_chat_orchestrator] = lambda: MockAnswerServiceStream()
 
     payload = {
         "question": "Say hello world",

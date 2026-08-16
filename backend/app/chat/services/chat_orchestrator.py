@@ -27,7 +27,7 @@ from app.chat.services.conversation_manager import ConversationManager
 from app.chat.services.llm_generation_service import LLMGenerationService
 from app.chat.services.prompt_builder import PromptBuilder
 from app.core.logger import request_id_ctx
-from app.documents.domain.models import SearchResult
+from app.documents.domain.models import DocumentRetrievalScope, SearchResult
 from app.documents.services.retrieval_service import RetrievalService
 
 logger = logging.getLogger(__name__)
@@ -291,12 +291,19 @@ class ChatOrchestrator:
                 sparse_matches=[],
             )
         else:
+            retrieval_scope = DocumentRetrievalScope(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                include_conversation_documents=True,
+                include_library_documents=documents_priority,
+                document_ids=retrieval_doc_ids if retrieval_doc_ids else None,
+            )
             search_result = await self.retrieval_service.retrieve(
                 query=query_to_retrieve,
                 user_id=user_id,
                 top_k=top_k,
-                document_ids=retrieval_doc_ids,
                 filter_metadata=filters,
+                retrieval_scope=retrieval_scope,
             )
         retrieval_time_ms = (time.perf_counter() - retrieval_start) * 1000
 
@@ -360,10 +367,11 @@ class ChatOrchestrator:
                     user_id=user_id,
                     conversation_id=conversation_id,
                     db_session=self.conversation_manager._conversation_repo._db,  # type: ignore[attr-defined]  # access underlying SQLAlchemy Session
-                    # Agent tool calls may only search this conversation's
-                    # scope — chat-scoped attachments stay in their chat and
-                    # global docs require the @documents mention.
-                    allowed_document_ids=retrieval_doc_ids or None,
+                    # Explicit retrieval intent: set from the @documents mention.
+                    # This is the only authoritative source for agent tools;
+                    # never derived from model-supplied document IDs.
+                    include_library_documents=documents_priority,
+                    include_conversation_documents=True,
                 )
                 agent_resp = await self.agent_executor.execute(
                     messages=messages,
@@ -544,12 +552,19 @@ class ChatOrchestrator:
                 sparse_matches=[],
             )
         else:
+            retrieval_scope = DocumentRetrievalScope(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                include_conversation_documents=True,
+                include_library_documents=documents_priority,
+                document_ids=retrieval_doc_ids if retrieval_doc_ids else None,
+            )
             search_result = await self.retrieval_service.retrieve(
                 query=query_to_retrieve,
                 user_id=user_id,
                 top_k=top_k,
-                document_ids=retrieval_doc_ids,
                 filter_metadata=filters,
+                retrieval_scope=retrieval_scope,
             )
         retrieval_time_ms = (time.perf_counter() - retrieval_start) * 1000
 
@@ -667,10 +682,11 @@ class ChatOrchestrator:
                         user_id=user_id,
                         conversation_id=conversation_id,
                         db_session=self.conversation_manager._conversation_repo._db,  # type: ignore[attr-defined]
-                        # Agent tool calls may only search this conversation's
-                        # scope — chat-scoped attachments stay in their chat
-                        # and global docs require the @documents mention.
-                        allowed_document_ids=retrieval_doc_ids or None,
+                        # Explicit retrieval intent: set from the @documents mention.
+                        # This is the only authoritative source for agent tools;
+                        # never derived from model-supplied document IDs.
+                        include_library_documents=documents_priority,
+                        include_conversation_documents=True,
                     )
                     async for event in self.agent_executor.execute_stream(
                         messages=messages,

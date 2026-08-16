@@ -28,6 +28,7 @@ from app.documents.domain.interfaces import (
     ChunkRepository,
     EmbeddingGenerator,
     EmbeddingRepository,
+    IndexCache,
     SearchRanker,
     VectorStore,
 )
@@ -444,6 +445,27 @@ def get_malware_scanner() -> Any:
     return StubMalwareScanner()
 
 
+_index_cache_instance: Any = None
+
+
+def get_index_cache():
+    """
+    Returns the single process-wide InMemoryIndexCache instance.
+
+    Note: this deliberately does NOT use the lru_cache-on-nested-function idiom
+    (each call to the outer function would create a fresh wrapper with a fresh
+    cache, silently defeating the caching). A module-global singleton is the
+    pattern used by get_cache / get_pricing_provider in this file.
+    """
+    global _index_cache_instance
+
+    if _index_cache_instance is None:
+        from app.documents.services.index_cache import InMemoryIndexCache
+
+        _index_cache_instance = InMemoryIndexCache()
+    return _index_cache_instance
+
+
 def get_document_service(
     background_tasks: BackgroundTasks,
     request: Request,
@@ -452,6 +474,7 @@ def get_document_service(
         get_document_processing_service
     ),
     embedding_service: EmbeddingService = Depends(get_embedding_service),
+    index_cache: IndexCache = Depends(get_index_cache),
 ) -> DocumentService:
     task_queue = FastAPIBackgroundTasksQueue(background_tasks)
     # Re-wire the request task queue into the dynamically resolved processing service
@@ -479,6 +502,7 @@ def get_document_service(
         uuid_generator=SystemUUIDGenerator(),
         time_provider=SystemTimeProvider(),
         max_upload_size=settings.MAX_UPLOAD_SIZE,
+        index_cache=index_cache,
         malware_scanner=get_malware_scanner(),
     )
 
@@ -827,6 +851,8 @@ def get_event_dispatcher(
 
 
 def get_conversation_manager(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
     conversation_repo=Depends(get_conversation_repository),
     message_repo=Depends(get_message_repository),
     summary_repo=Depends(get_summary_repository),
@@ -849,6 +875,8 @@ def get_conversation_manager(
         title_generator=title_generator,
         event_dispatcher=event_dispatcher,
         document_service=document_service,
+        db=db,
+        background_tasks=background_tasks,
     )
 
 

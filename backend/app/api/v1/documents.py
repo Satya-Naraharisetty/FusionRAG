@@ -6,24 +6,17 @@ from fastapi import (
     BackgroundTasks,
     Depends,
     File,
-    HTTPException,
     UploadFile,
     status,
 )
 from pydantic import BaseModel, ConfigDict
 
 from app.api.dependencies import (
-    get_conversation_access_service,
     get_current_user_context,
     get_document_service,
     get_embedding_service,
 )
-from app.chat.domain.exceptions import (
-    ConversationNotFoundException,
-    UnauthorizedConversationAccessException,
-)
-from app.chat.services.access_service import ConversationAccessService
-from app.documents.domain.models import EmbeddingStatus
+from app.documents.domain.models import DocumentScope, EmbeddingStatus
 from app.documents.infrastructure.tasks import FastAPIBackgroundTasksQueue
 from app.documents.services.document_service import DocumentService
 from app.documents.services.embedding_service import EmbeddingService
@@ -34,6 +27,7 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
 class DocumentResponse(BaseModel):
     id: UUID
     user_id: UUID
+    scope: str = "LIBRARY"
     conversation_id: UUID | None = None
     filename: str
     original_filename: str
@@ -59,60 +53,37 @@ class DocumentResponse(BaseModel):
 )
 async def upload_document(
     file: UploadFile = File(...),
-    conversation_id: UUID | None = None,
     current_user: dict = Depends(get_current_user_context),
     document_service: DocumentService = Depends(get_document_service),
-    conversation_access_service: ConversationAccessService = Depends(
-        get_conversation_access_service
-    ),
 ):
     """
     Upload a document, validating the formats and enqueuing background parsing & chunking.
-    Optionally associate the document with a conversation.
-
-    Chat-scoped uploads (``conversation_id`` set) are verified to belong to the
-    caller before the document is created: otherwise an authenticated user
-    could attach files into another user's conversation, polluting it (those
-    files are cascaded-deleted when the victim deletes the chat).
+    Always scopes the document to LIBRARY.
     """
     user_id = UUID(current_user["user_id"])
-    if conversation_id is not None:
-        try:
-            await conversation_access_service.verify_owner(conversation_id, user_id)
-        except ConversationNotFoundException as e:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-        except UnauthorizedConversationAccessException as e:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-
     file_bytes = await file.read()
 
-    # Delegate orchestration to DocumentService
+    # Delegate orchestration to DocumentService with scope=LIBRARY and no conversation
     document = await document_service.upload_document(
         original_filename=file.filename or "unnamed",
         content_type=file.content_type or "application/octet-stream",
         file_bytes=file_bytes,
         user_id=user_id,
-        conversation_id=conversation_id,
+        scope=DocumentScope.LIBRARY,
+        conversation_id=None,
     )
     return document
 
 
 @router.get("", response_model=list[DocumentResponse])
 def list_documents(
-    conversation_id: UUID | None = None,
     current_user: dict = Depends(get_current_user_context),
     document_service: DocumentService = Depends(get_document_service),
 ):
     """
-    List uploaded documents for the currently authenticated user.
-
-    Without a filter this returns the user's GLOBAL documents (Documents
-    section). Pass ``conversation_id`` to list the documents scoped to one
-    conversation (chat attachments) instead — both are owner-scoped.
+    List uploaded persistent library documents for the currently authenticated user.
     """
     user_id = UUID(current_user["user_id"])
-    if conversation_id is not None:
-        return document_service.list_documents_by_conversation(conversation_id, user_id)
     return document_service.list_documents(user_id)
 
 

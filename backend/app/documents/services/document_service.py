@@ -16,10 +16,11 @@ from app.documents.domain.exceptions import (
 from app.documents.domain.interfaces import (
     ChecksumGenerator,
     DocumentRepository,
+    IndexCache,
     StorageProvider,
     TaskQueue,
 )
-from app.documents.domain.models import Document, DocumentStatus
+from app.documents.domain.models import Document, DocumentScope, DocumentStatus
 from app.documents.infrastructure.extractors import ExtractorFactory
 from app.documents.services.document_processing_service import DocumentProcessingService
 from app.documents.services.embedding_service import EmbeddingService
@@ -41,6 +42,7 @@ class DocumentService:
         uuid_generator: UUIDGenerator,
         time_provider: TimeProvider,
         max_upload_size: int,
+        index_cache: IndexCache = None,
         malware_scanner: Any = None,
     ) -> None:
         self._document_repo = document_repo
@@ -54,6 +56,7 @@ class DocumentService:
         self._uuid_generator = uuid_generator
         self._time_provider = time_provider
         self._max_upload_size = max_upload_size
+        self._index_cache = index_cache
         self._malware_scanner = malware_scanner
 
     async def upload_document(
@@ -62,11 +65,22 @@ class DocumentService:
         content_type: str,
         file_bytes: bytes,
         user_id: UUID,
+        scope: DocumentScope = DocumentScope.LIBRARY,
         conversation_id: UUID | None = None,
     ) -> Document:
         """
         Validates, registers, and triggers the ingestion pipeline for a new document.
         """
+        if scope == DocumentScope.LIBRARY:
+            if conversation_id is not None:
+                raise ValueError(
+                    "Library-scoped documents must not have a conversation_id."
+                )
+        elif scope == DocumentScope.CONVERSATION:
+            if conversation_id is None:
+                raise ValueError(
+                    "Conversation-scoped documents must have a conversation_id."
+                )
         # 1. Reject empty files
         if not file_bytes or len(file_bytes) == 0:
             raise DocumentCorruptedError("Uploaded file is empty.")
@@ -131,6 +145,7 @@ class DocumentService:
         document = Document(
             id=document_id,
             user_id=user_id,
+            scope=scope,
             conversation_id=conversation_id,
             filename=storage_key,
             original_filename=safe_original_name,
@@ -176,7 +191,7 @@ class DocumentService:
         return [
             doc
             for doc in self._document_repo.list_by_user(user_id)
-            if doc.conversation_id is None
+            if doc.scope == DocumentScope.LIBRARY
         ]
 
     def list_documents_by_conversation(
@@ -225,6 +240,15 @@ class DocumentService:
                 f"Failed to delete Qdrant vectors during document deletion {document.id}: {e}"
             )
 
+        # Invalidate index cache for user
+        if self._index_cache:
+            try:
+                self._index_cache.invalidate(user_id)
+            except Exception as e:
+                logger.error(
+                    f"Failed to invalidate index cache for user {user_id}: {e}"
+                )
+
         # Attempt storage deletion (failures are logged, not raised)
         self._storage_provider.delete(document.filename)
 
@@ -236,8 +260,11 @@ class DocumentService:
         Returns the count of deleted documents.
         """
         documents = self._document_repo.list_by_conversation(conversation_id, user_id)
+        conversation_docs = [
+            d for d in documents if d.scope == DocumentScope.CONVERSATION
+        ]
         count = 0
-        for doc in documents:
+        for doc in conversation_docs:
             try:
                 self.delete_document(doc.id, user_id)
                 count += 1

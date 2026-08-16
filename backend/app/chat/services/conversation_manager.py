@@ -3,6 +3,9 @@ import uuid
 from datetime import UTC, datetime
 from uuid import UUID
 
+from fastapi import BackgroundTasks
+from sqlalchemy.orm import Session
+
 from app.chat.domain.events import ConversationCreated, ConversationMessageCreated
 from app.chat.domain.exceptions import ConversationNotFoundException
 from app.chat.domain.interfaces import (
@@ -41,6 +44,8 @@ class ConversationManager:
         title_generator: ConversationTitleGenerator,
         event_dispatcher: EventDispatcher,
         document_service: DocumentService | None = None,
+        db: Session | None = None,
+        background_tasks: BackgroundTasks | None = None,
     ) -> None:
         self._conversation_repo = conversation_repo
         self._message_repo = message_repo
@@ -51,6 +56,8 @@ class ConversationManager:
         self._title_generator = title_generator
         self._event_dispatcher = event_dispatcher
         self._document_service = document_service
+        self._db = db
+        self._background_tasks = background_tasks
 
     async def get_or_create_conversation(
         self,
@@ -221,30 +228,124 @@ class ConversationManager:
 
     async def delete_conversation(self, conversation_id: UUID, user_id: UUID) -> int:
         """
-        Deletes a conversation and all associated documents.
+        Deletes a conversation and all associated documents durably.
         Returns the count of deleted documents.
         """
         # Verify ownership first
         await self._access_service.verify_owner(conversation_id, user_id)
 
-        # Delete associated documents if document service is available
+        from app.core.config import settings
+        from app.documents.infrastructure.persistence.models import (
+            SQLAlchemyCleanupJob,
+            SQLAlchemyDocument,
+        )
+
         deleted_docs_count = 0
-        if self._document_service:
-            try:
-                deleted_docs_count = (
-                    self._document_service.delete_documents_by_conversation(
-                        conversation_id, user_id
+        job_ids = []
+
+        if self._db:
+            # Query conversation-scoped documents and their chunks before deleting them
+            db_docs = (
+                self._db.query(SQLAlchemyDocument)
+                .filter(
+                    SQLAlchemyDocument.conversation_id == conversation_id,
+                    SQLAlchemyDocument.user_id == user_id,
+                    SQLAlchemyDocument.scope == "CONVERSATION",
+                )
+                .all()
+            )
+            deleted_docs_count = len(db_docs)
+
+            for doc in db_docs:
+                payload = {
+                    "document_id": str(doc.id),
+                    "user_id": str(doc.user_id),
+                    "conversation_id": str(doc.conversation_id),
+                    "storage_key": doc.filename,
+                    "qdrant_collection_name": settings.QDRANT_COLLECTION,
+                    "qdrant_point_ids": [str(chunk.id) for chunk in doc.chunks],
+                }
+
+                # Uniqueness / Idempotency check:
+                # If a job already exists for this document, reset it to PENDING.
+                existing_job = (
+                    self._db.query(SQLAlchemyCleanupJob)
+                    .filter(
+                        SQLAlchemyCleanupJob.resource_type == "document",
+                        SQLAlchemyCleanupJob.resource_id == doc.id,
                     )
-                )
-                logger.info(
-                    f"Deleted {deleted_docs_count} documents for conversation {conversation_id}"
-                )
-            except Exception as e:
-                logger.error(
-                    f"Failed to delete documents for conversation {conversation_id}: {e}"
+                    .first()
                 )
 
-        # Delete the conversation (soft delete)
-        await self._conversation_repo.delete_conversation(conversation_id)
+                if not existing_job:
+                    job = SQLAlchemyCleanupJob(
+                        id=uuid.uuid4(),
+                        resource_type="document",
+                        resource_id=doc.id,
+                        payload=payload,
+                        status="PENDING",
+                        attempts=0,
+                    )
+                    self._db.add(job)
+                    job_ids.append(job.id)
+                else:
+                    existing_job.status = "PENDING"
+                    existing_job.attempts = 0
+                    existing_job.payload = payload
+                    job_ids.append(existing_job.id)
+
+                # Delete the document record from Postgres (cascades delete to chunks and embeddings)
+                self._db.delete(doc)
+
+            # Delete the conversation (soft delete)
+            await self._conversation_repo.delete_conversation(conversation_id)
+
+            self._db.flush()
+            # Commit the PostgreSQL transaction atomically
+            self._db.commit()
+
+            # Trigger asynchronous external cleanup jobs after commit
+            if job_ids and self._background_tasks:
+                self._background_tasks.add_task(self._run_cleanup_jobs, job_ids)
 
         return deleted_docs_count
+
+    async def _run_cleanup_jobs(self, job_ids: list[UUID]) -> None:
+        """
+        Runs the cleanup jobs in the background.
+        """
+        from app.api.dependencies import (
+            get_index_cache,
+            get_storage_provider,
+            get_vector_store,
+        )
+        from app.db.session import init_postgres_engine
+        from sqlalchemy.orm import sessionmaker
+        from app.core.config import settings
+        from app.documents.services.cleanup_worker import DurableCleanupWorker
+
+        import sys
+        db_url = settings.DATABASE_URL
+        if "pytest" in sys.modules:
+            db_url = "postgresql://postgres:postgres@localhost:5433/hybrid_rag_test"
+
+        engine = init_postgres_engine(db_url)
+        Session = sessionmaker(bind=engine)
+        db = Session()
+        try:
+            storage_provider = get_storage_provider(db)
+            vector_store = get_vector_store()
+            index_cache = get_index_cache()
+            worker = DurableCleanupWorker(
+                db, storage_provider, vector_store, index_cache
+            )
+
+            for jid in job_ids:
+                try:
+                    await worker.process_job(jid)
+                except Exception as e:
+                    logger.error(
+                        f"Error processing cleanup job {jid} in background: {e}"
+                    )
+        finally:
+            db.close()

@@ -159,6 +159,12 @@ class EmbeddingService:
                             "chunk_id": str(c.id),
                             "document_id": str(document_id),
                             "user_id": str(document.user_id),
+                            "document_scope": document.scope.value
+                            if hasattr(document.scope, "value")
+                            else str(document.scope),
+                            "conversation_id": str(document.conversation_id)
+                            if document.conversation_id
+                            else None,
                             "chunk_index": c.chunk_index,
                             "language": document.language or "en",
                             "metadata": c.metadata,

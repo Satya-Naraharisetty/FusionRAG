@@ -54,11 +54,16 @@ class ToolContext(BaseModel):
     user_id: UUID
     conversation_id: UUID
     db_session: Any
-    # Documents the agent is allowed to search in this conversation. None means
-    # "no restriction" (pre-mention behaviour); when set, tools scope their
-    # retrieval to these ids so chat-scoped attachments stay in their chat and
-    # global documents only participate after an explicit @documents mention.
-    allowed_document_ids: list[UUID] | None = None
+    # Explicit retrieval intent flags — set by the orchestrator from the parsed
+    # @documents mention. These are the canonical source of truth for agent tool
+    # scope; they must NOT be derived from model-supplied document IDs.
+    #
+    # include_library_documents=True  -> user explicitly mentioned @documents;
+    #                                    library-scoped documents are in scope.
+    # include_library_documents=False -> normal chat turn; only conversation-
+    #                                    scoped attachments are accessible.
+    include_library_documents: bool = False
+    include_conversation_documents: bool = True
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

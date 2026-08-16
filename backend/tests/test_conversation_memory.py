@@ -158,6 +158,7 @@ class MockRetrievalService:
         filter_metadata=None,
         tags=None,
         retrieval_mode=None,
+        retrieval_scope=None,
     ):
         self.retrieve_calls += 1
         return SearchResult(
@@ -863,9 +864,7 @@ def test_conversations_api_flow(client, chat_test_db):
         enable_conversation_memory=True,
     )
 
-    client.app.dependency_overrides[get_chat_orchestrator] = lambda: (
-        real_service
-    )
+    client.app.dependency_overrides[get_chat_orchestrator] = lambda: real_service
     client.app.dependency_overrides[get_conversation_manager] = lambda: manager
 
     # Setup token & user

@@ -5,6 +5,7 @@ from uuid import UUID
 
 from app.documents.domain.models import (
     Chunk,
+    CleanupJob,
     Document,
     Embedding,
     ExtractionResult,
@@ -204,6 +205,14 @@ class ChunkRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    async def get_allowed_document_ids(self, retrieval_scope: Any) -> list[UUID]:
+        """
+        Resolves the list of document IDs the user is allowed to access
+        based on the DocumentRetrievalScope.
+        """
+        pass
+
 
 class EmbeddingGenerator(ABC):
     @abstractmethod
@@ -383,6 +392,7 @@ class SparseIndex(ABC):
         document_ids: list[UUID] | None = None,
         tags: list[str] | None = None,
         filter_metadata: dict[str, Any] | None = None,
+        retrieval_scope: Any | None = None,
     ) -> list[RetrievedChunk]:
         """
         Searches the sparse index.
@@ -400,6 +410,7 @@ class SparseRetriever(ABC):
         document_ids: list[UUID] | None = None,
         tags: list[str] | None = None,
         filter_metadata: dict[str, Any] | None = None,
+        retrieval_scope: Any | None = None,
     ) -> list[RetrievedChunk]:
         """
         Retrieves matching document chunks using sparse retrieval.
@@ -417,6 +428,7 @@ class DenseRetriever(ABC):
         document_ids: list[UUID] | None = None,
         tags: list[str] | None = None,
         filter_metadata: dict[str, Any] | None = None,
+        retrieval_scope: Any | None = None,
     ) -> list[RetrievedChunk]:
         """
         Retrieves matching document chunks using dense vector search.
@@ -461,5 +473,28 @@ class Reranker(ABC):
     ) -> list[RetrievedChunk]:
         """
         Reranks retrieved chunks for the given query.
+        """
+        pass
+
+
+class CleanupJobRepository(ABC):
+    @abstractmethod
+    def get_by_id(self, id: UUID) -> CleanupJob | None:
+        """
+        Fetches a cleanup job by its ID.
+        """
+        pass
+
+    @abstractmethod
+    def save(self, job: CleanupJob) -> CleanupJob:
+        """
+        Persists or updates a cleanup job.
+        """
+        pass
+
+    @abstractmethod
+    def list_pending_or_failed(self) -> list[CleanupJob]:
+        """
+        Lists all jobs that are in PENDING or FAILED status.
         """
         pass

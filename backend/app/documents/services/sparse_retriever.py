@@ -17,6 +17,7 @@ class BM25Retriever(SparseRetriever):
         document_ids: list[UUID] | None = None,
         tags: list[str] | None = None,
         filter_metadata: dict[str, Any] | None = None,
+        retrieval_scope: Any | None = None,
     ) -> list[RetrievedChunk]:
         return await self._sparse_index.search(
             query=query,
@@ -25,4 +26,5 @@ class BM25Retriever(SparseRetriever):
             document_ids=document_ids,
             tags=tags,
             filter_metadata=filter_metadata,
+            retrieval_scope=retrieval_scope,
         )

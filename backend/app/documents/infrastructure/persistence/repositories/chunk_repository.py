@@ -120,8 +120,12 @@ class SQLAlchemyChunkRepository(ChunkRepository):
                 metadata=dict(c.metadata_json),
                 created_at=c.created_at,
             )
-            # Embed original filename in metadata so it is accessible downstream
+            # Embed original filename and scope details in metadata so it is accessible downstream
             chunk.metadata["document_name"] = c.document.original_filename
+            chunk.metadata["document_scope"] = c.document.scope
+            chunk.metadata["conversation_id"] = (
+                str(c.document.conversation_id) if c.document.conversation_id else None
+            )
             chunks.append(chunk)
 
         return chunks
@@ -198,6 +202,10 @@ class SQLAlchemyChunkRepository(ChunkRepository):
                 created_at=c.created_at,
             )
             chunk.metadata["document_name"] = c.document.original_filename
+            chunk.metadata["document_scope"] = c.document.scope
+            chunk.metadata["conversation_id"] = (
+                str(c.document.conversation_id) if c.document.conversation_id else None
+            )
             chunks.append(chunk)
 
         return chunks
@@ -218,3 +226,50 @@ class SQLAlchemyChunkRepository(ChunkRepository):
             "count": result[0] if result and result[0] is not None else 0,
             "max_created_at": result[1] if result and result[1] is not None else None,
         }
+
+    async def get_allowed_document_ids(self, retrieval_scope: Any) -> list[UUID]:
+        """
+        Resolves the list of document IDs the user is allowed to access
+        based on the DocumentRetrievalScope.
+
+        Returns [] immediately (without a DB query) when both include_* flags
+        are False, since no document can match an empty scope.
+        """
+        # Fast path: if no scope type is requested, nothing can match.
+        # This avoids an unnecessary DB query and is the correct semantic
+        # (an empty scope grants zero access).
+        include_library = retrieval_scope.include_library_documents
+        include_conversation = (
+            retrieval_scope.include_conversation_documents
+            and retrieval_scope.conversation_id
+        )
+        if not include_library and not include_conversation:
+            return []
+
+        from sqlalchemy import and_, or_
+
+        query = self._db.query(SQLAlchemyDocument.id).filter(
+            SQLAlchemyDocument.user_id == retrieval_scope.user_id
+        )
+
+        if retrieval_scope.document_ids is not None:
+            query = query.filter(
+                SQLAlchemyDocument.id.in_(retrieval_scope.document_ids)
+            )
+
+        conditions = []
+        if include_library:
+            conditions.append(SQLAlchemyDocument.scope == "LIBRARY")
+
+        if include_conversation:
+            conditions.append(
+                and_(
+                    SQLAlchemyDocument.scope == "CONVERSATION",
+                    SQLAlchemyDocument.conversation_id
+                    == retrieval_scope.conversation_id,
+                )
+            )
+
+        query = query.filter(or_(*conditions))
+        db_doc_ids = query.all()
+        return [row[0] for row in db_doc_ids]

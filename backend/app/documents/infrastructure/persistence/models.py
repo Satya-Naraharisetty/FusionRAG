@@ -27,6 +27,7 @@ class SQLAlchemyDocument(Base):
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    scope: Mapped[str] = mapped_column(String(50), default="LIBRARY", server_default="LIBRARY", nullable=False)
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -124,3 +125,28 @@ class SQLAlchemyDocumentFile(Base):
 
     key: Mapped[str] = mapped_column(String(255), primary_key=True)
     content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+
+class SQLAlchemyCleanupJob(Base):
+    __tablename__ = "durable_cleanup_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    resource_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    resource_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="PENDING", nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("resource_type", "resource_id", name="uq_cleanup_resource"),
+    )
