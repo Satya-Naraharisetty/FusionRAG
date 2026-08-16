@@ -31,14 +31,22 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Set up PATH to include installed binaries
 ENV PATH="/usr/local/bin:$PATH"
 
-# Create huggingface cache directory
-RUN mkdir -p /cache/huggingface
+# Create a non-root user and group
+RUN groupadd -g 999 appuser && \
+    useradd -r -u 999 -g appuser appuser
 
-# Copy backend application code
-COPY . .
+# Set up huggingface cache and application data folder, and set permissions
+RUN mkdir -p /cache/huggingface /app/data && \
+    chown -R appuser:appuser /cache/huggingface /app/data
+
+# Copy backend application code with correct ownership
+COPY --chown=appuser:appuser . .
+
+# Switch to non-root user
+USER appuser
 
 # Expose port 8000
 EXPOSE 8000
 
-# Run migrations and start the application
-CMD ["sh", "-c", "python -m alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Start the application directly (migrations executed out-of-band)
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

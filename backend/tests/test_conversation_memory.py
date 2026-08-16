@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from app.api.dependencies import (
-    get_answer_generation_service,
+    get_chat_orchestrator,
     get_conversation_manager,
 )
 from app.auth.infrastructure.persistence.models import SQLAlchemyUser
@@ -863,7 +863,7 @@ def test_conversations_api_flow(client, chat_test_db):
         enable_conversation_memory=True,
     )
 
-    client.app.dependency_overrides[get_answer_generation_service] = lambda: (
+    client.app.dependency_overrides[get_chat_orchestrator] = lambda: (
         real_service
     )
     client.app.dependency_overrides[get_conversation_manager] = lambda: manager

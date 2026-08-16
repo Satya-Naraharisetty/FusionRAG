@@ -1,1 +1,0 @@
-Quantum tunneling lets a particle pass through an energy barrier it classically could not overcome. It explains alpha decay in radioactive nuclei, enables fusion inside stars like the Sun, and is the principle behind flash memory, scanning tunneling microscopes, and the tunnel diode.

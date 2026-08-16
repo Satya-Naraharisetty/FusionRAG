@@ -3,7 +3,7 @@ from uuid import uuid4
 import pytest
 from fastapi import status
 
-from app.api.dependencies import get_answer_generation_service, get_current_user_context
+from app.api.dependencies import get_chat_orchestrator, get_current_user_context
 from app.chat.domain.exceptions import (
     NoRelevantContext,
     PromptTooLarge,
@@ -821,7 +821,7 @@ def test_api_chat_success(client):
         "user_id": str(mock_user_id),
         "role": "user",
     }
-    app.dependency_overrides[get_answer_generation_service] = lambda: (
+    app.dependency_overrides[get_chat_orchestrator] = lambda: (
         MockAnswerServiceSync()
     )
 
@@ -917,7 +917,7 @@ def test_api_chat_streaming(client):
         "user_id": str(mock_user_id),
         "role": "user",
     }
-    app.dependency_overrides[get_answer_generation_service] = lambda: (
+    app.dependency_overrides[get_chat_orchestrator] = lambda: (
         MockAnswerServiceStream()
     )
 
@@ -958,7 +958,7 @@ def test_api_chat_exceptions(client):
         "user_id": str(uuid4()),
         "role": "user",
     }
-    app.dependency_overrides[get_answer_generation_service] = lambda: (
+    app.dependency_overrides[get_chat_orchestrator] = lambda: (
         MockAnswerServiceExceptions()
     )
 

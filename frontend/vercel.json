@@ -2,10 +2,6 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://hybrid-rag-gilt.vercel.app/api/:path*"
-    },
-    {
       "source": "/((?!.*\\.(?:js|css|png|svg|ico|woff2|webmanifest)$).*)",
       "destination": "/index.html"
     }

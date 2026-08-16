@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
     check_rate_limit,
-    get_answer_generation_service,
+    get_chat_orchestrator,
     get_current_user_context,
 )
 from app.chat.domain.exceptions import (
@@ -58,7 +58,7 @@ async def chat(
     request: Request,
     chat_req: ChatRequest,
     user_context: dict[str, Any] = Depends(get_current_user_context),
-    orchestrator: ChatOrchestrator = Depends(get_answer_generation_service),
+    orchestrator: ChatOrchestrator = Depends(get_chat_orchestrator),
 ):
     """
     Orchestration endpoint that retrieves documents and generates a grounded response.
@@ -114,4 +114,12 @@ async def chat(
                 logger.exception("Unhandled error during chat streaming.")
                 yield f"event: error\ndata: {json.dumps({'code': 'INTERNAL_ERROR', 'message': str(e)})}\n\n"
 
-        return StreamingResponse(event_generator(), media_type="text/event-stream")
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
