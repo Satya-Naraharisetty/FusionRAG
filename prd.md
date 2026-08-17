@@ -59,7 +59,7 @@ To prevent scope creep and maintain the application's status as a focused refere
 
 ### Document Management & Organization
 *   *As a user,* I want to register and log in securely so that my uploaded documents and chat histories remain private and persistent.
-*   *As a user,* I want to upload files in PDF, DOCX, TXT, MD, HTML, and CSV formats so that I can query diverse data sources.
+*   As a user, I want to upload files in PDF, DOCX, TXT, MD, HTML, CSV, and image formats (PNG, JPG, JPEG, WEBP) so that I can query diverse data sources.
 *   *As a user,* I want to group documents into collections (e.g., "Tax Info", "System Architecture Specs") so that I can scope my queries to specific sets of documents.
 *   *As a user,* I want to browse my uploaded documents, see their ingestion status (parsing, chunked, indexed), and delete them when they are no longer needed.
 
@@ -95,6 +95,7 @@ To prevent scope creep and maintain the application's status as a focused refere
     *   **TXT & Markdown:** Plain text reading with preservation of headers/structure.
     *   **HTML:** Sanitization of tags, discarding scripts/styles, retaining semantic elements like headers, lists, and tables.
     *   **CSV:** Parsing structured rows and converting them to semantic key-value text lines or mini-tables.
+    *   **Images (PNG, JPG, JPEG, WEBP):** Text extraction via OCR or a Vision-based LLM (e.g., Gemini or OpenAI) to generate structured descriptions, captions, and text transcripts of the visual content.
 *   **Text Cleaning Pipeline:** Automatic removal of duplicate whitespace, boilerplate footers/headers (e.g., page numbers), and repair of word break hyphenations.
 
 ### 8.4. Metadata Extraction
