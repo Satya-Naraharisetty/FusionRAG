@@ -245,3 +245,4 @@ nginx-ssl/
 
 .vscode/
 .agents/
+.vercel
