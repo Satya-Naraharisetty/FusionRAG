@@ -1,7 +1,14 @@
+import base64
 import io
+import logging
 import pathlib
 
 import docx
+import httpx
+
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 from pypdf import PdfReader
 
 from app.documents.domain.exceptions import DocumentCorrupted, UnsupportedDocumentType
@@ -96,6 +103,112 @@ class MarkdownExtractor(DocumentExtractor):
             raise DocumentCorrupted(f"Markdown file is not valid UTF-8: {e}")
 
 
+class ImageExtractor(DocumentExtractor):
+    def __init__(self, mime_type: str) -> None:
+        self.mime_type = mime_type
+
+    def extract(self, file_bytes: bytes) -> ExtractionResult:
+        """
+        Uses a Vision LLM (Gemini or OpenAI depending on active configuration) to extract text and describe the image.
+        """
+        if not file_bytes:
+            raise DocumentCorrupted("Image file is empty.")
+
+        extracted_text = ""
+        prompt = (
+            "Analyze the attached image. Extract all readable text word-for-word (OCR). "
+            "Then, provide a detailed description of any charts, diagrams, tables, figures, or visual structures in the image. "
+            "Do not include conversational filler in your response; output only the extracted text and the semantic description."
+        )
+
+        if settings.GEMINI_API_KEY:
+            try:
+                extracted_text = self._extract_via_gemini(file_bytes, prompt)
+            except Exception as e:
+                logger.warning(f"Failed to extract image content via Gemini: {e}. Falling back to OpenAI if available.")
+                if settings.OPENAI_API_KEY:
+                    extracted_text = self._extract_via_openai(file_bytes, prompt)
+                else:
+                    raise DocumentCorrupted(f"Gemini image extraction failed and OpenAI credentials not configured. Error: {e}")
+        elif settings.OPENAI_API_KEY:
+            extracted_text = self._extract_via_openai(file_bytes, prompt)
+        else:
+            raise UnsupportedDocumentType("No API keys found for image vision processing (Gemini or OpenAI required).")
+
+        return ExtractionResult(text=extracted_text, page_count=1)
+
+    def _extract_via_gemini(self, file_bytes: bytes, prompt: str) -> str:
+        base64_data = base64.b64encode(file_bytes).decode("utf-8")
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "inlineData": {
+                                "mimeType": self.mime_type,
+                                "data": base64_data
+                            }
+                        }
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.0,
+                "maxOutputTokens": 2048
+            }
+        }
+
+        # Call gemini-2.5-flash which is multimodal and fast
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+
+        with httpx.Client(timeout=60.0) as client:
+            resp = client.post(url, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+
+            try:
+                return data["candidates"][0]["content"]["parts"][0]["text"]
+            except (KeyError, IndexError) as e:
+                raise RuntimeError(f"Unexpected response structure from Gemini API: {e}")
+
+    def _extract_via_openai(self, file_bytes: bytes, prompt: str) -> str:
+        base64_data = base64.b64encode(file_bytes).decode("utf-8")
+        headers = {
+            "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "gpt-4o-mini",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{self.mime_type};base64,{base64_data}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "temperature": 0.0,
+            "max_tokens": 2048
+        }
+
+        url = "https://api.openai.com/v1/chat/completions"
+        with httpx.Client(timeout=60.0) as client:
+            resp = client.post(url, headers=headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            try:
+                return data["choices"][0]["message"]["content"]
+            except (KeyError, IndexError) as e:
+                raise RuntimeError(f"Unexpected response structure from OpenAI API: {e}")
+
+
 class ExtractorFactory:
     def __init__(self) -> None:
         self._extractors = {
@@ -104,6 +217,9 @@ class ExtractorFactory:
             "text/plain": TXTExtractor(),
             "text/markdown": MarkdownExtractor(),
             "text/x-markdown": MarkdownExtractor(),
+            "image/png": ImageExtractor("image/png"),
+            "image/jpeg": ImageExtractor("image/jpeg"),
+            "image/webp": ImageExtractor("image/webp"),
         }
         self._extension_map = {
             ".pdf": "application/pdf",
@@ -111,6 +227,10 @@ class ExtractorFactory:
             ".txt": "text/plain",
             ".md": "text/markdown",
             ".markdown": "text/markdown",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".webp": "image/webp",
         }
 
     def get_extractor(self, content_type: str, filename: str) -> DocumentExtractor:

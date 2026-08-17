@@ -161,7 +161,7 @@ export const UploadDropzone: React.FC = () => {
           {isDragActive ? "Drop files here…" : "Drag & drop files here"}
         </p>
         <p className="text-xs text-[var(--text-muted)]">
-          PDF, TXT, DOCX, MD · max 50 MB
+          PDF, TXT, DOCX, MD, PNG, JPG, WEBP · max 50 MB
         </p>
       </div>
 

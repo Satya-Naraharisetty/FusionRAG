@@ -94,7 +94,7 @@ export const OnboardingTour: React.FC = () => {
                   </div>
                   <h3 className="text-base font-semibold text-[var(--text-primary)] font-title">Document Library</h3>
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-sm mx-auto">
-                    Upload PDF, TXT, DOCX, MD files. Chunks are extracted, vectorized, and retrieved automatically when you ask questions.
+                    Upload PDF, TXT, DOCX, MD, and image files. Chunks are extracted, vectorized, and retrieved automatically when you ask questions.
                   </p>
                 </div>
               )}

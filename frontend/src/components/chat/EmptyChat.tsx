@@ -33,7 +33,7 @@ export const EmptyChat: React.FC<EmptyChatProps> = ({ onSelectPrompt }) => {
 
         {/* Supporting text */}
         <p className="animate-fade-in-up stagger-2 text-[15px] leading-relaxed text-[var(--text-secondary)] max-w-[440px] mb-8">
-          Upload PDF, TXT, DOCX, or MD files to your library, then ask questions to retrieve grounded insights.
+          Upload PDF, TXT, DOCX, MD, or image files to your library, then ask questions to retrieve grounded insights.
         </p>
 
         {/* Prompt grid */}

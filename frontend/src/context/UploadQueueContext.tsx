@@ -69,7 +69,7 @@ export interface AddFilesOptions {
   onUploaded?: (file: File) => void;
 }
 
-const DEFAULT_ACCEPTED_EXTENSIONS = ["pdf", "txt", "docx", "doc", "md"];
+const DEFAULT_ACCEPTED_EXTENSIONS = ["pdf", "txt", "docx", "doc", "md", "png", "jpg", "jpeg", "webp"];
 
 /**
  * The upload queue is app-level state, not page state: processing continues

@@ -18,6 +18,7 @@ from app.documents.infrastructure.checksum import SHA256ChecksumGenerator
 from app.documents.infrastructure.extractors import (
     DOCXExtractor,
     ExtractorFactory,
+    ImageExtractor,
     MarkdownExtractor,
     PDFExtractor,
     TXTExtractor,
@@ -290,3 +291,82 @@ def test_s3_storage_provider():
     storage.delete(key)
     with pytest.raises(FileNotFoundError):
         storage.get(key)
+
+
+# --- Image Extractor Tests ---
+
+
+@patch("app.documents.infrastructure.extractors.httpx.Client")
+def test_image_extractor_gemini(mock_client_class):
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {"text": "Extracted text and chart details from Gemini"}
+                    ]
+                }
+            }
+        ]
+    }
+    mock_response.raise_for_status = MagicMock()
+    mock_client.post.return_value = mock_response
+    mock_client_class.return_value.__enter__.return_value = mock_client
+
+    with patch("app.documents.infrastructure.extractors.settings") as mock_settings:
+        mock_settings.GEMINI_API_KEY = "mock-gemini-key"
+        mock_settings.OPENAI_API_KEY = "mock-openai-key"
+
+        extractor = ImageExtractor("image/png")
+        res = extractor.extract(b"dummy png bytes")
+
+        assert res.text == "Extracted text and chart details from Gemini"
+        assert res.page_count == 1
+
+        mock_client.post.assert_called_once()
+        args, kwargs = mock_client.post.call_args
+        assert "gemini-2.5-flash" in args[0]
+        assert "mock-gemini-key" in args[0]
+
+
+@patch("app.documents.infrastructure.extractors.httpx.Client")
+def test_image_extractor_openai(mock_client_class):
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": "Extracted text and chart details from OpenAI"
+                }
+            }
+        ]
+    }
+    mock_response.raise_for_status = MagicMock()
+    mock_client.post.return_value = mock_response
+    mock_client_class.return_value.__enter__.return_value = mock_client
+
+    with patch("app.documents.infrastructure.extractors.settings") as mock_settings:
+        mock_settings.GEMINI_API_KEY = ""
+        mock_settings.OPENAI_API_KEY = "mock-openai-key"
+
+        extractor = ImageExtractor("image/jpeg")
+        res = extractor.extract(b"dummy jpeg bytes")
+
+        assert res.text == "Extracted text and chart details from OpenAI"
+        assert res.page_count == 1
+
+        mock_client.post.assert_called_once()
+        args, kwargs = mock_client.post.call_args
+        assert "api.openai.com" in args[0]
+        headers = kwargs["headers"]
+        assert headers["Authorization"] == "Bearer mock-openai-key"
+
+
+def test_image_extractor_factory():
+    factory = ExtractorFactory()
+    assert isinstance(factory.get_extractor("image/png", "chart.png"), ImageExtractor)
+    assert isinstance(factory.get_extractor("application/octet-stream", "screenshot.jpg"), ImageExtractor)
+

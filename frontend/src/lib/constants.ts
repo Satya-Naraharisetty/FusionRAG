@@ -16,6 +16,9 @@ export const UPLOAD_LIMITS = {
     "text/plain": [".txt"],
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
     "text/markdown": [".md"],
+    "image/png": [".png"],
+    "image/jpeg": [".jpg", ".jpeg"],
+    "image/webp": [".webp"],
   },
   CHAT_ACCEPTED_TYPES: {
     "application/pdf": [".pdf"],
