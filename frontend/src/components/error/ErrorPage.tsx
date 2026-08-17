@@ -44,7 +44,7 @@ export const ErrorPage: React.FC<ErrorPageProps> = ({ status }) => {
   const current = configs[status] || configs[404];
 
   return (
-    <div className="flex h-screen w-screen flex-col items-center justify-center bg-[var(--bg-primary)] p-6 text-center text-[var(--text-primary)] select-none">
+    <div className="flex h-dvh w-dvw flex-col items-center justify-center bg-[var(--bg-primary)] p-6 text-center text-[var(--text-primary)] select-none">
       <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         {current.icon}
       </div>

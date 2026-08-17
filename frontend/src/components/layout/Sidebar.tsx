@@ -83,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       className={cn(
-        "flex flex-col h-full bg-[var(--bg-secondary)] border-r border-[var(--border-subtle)] transition-all duration-200 relative z-20 select-none",
+        "flex flex-col h-full bg-[var(--bg-secondary)] transition-all duration-200 relative z-20 select-none",
         collapsed ? "w-16" : "w-[272px]",
         className
       )}
@@ -91,7 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       {/* Sidebar Header & Toggle Section */}
       <div
         className={cn(
-          "flex items-center px-3 shrink-0 h-14 border-b border-[var(--border-subtle)]",
+          "flex items-center px-3 shrink-0 h-14",
           collapsed ? "justify-center" : "justify-between"
         )}
       >

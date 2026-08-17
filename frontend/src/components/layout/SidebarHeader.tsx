@@ -38,7 +38,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
 
   if (collapsed) {
     return (
-      <div className="flex flex-col items-center gap-2 py-3 border-b border-[var(--border-subtle)]">
+      <div className="flex flex-col items-center gap-2 py-3">
         <button
           onClick={onNewChat}
           className="w-10 h-10 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-elevated)] rounded-[var(--radius-lg)] text-[var(--text-primary)] flex items-center justify-center cursor-pointer transition-colors"
@@ -73,7 +73,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   }
 
   return (
-    <div className="flex flex-col gap-2 p-3 border-b border-[var(--border-subtle)]">
+    <div className="flex flex-col gap-2 p-3">
       {/* New Chat Button */}
       <button
         onClick={onNewChat}

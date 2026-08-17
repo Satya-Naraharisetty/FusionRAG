@@ -422,11 +422,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={cn(
-            "relative flex items-end rounded-[20px] border bg-(--bg-secondary) transition-all duration-200 focus-within:border-(--border-hover) focus-within:shadow-[0_8px_32px_rgba(0,0,0,0.35)]",
+            "relative flex items-end rounded-[var(--radius-lg)] border bg-[var(--bg-secondary)] transition-all duration-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_4px_24px_rgba(0,0,0,0.4)] focus-within:bg-[var(--bg-elevated)] focus-within:border-[var(--accent-primary)]/30 focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_0_16px_rgba(0,210,253,0.1)]",
             isDraggingOver
-              ? "border-dashed border-(--accent-primary)/70 bg-(--accent-primary)/8 shadow-[0_0_25px_rgba(110,168,255,0.18)]"
-              : "border-(--border-default) shadow-[0_4px_20px_rgba(0,0,0,0.22)]",
-            isRecording && "border-(--accent-error)/45"
+              ? "border-dashed border-[var(--accent-primary)]/70 bg-[var(--accent-primary)]/8"
+              : "border-transparent",
+            isRecording && "border-[var(--accent-error)]/45 bg-red-950/10"
           )}
         >
           {/* Paperclip button with Recent Attachments dropdown */}
@@ -555,10 +555,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 onClick={() => { onVoiceInput(); setIsRecording(!isRecording); }}
                 disabled={isStreaming}
                 className={cn(
-                  "h-9.5 w-9.5 shrink-0 rounded-full border transition-colors",
+                  "h-9 w-9 shrink-0 rounded-sm border transition-colors",
                   isRecording
-                    ? "border-(--accent-error)/20 bg-(--accent-error)/12 text-(--accent-error) animate-pulse"
-                    : "border-transparent text-(--text-muted) hover:border-(--border-subtle) hover:bg-(--bg-tertiary) hover:text-(--text-primary)"
+                    ? "border-[var(--accent-error)]/20 bg-[var(--accent-error)]/12 text-[var(--accent-error)] animate-pulse"
+                    : "border-transparent text-[var(--text-muted)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
                 )}
                 aria-label={isRecording ? "Stop recording" : "Record voice"}
                 data-pressed={isRecording}
@@ -573,7 +573,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 type="button"
                 onClick={onStop}
                 size="icon"
-                className="h-9 w-9 shrink-0 rounded-full border border-(--border-subtle) bg-(--bg-elevated) text-(--text-primary) transition-all hover:bg-(--bg-tertiary) active:scale-95"
+                className="h-9 w-9 shrink-0 rounded-sm border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-primary)] transition-all hover:bg-[var(--bg-tertiary)] active:scale-95"
                 aria-label="Stop generation"
               >
                 <Square size={9} fill="currentColor" />
@@ -584,10 +584,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 disabled={!hasContent || !isOnline}
                 size="icon"
                 className={cn(
-                  "h-9 w-9 shrink-0 rounded-full border transition-all active:scale-95",
+                  "h-9 w-9 shrink-0 rounded-sm border transition-all active:scale-95",
                   hasContent && isOnline
-                    ? "border-transparent bg-[image:var(--gradient-main)] text-white shadow-[var(--elevation-glow)] hover:shadow-[var(--elevation-glow)] hover:brightness-110"
-                    : "border-(--border-subtle) bg-(--bg-tertiary) text-(--text-muted) cursor-not-allowed"
+                    ? "border-transparent bg-[image:var(--gradient-main)] text-white shadow-[var(--shadow-glow)] hover:shadow-[var(--shadow-glow)] hover:brightness-110"
+                    : "border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed"
                 )}
                 aria-label="Send query"
               >

@@ -8,7 +8,7 @@ export const OfflinePage: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen flex-col items-center justify-center bg-[var(--bg-primary)] p-6 text-center text-[var(--text-primary)] select-none">
+    <div className="flex h-dvh w-dvw flex-col items-center justify-center bg-[var(--bg-primary)] p-6 text-center text-[var(--text-primary)] select-none">
       <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-xl)] bg-[var(--bg-secondary)] border border-[var(--border-subtle)] mb-5">
         <WifiOff size={32} className="text-red-400 animate-pulse" />
       </div>

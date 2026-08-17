@@ -16,7 +16,7 @@ export const ChatToolbar: React.FC<ChatToolbarProps> = ({
   const { collapsed, setCollapsed } = useSidebarState();
 
   return (
-    <header className="h-[52px] flex items-center justify-between px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-primary)] flex-shrink-0 z-10">
+    <header className="h-[52px] flex items-center justify-between px-5 bg-[var(--bg-primary)] flex-shrink-0 z-10">
       {/* Left */}
       <div className="flex items-center gap-2.5 min-w-0">
         {collapsed && (
@@ -37,7 +37,7 @@ export const ChatToolbar: React.FC<ChatToolbarProps> = ({
       <div className="flex items-center gap-3.5 flex-shrink-0">
         {/* Model badge */}
         <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-primary)] shadow-[0_0_6px_var(--accent-primary)] flex-shrink-0" />
           {model}
         </span>
 

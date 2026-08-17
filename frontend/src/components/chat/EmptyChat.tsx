@@ -18,7 +18,7 @@ export const EmptyChat: React.FC<EmptyChatProps> = ({ onSelectPrompt }) => {
       <div className="w-full max-w-[580px] flex flex-col items-center text-center">
 
         {/* Logo badge — gradient tile with glow */}
-        <div className="animate-fade-in-up mb-6 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[14px] bg-[image:var(--gradient-main)] text-white shadow-[0_8px_24px_rgba(124,58,237,0.35)] transition-transform duration-200 hover:scale-105">
+        <div className="animate-fade-in-up mb-6 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-[image:var(--gradient-main)] text-white shadow-[var(--shadow-glow)] transition-transform duration-200 hover:scale-105">
           <span className="font-title text-xl font-bold leading-none">H</span>
         </div>
 

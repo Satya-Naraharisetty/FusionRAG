@@ -64,7 +64,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onRetry, on
           <div className="w-full max-w-[780px] flex justify-end px-6">
             <div className="flex flex-col items-end gap-1.5 max-w-[72%]">
               {/* Bubble */}
-              <div className="px-4 py-3 rounded-[18px] bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-[var(--text-primary)] text-[15px] leading-relaxed select-text">
+              <div className="px-4 py-3 rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] text-[15px] leading-relaxed select-text">
                 {message.content && (
                   <Suspense fallback={<MarkdownFallback />}>
                     <MarkdownRenderer content={message.content} />

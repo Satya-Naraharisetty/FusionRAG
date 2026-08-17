@@ -48,7 +48,7 @@ export const ChatLayout: React.FC = () => {
   });
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden font-sans bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="flex flex-col h-dvh w-dvw overflow-hidden font-sans bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {/* Skip to main content */}
       <a
         href="#main-content"

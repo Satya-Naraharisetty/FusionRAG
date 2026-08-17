@@ -1,7 +1,11 @@
 import { Suspense } from "react";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ChatMessage } from "../components/chat/ChatMessage";
+
+vi.mock("../components/chat/MarkdownRenderer", () => ({
+  MarkdownRenderer: ({ content }: { content: string }) => <div>{content}</div>,
+}));
 
 const renderWithSuspense = (ui: React.ReactElement) =>
   render(<Suspense fallback={null}>{ui}</Suspense>);

@@ -76,14 +76,14 @@ export const ConversationDocumentChips: React.FC<
             return (
               <Tooltip key={doc.id}>
                 <TooltipTrigger asChild>
-                  <div className="flex select-none items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] py-1 pl-2 pr-1 text-xs text-[var(--text-primary)] transition-colors">
+                  <div className="flex select-none items-center gap-1.5 rounded-sm border-y border-r border-l-2 border-l-[var(--accent-tertiary)] border-[var(--border-subtle)] bg-[var(--bg-input)] py-1 pl-2 pr-1 text-xs text-[var(--text-primary)] font-mono uppercase tracking-wider transition-colors">
                     <FileTypeBadge
                       filename={doc.original_filename}
                       variant="minimal"
                       size="sm"
                       className="flex-shrink-0"
                     />
-                    <span className="max-w-40 truncate font-medium">
+                    <span className="max-w-40 truncate font-medium text-[11px]">
                       {doc.original_filename}
                     </span>
                     {busy && (

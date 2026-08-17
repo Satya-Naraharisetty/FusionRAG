@@ -1,6 +1,6 @@
 .app-container {
-  width: 100vw;
-  height: 100vh;
+  width: 100dvw;
+  height: 100dvh;
   position: relative;
   display: flex;
   justify-content: center;
@@ -17,7 +17,7 @@
   width: 50vw;
   height: 50vw;
   border-radius: 50%;
-  background: radial-gradient(circle, hsla(250, 84%, 63%, 0.1) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(0, 210, 253, 0.1) 0%, transparent 70%);
   filter: blur(80px);
   pointer-events: none;
   z-index: 1;
@@ -30,7 +30,7 @@
   width: 45vw;
   height: 45vw;
   border-radius: 50%;
-  background: radial-gradient(circle, hsla(282, 84%, 60%, 0.08) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(110, 221, 255, 0.08) 0%, transparent 70%);
   filter: blur(80px);
   pointer-events: none;
   z-index: 1;

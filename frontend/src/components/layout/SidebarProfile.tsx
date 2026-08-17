@@ -22,7 +22,7 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, co
   const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : "US";
 
   return (
-    <div className="p-2 border-t border-[var(--border-subtle)] mt-auto">
+    <div className="p-2 mt-auto">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -55,7 +55,7 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, co
         <DropdownMenuContent side="top" align="start" className="w-52 mb-1">
           {/* User info header */}
           {user && (
-            <div className="px-2.5 py-2 border-b border-[var(--border-subtle)] mb-1">
+            <div className="px-2.5 py-2 mb-1">
               <p className="text-xs font-medium text-[var(--text-primary)] truncate">{user.email}</p>
               <p className="text-[11px] text-[var(--text-muted)] capitalize mt-0.5">{user.role}</p>
             </div>
