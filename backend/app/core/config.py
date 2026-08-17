@@ -232,6 +232,10 @@ class Settings(BaseSettings):
     # OAuth (Google)
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
+
+    # OAuth (GitHub)
+    GITHUB_CLIENT_ID: str = ""
+    GITHUB_CLIENT_SECRET: str = ""
     # Base URL of the backend used to build OAuth callback URIs.
     # Local: http://localhost:8000 | Production: https://hybrid-rag-gilt.vercel.app
     OAUTH_REDIRECT_BASE_URL: str = "http://localhost:8000"

@@ -15,7 +15,7 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
 };
 
 export const LoginForm: React.FC = () => {
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, loginWithGithub } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [email, setEmail]             = useState("");
   const [password, setPassword]       = useState("");
@@ -79,6 +79,8 @@ export const LoginForm: React.FC = () => {
   const handleSocialAuth = (provider: string) => {
     if (provider === "Google") {
       loginWithGoogle();
+    } else if (provider === "GitHub") {
+      loginWithGithub();
     }
   };
 

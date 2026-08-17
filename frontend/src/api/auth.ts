@@ -69,4 +69,16 @@ export const authApi = {
       import.meta.env.VITE_API_URL || "http://localhost:8000";
     window.location.href = `${apiBase}/api/v1/auth/oauth/google`;
   },
+
+  /**
+   * Redirect the full browser window to the backend GitHub OAuth initiation
+   * endpoint. The backend will redirect to GitHub, which redirects back to
+   * /api/v1/auth/oauth/github/callback, which then sends the user to
+   * /oauth/callback on the frontend with the access token in the URL.
+   */
+  loginWithGithub(): void {
+    const apiBase =
+      import.meta.env.VITE_API_URL || "http://localhost:8000";
+    window.location.href = `${apiBase}/api/v1/auth/oauth/github`;
+  },
 };

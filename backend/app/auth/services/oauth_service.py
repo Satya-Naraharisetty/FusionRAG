@@ -32,6 +32,13 @@ _GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 _GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 _GOOGLE_SCOPES = "openid email profile"
 
+# ─── GitHub OAuth endpoints ────────────────────────────────────────────────────
+_GITHUB_AUTH_URL = "https://github.com/login/oauth/authorize"
+_GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
+_GITHUB_USERINFO_URL = "https://api.github.com/user"
+_GITHUB_EMAILS_URL = "https://api.github.com/user/emails"
+_GITHUB_SCOPES = "read:user user:email"
+
 
 class OAuthService:
     def __init__(
@@ -70,6 +77,27 @@ class OAuthService:
             "prompt": "select_account",
         }
         url = f"{_GOOGLE_AUTH_URL}?{urllib.parse.urlencode(params)}"
+        return url, state
+
+    def get_github_authorization_url(self) -> tuple[str, str]:
+        """
+        Return ``(authorization_url, state)`` for the GitHub consent page.
+
+        The caller must store *state* in a short-lived HttpOnly cookie and
+        validate it when GitHub redirects back.
+        """
+        state = secrets.token_urlsafe(32)
+        callback_url = (
+            f"{settings.OAUTH_REDIRECT_BASE_URL}"
+            f"{settings.API_V1_STR}/auth/oauth/github/callback"
+        )
+        params = {
+            "client_id": settings.GITHUB_CLIENT_ID,
+            "redirect_uri": callback_url,
+            "scope": _GITHUB_SCOPES,
+            "state": state,
+        }
+        url = f"{_GITHUB_AUTH_URL}?{urllib.parse.urlencode(params)}"
         return url, state
 
     # ── 2. Exchange code → upsert user ────────────────────────────────────────
@@ -129,6 +157,120 @@ class OAuthService:
             )
             profile_resp.raise_for_status()
             return profile_resp.json()
+
+    def exchange_github_code(self, code: str, state: str) -> UserDomain:
+        """
+        Exchange the authorization *code* for a GitHub profile, then upsert
+        and return the local user record.
+
+        Raises ``InvalidCredentialsException`` on any provider-level error.
+        """
+        try:
+            profile = self._fetch_github_profile(code)
+        except Exception as exc:
+            logger.warning("GitHub OAuth token exchange failed: %s", exc)
+            raise InvalidCredentialsException(
+                "Failed to authenticate with GitHub. Please try again."
+            )
+
+        github_id = profile.get("id")
+        if github_id is None:
+            raise InvalidCredentialsException(
+                "GitHub did not return a valid user ID."
+            )
+        sub = str(github_id)
+        email = profile.get("email")
+
+        if not email:
+            raise InvalidCredentialsException(
+                "GitHub did not return a valid email address."
+            )
+
+        return self._upsert_user(provider="github", sub=sub, email=email)
+
+    def _fetch_github_profile(self, code: str) -> dict:
+        """Exchange authorization code for an access token, then fetch profile and emails."""
+        callback_url = (
+            f"{settings.OAUTH_REDIRECT_BASE_URL}"
+            f"{settings.API_V1_STR}/auth/oauth/github/callback"
+        )
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "Hybrid-RAG-Chatbot",
+        }
+        with httpx.Client(timeout=10) as client:
+            # Step 1: exchange code → tokens
+            token_resp = client.post(
+                _GITHUB_TOKEN_URL,
+                headers=headers,
+                data={
+                    "code": code,
+                    "client_id": settings.GITHUB_CLIENT_ID,
+                    "client_secret": settings.GITHUB_CLIENT_SECRET,
+                    "redirect_uri": callback_url,
+                },
+            )
+            token_resp.raise_for_status()
+            resp_data = token_resp.json()
+
+            if "error" in resp_data:
+                error_msg = resp_data.get("error_description") or resp_data["error"]
+                raise InvalidCredentialsException(f"GitHub token exchange error: {error_msg}")
+
+            access_token: str = resp_data["access_token"]
+
+            # Step 2: fetch user profile
+            profile_headers = {
+                **headers,
+                "Authorization": f"Bearer {access_token}",
+            }
+            profile_resp = client.get(
+                _GITHUB_USERINFO_URL,
+                headers=profile_headers,
+            )
+            profile_resp.raise_for_status()
+            profile = profile_resp.json()
+
+            # Step 3: fetch emails (in case primary email is private)
+            emails_resp = client.get(
+                _GITHUB_EMAILS_URL,
+                headers=profile_headers,
+            )
+            if emails_resp.status_code == 200:
+                emails = emails_resp.json()
+                extracted_email = None
+
+                # 1. Look for primary & verified
+                for entry in emails:
+                    if entry.get("primary") and entry.get("verified"):
+                        extracted_email = entry.get("email")
+                        break
+
+                # 2. Look for primary
+                if not extracted_email:
+                    for entry in emails:
+                        if entry.get("primary"):
+                            extracted_email = entry.get("email")
+                            break
+
+                # 3. Look for verified
+                if not extracted_email:
+                    for entry in emails:
+                        if entry.get("verified"):
+                            extracted_email = entry.get("email")
+                            break
+
+                # 4. Fallback to first email
+                if not extracted_email and emails:
+                    extracted_email = emails[0].get("email")
+
+                if extracted_email:
+                    profile["email"] = extracted_email.strip().lower()
+
+            if "email" in profile and profile["email"]:
+                profile["email"] = profile["email"].strip().lower()
+
+            return profile
 
     def _upsert_user(self, provider: str, sub: str, email: str) -> UserDomain:
         """

@@ -19,6 +19,7 @@ export interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => void;
+  loginWithGithub: () => void;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
@@ -188,6 +189,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     authApi.loginWithGoogle();
   };
 
+  const loginWithGithub = () => {
+    authApi.loginWithGithub();
+  };
+
   const value: AuthContextType = {
     user,
     accessToken,
@@ -195,6 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     isLoading,
     login,
     loginWithGoogle,
+    loginWithGithub,
     register,
     logout,
     deleteAccount,
