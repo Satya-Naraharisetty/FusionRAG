@@ -75,7 +75,7 @@ class MessageStatus(str, Enum):
 class ConversationSettings(BaseModel):
     temperature: float = 0.0
     provider: LLMProviderType = LLMProviderType.GEMINI
-    model: str = "gemini-1.5-flash"
+    model: str = "gemini-2.5-flash-lite"
     retrieval_mode: RetrievalMode = RetrievalMode.HYBRID
     stream: bool = False
     hybrid_enabled: bool = True

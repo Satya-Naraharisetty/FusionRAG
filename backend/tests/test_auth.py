@@ -26,32 +26,35 @@ def test_db(client):
     truncating users and sessions before each test runs.
     """
     engine = create_engine(TEST_DATABASE_URL)
-    Base.metadata.create_all(bind=engine)
-
-    session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-    # Clean the tables to guarantee test isolation
-    db = session_local()
     try:
-        _truncate_auth_tables(db)
+        Base.metadata.create_all(bind=engine)
+
+        session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+        # Clean the tables to guarantee test isolation
+        db = session_local()
+        try:
+            _truncate_auth_tables(db)
+        finally:
+            db.close()
+
+        # Wire our test database session factory into the application state
+        client.app.state.db_session_factory = session_local
+
+        yield session_local
+
+        # Teardown: truncate again as hygiene so no test (not even the last one in
+        # the file) leaves users/sessions behind. This is the dedicated
+        # hybrid_rag_test database, so leftovers would be harmless anyway — the
+        # pre-test truncation above alone would leak whatever the final test
+        # creates, e.g. concurrent@example.com from test_refresh_concurrency_fails.
+        db = session_local()
+        try:
+            _truncate_auth_tables(db)
+        finally:
+            db.close()
     finally:
-        db.close()
-
-    # Wire our test database session factory into the application state
-    client.app.state.db_session_factory = session_local
-
-    yield session_local
-
-    # Teardown: truncate again as hygiene so no test (not even the last one in
-    # the file) leaves users/sessions behind. This is the dedicated
-    # hybrid_rag_test database, so leftovers would be harmless anyway — the
-    # pre-test truncation above alone would leak whatever the final test
-    # creates, e.g. concurrent@example.com from test_refresh_concurrency_fails.
-    db = session_local()
-    try:
-        _truncate_auth_tables(db)
-    finally:
-        db.close()
+        engine.dispose()
 
 
 def test_register_user_success(client, test_db):

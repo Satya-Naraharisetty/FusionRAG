@@ -100,7 +100,7 @@ class LLMProviderRouter(LLMProvider):
         if provider_key == "openai" and "gemini" in model:
             actual_model = "gpt-4o-mini"  # Default backup model
         elif provider_key == "gemini" and "gpt" in model:
-            actual_model = "gemini-1.5-flash"  # Default backup model
+            actual_model = "gemini-2.5-flash-lite"  # Default backup model
 
         logger.info(
             f"Routing generate request to provider: {provider_key} (Model: {actual_model})"
@@ -123,7 +123,7 @@ class LLMProviderRouter(LLMProvider):
             if fallback_key in self._providers:
                 fallback_provider = self._providers[fallback_key]
                 fallback_model = (
-                    "gpt-4o-mini" if fallback_key == "openai" else "gemini-1.5-flash"
+                    "gpt-4o-mini" if fallback_key == "openai" else "gemini-2.5-flash-lite"
                 )
                 logger.warning(f"Attempting immediate fallback to: {fallback_key}")
                 try:
@@ -161,7 +161,7 @@ class LLMProviderRouter(LLMProvider):
         if provider_key == "openai" and "gemini" in model:
             actual_model = "gpt-4o-mini"
         elif provider_key == "gemini" and "gpt" in model:
-            actual_model = "gemini-1.5-flash"
+            actual_model = "gemini-2.5-flash-lite"
 
         logger.info(
             f"Routing stream request to provider: {provider_key} (Model: {actual_model})"

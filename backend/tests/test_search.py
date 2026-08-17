@@ -32,17 +32,20 @@ from tests.db import TEST_DATABASE_URL
 @pytest.fixture(scope="function")
 def search_test_db():
     engine = create_engine(TEST_DATABASE_URL)
-    Base.metadata.create_all(bind=engine)
-    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    db = session_factory()
     try:
-        db.execute(Base.metadata.tables["document_chunks"].delete())  # clean chunks
-        db.execute(Base.metadata.tables["documents"].delete())  # clean docs
-        db.execute(Base.metadata.tables["users"].delete())  # clean users
-        db.commit()
+        Base.metadata.create_all(bind=engine)
+        session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        db = session_factory()
+        try:
+            db.execute(Base.metadata.tables["document_chunks"].delete())  # clean chunks
+            db.execute(Base.metadata.tables["documents"].delete())  # clean docs
+            db.execute(Base.metadata.tables["users"].delete())  # clean users
+            db.commit()
+        finally:
+            db.close()
+        yield session_factory
     finally:
-        db.close()
-    return session_factory
+        engine.dispose()
 
 
 # --- 1. SearchRanker Unit Tests ---

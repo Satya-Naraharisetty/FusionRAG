@@ -18,23 +18,26 @@ def emb_test_db(client):
     Sets up a clean database for embedding integration tests.
     """
     engine = create_engine(TEST_DATABASE_URL)
-    Base.metadata.create_all(bind=engine)
-    session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-    db = session_local()
     try:
-        db.execute(text("TRUNCATE TABLE document_embeddings CASCADE;"))
-        db.execute(text("TRUNCATE TABLE document_chunks CASCADE;"))
-        db.execute(text("TRUNCATE TABLE documents CASCADE;"))
-        db.execute(text("TRUNCATE TABLE refresh_sessions CASCADE;"))
-        db.execute(text("TRUNCATE TABLE users CASCADE;"))
-        db.commit()
-    finally:
-        db.close()
+        Base.metadata.create_all(bind=engine)
+        session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-    client.app.state.db_session_factory = session_local
-    yield session_local
-    client.app.dependency_overrides.clear()
+        db = session_local()
+        try:
+            db.execute(text("TRUNCATE TABLE document_embeddings CASCADE;"))
+            db.execute(text("TRUNCATE TABLE document_chunks CASCADE;"))
+            db.execute(text("TRUNCATE TABLE documents CASCADE;"))
+            db.execute(text("TRUNCATE TABLE refresh_sessions CASCADE;"))
+            db.execute(text("TRUNCATE TABLE users CASCADE;"))
+            db.commit()
+        finally:
+            db.close()
+
+        client.app.state.db_session_factory = session_local
+        yield session_local
+        client.app.dependency_overrides.clear()
+    finally:
+        engine.dispose()
 
 
 def get_user_token(client, email="user_emb@example.com", password="SecurePassword123!"):

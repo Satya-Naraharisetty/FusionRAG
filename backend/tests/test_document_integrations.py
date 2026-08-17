@@ -17,22 +17,25 @@ def doc_test_db(client):
     Sets up a clean database for document tests.
     """
     engine = create_engine(TEST_DATABASE_URL)
-    Base.metadata.create_all(bind=engine)
-
-    session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-    db = session_local()
     try:
-        db.execute(text("TRUNCATE TABLE document_chunks CASCADE;"))
-        db.execute(text("TRUNCATE TABLE documents CASCADE;"))
-        db.execute(text("TRUNCATE TABLE refresh_sessions CASCADE;"))
-        db.execute(text("TRUNCATE TABLE users CASCADE;"))
-        db.commit()
-    finally:
-        db.close()
+        Base.metadata.create_all(bind=engine)
 
-    client.app.state.db_session_factory = session_local
-    yield session_local
+        session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+        db = session_local()
+        try:
+            db.execute(text("TRUNCATE TABLE document_chunks CASCADE;"))
+            db.execute(text("TRUNCATE TABLE documents CASCADE;"))
+            db.execute(text("TRUNCATE TABLE refresh_sessions CASCADE;"))
+            db.execute(text("TRUNCATE TABLE users CASCADE;"))
+            db.commit()
+        finally:
+            db.close()
+
+        client.app.state.db_session_factory = session_local
+        yield session_local
+    finally:
+        engine.dispose()
 
 
 # Helper function to register and authenticate a user
@@ -218,8 +221,8 @@ def test_upload_empty_file_rejected(client, doc_test_db):
         headers={"Authorization": f"Bearer {token}"},
     )
 
-    assert response.status_code == status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
-    assert response.json()["error"]["code"] == "UNSUPPORTED_DOCUMENT_TYPE"
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.json()["error"]["code"] == "DOCUMENT_CORRUPTED"
 
 
 def test_upload_large_file_rejected(client, doc_test_db):
@@ -705,6 +708,7 @@ def test_concurrent_processing_guard(mock_extract, client, doc_test_db):
             results.append((name, "error", str(e)))
         finally:
             db.close()
+            engine.dispose()
 
     # Start Thread A
     t_a = threading.Thread(target=run_pipeline, args=("ThreadA",))
@@ -817,6 +821,7 @@ def test_document_processing_invalidates_index_cache(client, doc_test_db):
         proc_service.process_document(doc_id)
     finally:
         db.close()
+        engine.dispose()
 
     # The cached "no chunks" flag must be invalidated after ingestion so the
     # next chat message re-checks the DB and sees the new chunks.

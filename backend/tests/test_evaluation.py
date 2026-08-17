@@ -225,7 +225,7 @@ def test_report_generation(db_session):
         dataset_id="test-ds",
         dataset_version="1.0.0",
         provider="gemini",
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash-lite",
         temperature=0.0,
         embedding_model="text-embedding-3-small",
         reranker="identity",

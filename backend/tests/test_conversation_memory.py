@@ -55,23 +55,26 @@ def chat_test_db(client):
     Sets up a clean database for conversation memory tests.
     """
     engine = create_engine(TEST_DATABASE_URL)
-    Base.metadata.create_all(bind=engine)
-
-    session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-    db = session_local()
     try:
-        db.execute(text("TRUNCATE TABLE conversation_summaries CASCADE;"))
-        db.execute(text("TRUNCATE TABLE conversation_messages CASCADE;"))
-        db.execute(text("TRUNCATE TABLE conversations CASCADE;"))
-        db.execute(text("TRUNCATE TABLE refresh_sessions CASCADE;"))
-        db.execute(text("TRUNCATE TABLE users CASCADE;"))
-        db.commit()
-    finally:
-        db.close()
+        Base.metadata.create_all(bind=engine)
 
-    client.app.state.db_session_factory = session_local
-    yield session_local
+        session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+        db = session_local()
+        try:
+            db.execute(text("TRUNCATE TABLE conversation_summaries CASCADE;"))
+            db.execute(text("TRUNCATE TABLE conversation_messages CASCADE;"))
+            db.execute(text("TRUNCATE TABLE conversations CASCADE;"))
+            db.execute(text("TRUNCATE TABLE refresh_sessions CASCADE;"))
+            db.execute(text("TRUNCATE TABLE users CASCADE;"))
+            db.commit()
+        finally:
+            db.close()
+
+        client.app.state.db_session_factory = session_local
+        yield session_local
+    finally:
+        engine.dispose()
 
 
 @pytest.fixture(scope="function")
@@ -485,7 +488,7 @@ async def test_conversation_summarizer(chat_test_db, test_users):
         llm_provider=llm_provider,
         summary_repo=sum_repo,
         message_repo=msg_repo,
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash-lite",
     )
 
     # Generate initial summary up to message index 2
@@ -511,7 +514,7 @@ async def test_conversation_summarizer(chat_test_db, test_users):
 async def test_query_rewriter_heuristics_and_caching():
     llm = MockLLMProvider("Standalone rewritten question")
     # Using local memory cache in rewriter
-    rewriter = LLMHistoryRewriter(llm, "gemini-1.5-flash", MemoryRewriteCache())
+    rewriter = LLMHistoryRewriter(llm, "gemini-2.5-flash-lite", MemoryRewriteCache())
 
     history = [
         ConversationMessage(
@@ -717,7 +720,7 @@ async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
 
     access_service = ConversationAccessService(conv_repo)
     memory = RollingConversationMemory(msg_repo, sum_repo, max_messages=12)
-    rewriter = LLMHistoryRewriter(llm, "gemini-1.5-flash", MemoryRewriteCache())
+    rewriter = LLMHistoryRewriter(llm, "gemini-2.5-flash-lite", MemoryRewriteCache())
 
     manager = ConversationManager(
         conversation_repo=conv_repo,
@@ -738,7 +741,7 @@ async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
         token_estimator=estimator,
         conversation_manager=manager,
         context_builder=context_builder,
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
@@ -830,7 +833,7 @@ def test_conversations_api_flow(client, chat_test_db):
     sum_repo = SQLAlchemySummaryRepository(db_session)
     access_service = ConversationAccessService(conv_repo)
     memory = RollingConversationMemory(msg_repo, sum_repo, max_messages=12)
-    rewriter = LLMHistoryRewriter(llm, "gemini-1.5-flash", MemoryRewriteCache())
+    rewriter = LLMHistoryRewriter(llm, "gemini-2.5-flash-lite", MemoryRewriteCache())
 
     # Title generator
     from app.chat.services.title_generator import FallbackConversationTitleGenerator
@@ -846,6 +849,7 @@ def test_conversations_api_flow(client, chat_test_db):
         rewriter=rewriter,
         title_generator=title_generator,
         event_dispatcher=dispatcher,
+        db=db_session,
     )
 
     real_service = AnswerGenerationService(
@@ -855,7 +859,7 @@ def test_conversations_api_flow(client, chat_test_db):
         token_estimator=estimator,
         conversation_manager=manager,
         context_builder=context_builder,
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
@@ -898,14 +902,14 @@ def test_conversations_api_flow(client, chat_test_db):
         headers=headers,
         json={
             "title": "Renamed Chat Session",
-            "settings": {"temperature": 0.7, "model": "gemini-1.5-pro"},
+            "settings": {"temperature": 0.7, "model": "gemini-2.5-flash-lite"},
         },
     )
     assert patch_resp.status_code == status.HTTP_200_OK
     patched_data = patch_resp.json()
     assert patched_data["title"] == "Renamed Chat Session"
     assert patched_data["settings"]["temperature"] == 0.7
-    assert patched_data["settings"]["model"] == "gemini-1.5-pro"
+    assert patched_data["settings"]["model"] == "gemini-2.5-flash-lite"
 
     # 5. Get specific conversation details
     detail_resp = client.get(f"/api/v1/conversations/{conv_id}", headers=headers)
@@ -1114,7 +1118,7 @@ def _build_answer_service(db):
     dispatcher = SimpleEventDispatcher()
     access_service = ConversationAccessService(conv_repo)
     memory = RollingConversationMemory(msg_repo, sum_repo, max_messages=12)
-    rewriter = LLMHistoryRewriter(llm, "gemini-1.5-flash", MemoryRewriteCache())
+    rewriter = LLMHistoryRewriter(llm, "gemini-2.5-flash-lite", MemoryRewriteCache())
 
     manager = ConversationManager(
         conversation_repo=conv_repo,
@@ -1134,7 +1138,7 @@ def _build_answer_service(db):
         token_estimator=estimator,
         conversation_manager=manager,
         context_builder=context_builder,
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
@@ -1386,7 +1390,7 @@ async def test_answer_generation_skips_rewrite_and_retrieval_without_documents(
         token_estimator=estimator,
         conversation_manager=manager,
         context_builder=context_builder,
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,

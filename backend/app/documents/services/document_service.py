@@ -83,7 +83,7 @@ class DocumentService:
                 )
         # 1. Reject empty files
         if not file_bytes or len(file_bytes) == 0:
-            raise DocumentCorruptedError("Uploaded file is empty.")
+            raise DocumentCorrupted("Uploaded file is empty.")
 
         # 2. Validate file size
         if len(file_bytes) > self._max_upload_size:
