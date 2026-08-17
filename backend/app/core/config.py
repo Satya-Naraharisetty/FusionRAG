@@ -130,6 +130,8 @@ class Settings(BaseSettings):
         # Legacy / alternate local ports
         "http://localhost:8080",
     ]
+    BACKEND_CORS_ORIGIN_REGEX: str | None = None
+
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
