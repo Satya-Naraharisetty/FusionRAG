@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, ShieldAlert, ArrowRight, Github } from "lucide-react";
+import { Eye, EyeOff, ShieldAlert, ArrowRight } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 
@@ -154,12 +154,12 @@ export const LoginCard: React.FC<LoginCardProps> = ({
       </div>
 
       {/* OAuth buttons */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="flex flex-col gap-2">
         <Button
           variant="secondary"
           size="default"
           onClick={() => onSocialAuth("Google")}
-          className="gap-2 text-xs font-medium"
+          className="gap-2 text-xs font-medium w-full"
           aria-label="Sign in with Google"
         >
           <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -168,17 +168,7 @@ export const LoginCard: React.FC<LoginCardProps> = ({
             <path fill="#FBBC05" d="M5.1 14.7c-.24-.73-.38-1.51-.38-2.32s.14-1.59.38-2.32L1.5 7.26C.54 9.17 0 11.31 0 13.62s.54 4.45 1.5 6.36l3.6-2.8z" />
             <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.6-2.8c-1.1.74-2.5 1.18-4.36 1.18-3.21 0-5.99-1.99-6.9-4.76L1.5 16.5C3.39 20.35 7.35 23 12 23z" />
           </svg>
-          <span>Google</span>
-        </Button>
-        <Button
-          variant="secondary"
-          size="default"
-          onClick={() => onSocialAuth("GitHub")}
-          className="gap-2 text-xs font-medium"
-          aria-label="Sign in with GitHub"
-        >
-          <Github size={14} className="flex-shrink-0" />
-          <span>GitHub</span>
+          <span>Continue with Google</span>
         </Button>
       </div>
 

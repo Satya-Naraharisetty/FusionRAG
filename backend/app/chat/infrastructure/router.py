@@ -123,7 +123,9 @@ class LLMProviderRouter(LLMProvider):
             if fallback_key in self._providers:
                 fallback_provider = self._providers[fallback_key]
                 fallback_model = (
-                    "gpt-4o-mini" if fallback_key == "openai" else "gemini-2.5-flash-lite"
+                    "gpt-4o-mini"
+                    if fallback_key == "openai"
+                    else "gemini-2.5-flash-lite"
                 )
                 logger.warning(f"Attempting immediate fallback to: {fallback_key}")
                 try:

@@ -7,6 +7,7 @@ export interface UserResponse {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  oauth_provider: string | null;
 }
 
 export interface TokenResponse {
@@ -55,5 +56,17 @@ export const authApi = {
     return api.delete("/auth/account", {
       body: JSON.stringify({ password }),
     });
+  },
+
+  /**
+   * Redirect the full browser window to the backend Google OAuth initiation
+   * endpoint. The backend will redirect to Google, which redirects back to
+   * /api/v1/auth/oauth/google/callback, which then sends the user to
+   * /oauth/callback on the frontend with the access token in the URL.
+   */
+  loginWithGoogle(): void {
+    const apiBase =
+      import.meta.env.VITE_API_URL || "http://localhost:8000";
+    window.location.href = `${apiBase}/api/v1/auth/oauth/google`;
   },
 };

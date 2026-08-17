@@ -229,6 +229,16 @@ class Settings(BaseSettings):
     ENABLE_STREAMING: bool = True
     GEMINI_API_KEY: str = ""
 
+    # OAuth (Google)
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    # Base URL of the backend used to build OAuth callback URIs.
+    # Local: http://localhost:8000 | Production: https://hybrid-rag-gilt.vercel.app
+    OAUTH_REDIRECT_BASE_URL: str = "http://localhost:8000"
+    # Base URL of the frontend used to redirect after OAuth success/failure.
+    # Local: http://localhost:5173 | Production: https://hybrid-rag-frontend.vercel.app
+    FRONTEND_URL: str = "http://localhost:5173"
+
     # Conversation Memory & History-Aware Retrieval Configurations
     ENABLE_CONVERSATION_MEMORY: bool = True
     ENABLE_HISTORY_REWRITE: bool = True

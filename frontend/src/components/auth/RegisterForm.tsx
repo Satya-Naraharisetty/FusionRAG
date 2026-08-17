@@ -5,7 +5,7 @@ import { checkPasswordStrength } from "../../lib/passwordStrength";
 import toast from "react-hot-toast";
 
 export const RegisterForm: React.FC = () => {
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const [email, setEmail]                       = useState("");
   const [password, setPassword]                 = useState("");
   const [confirmPassword, setConfirmPassword]   = useState("");
@@ -49,7 +49,9 @@ export const RegisterForm: React.FC = () => {
   };
 
   const handleSocialAuth = (provider: string) => {
-    toast.success(`Redirecting to ${provider} registration…`);
+    if (provider === "Google") {
+      loginWithGoogle();
+    }
   };
 
   return (

@@ -17,6 +17,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const ChatPage = lazy(() => import("./pages/ChatPage"));
 const DocumentsPage = lazy(() => import("./pages/DocumentsPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const OAuthCallbackPage = lazy(() => import("./pages/OAuthCallbackPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,6 +94,10 @@ function App() {
                     />
                   </Route>
                 </Route>
+
+                {/* OAuth callback — must be outside both Public and Protected
+                    guards so it is reachable immediately after redirect */}
+                <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
 
                 {/* Fallbacks */}
                 <Route path="/401" element={<ErrorPage status={401} />} />

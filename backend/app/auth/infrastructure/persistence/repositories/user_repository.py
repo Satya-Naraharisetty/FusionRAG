@@ -31,6 +31,22 @@ class SQLAlchemyUserRepository(UserRepository):
             return None
         return UserDomain.model_validate(db_user)
 
+    def get_by_oauth_sub(self, provider: str, sub: str) -> UserDomain | None:
+        """
+        Query a user by OAuth provider + subject identifier.
+        """
+        db_user = (
+            self._db.query(SQLAlchemyUser)
+            .filter(
+                SQLAlchemyUser.oauth_provider == provider,
+                SQLAlchemyUser.oauth_sub == sub,
+            )
+            .first()
+        )
+        if not db_user:
+            return None
+        return UserDomain.model_validate(db_user)
+
     def save(self, user: UserDomain) -> UserDomain:
         """
         Save/persist a user model in the database transaction context.
@@ -47,6 +63,8 @@ class SQLAlchemyUserRepository(UserRepository):
                 is_active=user.is_active,
                 created_at=user.created_at,
                 updated_at=user.updated_at,
+                oauth_provider=user.oauth_provider,
+                oauth_sub=user.oauth_sub,
             )
             self._db.add(db_user)
         else:
@@ -55,6 +73,11 @@ class SQLAlchemyUserRepository(UserRepository):
             db_user.role = user.role
             db_user.is_active = user.is_active
             db_user.updated_at = user.updated_at
+            # Update OAuth fields if provided
+            if user.oauth_provider is not None:
+                db_user.oauth_provider = user.oauth_provider
+            if user.oauth_sub is not None:
+                db_user.oauth_sub = user.oauth_sub
 
         self._db.flush()
         return UserDomain.model_validate(db_user)

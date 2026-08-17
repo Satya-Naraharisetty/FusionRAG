@@ -18,6 +18,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => void;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
@@ -183,12 +184,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [scheduleRefresh, clearRefreshTimer]);
 
+  const loginWithGoogle = () => {
+    authApi.loginWithGoogle();
+  };
+
   const value: AuthContextType = {
     user,
     accessToken,
     isAuthenticated: !!accessToken,
     isLoading,
     login,
+    loginWithGoogle,
     register,
     logout,
     deleteAccount,

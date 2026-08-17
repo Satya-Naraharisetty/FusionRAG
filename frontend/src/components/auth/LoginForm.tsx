@@ -2,9 +2,21 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { LoginCard } from "./LoginCard";
 import toast from "react-hot-toast";
+import { useSearchParams } from "react-router-dom";
+
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  access_denied: "Google sign-in was cancelled.",
+  invalid_state: "Security check failed. Please try again.",
+  exchange_failed: "Could not complete Google sign-in. Please try again.",
+  session_failed: "Session creation failed. Please try again.",
+  missing_params: "OAuth response was invalid. Please try again.",
+  missing_token: "Sign-in token was not received. Please try again.",
+  profile_fetch_failed: "Could not load your profile. Please try again.",
+};
 
 export const LoginForm: React.FC = () => {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [email, setEmail]             = useState("");
   const [password, setPassword]       = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -12,6 +24,22 @@ export const LoginForm: React.FC = () => {
   const [isMagicLink, setIsMagicLink] = useState(false);
   const [error, setError]             = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Show a toast if we were redirected back from a failed OAuth attempt
+  useEffect(() => {
+    const oauthError = searchParams.get("oauth_error");
+    if (oauthError) {
+      const msg =
+        OAUTH_ERROR_MESSAGES[oauthError] ||
+        "Google sign-in failed. Please try again.";
+      toast.error(msg);
+      // Remove the param so refreshing doesn't re-show it
+      setSearchParams((prev) => {
+        prev.delete("oauth_error");
+        return prev;
+      });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     const saved = localStorage.getItem("login-remember-email");
@@ -49,7 +77,9 @@ export const LoginForm: React.FC = () => {
   };
 
   const handleSocialAuth = (provider: string) => {
-    toast.success(`Redirecting to ${provider} authentication…`);
+    if (provider === "Google") {
+      loginWithGoogle();
+    }
   };
 
   return (

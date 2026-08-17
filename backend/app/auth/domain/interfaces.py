@@ -75,6 +75,13 @@ class UserRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_by_oauth_sub(self, provider: str, sub: str) -> "UserDomain | None":
+        """
+        Fetch a user by OAuth provider + subject identifier.
+        """
+        pass
+
 
 class SessionRepository(ABC):
     @abstractmethod

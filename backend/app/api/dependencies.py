@@ -21,6 +21,7 @@ from app.auth.infrastructure.providers import (
     SystemUUIDGenerator,
 )
 from app.auth.services.auth_service import AuthService
+from app.auth.services.oauth_service import OAuthService
 from app.core.config import settings
 from app.db.session import get_db
 from app.documents.domain.events import DocumentProcessingCompleted
@@ -82,6 +83,23 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
         session_repo=session_repo,
         hasher=hasher,
         token_provider=token_provider,
+        time_provider=time_provider,
+        uuid_generator=uuid_generator,
+        uow=uow,
+    )
+
+
+def get_oauth_service(db: Session = Depends(get_db)) -> OAuthService:
+    """
+    Composition root for OAuthService.
+    """
+    user_repo = SQLAlchemyUserRepository(db)
+    time_provider = SystemTimeProvider()
+    uuid_generator = SystemUUIDGenerator()
+    uow = SQLAlchemyUnitOfWork(db)
+
+    return OAuthService(
+        user_repo=user_repo,
         time_provider=time_provider,
         uuid_generator=uuid_generator,
         uow=uow,

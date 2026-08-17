@@ -2,12 +2,14 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import RedirectResponse
 
 from app.api.dependencies import (
     check_account_delete_rate_limit,
     check_rate_limit,
     get_auth_service,
     get_current_user_context,
+    get_oauth_service,
 )
 from app.auth.domain.schemas import (
     DeleteAccountSchema,
@@ -17,9 +19,13 @@ from app.auth.domain.schemas import (
     UserResponseSchema,
 )
 from app.auth.services.auth_service import AuthService
+from app.auth.services.oauth_service import OAuthService
 from app.core.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+# ── OAuth state cookie name (short-lived CSRF token) ──────────────────────────
+_OAUTH_STATE_COOKIE = "oauth_state"
 
 
 @router.post(
@@ -198,3 +204,140 @@ def delete_account(
         httponly=True,
         samesite=settings.COOKIE_SAMESITE,
     )
+
+
+# ── Google OAuth ───────────────────────────────────────────────────────────────
+
+
+@router.get("/oauth/google", tags=["OAuth"])
+def google_oauth_initiate(response: Response):
+    """
+    Redirect the user to Google's consent page.
+
+    A short-lived HttpOnly state cookie is set for CSRF protection.
+    """
+    import secrets
+    import urllib.parse
+
+    state = secrets.token_urlsafe(32)
+    callback_url = (
+        f"{settings.OAUTH_REDIRECT_BASE_URL}"
+        f"{settings.API_V1_STR}/auth/oauth/google/callback"
+    )
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": callback_url,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "offline",
+        "prompt": "select_account",
+    }
+    google_url = (
+        f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
+    )
+
+    redirect = RedirectResponse(url=google_url, status_code=302)
+    # Store state in a short-lived HttpOnly cookie for CSRF validation
+    redirect.set_cookie(
+        key=_OAUTH_STATE_COOKIE,
+        value=state,
+        max_age=600,  # 10 minutes — enough time for user to approve
+        path=settings.API_V1_STR + "/auth",
+        secure=settings.COOKIE_SECURE,
+        httponly=True,
+        samesite="lax",
+    )
+    return redirect
+
+
+@router.get("/oauth/google/callback", tags=["OAuth"])
+def google_oauth_callback(
+    request: Request,
+    response: Response,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    oauth_service: OAuthService = Depends(get_oauth_service),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    Handle Google's redirect after user consent.
+
+    Validates the CSRF state, exchanges the authorization code, upserts the
+    user, creates a session, and redirects to the frontend with the access token.
+    """
+    frontend_base = settings.FRONTEND_URL
+
+    # ── Error from Google ──────────────────────────────────────────────────────
+    if error:
+        return RedirectResponse(
+            url=f"{frontend_base}/login?oauth_error={error}",
+            status_code=302,
+        )
+
+    if not code or not state:
+        return RedirectResponse(
+            url=f"{frontend_base}/login?oauth_error=missing_params",
+            status_code=302,
+        )
+
+    # ── CSRF state validation ──────────────────────────────────────────────────
+    stored_state = request.cookies.get(_OAUTH_STATE_COOKIE)
+    if not stored_state or stored_state != state:
+        return RedirectResponse(
+            url=f"{frontend_base}/login?oauth_error=invalid_state",
+            status_code=302,
+        )
+
+    # ── Exchange code → user ───────────────────────────────────────────────────
+    try:
+        user = oauth_service.exchange_google_code(code=code, state=state)
+    except Exception:
+        return RedirectResponse(
+            url=f"{frontend_base}/login?oauth_error=exchange_failed",
+            status_code=302,
+        )
+
+    # ── Create session ─────────────────────────────────────────────────────────
+    try:
+        user_agent = request.headers.get("User-Agent")
+        ip_address = request.client.host if request.client else None
+        access_token, refresh_token = auth_service.create_session(
+            user_id=user.id, user_agent=user_agent, ip_address=ip_address
+        )
+    except Exception:
+        return RedirectResponse(
+            url=f"{frontend_base}/login?oauth_error=session_failed",
+            status_code=302,
+        )
+
+    # ── Redirect to frontend with access token ─────────────────────────────────
+    redirect = RedirectResponse(
+        url=(
+            f"{frontend_base}/oauth/callback"
+            f"?access_token={access_token}"
+            f"&expires_in={settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60}"
+        ),
+        status_code=302,
+    )
+    # Set the long-lived refresh cookie
+    redirect.set_cookie(
+        key=settings.COOKIE_NAME,
+        value=refresh_token,
+        max_age=settings.COOKIE_MAX_AGE,
+        path=settings.COOKIE_PATH,
+        domain=settings.COOKIE_DOMAIN,
+        secure=settings.COOKIE_SECURE,
+        httponly=True,
+        samesite=settings.COOKIE_SAMESITE,
+    )
+    # Clear the CSRF state cookie
+    redirect.delete_cookie(
+        key=_OAUTH_STATE_COOKIE,
+        path=settings.API_V1_STR + "/auth",
+        secure=settings.COOKIE_SECURE,
+        httponly=True,
+        samesite="lax",
+    )
+    return redirect

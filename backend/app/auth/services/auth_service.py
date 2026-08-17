@@ -231,13 +231,20 @@ class AuthService:
         a deactivated account may still be deleted by its owner when the
         correct password is supplied.
 
-        Raises UserNotFoundException if the account no longer exists and
-        InvalidCredentialsException if the password does not match, so the API
-        layer responds with the standard error codes.
+        Raises UserNotFoundException if the account no longer exists,
+        InvalidCredentialsException if the password does not match, and
+        InvalidCredentialsException with a descriptive message for OAuth-only
+        accounts that have no local password set.
         """
         user = self._user_repo.get_by_id(user_id)
         if not user:
             raise UserNotFoundException("User account no longer exists.")
+        # OAuth-only accounts have no local password — inform the caller.
+        if not user.hashed_password:
+            raise InvalidCredentialsException(
+                "This account uses Google Sign-In and has no password set. "
+                "Delete is not supported via password re-entry for OAuth accounts."
+            )
         if not self._hasher.verify(password, user.hashed_password):
             raise InvalidCredentialsException("Invalid email or password.")
 

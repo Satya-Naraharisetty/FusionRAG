@@ -53,6 +53,7 @@ class UserResponseSchema(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    oauth_provider: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -66,11 +67,14 @@ class TokenResponseSchema(BaseModel):
 class UserDomain(BaseModel):
     id: UUID
     email: EmailStr
-    hashed_password: str
+    # None for OAuth-only accounts that have no password
+    hashed_password: str | None = None
     role: str
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    oauth_provider: str | None = None
+    oauth_sub: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

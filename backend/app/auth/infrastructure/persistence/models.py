@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -9,12 +9,19 @@ from app.db.session import Base
 
 class SQLAlchemyUser(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        # Ensure each (provider, sub) pair maps to exactly one account
+        UniqueConstraint(
+            "oauth_provider", "oauth_sub", name="uq_users_oauth_provider_sub"
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(
         String(255), unique=True, index=True, nullable=False
     )
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Nullable for OAuth-only users who have no local password
+    hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role: Mapped[str] = mapped_column(String(50), default="user", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -25,6 +32,11 @@ class SQLAlchemyUser(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+    # OAuth fields — None for email/password accounts
+    oauth_provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    oauth_sub: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
     )
 
     # Relationships
