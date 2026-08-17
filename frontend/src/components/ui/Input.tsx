@@ -47,7 +47,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             aria-describedby={describedBy}
             {...invalidProps}
             className={cn(
-              "flex h-10 w-full rounded-xl border border-(--border-default) bg-(--bg-input) text-sm text-(--text-primary) placeholder:text-(--text-muted) transition-all duration-200 hover:border-(--border-hover) focus:border-(--accent-primary)/50 focus:outline-none focus:ring-2 focus:ring-(--accent-primary)/20 disabled:cursor-not-allowed disabled:opacity-40",
+              "flex h-10 w-full rounded-xl border border-(--border-default) bg-(--bg-input) pl-3.5 pr-3.5 text-sm text-(--text-primary) placeholder:text-(--text-muted) transition-all duration-200 hover:border-(--border-hover) focus:border-(--accent-primary)/50 focus:outline-none focus:ring-2 focus:ring-(--accent-primary)/20 disabled:cursor-not-allowed disabled:opacity-40",
               leftIcon && "pl-10",
               rightIcon && "pr-10",
               error && "border-(--accent-error)/50 focus:border-(--accent-error) focus:ring-(--accent-error)/20",

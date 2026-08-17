@@ -1,10 +1,11 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Plus, Database, Search } from "lucide-react";
 import { useDocuments } from "../../hooks/useDocuments";
 import { useDocumentPipelineSummary } from "../../hooks/useDocumentPipelineSummary";
 import { SidebarUploadIndicator } from "./SidebarUploadIndicator";
 import { Conversation } from "../../types";
+import { cn } from "../../lib/utils";
 import {
   Tooltip,
   TooltipContent,
@@ -28,6 +29,8 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   collapsed,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isDocumentsActive = location.pathname === "/documents";
   const { data: documents = [] } = useDocuments();
   const pipeline = useDocumentPipelineSummary();
   const busy = pipeline.processing > 0;
@@ -51,7 +54,12 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             <TooltipTrigger asChild>
               <button
                 onClick={() => navigate("/documents")}
-                className="relative w-10 h-10 bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-[var(--radius-lg)] flex items-center justify-center cursor-pointer transition-colors"
+                className={cn(
+                  "relative w-10 h-10 rounded-[var(--radius-lg)] flex items-center justify-center cursor-pointer transition-colors",
+                  isDocumentsActive
+                    ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
+                    : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                )}
                 aria-label="Documents"
               >
                 <Database size={16} />
@@ -89,7 +97,12 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
           <TooltipTrigger asChild>
             <button
               onClick={() => navigate("/documents")}
-              className="w-full h-10 bg-transparent hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-[var(--radius-lg)] flex items-center justify-between px-3 cursor-pointer text-xs font-medium transition-colors text-left"
+              className={cn(
+                "w-full h-10 rounded-[var(--radius-lg)] flex items-center justify-between px-3 cursor-pointer text-xs font-medium transition-colors text-left",
+                isDocumentsActive
+                  ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
+                  : "bg-transparent hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              )}
             >
               <div className="flex items-center gap-2.5">
                 <span className="relative flex-shrink-0">
