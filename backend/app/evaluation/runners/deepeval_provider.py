@@ -11,16 +11,28 @@ from app.evaluation.domain.models import (
 
 logger = logging.getLogger(__name__)
 
-DEEPEVAL_AVAILABLE = False
-try:
-    from deepeval.metrics import AnswerRelevancyMetric, HallucinationMetric
-    from deepeval.test_case import LLMTestCase
+_deepeval_available = None
 
-    DEEPEVAL_AVAILABLE = True
-except ImportError as e:
-    logger.warning(
-        f"DeepEval or its dependencies are not fully loaded/installed. DeepEval evaluations will run in Mock/Stub mode. Detail: {e}"
-    )
+
+def is_deepeval_available() -> bool:
+    global _deepeval_available
+    if _deepeval_available is None:
+        try:
+            from deepeval.metrics import (  # noqa: F401
+                AnswerRelevancyMetric,
+                HallucinationMetric,
+            )
+            from deepeval.test_case import LLMTestCase  # noqa: F401
+
+            _deepeval_available = True
+        except ImportError as e:
+            _deepeval_available = False
+            if settings.ENABLE_DEEPEVAL:
+                logger.warning(
+                    f"DeepEval or its dependencies are not fully loaded/installed. "
+                    f"DeepEval evaluations will run in Mock/Stub mode. Detail: {e}"
+                )
+    return _deepeval_available
 
 
 class DeepEvalProvider(EvaluationProvider):
@@ -32,7 +44,7 @@ class DeepEvalProvider(EvaluationProvider):
     async def evaluate(
         self, samples: list[EvaluationSample], metrics: list[str], mock: bool = False
     ) -> list[EvaluationResult]:
-        use_mock = mock or not DEEPEVAL_AVAILABLE or not settings.ENABLE_DEEPEVAL
+        use_mock = mock or not settings.ENABLE_DEEPEVAL or not is_deepeval_available()
 
         if use_mock:
             logger.info("Executing DeepEval metrics in Mock/Stub mode...")
@@ -46,6 +58,9 @@ class DeepEvalProvider(EvaluationProvider):
         try:
             # Setup the API key environment variable for DeepEval
             import os
+
+            from deepeval.metrics import AnswerRelevancyMetric, HallucinationMetric
+            from deepeval.test_case import LLMTestCase
 
             if settings.EVALUATION_PROVIDER == "gemini":
                 os.environ["OPENAI_API_KEY"] = settings.GEMINI_API_KEY

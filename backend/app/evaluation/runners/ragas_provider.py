@@ -11,22 +11,31 @@ from app.evaluation.domain.models import (
 
 logger = logging.getLogger(__name__)
 
-RAGAS_AVAILABLE = False
-try:
-    from datasets import Dataset
-    from ragas import evaluate as ragas_evaluate
-    from ragas.metrics import (
-        answer_relevancy,
-        context_precision,
-        context_recall,
-        faithfulness,
-    )
+_ragas_available = None
 
-    RAGAS_AVAILABLE = True
-except ImportError as e:
-    logger.warning(
-        f"Ragas or its dependencies are not fully loaded/installed. Ragas evaluations will run in Mock/Stub mode. Detail: {e}"
-    )
+
+def is_ragas_available() -> bool:
+    global _ragas_available
+    if _ragas_available is None:
+        try:
+            from datasets import Dataset  # noqa: F401
+            from ragas import evaluate as ragas_evaluate  # noqa: F401
+            from ragas.metrics import (  # noqa: F401
+                answer_relevancy,
+                context_precision,
+                context_recall,
+                faithfulness,
+            )
+
+            _ragas_available = True
+        except ImportError as e:
+            _ragas_available = False
+            if settings.ENABLE_RAGAS:
+                logger.warning(
+                    f"Ragas or its dependencies are not fully loaded/installed. "
+                    f"Ragas evaluations will run in Mock/Stub mode. Detail: {e}"
+                )
+    return _ragas_available
 
 
 class RagasProvider(EvaluationProvider):
@@ -39,7 +48,7 @@ class RagasProvider(EvaluationProvider):
         self, samples: list[EvaluationSample], metrics: list[str], mock: bool = False
     ) -> list[EvaluationResult]:
         # Determine if we must run mock mode
-        use_mock = mock or not RAGAS_AVAILABLE or not settings.ENABLE_RAGAS
+        use_mock = mock or not settings.ENABLE_RAGAS or not is_ragas_available()
 
         if use_mock:
             logger.info("Executing Ragas metrics in Mock/Stub mode...")
@@ -51,6 +60,15 @@ class RagasProvider(EvaluationProvider):
         self, samples: list[EvaluationSample], metrics: list[str]
     ) -> list[EvaluationResult]:
         try:
+            from datasets import Dataset
+            from ragas import evaluate as ragas_evaluate
+            from ragas.metrics import (
+                answer_relevancy,
+                context_precision,
+                context_recall,
+                faithfulness,
+            )
+
             # 1. Prepare Ragas dataset structure
             questions = []
             answers = []

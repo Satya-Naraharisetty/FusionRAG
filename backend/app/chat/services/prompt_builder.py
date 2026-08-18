@@ -98,13 +98,29 @@ class PromptBuilder:
         from app.chat.domain.models import ChatMessage, ChatRole, MessageRole
 
         # 1. System Prompt & Summaries
-        system_content = self._system_prompt
+        if not context_obj.retrieved_chunks:
+            if document_priority:
+                system_content = (
+                    "You are a helpful and precise AI assistant. "
+                    "The user explicitly asked to prioritize their uploaded documents (they used @documents), "
+                    "but no uploaded documents were found or match the query. "
+                    "Answer the question from your general knowledge and clearly state that the information "
+                    "was not found in the uploaded documents."
+                )
+            else:
+                system_content = (
+                    "You are a helpful and precise AI assistant. "
+                    "No document context is available for this question. Answer the question from your general knowledge."
+                )
+        else:
+            system_content = self._system_prompt
+            if document_priority:
+                system_content += self._DOCUMENTS_PRIORITY_NOTE
+
         if context_obj.summary:
             system_content += (
                 f"\n\nConversation Summary:\n{context_obj.summary.summary}"
             )
-        if document_priority:
-            system_content += self._DOCUMENTS_PRIORITY_NOTE
 
         system_tokens = token_estimator.estimate(system_content)
 
@@ -170,10 +186,14 @@ class PromptBuilder:
 
         concatenated_context = "".join(concatenated_parts).strip()
 
-        # If no document context made it into the prompt and the user did not
+        # If no document context made it into the prompt (e.g. due to budget limits) and the user did not
         # explicitly prioritize documents, tell the assistant to answer from
         # general knowledge so an empty knowledge base never yields a refusal.
-        if not chunk_references and not document_priority:
+        if (
+            not chunk_references
+            and not document_priority
+            and context_obj.retrieved_chunks
+        ):
             system_content += self._NO_CONTEXT_NOTE
 
         # 5. Assemble final prompt messages
