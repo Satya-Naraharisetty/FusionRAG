@@ -197,7 +197,9 @@ def test_embedding_service_batch_no_n_plus_1(mocker):
     vector_store = mocker.MagicMock()
     embedding_repo = mocker.MagicMock()
     embedding_repo.get_by_chunk_ids.return_value = []
-    embedding_repo.get_by_chunk.side_effect = AssertionError("get_by_chunk was called! Expected N+1 query elimination.")
+    embedding_repo.get_by_chunk.side_effect = AssertionError(
+        "get_by_chunk was called! Expected N+1 query elimination."
+    )
 
     chunk_repo = mocker.MagicMock()
     doc_id = uuid4()

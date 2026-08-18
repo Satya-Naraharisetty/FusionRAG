@@ -56,7 +56,9 @@ class RedisCache(BaseCache):
                 user_id = kwargs.get("user_id")
                 if not user_id:
                     try:
-                        from app.core.context.request_context import current_request_context
+                        from app.core.context.request_context import (
+                            current_request_context,
+                        )
 
                         ctx = current_request_context.get()
                         user_id = ctx.user_id

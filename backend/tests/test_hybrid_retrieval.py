@@ -99,7 +99,7 @@ def test_index_cache_lru_and_capacity():
 
     # Adding u4 must evict the LRU element (u2)
     cache.set(u4, "index_data_4", {"u": 4})
-    
+
     assert cache.get(u2) is None  # Evicted
     assert cache.get(u1) == "index_data_1"
     assert cache.get(u3) == "index_data_3"

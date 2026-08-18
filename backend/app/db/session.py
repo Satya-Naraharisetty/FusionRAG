@@ -107,7 +107,9 @@ def init_redis_client(
                 max_connections=50,
             )
         else:
-            connection_class = async_redis.SSLConnection if ssl else async_redis.Connection
+            connection_class = (
+                async_redis.SSLConnection if ssl else async_redis.Connection
+            )
             _redis_pool = async_redis.ConnectionPool(
                 host=host or "localhost",
                 port=port or 6379,

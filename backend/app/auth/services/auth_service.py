@@ -83,6 +83,9 @@ class AuthService:
         if not user.is_active:
             raise AccountDisabledException("Account has been deactivated.")
 
+        if not user.hashed_password:
+            raise InvalidCredentialsException("Invalid email or password.")
+
         if not self._hasher.verify(password, user.hashed_password):
             raise InvalidCredentialsException("Invalid email or password.")
 

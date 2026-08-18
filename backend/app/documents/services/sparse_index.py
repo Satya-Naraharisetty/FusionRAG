@@ -144,7 +144,9 @@ class InMemoryBM25Index(SparseIndex):
                     InMemoryBM25Index._tokenized_chunks_cache.pop(uid, None)
 
             # Get user's pre-tokenized dictionary
-            user_tokenized = InMemoryBM25Index._tokenized_chunks_cache.setdefault(user_id, {})
+            user_tokenized = InMemoryBM25Index._tokenized_chunks_cache.setdefault(
+                user_id, {}
+            )
             # Keep only the current active chunk IDs to prune deleted chunks
             active_chunk_ids = {c.id for c in chunks}
             for chunk_id in list(user_tokenized.keys()):

@@ -1,15 +1,14 @@
-import asyncio
-from uuid import uuid4
-import pytest
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
+import pytest
+
+from app.documents.infrastructure.persistence.models import SQLAlchemyCleanupJob
 from app.documents.services.cleanup_worker import (
     DurableCleanupWorker,
-    run_durable_cleanup_recovery,
-    async_durable_cleanup_recovery,
     _query_pending_failed_jobs,
+    async_durable_cleanup_recovery,
 )
-from app.documents.infrastructure.persistence.models import SQLAlchemyCleanupJob
 
 
 class MockDB:
@@ -107,8 +106,13 @@ async def test_async_durable_cleanup_recovery_triggers_jobs():
     job_ids = [uuid4(), uuid4()]
 
     # Mock the thread-based DB query to return our job IDs
-    with patch("app.documents.services.cleanup_worker._query_pending_failed_jobs", return_value=job_ids) as mock_query:
-        with patch("app.documents.services.cleanup_worker._run_cleanup_jobs_async") as mock_run:
+    with patch(
+        "app.documents.services.cleanup_worker._query_pending_failed_jobs",
+        return_value=job_ids,
+    ) as mock_query:
+        with patch(
+            "app.documents.services.cleanup_worker._run_cleanup_jobs_async"
+        ) as mock_run:
             await async_durable_cleanup_recovery()
 
             mock_query.assert_called_once()
@@ -125,7 +129,7 @@ def test_query_pending_failed_jobs_bounded():
         job2 = SQLAlchemyCleanupJob(id=uuid4(), status="FAILED")
         mock_db = MockDB([job1, job2])
 
-        with patch("app.db.session.init_postgres_engine") as mock_engine:
+        with patch("app.db.session.init_postgres_engine"):
             with patch("sqlalchemy.orm.sessionmaker", return_value=lambda: mock_db):
                 job_ids = _query_pending_failed_jobs()
 

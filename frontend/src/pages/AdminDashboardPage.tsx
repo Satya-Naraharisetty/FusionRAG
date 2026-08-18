@@ -16,8 +16,8 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
-import { evaluationApi, EvaluationRun } from "../api/evaluation";
-import { observabilityApi, TraceItem } from "../api/observability";
+import { evaluationApi, EvaluationRun, RegressionResponse } from "../api/evaluation";
+import { observabilityApi, TraceItem, DailyMetric } from "../api/observability";
 import toast from "react-hot-toast";
 
 export const AdminDashboardPage: React.FC = () => {
@@ -41,7 +41,7 @@ export const AdminDashboardPage: React.FC = () => {
   // Form states for regression comparison
   const [candidateRunId, setCandidateRunId] = useState("");
   const [baselineRunId, setBaselineRunId] = useState("");
-  const [regressionResult, setRegressionResult] = useState<any>(null);
+  const [regressionResult, setRegressionResult] = useState<RegressionResponse | null>(null);
 
   // Trace details expander state
   const [expandedTraceId, setExpandedTraceId] = useState<string | null>(null);
@@ -85,8 +85,8 @@ export const AdminDashboardPage: React.FC = () => {
       setIsRunModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["evaluationRuns"] });
     },
-    onError: (err: any) => {
-      toast.error(`Failed to launch benchmark: ${err.message || err}`);
+    onError: (err: Error) => {
+      toast.error(`Failed to launch benchmark: ${err.message || String(err)}`);
     },
   });
 
@@ -97,8 +97,8 @@ export const AdminDashboardPage: React.FC = () => {
       setRegressionResult(data);
       queryClient.invalidateQueries({ queryKey: ["evaluationRuns"] });
     },
-    onError: (err: any) => {
-      toast.error(`Regression check failed: ${err.message || err}`);
+    onError: (err: Error) => {
+      toast.error(`Regression check failed: ${err.message || String(err)}`);
     },
   });
 
@@ -162,7 +162,7 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   // Helper: Draw SVG Line Chart
-  const renderSVGLineChart = (data: any[]) => {
+  const renderSVGLineChart = (data: DailyMetric[]) => {
     if (!data || data.length === 0) return null;
     const padding = 40;
     const width = 500;
@@ -235,7 +235,7 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   // Helper: Draw SVG Bar Chart
-  const renderSVGBarChart = (data: any[]) => {
+  const renderSVGBarChart = (data: DailyMetric[]) => {
     if (!data || data.length === 0) return null;
     const padding = 40;
     const width = 500;
@@ -883,7 +883,7 @@ export const AdminDashboardPage: React.FC = () => {
                     </div>
 
                     <div className="max-h-40 overflow-y-auto space-y-1.5 font-mono text-[11px]">
-                      {Object.entries(regressionResult.metric_deltas).map(([metric, val]: any) => {
+                      {Object.entries(regressionResult.metric_deltas).map(([metric, val]) => {
                         const isPos = val > 0.01;
                         const isNeg = val < -0.01;
                         return (

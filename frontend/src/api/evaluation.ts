@@ -68,7 +68,7 @@ export interface RegressionResponse {
   baseline_run_id: string;
   candidate_run_id: string;
   metric_deltas: Record<string, number>;
-  details: Record<string, any>;
+  details: Record<string, unknown>;
 }
 
 export const evaluationApi = {

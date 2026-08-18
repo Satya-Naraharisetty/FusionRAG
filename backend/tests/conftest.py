@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 # 1. Set environment variables
+os.environ["ENV"] = "testing"
 os.environ["POSTGRES_SERVER"] = "mock_db"
 os.environ["POSTGRES_USER"] = "mock_user"
 os.environ["POSTGRES_PASSWORD"] = "mock_password"

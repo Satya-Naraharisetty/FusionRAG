@@ -1,6 +1,7 @@
+import builtins
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import Any, Set
+from typing import Any
 from uuid import UUID
 
 from app.documents.domain.models import (
@@ -384,7 +385,7 @@ class IndexCache(ABC):
         pass
 
     @abstractmethod
-    def get_cached_user_ids(self) -> Set[UUID]:
+    def get_cached_user_ids(self) -> builtins.set[UUID]:
         """
         Retrieves the set of user IDs currently in the cache.
         """

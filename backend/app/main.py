@@ -252,15 +252,16 @@ async def lifespan(app: FastAPI):
             logger.info("Enforcing single default admin account seeding...")
             db_session = app.state.db_session_factory()
             try:
-                from app.auth.infrastructure.crypto.password_hasher import Argon2PasswordHasher
+                from app.auth.infrastructure.crypto.password_hasher import (
+                    Argon2PasswordHasher,
+                )
                 from app.auth.infrastructure.persistence.models import SQLAlchemyUser
 
                 email = settings.ADMIN_EMAIL.strip().lower()
 
                 # 1. Demote any other admin users to "user" to maintain single admin constraint
                 db_session.query(SQLAlchemyUser).filter(
-                    SQLAlchemyUser.role == "admin",
-                    SQLAlchemyUser.email != email
+                    SQLAlchemyUser.role == "admin", SQLAlchemyUser.email != email
                 ).update({SQLAlchemyUser.role: "user"})
 
                 # 2. Check if the configured admin user exists
@@ -286,7 +287,9 @@ async def lifespan(app: FastAPI):
                 else:
                     if existing_admin.role != "admin":
                         existing_admin.role = "admin"
-                        logger.info(f"Successfully promoted existing user {email} to admin.")
+                        logger.info(
+                            f"Successfully promoted existing user {email} to admin."
+                        )
 
                 db_session.commit()
             except Exception as e:
@@ -320,6 +323,7 @@ async def lifespan(app: FastAPI):
 
         # Trigger background recovery of pending/failed durable cleanup jobs
         from app.documents.services.cleanup_worker import run_durable_cleanup_recovery
+
         run_durable_cleanup_recovery()
 
         logger.info(

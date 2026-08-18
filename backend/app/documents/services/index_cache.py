@@ -1,7 +1,8 @@
+import builtins
 import collections
 import threading
 import time
-from typing import Any, Set
+from typing import Any
 from uuid import UUID
 
 from app.core.config import settings
@@ -12,12 +13,16 @@ class InMemoryIndexCache(IndexCache):
     def __init__(self, max_capacity: int | None = None) -> None:
         self._lock = threading.Lock()
         # If max_capacity is not specified, read it from settings
-        self.max_capacity = max_capacity if max_capacity is not None else settings.INDEX_CACHE_MAX_USERS
+        self.max_capacity = (
+            max_capacity if max_capacity is not None else settings.INDEX_CACHE_MAX_USERS
+        )
         if self.max_capacity <= 0:
             raise ValueError("Cache capacity must be greater than zero.")
         # Structure: user_id -> {"index_data": Any, "stats": dict[str, Any], "created_at": float}
         # Using OrderedDict to implement LRU policy
-        self._cache: collections.OrderedDict[UUID, dict[str, Any]] = collections.OrderedDict()
+        self._cache: collections.OrderedDict[UUID, dict[str, Any]] = (
+            collections.OrderedDict()
+        )
 
     def get(self, user_id: UUID) -> Any | None:
         with self._lock:
@@ -42,7 +47,7 @@ class InMemoryIndexCache(IndexCache):
                 # Evict oldest entry (the first one) if at capacity
                 while len(self._cache) >= self.max_capacity:
                     self._cache.popitem(last=False)
-                
+
                 self._cache[user_id] = {
                     "index_data": index_data,
                     "stats": stats,
@@ -71,10 +76,10 @@ class InMemoryIndexCache(IndexCache):
             entry = self._cache.get(user_id)
             if not entry:
                 return None
-            
+
             # Update recency since it was accessed
             self._cache.move_to_end(user_id)
-            
+
             if time.monotonic() - entry["created_at"] > max_age_seconds:
                 return None
             return entry["stats"]
@@ -84,6 +89,6 @@ class InMemoryIndexCache(IndexCache):
             if user_id in self._cache:
                 del self._cache[user_id]
 
-    def get_cached_user_ids(self) -> Set[UUID]:
+    def get_cached_user_ids(self) -> builtins.set[UUID]:
         with self._lock:
             return set(self._cache.keys())

@@ -63,6 +63,7 @@ async def test_multi_tier_cache_fallback():
 
     # Mock Redis client
     from unittest.mock import AsyncMock
+
     mock_redis = MagicMock()
     mock_redis.get = AsyncMock(return_value='"redis_value"')  # Serialized JSON string
     l2 = RedisCache(mock_redis)
