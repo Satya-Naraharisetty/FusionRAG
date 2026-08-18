@@ -164,6 +164,7 @@ class MessageRepository(ABC):
         completion_tokens: int,
         citations: list[dict[str, Any]] | None = None,
         content: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ConversationMessage:
         """
         Transition an assistant message to COMPLETED status and set tokens & citations.

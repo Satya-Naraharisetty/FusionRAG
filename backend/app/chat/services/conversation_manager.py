@@ -168,6 +168,7 @@ class ConversationManager:
         prompt_tokens: int,
         completion_tokens: int,
         citations: list[dict] | None = None,
+        metadata: dict | None = None,
     ) -> None:
         """
         Completes the assistant's message in the DB and dispatches domain events to trigger background summarization.
@@ -182,6 +183,7 @@ class ConversationManager:
             completion_tokens=completion_tokens,
             citations=citations,
             content=assistant_content,
+            metadata=metadata,
         )
 
         # 2. Check if we need to auto-generate the title (if conversation only has first user + assistant messages)

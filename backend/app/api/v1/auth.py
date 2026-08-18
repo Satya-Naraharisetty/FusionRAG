@@ -462,4 +462,3 @@ def github_oauth_callback(
         samesite="lax",
     )
     return redirect
-

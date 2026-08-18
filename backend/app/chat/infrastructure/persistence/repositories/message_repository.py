@@ -155,6 +155,7 @@ class SQLAlchemyMessageRepository(MessageRepository):
         completion_tokens: int,
         citations: list[dict[str, Any]] | None = None,
         content: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ConversationMessage:
         orm = (
             self._db.query(ConversationMessageORM)
@@ -179,6 +180,12 @@ class SQLAlchemyMessageRepository(MessageRepository):
         orm.prompt_tokens = prompt_tokens
         orm.completion_tokens = completion_tokens
         orm.citations = citations
+        if metadata:
+            current_meta = orm.metadata_json or {}
+            # Ensure it is a dictionary we can update
+            if isinstance(current_meta, dict):
+                current_meta.update(metadata)
+                orm.metadata_json = current_meta
         orm.status = MessageStatus.COMPLETED.value
         self._db.flush()
         return self._to_domain(orm)

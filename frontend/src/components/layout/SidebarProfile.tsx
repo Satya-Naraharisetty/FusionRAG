@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, LogOut, ChevronUp } from "lucide-react";
+import { Settings, LogOut, ChevronUp, Activity } from "lucide-react";
 import { Avatar, AvatarFallback } from "../ui/Avatar";
 import {
   DropdownMenu,
@@ -68,6 +68,16 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, co
             <Settings size={13} />
             <span>Settings</span>
           </DropdownMenuItem>
+
+          {user?.role === "admin" && (
+            <DropdownMenuItem
+              onClick={() => navigate("/admin/dashboard")}
+              className="gap-2 cursor-pointer"
+            >
+              <Activity size={13} className="text-[var(--accent-primary)]" />
+              <span>Admin Console</span>
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuSeparator />
 

@@ -304,9 +304,7 @@ def test_image_extractor_gemini(mock_client_class):
         "candidates": [
             {
                 "content": {
-                    "parts": [
-                        {"text": "Extracted text and chart details from Gemini"}
-                    ]
+                    "parts": [{"text": "Extracted text and chart details from Gemini"}]
                 }
             }
         ]
@@ -337,11 +335,7 @@ def test_image_extractor_openai(mock_client_class):
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "choices": [
-            {
-                "message": {
-                    "content": "Extracted text and chart details from OpenAI"
-                }
-            }
+            {"message": {"content": "Extracted text and chart details from OpenAI"}}
         ]
     }
     mock_response.raise_for_status = MagicMock()
@@ -368,5 +362,7 @@ def test_image_extractor_openai(mock_client_class):
 def test_image_extractor_factory():
     factory = ExtractorFactory()
     assert isinstance(factory.get_extractor("image/png", "chart.png"), ImageExtractor)
-    assert isinstance(factory.get_extractor("application/octet-stream", "screenshot.jpg"), ImageExtractor)
-
+    assert isinstance(
+        factory.get_extractor("application/octet-stream", "screenshot.jpg"),
+        ImageExtractor,
+    )

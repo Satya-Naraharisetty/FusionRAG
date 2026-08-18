@@ -428,6 +428,13 @@ class ChatOrchestrator:
             for cit in citations
         ]
 
+        total_time_ms = (time.perf_counter() - start_time) * 1000
+        metadata = {
+            "retrieval_time_ms": retrieval_time_ms,
+            "generation_time_ms": generation_time_ms,
+            "total_time_ms": total_time_ms,
+        }
+
         # 10. Persist completion details
         await self.conversation_manager.finalize_message(
             conversation_id=conversation_id,
@@ -436,9 +443,8 @@ class ChatOrchestrator:
             prompt_tokens=usage.prompt_tokens,
             completion_tokens=usage.completion_tokens,
             citations=citations_data,
+            metadata=metadata,
         )
-
-        total_time_ms = (time.perf_counter() - start_time) * 1000
 
         # Log Observability Metrics
         req_id = request_id_ctx.get() or "N/A"
@@ -756,6 +762,11 @@ class ChatOrchestrator:
                             total_tokens=prompt_tokens_est + completion_tokens_est,
                         )
 
+                    metadata = {
+                        "retrieval_time_ms": retrieval_time_ms,
+                        "generation_time_ms": generation_time_ms,
+                        "total_time_ms": total_time_ms,
+                    }
                     # Persist standard completion details
                     await self.conversation_manager.finalize_message(
                         conversation_id=conversation_id,
@@ -764,6 +775,7 @@ class ChatOrchestrator:
                         prompt_tokens=final_usage.prompt_tokens,
                         completion_tokens=final_usage.completion_tokens,
                         citations=citations_data,
+                        metadata=metadata,
                     )
                     message_finalized = True
 
@@ -802,6 +814,13 @@ class ChatOrchestrator:
             # Finalize message database record if using agentic tool calling
             if self.enable_tool_calling and final_usage:
                 full_answer = "".join(full_answer_list)
+                generation_time_ms = (time.perf_counter() - gen_start_time) * 1000
+                total_time_ms = (time.perf_counter() - start_time) * 1000
+                metadata = {
+                    "retrieval_time_ms": retrieval_time_ms,
+                    "generation_time_ms": generation_time_ms,
+                    "total_time_ms": total_time_ms,
+                }
                 await self.conversation_manager.finalize_message(
                     conversation_id=conversation_id,
                     message_id=assistant_message_id,
@@ -809,6 +828,7 @@ class ChatOrchestrator:
                     prompt_tokens=final_usage.prompt_tokens,
                     completion_tokens=final_usage.completion_tokens,
                     citations=citations_data,
+                    metadata=metadata,
                 )
                 message_finalized = True
         finally:

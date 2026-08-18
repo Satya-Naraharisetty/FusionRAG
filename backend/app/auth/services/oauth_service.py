@@ -175,9 +175,7 @@ class OAuthService:
 
         github_id = profile.get("id")
         if github_id is None:
-            raise InvalidCredentialsException(
-                "GitHub did not return a valid user ID."
-            )
+            raise InvalidCredentialsException("GitHub did not return a valid user ID.")
         sub = str(github_id)
         email = profile.get("email")
 
@@ -215,7 +213,9 @@ class OAuthService:
 
             if "error" in resp_data:
                 error_msg = resp_data.get("error_description") or resp_data["error"]
-                raise InvalidCredentialsException(f"GitHub token exchange error: {error_msg}")
+                raise InvalidCredentialsException(
+                    f"GitHub token exchange error: {error_msg}"
+                )
 
             access_token: str = resp_data["access_token"]
 

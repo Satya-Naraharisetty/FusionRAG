@@ -18,6 +18,7 @@ const ChatPage = lazy(() => import("./pages/ChatPage"));
 const DocumentsPage = lazy(() => import("./pages/DocumentsPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const OAuthCallbackPage = lazy(() => import("./pages/OAuthCallbackPage"));
+const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -89,6 +90,14 @@ function App() {
                       element={
                         <ErrorBoundary>
                           <SettingsPage />
+                        </ErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="/admin/dashboard"
+                      element={
+                        <ErrorBoundary>
+                          <AdminDashboardPage />
                         </ErrorBoundary>
                       }
                     />

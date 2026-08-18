@@ -24,6 +24,7 @@ from app.api.v1.conversations import router as conversations_router
 from app.api.v1.documents import router as documents_router
 from app.api.v1.evaluation import router as evaluation_router
 from app.api.v1.health import router as health_router
+from app.api.v1.observability import router as observability_router
 from app.api.v1.search import router as search_router
 from app.auth.domain.exceptions import (
     AccountDisabledException,
@@ -707,6 +708,7 @@ app.include_router(chat_router, prefix=settings.API_V1_STR)
 app.include_router(conversations_router, prefix=f"{settings.API_V1_STR}/conversations")
 app.include_router(evaluation_router, prefix=settings.API_V1_STR)
 app.include_router(admin_router, prefix=settings.API_V1_STR)
+app.include_router(observability_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/metrics")

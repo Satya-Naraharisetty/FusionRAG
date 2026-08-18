@@ -5,15 +5,14 @@ import pathlib
 
 import docx
 import httpx
-
-from app.core.config import settings
-
-logger = logging.getLogger(__name__)
 from pypdf import PdfReader
 
+from app.core.config import settings
 from app.documents.domain.exceptions import DocumentCorrupted, UnsupportedDocumentType
 from app.documents.domain.interfaces import DocumentExtractor
 from app.documents.domain.models import ExtractionResult
+
+logger = logging.getLogger(__name__)
 
 
 class PDFExtractor(DocumentExtractor):
@@ -125,15 +124,21 @@ class ImageExtractor(DocumentExtractor):
             try:
                 extracted_text = self._extract_via_gemini(file_bytes, prompt)
             except Exception as e:
-                logger.warning(f"Failed to extract image content via Gemini: {e}. Falling back to OpenAI if available.")
+                logger.warning(
+                    f"Failed to extract image content via Gemini: {e}. Falling back to OpenAI if available."
+                )
                 if settings.OPENAI_API_KEY:
                     extracted_text = self._extract_via_openai(file_bytes, prompt)
                 else:
-                    raise DocumentCorrupted(f"Gemini image extraction failed and OpenAI credentials not configured. Error: {e}")
+                    raise DocumentCorrupted(
+                        f"Gemini image extraction failed and OpenAI credentials not configured. Error: {e}"
+                    )
         elif settings.OPENAI_API_KEY:
             extracted_text = self._extract_via_openai(file_bytes, prompt)
         else:
-            raise UnsupportedDocumentType("No API keys found for image vision processing (Gemini or OpenAI required).")
+            raise UnsupportedDocumentType(
+                "No API keys found for image vision processing (Gemini or OpenAI required)."
+            )
 
         return ExtractionResult(text=extracted_text, page_count=1)
 
@@ -147,16 +152,13 @@ class ImageExtractor(DocumentExtractor):
                         {
                             "inlineData": {
                                 "mimeType": self.mime_type,
-                                "data": base64_data
+                                "data": base64_data,
                             }
-                        }
+                        },
                     ]
                 }
             ],
-            "generationConfig": {
-                "temperature": 0.0,
-                "maxOutputTokens": 2048
-            }
+            "generationConfig": {"temperature": 0.0, "maxOutputTokens": 2048},
         }
 
         # Call gemini-2.5-flash which is multimodal and fast
@@ -170,13 +172,15 @@ class ImageExtractor(DocumentExtractor):
             try:
                 return data["candidates"][0]["content"]["parts"][0]["text"]
             except (KeyError, IndexError) as e:
-                raise RuntimeError(f"Unexpected response structure from Gemini API: {e}")
+                raise RuntimeError(
+                    f"Unexpected response structure from Gemini API: {e}"
+                )
 
     def _extract_via_openai(self, file_bytes: bytes, prompt: str) -> str:
         base64_data = base64.b64encode(file_bytes).decode("utf-8")
         headers = {
             "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
         payload = {
             "model": "gpt-4o-mini",
@@ -189,13 +193,13 @@ class ImageExtractor(DocumentExtractor):
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:{self.mime_type};base64,{base64_data}"
-                            }
-                        }
-                    ]
+                            },
+                        },
+                    ],
                 }
             ],
             "temperature": 0.0,
-            "max_tokens": 2048
+            "max_tokens": 2048,
         }
 
         url = "https://api.openai.com/v1/chat/completions"
@@ -206,7 +210,9 @@ class ImageExtractor(DocumentExtractor):
             try:
                 return data["choices"][0]["message"]["content"]
             except (KeyError, IndexError) as e:
-                raise RuntimeError(f"Unexpected response structure from OpenAI API: {e}")
+                raise RuntimeError(
+                    f"Unexpected response structure from OpenAI API: {e}"
+                )
 
 
 class ExtractorFactory:
