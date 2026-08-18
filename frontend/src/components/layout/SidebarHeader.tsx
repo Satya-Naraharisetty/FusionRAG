@@ -31,6 +31,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const isDocumentsActive = location.pathname === "/documents";
+  const isNewChatActive = location.pathname === "/chat" || location.pathname === "/";
   const { data: documents = [] } = useDocuments();
   const pipeline = useDocumentPipelineSummary();
   const busy = pipeline.processing > 0;
@@ -44,7 +45,12 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
       <div className="flex flex-col items-center gap-2 py-3">
         <button
           onClick={onNewChat}
-          className="w-10 h-10 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-elevated)] rounded-[var(--radius-lg)] text-[var(--text-primary)] flex items-center justify-center cursor-pointer transition-colors"
+          className={cn(
+            "w-10 h-10 rounded-[var(--radius-lg)] flex items-center justify-center cursor-pointer transition-colors",
+            isNewChatActive
+              ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
+              : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+          )}
           title="New Chat"
         >
           <Plus size={16} />
@@ -85,7 +91,12 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
       {/* New Chat Button */}
       <button
         onClick={onNewChat}
-        className="w-full h-10 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-elevated)] rounded-[var(--radius-lg)] text-[var(--text-primary)] flex items-center gap-2.5 px-3 cursor-pointer text-xs font-medium transition-colors text-left"
+        className={cn(
+          "w-full h-10 rounded-[var(--radius-lg)] flex items-center gap-2.5 px-3 cursor-pointer text-xs font-medium transition-colors text-left",
+          isNewChatActive
+            ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
+            : "bg-transparent hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+        )}
       >
         <Plus size={16} className="flex-shrink-0 text-[var(--text-secondary)]" />
         <span>New Chat</span>
