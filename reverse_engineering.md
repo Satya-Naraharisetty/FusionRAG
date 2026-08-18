@@ -198,7 +198,7 @@ Qdrant stores dense embeddings. The vectors are configured with **Cosine Distanc
 To run fast metadata filtering, payload indexes are created on specific fields. Without these payload indexes, Qdrant will fail filtered searches with `Index required but not found` errors.
 
 #### Vector Configurations
-* **Dimension**: `1536` (Cloud / OpenAI `text-embedding-3-small`) or `384` (Local / `all-MiniLM-L6-v2`)
+* **Dimension**: `768` (Gemini `text-embedding-004` used in all environments)
 * **Distance Metric**: `Distance.COSINE`
 
 #### Payload Schema
@@ -245,7 +245,7 @@ flowchart TD
     Complete --> ClearCache["11. Invalidate BM25 Cache"]
     ClearCache --> Event["12. Dispatch DocumentProcessingCompleted"]
     Event --> GenerateEmb["13. Enqueue embedding generation"]
-    GenerateEmb --> Embedder["14. Call OpenAI / local Embedding model"]
+    GenerateEmb --> Embedder["14. Call Gemini Embedding model"]
     Embedder --> Qdrant["15. Upsert points into Qdrant"]
     Qdrant --> Status["16. Set Embedding state to COMPLETED"]
 ```
@@ -356,7 +356,7 @@ When a search is requested:
 
 ### 4.3. Dense Semantic Retrieval
 Dense retrieval matches conceptual and semantic meaning.
-1. The system generates a vector representation of the query using the configured embedding model (e.g., OpenAI `text-embedding-3-small`).
+1. The system generates a vector representation of the query using the configured embedding model (Gemini `text-embedding-004`).
 2. It queries Qdrant using the query vector.
 3. Qdrant applies payload pre-filters (`user_id`, `document_ids`, and `document_scope`).
 4. Cosine similarity scores are normalized to a `[0.0, 1.0]` range:

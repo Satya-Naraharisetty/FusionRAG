@@ -110,8 +110,8 @@ To prevent scope creep and maintain the application's status as a focused refere
 *   **Configuration Parameters:** Admins can adjust chunk size (e.g., 512 tokens) and chunk overlap (e.g., 64 tokens) globally or per collection.
 
 ### 8.6. Embedding Generation
-*   **Dual Encoder Support:** Support for both local embeddings (e.g., HuggingFace transformers such as `BGE-M3` or `All-MiniLM-L6-v2`) and cloud embeddings (e.g., OpenAI `text-embedding-3-small`, Cohere Embed).
-*   **Dimension Alignment:** Vector database configurations must dynamically align with the selected embedding model's dimensions (e.g., 384, 768, 1536).
+*   **Gemini-Only Embeddings:** Support for Google Gemini embeddings (specifically `text-embedding-004`) as the unified embedding model across all environments (local development, testing, and production).
+*   **Dimension Alignment:** Vector database configurations are aligned with the Gemini embedding model's dimension (768). Local/local-ML embedding dependencies (such as torch and sentence-transformers) have been removed.
 
 ### 8.7. Hybrid Retrieval
 To maximize search accuracy, the system must execute queries against two parallel indexes and combine them:
@@ -142,8 +142,7 @@ To handle ambiguous or conversational queries, the system must preprocess incomi
 *   **Multi-Query Retrieval:** Generates 3-4 different variations of the user's question from different perspectives, executes them in parallel, retrieves the union of results, and applies deduplication.
 
 ### 8.9. Cross-Encoder Reranking
-*   **Relevance Refinement:** Re-score the top-$N$ (e.g., $N=25$) retrieved chunks using a Cross-Encoder reranker (e.g., `bge-reranker-large` or Cohere Rerank API).
-*   **Thresholding:** Discard chunks with reranked scores below a configurable absolute relevance threshold (e.g., $< 0.3$), preventing irrelevant text from polluting the LLM context.
+*   **Reranking Pipeline:** Support for an optional reranking step (using a pass-through `IdentityReranker` by default). Heavyweight local cross-encoder models are not run by default to maintain a light memory footprint.
 *   **Reranked Top-K Selection:** Select the top-$K$ (e.g., $K=5$) high-relevance chunks to pass to context compression.
 
 ### 8.10. Context Compression
@@ -216,7 +215,7 @@ A single control panel for system configuration and inspection:
 
 ### 9.2. Scalability (Single Application Focus)
 *   **Horizontal scaling is not required.** The system must run optimally as a single self-contained application instance.
-*   **Resource Footprint:** Memory utilization of the local server must remain $< 8\text{ GB}$ of RAM when running local embedding and reranking models.
+*   **Resource Footprint:** Memory utilization of the local server remains minimal (typically $< 2\text{ GB}$) because local embedding and reranking models are offloaded to lightweight API calls or pass-through structures.
 *   **Vector Search Efficiency:** Utilize HNSW indexing to ensure vector search time scales logarithmically ($O(\log N)$) with the number of chunks.
 
 ### 9.3. Security
@@ -300,7 +299,7 @@ A single control panel for system configuration and inspection:
 1.  **Grounded Over Clever:** It is far better for the chatbot to state *"I cannot answer this based on the retrieved documents"* than to generate a highly polished but ungrounded answer.
 2.  **Transparency is Paramount:** The system must never hide its operations. Retrieval traces, raw prompt inputs, and scoring metrics are first-class citizen data.
 3.  **Modular Over Coupled:** Every RAG pipeline component (sparse search, dense search, reranker, compressor) must exist as a clean, decoupled class or module that can be swapped out or upgraded independently.
-4.  **Local-First, Cloud-Ready:** The application must be fully functional offline using local embedding/rerank models and database engines, while remaining simple to pivot to enterprise cloud endpoints.
+4.  **Cloud-Powered, Locally Run:** The application runs locally for databases and caching (PostgreSQL, Qdrant, Redis), while offloading computationally intensive embedding and LLM generation to Google Gemini endpoints.
 
 ---
 

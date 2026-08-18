@@ -31,7 +31,7 @@ Reusable smoke tests for the auth path against a running stack:
   the conversation is deleted), and checks the "Answering from general
   knowledge" hint for queries that match nothing. Needs Chrome, the Vite dev
   server, the dockerized backend, and a real LLM key (`GEMINI_API_KEY`) —
-  embeddings are local in the dev stack, so no embedding key is needed.
+  embeddings are also generated via Gemini, which requires a valid `GEMINI_API_KEY` on the backend.
 
 Both `redis-fallback*` scripts share their docker orchestration through
 `stack.js`.
@@ -168,7 +168,7 @@ content is what the grounding assertions depend on). LLM answers stream from a
 real provider (Gemini by default), so the script needs `GEMINI_API_KEY` set
 in the backend's environment. The script's `sendAndWaitForLog` retry loop
 absorbs transient Gemini free-tier 429s. Embeddings run locally
-(`ENV=development` → `all-MiniLM-L6-v2`), so no embedding key is needed.
+(via the `text-embedding-004` model), which requires `GEMINI_API_KEY` in all environments.
 
 ## Configuration (env vars)
 
