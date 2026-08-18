@@ -246,6 +246,55 @@ async def lifespan(app: FastAPI):
         app.state.db_session_factory = sessionmaker(
             autocommit=False, autoflush=False, bind=engine
         )
+
+        # Seed and enforce single default admin user from environment settings if configured
+        if settings.ADMIN_EMAIL and settings.ADMIN_PASSWORD:
+            logger.info("Enforcing single default admin account seeding...")
+            db_session = app.state.db_session_factory()
+            try:
+                from app.auth.infrastructure.crypto.password_hasher import Argon2PasswordHasher
+                from app.auth.infrastructure.persistence.models import SQLAlchemyUser
+
+                email = settings.ADMIN_EMAIL.strip().lower()
+
+                # 1. Demote any other admin users to "user" to maintain single admin constraint
+                db_session.query(SQLAlchemyUser).filter(
+                    SQLAlchemyUser.role == "admin",
+                    SQLAlchemyUser.email != email
+                ).update({SQLAlchemyUser.role: "user"})
+
+                # 2. Check if the configured admin user exists
+                existing_admin = (
+                    db_session.query(SQLAlchemyUser)
+                    .filter(SQLAlchemyUser.email == email)
+                    .first()
+                )
+                if not existing_admin:
+                    hasher = Argon2PasswordHasher()
+                    hashed_pwd = hasher.hash(settings.ADMIN_PASSWORD)
+                    new_admin = SQLAlchemyUser(
+                        id=uuid.uuid4(),
+                        email=email,
+                        hashed_password=hashed_pwd,
+                        role="admin",
+                        is_active=True,
+                        created_at=datetime.now(UTC),
+                        updated_at=datetime.now(UTC),
+                    )
+                    db_session.add(new_admin)
+                    logger.info(f"Successfully seeded default admin account: {email}")
+                else:
+                    if existing_admin.role != "admin":
+                        existing_admin.role = "admin"
+                        logger.info(f"Successfully promoted existing user {email} to admin.")
+
+                db_session.commit()
+            except Exception as e:
+                logger.error(f"Failed to seed/enforce default admin account: {e}")
+                db_session.rollback()
+            finally:
+                db_session.close()
+
         app.state.redis = init_redis_client(
             host=settings.REDIS_HOST,
             port=settings.REDIS_PORT,

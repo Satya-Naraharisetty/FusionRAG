@@ -278,6 +278,10 @@ class Settings(BaseSettings):
     SAVE_EVALUATION_RESULTS: bool = True
     EVALUATION_RESULTS_DIR: str = "data/evaluation"
 
+    # Default Admin Credentials Seeding
+    ADMIN_EMAIL: str | None = None
+    ADMIN_PASSWORD: str | None = None
+
     # Default quality thresholds
     THRESHOLD_FAITHFULNESS: float = 0.90
     THRESHOLD_ANSWER_RELEVANCY: float = 0.88

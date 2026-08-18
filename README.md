@@ -116,6 +116,28 @@ Make sure you have the following installed on your system:
 
 ---
 
+## Admin Console & LLM Observability
+
+We have implemented a visual **Admin Console** at `/admin/dashboard` in the React frontend, allowing admin users to:
+*   **Monitor LLM Observability**: Real-time KPI metrics, daily token volume & response speed charts, and collapsible LLM execution traces (tokens, cost, citations, and granular latencies).
+*   **Run RAG Evaluations**: Trigger benchmark runs, compare pipeline results to prevent regressions, and render detailed HTML performance reports in-app.
+
+### Configuring the Single Admin User
+By design, the application enforces a **single-admin invariant** configured declaratively via the environment variables in `backend/.env`:
+
+```env
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=admin_secure_password_123
+```
+
+On backend startup, the system automatically:
+1. Promotes the user matching `ADMIN_EMAIL` to the `"admin"` role (registering them first if they do not exist).
+2. Demotes any other database user possessing the `"admin"` role to `"user"`, guaranteeing that exactly one admin account exists at any time.
+
+To change the admin account or update the password, simply edit these values in `.env` and restart the backend service.
+
+---
+
 ## Local Development Checks
 
 ### Running Backend Unit Tests (Offline)

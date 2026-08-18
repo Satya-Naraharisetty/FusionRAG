@@ -125,7 +125,7 @@ flowchart TD
 
 ---
 
-## 6. Evaluation Framework
+## 6. Evaluation Framework & Observability Console
 
 To prevent regression, offline dataset runners evaluate retrieval and generation metrics.
 
@@ -133,3 +133,10 @@ To prevent regression, offline dataset runners evaluate retrieval and generation
 *   **Answer Relevancy**: Asserts the response directly answers the user's prompt.
 *   **Context Recall & Precision**: Asserts the retrieval contains and isolates the exact answers.
 *   **Circuit-Breaker Failover**: Automatically redirects LLM queries between Gemini and OpenAI in case of API degradation.
+
+### Visual Admin Dashboard (`/admin/dashboard`)
+We have introduced a visual frontend console allowing admin users to:
+1.  **Observability Traces**: View real-time token counts, response latency (retrieval vs. generation), cost estimates, and full conversation traces.
+2.  **Evaluations Suite**: View runs history, trigger offline benchmarks, perform regression comparison checking, and render styled HTML performance reports directly in-app.
+
+The backend exposes these operations via `/api/v1/observability` and `/api/v1/evaluation` endpoints, restricted via the `check_admin_user` dependency guard.
