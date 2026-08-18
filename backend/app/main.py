@@ -143,9 +143,10 @@ def verify_postgres_connectivity(engine) -> None:
     if (
         "PYTEST_CURRENT_TEST" in os.environ
         or settings.ENV == "testing"
+        or os.getenv("VERCEL") == "1"
         or type(engine).__name__ in ("MagicMock", "Mock")
     ):
-        logger.info("Skipping PostgreSQL connectivity check in testing environment.")
+        logger.info("Skipping PostgreSQL connectivity check.")
         return
 
     logger.info("Testing PostgreSQL connection readiness...")
@@ -176,6 +177,7 @@ def verify_alembic_migrations(engine) -> None:
     if (
         "PYTEST_CURRENT_TEST" in os.environ
         or settings.ENV == "testing"
+        or os.getenv("VERCEL") == "1"
         or os.getenv("SKIP_DB_MIGRATION_CHECK", "false").lower() in ("true", "1", "yes")
         or type(engine).__name__ in ("MagicMock", "Mock")
     ):

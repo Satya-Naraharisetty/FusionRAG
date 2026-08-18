@@ -130,7 +130,7 @@ class Settings(BaseSettings):
         # Legacy / alternate local ports
         "http://localhost:8080",
     ]
-    BACKEND_CORS_ORIGIN_REGEX: str | None = None
+    BACKEND_CORS_ORIGIN_REGEX: str | None = r"https://.*\.vercel\.app"
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
