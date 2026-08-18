@@ -98,13 +98,20 @@ def run_startup_validations() -> None:
 
     empty_infra = [k for k, v in infra_vars.items() if not v or not str(v).strip()]
 
-    # Validate Redis config
-    if not settings.REDIS_URL and not settings.REDIS_HOST:
-        empty_infra.append("REDIS_HOST or REDIS_URL")
+    # On Vercel serverless, skip presence checks for Redis and Qdrant — these
+    # services are validated lazily at first use and their absence at boot
+    # must not prevent the ASGI app from starting (which would also suppress
+    # all CORS headers and present as a CORS error in the browser).
+    import os as _os
 
-    # Validate Qdrant config
-    if not settings.QDRANT_URL and not settings.QDRANT_HOST:
-        empty_infra.append("QDRANT_HOST or QDRANT_URL")
+    if _os.getenv("VERCEL") != "1":
+        # Validate Redis config
+        if not settings.REDIS_URL and not settings.REDIS_HOST:
+            empty_infra.append("REDIS_HOST or REDIS_URL")
+
+        # Validate Qdrant config
+        if not settings.QDRANT_URL and not settings.QDRANT_HOST:
+            empty_infra.append("QDRANT_HOST or QDRANT_URL")
 
     if empty_infra:
         raise ConfigurationError(
@@ -126,7 +133,10 @@ def run_startup_validations() -> None:
     empty_keys = [k for k, v in key_vars.items() if not v or not str(v).strip()]
     if empty_keys:
         msg = f"Empty required API key parameters: {', '.join(empty_keys)}"
-        if settings.ENV == "production":
+        # On Vercel the app must boot so CORS preflight responses are served;
+        # missing keys are downgraded to a warning and calls will fail at
+        # request time rather than silently blocking all cross-origin requests.
+        if settings.ENV == "production" and _os.getenv("VERCEL") != "1":
             raise ConfigurationError(f"Startup aborted due to: {msg}")
         else:
             logger.warning(
