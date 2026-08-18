@@ -27,7 +27,12 @@ class LocalEmbeddingGenerator(EmbeddingGenerator):
         self._model_name = model_name
         self._device = device
         self._model = SentenceTransformer(model_name, device=device)
-        self._dimension = self._model.get_sentence_embedding_dimension()
+        dim = self._model.get_sentence_embedding_dimension()
+        if dim is None:
+            raise RuntimeError(
+                f"Could not retrieve embedding dimension for model {model_name}"
+            )
+        self._dimension: int = dim
 
     @property
     def dimension(self) -> int:
