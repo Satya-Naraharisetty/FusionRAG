@@ -314,30 +314,14 @@ def get_embedding_generator() -> EmbeddingGenerator:
 
     from app.core.config import settings
 
-    # The embedding generator is stateless after construction (the local model
-    # is loaded once, encode() is read-only), so share a single process-wide
-    # instance. Without this, every documents/chat request in development
-    # rebuilt a fresh SentenceTransformer — re-fetching model metadata from the
-    # HuggingFace Hub (dozens of blocking HEAD requests, 5-13s per request, and
-    # a hard hang when the network stalls). Same singleton pattern as
-    # get_cache / get_index_cache below.
+    # Singleton: construct once per process (both API and background workers).
     if _embedding_generator_instance is None:
-        # Use local embedder for development - zero cost, fast, no API key needed
-        if settings.ENV == "development":
-            from app.documents.infrastructure.embedding_generator import (
-                LocalEmbeddingGenerator,
-            )
-
-            logger.info("Using LocalEmbeddingGenerator for development environment")
-            _embedding_generator_instance = LocalEmbeddingGenerator(
-                model_name=settings.LOCAL_EMBEDDING_MODEL,
-                device=settings.LOCAL_EMBEDDING_DEVICE,
-            )
-        elif settings.EMBEDDING_PROVIDER.lower() == "gemini":
+        if settings.EMBEDDING_PROVIDER.lower() == "gemini":
             from app.documents.infrastructure.embedding_generator import (
                 GeminiEmbeddingGenerator,
             )
 
+            logger.info("Using GeminiEmbeddingGenerator")
             _embedding_generator_instance = GeminiEmbeddingGenerator(
                 api_key=settings.GEMINI_API_KEY,
                 model=settings.EMBEDDING_MODEL,
@@ -348,6 +332,7 @@ def get_embedding_generator() -> EmbeddingGenerator:
                 OpenAIEmbeddingGenerator,
             )
 
+            logger.info("Using OpenAIEmbeddingGenerator")
             _embedding_generator_instance = OpenAIEmbeddingGenerator(
                 api_key=settings.OPENAI_API_KEY,
                 model=settings.EMBEDDING_MODEL,
@@ -409,9 +394,7 @@ def get_embedding_service(
         time_provider=SystemTimeProvider(),
         uuid_generator=SystemUUIDGenerator(),
         batch_size=settings.EMBEDDING_BATCH_SIZE,
-        provider_name=settings.EMBEDDING_PROVIDER
-        if settings.ENV != "development"
-        else "local",
+        provider_name=settings.EMBEDDING_PROVIDER,
         model_name=settings.effective_embedding_model,
         dimension=settings.effective_embedding_dimension,
         embedding_version=settings.EMBEDDING_VERSION,

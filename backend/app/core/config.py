@@ -79,30 +79,22 @@ class Settings(BaseSettings):
     QDRANT_URL: str | None = None
 
     # Embedding Configurations
-    EMBEDDING_PROVIDER: str = "openai"
-    EMBEDDING_MODEL: str = "text-embedding-3-small"
-    EMBEDDING_DIMENSION: int = 1536
+    # Gemini text-embedding-004 is used in all environments (local + production).
+    # sentence-transformers / torch are no longer required.
+    EMBEDDING_PROVIDER: str = "gemini"
+    EMBEDDING_MODEL: str = "text-embedding-004"
+    EMBEDDING_DIMENSION: int = 768
     EMBEDDING_BATCH_SIZE: int = 32
     EMBEDDING_VERSION: str = "v1"
 
-    # Local Embedding Model (for development/testing)
-    LOCAL_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
-    LOCAL_EMBEDDING_DEVICE: str = "cpu"
-    LOCAL_EMBEDDING_DIMENSION: int = 384
-
-    # Computed properties based on ENV
     @property
     def effective_embedding_dimension(self) -> int:
-        """Return the correct embedding dimension based on environment."""
-        if self.ENV == "development":
-            return self.LOCAL_EMBEDDING_DIMENSION
+        """Return the configured embedding dimension."""
         return self.EMBEDDING_DIMENSION
 
     @property
     def effective_embedding_model(self) -> str:
-        """Return the correct embedding model based on environment."""
-        if self.ENV == "development":
-            return self.LOCAL_EMBEDDING_MODEL
+        """Return the configured embedding model."""
         return self.EMBEDDING_MODEL
 
     # OpenAI API Configurations
