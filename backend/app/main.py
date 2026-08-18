@@ -83,42 +83,55 @@ def run_startup_validations() -> None:
     Validates that required system settings are non-empty and well-formed.
     """
     logger.info("Auditing environment settings configurations...")
-    required_vars: dict[str, str | None] = {
+
+    # Validate core infrastructure parameters
+    infra_vars: dict[str, str | None] = {
         "JWT_SECRET": settings.JWT_SECRET,
     }
     if not settings.DATABASE_URL:
-        required_vars["POSTGRES_SERVER"] = settings.POSTGRES_SERVER
-        required_vars["POSTGRES_DB"] = settings.POSTGRES_DB
+        infra_vars["POSTGRES_SERVER"] = settings.POSTGRES_SERVER
+        infra_vars["POSTGRES_DB"] = settings.POSTGRES_DB
 
-    # Dynamically validate API keys based on configured providers
+    # Dynamically validate S3 settings if storage provider is S3
+    if settings.STORAGE_PROVIDER.lower() == "s3":
+        infra_vars["S3_BUCKET"] = settings.S3_BUCKET
+
+    empty_infra = [k for k, v in infra_vars.items() if not v or not str(v).strip()]
+
+    # Validate Redis config
+    if not settings.REDIS_URL and not settings.REDIS_HOST:
+        empty_infra.append("REDIS_HOST or REDIS_URL")
+
+    # Validate Qdrant config
+    if not settings.QDRANT_URL and not settings.QDRANT_HOST:
+        empty_infra.append("QDRANT_HOST or QDRANT_URL")
+
+    if empty_infra:
+        raise ConfigurationError(
+            f"Startup aborted due to empty required infrastructure parameters: "
+            f"{', '.join(empty_infra)}"
+        )
+
+    # Validate API keys based on configured providers
+    key_vars: dict[str, str | None] = {}
     active_providers = {
         settings.LLM_PROVIDER.lower(),
         settings.LLM_PROVIDER_BACKUP.lower(),
     }
     if "gemini" in active_providers:
-        required_vars["GEMINI_API_KEY"] = settings.GEMINI_API_KEY
+        key_vars["GEMINI_API_KEY"] = settings.GEMINI_API_KEY
     if "openai" in active_providers or settings.EMBEDDING_PROVIDER.lower() == "openai":
-        required_vars["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
+        key_vars["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
 
-    # Dynamically validate S3 settings if storage provider is S3
-    if settings.STORAGE_PROVIDER.lower() == "s3":
-        required_vars["S3_BUCKET"] = settings.S3_BUCKET
-
-    empty_vars = [k for k, v in required_vars.items() if not v or not str(v).strip()]
-
-    # Validate Redis config
-    if not settings.REDIS_URL and not settings.REDIS_HOST:
-        empty_vars.append("REDIS_HOST or REDIS_URL")
-
-    # Validate Qdrant config
-    if not settings.QDRANT_URL and not settings.QDRANT_HOST:
-        empty_vars.append("QDRANT_HOST or QDRANT_URL")
-
-    if empty_vars:
-        raise ConfigurationError(
-            f"Startup aborted due to empty required config parameters: "
-            f"{', '.join(empty_vars)}"
-        )
+    empty_keys = [k for k, v in key_vars.items() if not v or not str(v).strip()]
+    if empty_keys:
+        msg = f"Empty required API key parameters: {', '.join(empty_keys)}"
+        if settings.ENV == "production":
+            raise ConfigurationError(f"Startup aborted due to: {msg}")
+        else:
+            logger.warning(
+                f"{msg}. This is allowed in {settings.ENV} mode, but LLM or cloud embedding calls will fail."
+            )
 
 
 def verify_postgres_connectivity(engine) -> None:
