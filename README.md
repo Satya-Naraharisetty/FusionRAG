@@ -2,12 +2,18 @@
 
 This repository contains a reference implementation of a production-ready **Hybrid RAG Chatbot** engineered with FastAPI, React + Vite + TypeScript, PostgreSQL, Redis, and Qdrant.
 
-## Features (Milestone 1: Project Foundation)
+## Features
 
 * **Fully Containerized Development**: One-command local startup via Docker Compose.
 * **Health Check API**: A comprehensive health-monitoring API `/api/v1/health` verifying backing databases and caching availability.
 * **Type-Safe Configurations**: Environment settings parsed and validated using Pydantic at server startup.
 * **Continuous Integration Checks**: Standardized Python formatting (`ruff`) and TypeScript verification.
+* **Low-Risk Scalability Enhancements**:
+  * **Async Redis Client**: Optimized rate limiting, distributed locking, and caching via connection-pooled async Redis.
+  * **Batch DB Fetching**: Eliminated N+1 database queries during document ingestion using bulk chunk status queries.
+  * **Bounded LRU Cache**: Implemented a bounded user index cache with LRU eviction and memory-safety caps.
+  * **Pre-Tokenization Caching**: Speeds up BM25 sparse retrieval by reusing tokenized representations across query requests.
+  * **Durable Cleanup Recovery**: Non-blocking, thread-isolated startup recovery of failed cleanup jobs.
 
 ---
 
@@ -180,3 +186,17 @@ ruff format --check .
 cd ../frontend
 npm run lint
 ```
+
+---
+
+## Performance Benchmarking
+
+To measure and verify concurrent search throughput, latencies, and error rates, a dedicated benchmark script is available:
+
+```bash
+cd backend
+uv run python scripts/load_test.py --concurrency 10,25,50 --duration 5 --runs 3
+```
+
+This script registers a test user, uploads a sample document, waits for ingestion, runs multiple concurrent search queries for the specified duration and concurrency tiers, aggregates p50/p95/p99 latencies, and cleans up the test data.
+

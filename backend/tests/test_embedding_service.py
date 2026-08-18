@@ -188,3 +188,74 @@ def test_embedding_service_batch_failure_isolation(mocker):
     # Batch 2 (2, 3) should be FAILED
     assert chunks[2].id in failed_ids
     assert chunks[3].id in failed_ids
+
+
+def test_embedding_service_batch_no_n_plus_1(mocker):
+    generator = mocker.MagicMock()
+    generator.batch_generate.side_effect = lambda texts: [[0.1] * 1536 for _ in texts]
+
+    vector_store = mocker.MagicMock()
+    embedding_repo = mocker.MagicMock()
+    embedding_repo.get_by_chunk_ids.return_value = []
+    embedding_repo.get_by_chunk.side_effect = AssertionError("get_by_chunk was called! Expected N+1 query elimination.")
+
+    chunk_repo = mocker.MagicMock()
+    doc_id = uuid4()
+    chunks = [
+        Chunk(
+            id=uuid4(),
+            document_id=doc_id,
+            chunk_index=i,
+            text=f"chunk {i}",
+            character_start=0,
+            character_end=10,
+            token_estimate=2,
+            created_at=datetime.now(UTC),
+        )
+        for i in range(5)
+    ]
+    chunk_repo.list_by_document.return_value = chunks
+
+    document_repo = mocker.MagicMock()
+    document = Document(
+        id=doc_id,
+        user_id=uuid4(),
+        filename="test.txt",
+        original_filename="test.txt",
+        content_type="text/plain",
+        file_size=100,
+        checksum="hash",
+        status=DocumentStatus.COMPLETED,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    document_repo.get_by_id.return_value = document
+
+    uow = MockUnitOfWork()
+    time_provider = mocker.MagicMock()
+    time_provider.get_now.return_value = datetime.now(UTC)
+    uuid_generator = mocker.MagicMock()
+    uuid_generator.generate.side_effect = lambda: uuid4()
+
+    service = EmbeddingService(
+        embedding_generator=generator,
+        vector_store=vector_store,
+        embedding_repo=embedding_repo,
+        chunk_repo=chunk_repo,
+        document_repo=document_repo,
+        uow=uow,
+        time_provider=time_provider,
+        uuid_generator=uuid_generator,
+        batch_size=2,
+        provider_name="openai",
+        model_name="text-embedding-3-small",
+        dimension=1536,
+        embedding_version="v1",
+    )
+
+    service.generate_embeddings(doc_id)
+
+    # Verify that get_by_chunk was never called
+    embedding_repo.get_by_chunk.assert_not_called()
+    # Verify that get_by_chunk_ids was called to batch fetch statuses
+    assert embedding_repo.get_by_chunk_ids.call_count > 0

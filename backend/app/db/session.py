@@ -1,4 +1,4 @@
-import redis
+import redis.asyncio as async_redis
 from fastapi import Request
 from qdrant_client import QdrantClient
 from sqlalchemy import create_engine
@@ -39,7 +39,7 @@ def get_db(request: Request):
         db.close()
 
 
-def get_redis(request: Request) -> redis.Redis:
+def get_redis(request: Request) -> async_redis.Redis:
     """
     FastAPI dependency injection provider to retrieve the lifespan-managed Redis client.
     """
@@ -68,8 +68,8 @@ def init_postgres_engine(database_url: str) -> Engine:
     """
     engine_kwargs = {
         "pool_pre_ping": True,
-        "pool_size": 10,
-        "max_overflow": 20,
+        "pool_size": 50,
+        "max_overflow": 50,
     }
 
     # Strip pgbouncer query parameter as psycopg2 doesn't support it
@@ -92,14 +92,14 @@ def init_redis_client(
     password: str | None = None,
     ssl: bool = False,
     url: str | None = None,
-) -> redis.Redis:
+) -> async_redis.Redis:
     """
     Instantiates the Redis key-value cache client connection pool or from a connection URL.
     """
     global _redis_pool
     if _redis_pool is None:
         if url:
-            _redis_pool = redis.ConnectionPool.from_url(
+            _redis_pool = async_redis.ConnectionPool.from_url(
                 url,
                 decode_responses=True,
                 socket_timeout=3.0,
@@ -107,8 +107,8 @@ def init_redis_client(
                 max_connections=50,
             )
         else:
-            connection_class = redis.SSLConnection if ssl else redis.Connection
-            _redis_pool = redis.ConnectionPool(
+            connection_class = async_redis.SSLConnection if ssl else async_redis.Connection
+            _redis_pool = async_redis.ConnectionPool(
                 host=host or "localhost",
                 port=port or 6379,
                 password=password,
@@ -118,7 +118,7 @@ def init_redis_client(
                 socket_connect_timeout=3.0,
                 max_connections=50,  # Optimized production size
             )
-    return redis.Redis(connection_pool=_redis_pool)
+    return async_redis.Redis(connection_pool=_redis_pool)
 
 
 def init_qdrant_client(

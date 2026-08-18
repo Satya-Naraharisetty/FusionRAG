@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-import redis
+import redis.asyncio as async_redis
 
 from app.core.events.interfaces import BaseEventBus, IntegrationEvent
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class RedisEventBus(BaseEventBus):
-    def __init__(self, redis_client: redis.Redis) -> None:
+    def __init__(self, redis_client: async_redis.Redis) -> None:
         self._redis = redis_client
         self._handlers: dict[str, list[Callable[[Any], Any]]] = {}
         self._consumer_task: asyncio.Task | None = None
@@ -26,7 +26,7 @@ class RedisEventBus(BaseEventBus):
         payload = event.model_dump_json()
         try:
             # Publish to Redis Stream 'stream:events'
-            self._redis.xadd(
+            await self._redis.xadd(
                 "stream:events",
                 {"event_type": event_name, "payload": payload},
                 maxlen=10000,  # Approximate size capping
@@ -68,9 +68,8 @@ class RedisEventBus(BaseEventBus):
         last_id = "$"  # Read only new events that arrive after we start
         while self._is_running:
             try:
-                # Read from Redis Stream (blocking). Runs in thread to prevent blocking event loop.
-                streams = await asyncio.to_thread(
-                    self._redis.xread,
+                # Read from Redis Stream (blocking, but async-awaited).
+                streams = await self._redis.xread(
                     {"stream:events": last_id},
                     count=10,
                     block=1000,

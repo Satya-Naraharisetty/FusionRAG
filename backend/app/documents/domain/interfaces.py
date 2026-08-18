@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Set
 from uuid import UUID
 
 from app.documents.domain.models import (
@@ -312,6 +312,13 @@ class EmbeddingRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_by_chunk_ids(self, chunk_ids: list[UUID]) -> list[Embedding]:
+        """
+        Retrieves embedding metadata for multiple chunks in a single batch query.
+        """
+        pass
+
 
 class SearchRanker(ABC):
     @abstractmethod
@@ -373,6 +380,13 @@ class IndexCache(ABC):
     def invalidate(self, user_id: UUID) -> None:
         """
         Invalidates a user's cached index.
+        """
+        pass
+
+    @abstractmethod
+    def get_cached_user_ids(self) -> Set[UUID]:
+        """
+        Retrieves the set of user IDs currently in the cache.
         """
         pass
 

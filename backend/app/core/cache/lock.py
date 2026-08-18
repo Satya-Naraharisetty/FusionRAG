@@ -3,7 +3,7 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 
-import redis
+import redis.asyncio as async_redis
 
 
 class BaseDistributedLock(ABC):
@@ -21,7 +21,7 @@ class BaseDistributedLock(ABC):
 
 
 class RedisDistributedLock(BaseDistributedLock):
-    def __init__(self, redis_client: redis.Redis) -> None:
+    def __init__(self, redis_client: async_redis.Redis) -> None:
         self._redis = redis_client
         self._lock_id = str(uuid.uuid4())
 
@@ -34,7 +34,7 @@ class RedisDistributedLock(BaseDistributedLock):
             try:
                 # Set key if not exists (nx=True) with a safety expiration (ex=seconds)
                 # timeout acts as the lease duration
-                res = self._redis.set(
+                res = await self._redis.set(
                     key, self._lock_id, nx=True, ex=max(1, int(timeout))
                 )
                 if res:
@@ -55,7 +55,7 @@ class RedisDistributedLock(BaseDistributedLock):
         end
         """
         try:
-            self._redis.eval(lua_release, 1, key, self._lock_id)
+            await self._redis.eval(lua_release, 1, key, self._lock_id)
         except Exception:
             pass
 

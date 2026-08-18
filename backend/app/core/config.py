@@ -344,6 +344,16 @@ class Settings(BaseSettings):
     ENABLE_RATE_LIMITER: bool = True
     ENABLE_RESOURCE_QUOTAS: bool = True
 
+    INDEX_CACHE_MAX_USERS: int = 500
+    CLEANUP_RECOVERY_BATCH_SIZE: int = 20
+
+    @field_validator("INDEX_CACHE_MAX_USERS")
+    @classmethod
+    def validate_index_cache_max_users(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("INDEX_CACHE_MAX_USERS must be greater than zero.")
+        return v
+
     model_config = SettingsConfigDict(
         case_sensitive=True,
         env_file=[

@@ -246,7 +246,7 @@ def test_upload_large_file_rejected(client, doc_test_db):
 def test_unsupported_format_rejected(client, doc_test_db):
     token = get_user_token(client)
 
-    file_payload = {"file": ("photo.png", b"image bytes", "image/png")}
+    file_payload = {"file": ("archive.zip", b"zip bytes", "application/zip")}
     response = client.post(
         "/api/v1/documents/upload",
         files=file_payload,

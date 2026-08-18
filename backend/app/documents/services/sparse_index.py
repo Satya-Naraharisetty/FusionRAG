@@ -80,6 +80,9 @@ class BM25:
 
 
 class InMemoryBM25Index(SparseIndex):
+    # Class-level cache to share pre-tokenized chunks across request-scoped instances
+    _tokenized_chunks_cache: dict[UUID, dict[UUID, list[str]]] = {}
+
     def __init__(
         self,
         chunk_repo: ChunkRepository,
@@ -130,9 +133,32 @@ class InMemoryBM25Index(SparseIndex):
                     index_data={"chunks": [], "bm25": None},
                     stats=db_stats,
                 )
+                # Clean up tokenized cache for this user
+                InMemoryBM25Index._tokenized_chunks_cache.pop(user_id, None)
                 return
 
-            corpus = [tokenize(c.text) for c in chunks]
+            # Prune obsolete users no longer present in index_cache
+            active_users = self._index_cache.get_cached_user_ids()
+            for uid in list(InMemoryBM25Index._tokenized_chunks_cache.keys()):
+                if uid not in active_users and uid != user_id:
+                    InMemoryBM25Index._tokenized_chunks_cache.pop(uid, None)
+
+            # Get user's pre-tokenized dictionary
+            user_tokenized = InMemoryBM25Index._tokenized_chunks_cache.setdefault(user_id, {})
+            # Keep only the current active chunk IDs to prune deleted chunks
+            active_chunk_ids = {c.id for c in chunks}
+            for chunk_id in list(user_tokenized.keys()):
+                if chunk_id not in active_chunk_ids:
+                    user_tokenized.pop(chunk_id, None)
+
+            corpus = []
+            for c in chunks:
+                tokenized = user_tokenized.get(c.id)
+                if tokenized is None:
+                    tokenized = tokenize(c.text)
+                    user_tokenized[c.id] = tokenized
+                corpus.append(tokenized)
+
             bm25 = BM25(corpus, k1=self._k1, b=self._b)
 
             self._index_cache.set(

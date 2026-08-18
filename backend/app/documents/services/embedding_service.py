@@ -179,8 +179,12 @@ class EmbeddingService:
 
                 # 4. Mark status as COMPLETED in DB
                 now = self._time_provider.get_now()
+                chunk_ids = [c.id for c in batch]
+                existing_embs = self._embedding_repo.get_by_chunk_ids(chunk_ids)
+                emb_map = {emb.chunk_id: emb for emb in existing_embs}
+
                 for chunk in batch:
-                    current_emb = self._embedding_repo.get_by_chunk(chunk.id)
+                    current_emb = emb_map.get(chunk.id)
                     current_status = (
                         current_emb.status
                         if current_emb
@@ -217,8 +221,12 @@ class EmbeddingService:
                 # Record batch chunks as FAILED in database
                 try:
                     now = self._time_provider.get_now()
+                    chunk_ids = [c.id for c in batch]
+                    existing_embs = self._embedding_repo.get_by_chunk_ids(chunk_ids)
+                    emb_map = {emb.chunk_id: emb for emb in existing_embs}
+
                     for chunk in batch:
-                        current_emb = self._embedding_repo.get_by_chunk(chunk.id)
+                        current_emb = emb_map.get(chunk.id)
                         current_status = (
                             current_emb.status
                             if current_emb

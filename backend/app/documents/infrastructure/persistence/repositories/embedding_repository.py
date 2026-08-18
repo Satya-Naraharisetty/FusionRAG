@@ -59,6 +59,16 @@ class SQLAlchemyEmbeddingRepository(EmbeddingRepository):
             return None
         return self._to_domain(db_emb)
 
+    def get_by_chunk_ids(self, chunk_ids: list[UUID]) -> list[Embedding]:
+        if not chunk_ids:
+            return []
+        db_embs = (
+            self._db.query(SQLAlchemyEmbedding)
+            .filter(SQLAlchemyEmbedding.chunk_id.in_(chunk_ids))
+            .all()
+        )
+        return [self._to_domain(emb) for emb in db_embs]
+
     def delete_by_document(self, document_id: UUID) -> None:
         self._db.query(SQLAlchemyEmbedding).filter(
             SQLAlchemyEmbedding.chunk_id.in_(

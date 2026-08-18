@@ -316,6 +316,7 @@ class MockConversationManager:
         prompt_tokens,
         completion_tokens,
         citations=None,
+        metadata=None,
     ):
         pass
 

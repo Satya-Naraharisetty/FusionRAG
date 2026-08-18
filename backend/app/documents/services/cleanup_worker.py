@@ -153,3 +153,99 @@ class DurableCleanupWorker:
                 asyncio.run(self.process_job(job.id))
             except Exception as e:
                 logger.error(f"Failed to run job {job.id} synchronously: {e}")
+
+
+def run_durable_cleanup_recovery() -> None:
+    """
+    Spawns the background recovery task on startup in a non-blocking manner.
+    """
+    asyncio.create_task(async_durable_cleanup_recovery())
+
+
+async def async_durable_cleanup_recovery() -> None:
+    logger.info("Starting durable cleanup recovery scan...")
+    try:
+        # Query database for pending/failed jobs in a separate thread to maintain thread-safety
+        job_ids = await asyncio.to_thread(_query_pending_failed_jobs)
+        if not job_ids:
+            logger.info("No pending or failed cleanup jobs found during startup recovery.")
+            return
+
+        logger.info(f"Durable cleanup recovery found {len(job_ids)} jobs to process. Dispatched in background.")
+        
+        # Trigger async execution of these jobs using a helper that manages its own DB session
+        await _run_cleanup_jobs_async(job_ids)
+
+    except Exception as e:
+        logger.error(f"Error during durable cleanup startup recovery: {e}")
+
+
+def _query_pending_failed_jobs() -> list[UUID]:
+    import sys
+    from sqlalchemy.orm import sessionmaker
+    from app.core.config import settings
+    from app.db.session import init_postgres_engine
+    
+    db_url = settings.DATABASE_URL
+    if "pytest" in sys.modules:
+        import os
+        db_url = os.environ.get(
+            "TEST_DATABASE_URL",
+            "postgresql://postgres:postgres@localhost:5433/hybrid_rag_test",
+        )
+    if not db_url:
+        logger.error("DATABASE_URL not configured, skipping startup recovery query.")
+        return []
+
+    engine = init_postgres_engine(db_url)
+    session_factory = sessionmaker(bind=engine)
+    db = session_factory()
+    try:
+        limit = getattr(settings, "CLEANUP_RECOVERY_BATCH_SIZE", 20)
+        jobs = (
+            db.query(SQLAlchemyCleanupJob)
+            .filter(SQLAlchemyCleanupJob.status.in_(["PENDING", "FAILED"]))
+            .limit(limit)
+            .all()
+        )
+        return [job.id for job in jobs]
+    finally:
+        db.close()
+        engine.dispose()
+
+
+async def _run_cleanup_jobs_async(job_ids: list[UUID]) -> None:
+    import sys
+    from sqlalchemy.orm import sessionmaker
+    from app.core.config import settings
+    from app.db.session import init_postgres_engine
+    from app.api.dependencies import get_storage_provider, get_vector_store, get_index_cache
+    
+    db_url = settings.DATABASE_URL
+    if "pytest" in sys.modules:
+        import os
+        db_url = os.environ.get(
+            "TEST_DATABASE_URL",
+            "postgresql://postgres:postgres@localhost:5433/hybrid_rag_test",
+        )
+    if not db_url:
+        return
+
+    engine = init_postgres_engine(db_url)
+    session_factory = sessionmaker(bind=engine)
+    db = session_factory()
+    try:
+        storage_provider = get_storage_provider(db)
+        vector_store = get_vector_store()
+        index_cache = get_index_cache()
+        worker = DurableCleanupWorker(
+            db, storage_provider, vector_store, index_cache
+        )
+        for jid in job_ids:
+            try:
+                await worker.process_job(jid)
+            except Exception as e:
+                logger.error(f"Error processing cleanup job {jid} in startup recovery: {e}")
+    finally:
+        db.close()
+        engine.dispose()

@@ -74,6 +74,53 @@ def test_index_cache_operations():
     assert cache.get_fresh_stats(user_id, 60.0) is None
 
 
+def test_index_cache_lru_and_capacity():
+    # 1. Capacity validation
+    with pytest.raises(ValueError):
+        InMemoryIndexCache(max_capacity=0)
+    with pytest.raises(ValueError):
+        InMemoryIndexCache(max_capacity=-5)
+
+    # 2. LRU Eviction & Capacity Enforcement
+    cache = InMemoryIndexCache(max_capacity=3)
+    u1, u2, u3, u4 = uuid4(), uuid4(), uuid4(), uuid4()
+
+    cache.set(u1, "index_data_1", {"u": 1})
+    cache.set(u2, "index_data_2", {"u": 2})
+    cache.set(u3, "index_data_3", {"u": 3})
+
+    # Cache should be full with u1, u2, u3
+    assert cache.get(u1) == "index_data_1"
+    assert cache.get(u2) == "index_data_2"
+    assert cache.get(u3) == "index_data_3"
+
+    # Accessing u1 updates its recency (u1 is now MRU, u2 is LRU)
+    assert cache.get(u1) == "index_data_1"
+
+    # Adding u4 must evict the LRU element (u2)
+    cache.set(u4, "index_data_4", {"u": 4})
+    
+    assert cache.get(u2) is None  # Evicted
+    assert cache.get(u1) == "index_data_1"
+    assert cache.get(u3) == "index_data_3"
+    assert cache.get(u4) == "index_data_4"
+
+    # Accessing u3 stats updates recency (u3 is MRU, u1 is LRU)
+    assert cache.get_stats(u3) == {"u": 3}
+
+    # Adding another element evicts u1
+    u5 = uuid4()
+    cache.set(u5, "index_data_5", {"u": 5})
+    assert cache.get(u1) is None  # Evicted
+    assert cache.get(u3) == "index_data_3"
+    assert cache.get(u4) == "index_data_4"
+    assert cache.get(u5) == "index_data_5"
+
+    # Invalidation works
+    cache.invalidate(u3)
+    assert cache.get(u3) is None
+
+
 # --- 3. SparseIndex & BM25Retriever Tests ---
 @pytest.mark.asyncio
 async def test_sparse_index_build_and_search():

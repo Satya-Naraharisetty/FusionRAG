@@ -2,7 +2,7 @@ import logging
 import threading
 import time
 
-import redis
+import redis.asyncio as async_redis
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ def _trip_redis_breaker() -> None:
 class RateLimiter:
     def __init__(
         self,
-        redis_client: redis.Redis | None = None,
+        redis_client: async_redis.Redis | None = None,
         requests_per_minute: int = 60,
         burst: int = 10,
     ) -> None:
@@ -137,17 +137,18 @@ class RateLimiter:
                 window_start = now - 60.0
                 key = f"rate:limit:{identifier}"
 
-                pipe = self._redis.pipeline()
-                # 1. Clean up old requests from sliding window
-                pipe.zremrangebyscore(key, 0, window_start)
-                # 2. Count active request timestamps
-                pipe.zcard(key)
-                # 3. Add current timestamp
-                pipe.zadd(key, {str(now): now})
-                # 4. Refresh key TTL
-                pipe.expire(key, 60)
+                async with self._redis.pipeline() as pipe:
+                    # 1. Clean up old requests from sliding window
+                    pipe.zremrangebyscore(key, 0, window_start)
+                    # 2. Count active request timestamps
+                    pipe.zcard(key)
+                    # 3. Add current timestamp
+                    pipe.zadd(key, {str(now): now})
+                    # 4. Refresh key TTL
+                    pipe.expire(key, 60)
+                    results = await pipe.execute()
 
-                _, count, _, _ = pipe.execute()
+                _, count, _, _ = results
 
                 # Block when the window is already full (>=), matching the
                 # in-memory fallback so both paths allow exactly

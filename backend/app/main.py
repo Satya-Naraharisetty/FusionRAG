@@ -318,6 +318,10 @@ async def lifespan(app: FastAPI):
             storage_provider.verify_connection()
             logger.info("S3 storage connection verified.")
 
+        # Trigger background recovery of pending/failed durable cleanup jobs
+        from app.documents.services.cleanup_worker import run_durable_cleanup_recovery
+        run_durable_cleanup_recovery()
+
         logger.info(
             "Application lifespan initialization completed. Web service online."
         )
@@ -346,7 +350,7 @@ async def lifespan(app: FastAPI):
             app.state.db_engine.dispose()
             logger.info("PostgreSQL connection engine disposed.")
         if hasattr(app.state, "redis"):
-            app.state.redis.close()
+            await app.state.redis.close()
             logger.info("Redis cache client closed.")
         logger.info("Lifespan connections clean up completed.")
     except Exception as e:
