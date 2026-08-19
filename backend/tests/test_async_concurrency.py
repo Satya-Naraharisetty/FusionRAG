@@ -11,15 +11,18 @@ from app.auth.domain.schemas import UserDomain
 from app.auth.infrastructure.persistence.repositories.user_repository import (
     SQLAlchemyUserRepository,
 )
+from tests.db import TEST_DATABASE_URL
 
-TEST_DATABASE_URL = (
-    "postgresql+asyncpg://postgres:postgres@localhost:5433/hybrid_rag_test"
+ASYNC_TEST_DATABASE_URL = (
+    TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    if not TEST_DATABASE_URL.startswith("postgresql+asyncpg://")
+    else TEST_DATABASE_URL
 )
 
 
 @pytest.fixture(scope="function")
 async def concurrency_async_db():
-    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
+    engine = create_async_engine(ASYNC_TEST_DATABASE_URL, poolclass=NullPool)
     session_factory = async_sessionmaker(
         bind=engine,
         class_=AsyncSession,
