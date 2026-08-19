@@ -1,11 +1,12 @@
+import asyncio
 import logging
 import time
+from typing import Any
 
-import redis
 from fastapi import APIRouter, Depends, Response, status
 from pydantic import BaseModel
-from qdrant_client import QdrantClient
-from sqlalchemy.orm import Session
+from qdrant_client import AsyncQdrantClient
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
 
 from app.db.session import get_db, get_qdrant, get_redis
@@ -49,11 +50,11 @@ def liveness_check():
 
 
 @router.get("/health/readiness", response_model=ReadinessResponse)
-def readiness_check(
+async def readiness_check(
     response: Response,
-    db: Session = Depends(get_db),
-    redis_client: redis.Redis = Depends(get_redis),
-    qdrant_client: QdrantClient = Depends(get_qdrant),
+    db: AsyncSession = Depends(get_db),
+    redis_client: Any = Depends(get_redis),
+    qdrant_client: AsyncQdrantClient = Depends(get_qdrant),
 ):
     """
     Readiness check probe verifying basic connectivity to Postgres, Redis, and Qdrant.
@@ -64,14 +65,14 @@ def readiness_check(
     is_ready = True
 
     try:
-        db.execute(text("SELECT 1"))
+        await db.execute(text("SELECT 1"))
     except Exception as e:
         logger.error(f"Readiness PostgreSQL check failed: {e}")
         postgres_status = "disconnected"
         is_ready = False
 
     try:
-        if not redis_client.ping():
+        if not await redis_client.ping():
             redis_status = "disconnected"
             is_ready = False
     except Exception as e:
@@ -80,7 +81,7 @@ def readiness_check(
         is_ready = False
 
     try:
-        qdrant_client.get_collections()
+        await qdrant_client.get_collections()
     except Exception as e:
         logger.error(f"Readiness Qdrant check failed: {e}")
         vector_db_status = "disconnected"
@@ -103,11 +104,11 @@ def readiness_check(
 
 
 @router.get("/health/deep", response_model=DeepHealthResponse)
-def deep_check(
+async def deep_check(
     response: Response,
-    db: Session = Depends(get_db),
-    redis_client: redis.Redis = Depends(get_redis),
-    qdrant_client: QdrantClient = Depends(get_qdrant),
+    db: AsyncSession = Depends(get_db),
+    redis_client: Any = Depends(get_redis),
+    qdrant_client: AsyncQdrantClient = Depends(get_qdrant),
 ):
     """
     Deep health check performing write validation on DB and Redis,
@@ -122,7 +123,7 @@ def deep_check(
 
     # 1. Deep Postgres check: perform a write/read transaction check or simple test
     try:
-        db.execute(text("SELECT 1"))
+        await db.execute(text("SELECT 1"))
     except Exception as e:
         logger.error(f"Deep health Postgres failed: {e}")
         db_status = f"unhealthy: {str(e)}"
@@ -130,8 +131,11 @@ def deep_check(
 
     # 2. Deep Redis check: perform SET and GET validation
     try:
-        redis_client.set("health:deep:ping", "pong", ex=10)
-        ping_val = redis_client.get("health:deep:ping")
+        await redis_client.set("health:deep:ping", "pong", ex=10)
+        ping_val = await redis_client.get("health:deep:ping")
+        # Decode if bytes (some redis clients return bytes)
+        if isinstance(ping_val, bytes):
+            ping_val = ping_val.decode("utf-8")
         if ping_val != "pong":
             redis_status = "unhealthy: Read validation failed"
             is_healthy = False
@@ -142,31 +146,33 @@ def deep_check(
 
     # 3. Deep Qdrant check
     try:
-        qdrant_client.get_collections()
+        await qdrant_client.get_collections()
     except Exception as e:
         logger.error(f"Deep health Qdrant failed: {e}")
         qdrant_status = f"unhealthy: {str(e)}"
         is_healthy = False
 
-    # 4. Storage check: test local upload dir permissions or S3 connectivity
+    # 4. Storage check: test local upload dir permissions or database storage
     try:
         from app.api.dependencies import get_storage_provider
 
         storage_prov = get_storage_provider(db)
-        from app.documents.infrastructure.storage import S3StorageProvider
+        from app.documents.infrastructure.storage import LocalStorageProvider
 
-        if isinstance(storage_prov, S3StorageProvider):
-            storage_prov.verify_connection()
-        else:
-            import pathlib
+        if isinstance(storage_prov, LocalStorageProvider):
 
-            from app.core.config import settings
+            def _check_local_storage():
+                import pathlib
 
-            path = pathlib.Path(settings.UPLOAD_DIR)
-            path.mkdir(parents=True, exist_ok=True)
-            test_file = path / f"health_check_{int(time.time())}.txt"
-            test_file.write_text("health check")
-            test_file.unlink()
+                from app.core.config import settings
+
+                path = pathlib.Path(settings.UPLOAD_DIR)
+                path.mkdir(parents=True, exist_ok=True)
+                test_file = path / f"health_check_{int(time.time())}.txt"
+                test_file.write_text("health check")
+                test_file.unlink()
+
+            await asyncio.to_thread(_check_local_storage)
     except Exception as e:
         logger.error(f"Deep health Storage check failed: {e}")
         storage_status = f"unhealthy: {str(e)}"

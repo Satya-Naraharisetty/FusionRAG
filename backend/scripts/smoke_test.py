@@ -118,36 +118,6 @@ async def run_quick_checks():
         logger.error(f"API health connection failed: {e}")
         errors.append("API Offline")
 
-    # 5. Check S3 if enabled
-    if STORAGE_PROVIDER.lower() == "s3":
-        logger.info("Verifying S3 storage connection (read-only checks)...")
-        try:
-            import boto3
-
-            s3_bucket = get_env_or_default("S3_BUCKET", "hybrid-rag-documents")
-            s3_endpoint = os.getenv("S3_ENDPOINT_URL")
-            s3_access = os.getenv("S3_ACCESS_KEY_ID")
-            s3_secret = os.getenv("S3_SECRET_ACCESS_KEY")
-            s3_region = os.getenv("S3_REGION_NAME")
-
-            client_kwargs = {}
-            if s3_access:
-                client_kwargs["aws_access_key_id"] = s3_access
-            if s3_secret:
-                client_kwargs["aws_secret_access_key"] = s3_secret
-            if s3_region:
-                client_kwargs["region_name"] = s3_region
-            if s3_endpoint:
-                client_kwargs["endpoint_url"] = s3_endpoint
-
-            s3 = boto3.client("s3", **client_kwargs)
-            s3.head_bucket(Bucket=s3_bucket)
-            s3.list_objects_v2(Bucket=s3_bucket, MaxKeys=1)
-            logger.info("S3 storage is ONLINE and accessible.")
-        except Exception as e:
-            logger.error(f"S3 storage check failed: {e}")
-            errors.append(f"S3 Storage Offline: {e}")
-
     if errors:
         logger.error(f"Quick checks completed with ERRORS: {', '.join(errors)}")
         return False

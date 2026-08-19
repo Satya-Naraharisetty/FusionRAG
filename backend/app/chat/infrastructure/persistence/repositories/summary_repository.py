@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat.domain.interfaces import SummaryRepository
 from app.chat.domain.models import ConversationSummary
@@ -8,7 +9,7 @@ from app.chat.infrastructure.persistence.models import ConversationSummaryORM
 
 
 class SQLAlchemySummaryRepository(SummaryRepository):
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
     def _to_domain(self, orm: ConversationSummaryORM) -> ConversationSummary:
@@ -35,16 +36,17 @@ class SQLAlchemySummaryRepository(SummaryRepository):
             created_at=summary.created_at,
         )
         self._db.add(orm)
-        self._db.flush()
+        await self._db.flush()
+        await self._db.refresh(orm)
         return self._to_domain(orm)
 
     async def latest_summary(self, conversation_id: UUID) -> ConversationSummary | None:
-        orm = (
-            self._db.query(ConversationSummaryORM)
-            .filter(ConversationSummaryORM.conversation_id == conversation_id)
+        result = await self._db.execute(
+            select(ConversationSummaryORM)
+            .where(ConversationSummaryORM.conversation_id == conversation_id)
             .order_by(ConversationSummaryORM.summary_version.desc())
-            .first()
         )
+        orm = result.scalars().first()
         if not orm:
             return None
         return self._to_domain(orm)

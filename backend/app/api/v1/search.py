@@ -1,3 +1,4 @@
+import inspect
 from typing import Any
 from uuid import UUID
 
@@ -102,14 +103,21 @@ async def search_documents(
     if request.document_ids:
         retrieval_doc_ids = list(request.document_ids)
     elif request.conversation_id:
-        retrieval_doc_ids = [
-            doc.id
-            for doc in document_service.list_documents_by_conversation(
-                conversation_id, user_id
-            )
-        ]
+        conv_res = document_service.list_documents_by_conversation(
+            conversation_id, user_id
+        )
+        if inspect.isawaitable(conv_res):
+            conv_docs = await conv_res
+        else:
+            conv_docs = conv_res
+        retrieval_doc_ids = [doc.id for doc in conv_docs]
     else:
-        retrieval_doc_ids = [doc.id for doc in document_service.list_documents(user_id)]
+        user_res = document_service.list_documents(user_id)
+        if inspect.isawaitable(user_res):
+            user_docs = await user_res
+        else:
+            user_docs = user_res
+        retrieval_doc_ids = [doc.id for doc in user_docs]
 
     # The resolution above mirrors ChatOrchestrator._resolve_retrieval_scope.
     # Build a DocumentRetrievalScope so the RetrievalService enforces scope

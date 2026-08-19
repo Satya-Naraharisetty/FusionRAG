@@ -1,8 +1,11 @@
+import inspect
 import logging
 import uuid
 from typing import Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.evaluation.domain.models import RegressionRun
 from app.evaluation.infrastructure.persistence.models import SQLAlchemyEvaluationRun
@@ -16,9 +19,9 @@ class RegressionRunner:
     and a baseline benchmark run, flagging regressions based on metric thresholds.
     """
 
-    def compare_runs(
+    async def compare_runs(
         self,
-        db: Session,
+        db: AsyncSession,
         candidate_run_id: uuid.UUID,
         baseline_run_id: uuid.UUID,
         delta_thresholds: dict[str, float] | None = None,
@@ -39,16 +42,25 @@ class RegressionRunner:
             "conversation_quality": -0.05,
         }
 
-        candidate = (
-            db.query(SQLAlchemyEvaluationRun)
-            .filter(SQLAlchemyEvaluationRun.id == candidate_run_id)
-            .first()
+        cand_stmt = (
+            select(SQLAlchemyEvaluationRun)
+            .options(selectinload(SQLAlchemyEvaluationRun.results))
+            .where(SQLAlchemyEvaluationRun.id == candidate_run_id)
         )
-        baseline = (
-            db.query(SQLAlchemyEvaluationRun)
-            .filter(SQLAlchemyEvaluationRun.id == baseline_run_id)
-            .first()
+        candidate_result: Any = db.execute(cand_stmt)
+        if inspect.isawaitable(candidate_result):
+            candidate_result = await candidate_result
+        candidate = candidate_result.scalar_one_or_none()
+
+        base_stmt = (
+            select(SQLAlchemyEvaluationRun)
+            .options(selectinload(SQLAlchemyEvaluationRun.results))
+            .where(SQLAlchemyEvaluationRun.id == baseline_run_id)
         )
+        baseline_result: Any = db.execute(base_stmt)
+        if inspect.isawaitable(baseline_result):
+            baseline_result = await baseline_result
+        baseline = baseline_result.scalar_one_or_none()
 
         if not candidate:
             raise ValueError(

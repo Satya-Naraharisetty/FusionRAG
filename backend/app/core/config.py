@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     POSTGRES_DB: str | None = None
     POSTGRES_PORT: int = 5432
     DATABASE_URL: str | None = None
+    DATABASE_POOL_SIZE: int = 20
+    DATABASE_MAX_OVERFLOW: int = 10
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
@@ -96,9 +98,6 @@ class Settings(BaseSettings):
     def effective_embedding_model(self) -> str:
         """Return the configured embedding model."""
         return self.EMBEDDING_MODEL
-
-    # OpenAI API Configurations
-    OPENAI_API_KEY: str = ""
 
     # CORS Configurations
     # NoDecode disables pydantic-settings' eager JSON decoding so that both
@@ -174,12 +173,7 @@ class Settings(BaseSettings):
     # Ingestion & Upload Configurations
     UPLOAD_DIR: str = "data/uploads"
     MAX_UPLOAD_SIZE: int = 25 * 1024 * 1024  # 25 MB default
-    STORAGE_PROVIDER: str = "database"  # database | local | s3
-    S3_BUCKET: str = "hybrid-rag-documents"
-    S3_ENDPOINT_URL: str | None = None
-    S3_ACCESS_KEY_ID: str | None = None
-    S3_SECRET_ACCESS_KEY: str | None = None
-    S3_REGION_NAME: str | None = None
+    STORAGE_PROVIDER: Literal["database", "local"] = "database"
 
     # Chunking Configurations
     CHUNK_SIZE: int = 500
@@ -211,7 +205,6 @@ class Settings(BaseSettings):
 
     # LLM Orchestration & Answer Generation Configurations
     LLM_PROVIDER: str = "gemini"
-    OPENAI_CHAT_MODEL: str = "gpt-4o-mini"
     GEMINI_CHAT_MODEL: str = "gemini-2.5-flash-lite"
     TEMPERATURE: float = 0.0
     MAX_CONTEXT_TOKENS: int = 4000
@@ -305,7 +298,6 @@ class Settings(BaseSettings):
     ACCOUNT_DELETE_RATE_LIMIT_PER_MINUTE: int = 10
 
     # Reliability settings
-    LLM_PROVIDER_BACKUP: str = "openai"
     CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5
     CIRCUIT_BREAKER_RECOVERY_TIMEOUT: float = 30.0
     RETRY_MAX_ATTEMPTS: int = 3
@@ -377,33 +369,14 @@ class Settings(BaseSettings):
 
             # 2. LLM Provider keys
             # Gemini key check
-            if (
-                getattr(self, "LLM_PROVIDER", None) == "gemini"
-                or getattr(self, "EMBEDDING_PROVIDER", None) == "gemini"
+            gemini_key = getattr(self, "GEMINI_API_KEY", "")
+            if not gemini_key or gemini_key.strip() in (
+                "",
+                "your_gemini_api_key_here",
             ):
-                gemini_key = getattr(self, "GEMINI_API_KEY", "")
-                if not gemini_key or gemini_key.strip() in (
-                    "",
-                    "your_gemini_api_key_here",
-                ):
-                    raise ConfigurationError(
-                        "GEMINI_API_KEY is required in production when Gemini is enabled."
-                    )
-
-            # OpenAI key check
-            if (
-                getattr(self, "LLM_PROVIDER", None) == "openai"
-                or getattr(self, "LLM_PROVIDER_BACKUP", None) == "openai"
-            ):
-                openai_key = getattr(self, "OPENAI_API_KEY", "")
-                if not openai_key or openai_key.strip() in (
-                    "",
-                    "your_openai_api_key_here",
-                    "mock_key",
-                ):
-                    raise ConfigurationError(
-                        "OPENAI_API_KEY is required in production when OpenAI is active or backup."
-                    )
+                raise ConfigurationError(
+                    "GEMINI_API_KEY is required in production when Gemini is enabled."
+                )
 
             # 3. OAuth checks
             google_id = getattr(self, "GOOGLE_CLIENT_ID", "")

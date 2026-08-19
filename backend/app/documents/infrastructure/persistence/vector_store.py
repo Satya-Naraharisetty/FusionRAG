@@ -1,9 +1,8 @@
-import asyncio
 import logging
 from typing import Any
 from uuid import UUID
 
-from qdrant_client import QdrantClient
+from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     Distance,
     FieldCondition,
@@ -23,23 +22,20 @@ logger = logging.getLogger(__name__)
 class QdrantVectorStore(VectorStore):
     """
     Qdrant implementation of the VectorStore.
-    Encapsulates QdrantClient calls and isolates Qdrant details behind the VectorStore domain interface.
+    Encapsulates AsyncQdrantClient calls and isolates Qdrant details behind the VectorStore domain interface.
     """
 
     def __init__(
-        self, client: QdrantClient, collection_name: str, dimension: int
+        self, client: AsyncQdrantClient, collection_name: str, dimension: int
     ) -> None:
         self._client = client
         self._collection_name = collection_name
         self._dimension = dimension
         # Fields whose payload indexes have been successfully ensured on the
-        # Qdrant collection. Qdrant create_payload_index is idempotent
-        # server-side, but re-calling it on every request would add extra
-        # round-trips; tracking per-field success means a transient failure is
-        # retried on the next operation without re-paying for the successes.
+        # Qdrant collection.
         self._indexed_fields: set[str] = set()
 
-    # Fields filtered on by _search_sync / delete_document. They must be
+    # Fields filtered on by search / delete_document. They must be
     # indexed in Qdrant or filtered searches fail with
     # "Index required but not found" errors.
     _FILTERABLE_FIELDS = (
@@ -51,22 +47,15 @@ class QdrantVectorStore(VectorStore):
         "metadata",
     )
 
-    def _ensure_payload_indexes(self) -> None:
+    async def _ensure_payload_indexes(self) -> None:
         """
         Idempotently create keyword payload indexes for filterable fields.
-
-        Qdrant refuses filtered queries on unindexed payload fields, so the
-        collection must have indexes on every key used in FieldCondition.
-        This runs even when the collection already exists so that collections
-        created by older code (or other environments) are self-healed. Each
-        field is only attempted until it succeeds once per store instance;
-        a failed field is retried on the next operation.
         """
         for field in self._FILTERABLE_FIELDS:
             if field in self._indexed_fields:
                 continue
             try:
-                self._client.create_payload_index(
+                await self._client.create_payload_index(
                     collection_name=self._collection_name,
                     field_name=field,
                     field_schema=PayloadSchemaType.KEYWORD,
@@ -79,14 +68,14 @@ class QdrantVectorStore(VectorStore):
             else:
                 self._indexed_fields.add(field)
 
-    def _ensure_collection(self) -> None:
+    async def _ensure_collection(self) -> None:
         try:
-            self._client.get_collection(self._collection_name)
+            await self._client.get_collection(self._collection_name)
         except Exception:
             logger.info(
                 f"Creating Qdrant collection {self._collection_name} since it does not exist."
             )
-            self._client.create_collection(
+            await self._client.create_collection(
                 collection_name=self._collection_name,
                 vectors_config=VectorParams(
                     size=self._dimension,
@@ -94,15 +83,15 @@ class QdrantVectorStore(VectorStore):
                 ),
             )
         if not self._indexed_fields.issuperset(self._FILTERABLE_FIELDS):
-            self._ensure_payload_indexes()
+            await self._ensure_payload_indexes()
 
-    def upsert(
+    async def upsert(
         self,
         vectors: list[list[float]],
         payloads: list[dict[str, Any]],
         ids: list[UUID],
     ) -> None:
-        self._ensure_collection()
+        await self._ensure_collection()
         points = []
         for vid, vector, payload in zip(ids, vectors, payloads, strict=True):
             points.append(
@@ -112,23 +101,23 @@ class QdrantVectorStore(VectorStore):
                     payload=payload,
                 )
             )
-        self._client.upsert(
+        await self._client.upsert(
             collection_name=self._collection_name,
             points=points,
         )
 
-    def delete(self, ids: list[UUID]) -> None:
-        self._ensure_collection()
+    async def delete(self, ids: list[UUID]) -> None:
+        await self._ensure_collection()
         if not ids:
             return
-        self._client.delete(
+        await self._client.delete(
             collection_name=self._collection_name,
             points_selector=PointIdsList(points=[str(vid) for vid in ids]),
         )
 
-    def delete_document(self, document_id: UUID) -> None:
-        self._ensure_collection()
-        self._client.delete(
+    async def delete_document(self, document_id: UUID) -> None:
+        await self._ensure_collection()
+        await self._client.delete(
             collection_name=self._collection_name,
             points_selector=Filter(
                 must=[
@@ -140,14 +129,14 @@ class QdrantVectorStore(VectorStore):
             ),
         )
 
-    def health(self) -> bool:
+    async def health(self) -> bool:
         try:
             # 1. Check reachability
-            self._client.get_collections()
+            await self._client.get_collections()
             # 2. Ensure collection exists
-            self._ensure_collection()
+            await self._ensure_collection()
             # 3. Verify dimension matches
-            collection_info = self._client.get_collection(self._collection_name)
+            collection_info = await self._client.get_collection(self._collection_name)
             vectors_config = collection_info.config.params.vectors
 
             # Qdrant client vectors config can be multiple vectors or single vector config
@@ -170,7 +159,7 @@ class QdrantVectorStore(VectorStore):
             logger.warning(f"Qdrant health check failed: {e}")
             return False
 
-    def _search_sync(
+    async def search(
         self,
         query_vector: list[float],
         top_k: int,
@@ -181,7 +170,7 @@ class QdrantVectorStore(VectorStore):
         timeout: float | None = None,
         retrieval_scope: Any | None = None,
     ) -> list[dict[str, Any]]:
-        self._ensure_collection()
+        await self._ensure_collection()
 
         must_conditions: list[Any] = [
             FieldCondition(
@@ -251,7 +240,7 @@ class QdrantVectorStore(VectorStore):
             if scope_conditions:
                 must_conditions.append(Filter(should=scope_conditions))
 
-        results = self._client.search(
+        results = await self._client.search(
             collection_name=self._collection_name,
             query_vector=query_vector,
             query_filter=Filter(must=must_conditions),
@@ -267,29 +256,3 @@ class QdrantVectorStore(VectorStore):
             }
             for r in results
         ]
-
-    async def search(
-        self,
-        query_vector: list[float],
-        top_k: int,
-        user_id: UUID,
-        document_ids: list[UUID] | None = None,
-        tags: list[str] | None = None,
-        filter_metadata: dict[str, Any] | None = None,
-        timeout: float | None = None,
-        retrieval_scope: Any | None = None,
-    ) -> list[dict[str, Any]]:
-        """
-        Asynchronously searches the vector store using the query vector.
-        """
-        return await asyncio.to_thread(
-            self._search_sync,
-            query_vector=query_vector,
-            top_k=top_k,
-            user_id=user_id,
-            document_ids=document_ids,
-            tags=tags,
-            filter_metadata=filter_metadata,
-            timeout=timeout,
-            retrieval_scope=retrieval_scope,
-        )

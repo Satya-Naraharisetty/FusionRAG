@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from app.core.config import settings
 from app.evaluation.domain.interfaces import EvaluationProvider
@@ -97,32 +98,25 @@ class RagasProvider(EvaluationProvider):
             }
             dataset = Dataset.from_dict(data)
 
-            # 2. Resolve Ragas LLM and Embeddings based on evaluation settings
-            # We construct a Langchain model pointing to OpenAI or Gemini
+            # 2. Resolve Ragas LLM and Embeddings pointing to Google Gemini
             from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+            from pydantic import SecretStr
 
-            # Use Gemini's OpenAI compatibility or OpenAI based on config
-            if settings.EVALUATION_PROVIDER == "gemini":
-                llm = ChatOpenAI(
-                    model=settings.GEMINI_CHAT_MODEL,
-                    api_key=settings.GEMINI_API_KEY,
-                    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-                    temperature=0.0,
-                )
-                embeddings = OpenAIEmbeddings(
-                    model="text-embedding-004",  # Gemini embedding model name
-                    api_key=settings.GEMINI_API_KEY,
-                    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-                )
-            else:
-                llm = ChatOpenAI(
-                    model=settings.OPENAI_CHAT_MODEL,
-                    api_key=settings.OPENAI_API_KEY,
-                    temperature=0.0,
-                )
-                embeddings = OpenAIEmbeddings(
-                    model=settings.EMBEDDING_MODEL, api_key=settings.OPENAI_API_KEY
-                )
+            llm = ChatOpenAI(
+                model=settings.GEMINI_CHAT_MODEL,
+                api_key=SecretStr(settings.GEMINI_API_KEY)
+                if settings.GEMINI_API_KEY
+                else None,
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+                temperature=0.0,
+            )
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-004",  # Gemini embedding model name
+                api_key=SecretStr(settings.GEMINI_API_KEY)
+                if settings.GEMINI_API_KEY
+                else None,
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            )
 
             # 3. Resolve metrics
             ragas_metrics = []
@@ -143,7 +137,7 @@ class RagasProvider(EvaluationProvider):
             import asyncio
 
             loop = asyncio.get_event_loop()
-            result_df = await loop.run_in_executor(
+            result_df: Any = await loop.run_in_executor(
                 None,
                 lambda: ragas_evaluate(
                     dataset=dataset,

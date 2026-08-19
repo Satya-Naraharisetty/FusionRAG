@@ -1,4 +1,4 @@
-import asyncio
+import inspect
 from typing import Any
 from uuid import UUID
 
@@ -37,9 +37,11 @@ class QdrantDenseRetriever(DenseRetriever):
         retrieval_scope: Any | None = None,
     ) -> list[RetrievedChunk]:
         # 1. Generate Query Embedding
-        query_vector = await asyncio.to_thread(
-            self._embedding_generator.generate, query
-        )
+        gen_res = self._embedding_generator.generate(query)
+        if inspect.isawaitable(gen_res):
+            query_vector = await gen_res
+        else:
+            query_vector = gen_res
 
         # 2. Vector Search (applying user context, document IDs, tags, metadata, and timeout)
         search_results = await self._vector_store.search(

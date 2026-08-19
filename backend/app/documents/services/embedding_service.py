@@ -56,9 +56,9 @@ class EmbeddingService:
         self._dimension = dimension
         self._embedding_version = embedding_version
 
-    def generate_embeddings(self, document_id: UUID, force: bool = False) -> None:
+    async def generate_embeddings(self, document_id: UUID, force: bool = False) -> None:
         """
-        Generates embeddings for chunks belonging to a document.
+        Generates embeddings for chunks belonging to a document asynchronously.
         If force=True, deletes existing embeddings and vectors, and regenerates.
         Otherwise, only embeds chunks with FAILED, PENDING, or missing statuses.
         """
@@ -66,11 +66,22 @@ class EmbeddingService:
             f"Initiating embedding generation for document {document_id} (force={force})"
         )
 
-        document = self._document_repo.get_by_id(document_id)
+        document = await self._document_repo.get_by_id(document_id)
         if not document:
             raise DocumentNotFound(f"Document with ID {document_id} not found.")
 
-        chunks = self._chunk_repo.list_by_document(document_id)
+        doc_user_id = str(document.user_id)
+        doc_scope = (
+            document.scope.value
+            if hasattr(document.scope, "value")
+            else str(document.scope)
+        )
+        doc_conversation_id = (
+            str(document.conversation_id) if document.conversation_id else None
+        )
+        doc_language = document.language or "en"
+
+        chunks = await self._chunk_repo.list_by_document(document_id)
         if not chunks:
             logger.info(f"No chunks found for document {document_id}. Skipping.")
             return
@@ -80,19 +91,19 @@ class EmbeddingService:
                 f"Regeneration requested: clearing existing database metadata and vectors for document {document_id}"
             )
             try:
-                self._embedding_repo.delete_by_document(document_id)
-                self._uow.commit()
+                await self._embedding_repo.delete_by_document(document_id)
+                await self._uow.commit()
                 # Deleting from the vector store is done after DB commit is verified
-                self._vector_store.delete_document(document_id)
+                await self._vector_store.delete_document(document_id)
             except Exception as e:
-                self._uow.rollback()
+                await self._uow.rollback()
                 logger.exception(
                     f"Failed to clear old embeddings/vectors for document {document_id}: {e}"
                 )
                 raise
 
         # Retrieve current embedding records
-        existing_embeddings = self._embedding_repo.list_by_document(document_id)
+        existing_embeddings = await self._embedding_repo.list_by_document(document_id)
         existing_map = {emb.chunk_id: emb for emb in existing_embeddings}
 
         # Filter chunks that need embedding
@@ -144,12 +155,12 @@ class EmbeddingService:
                         created_at=old_emb.created_at if old_emb else now,
                         updated_at=now,
                     )
-                    self._embedding_repo.save(emb)
-                self._uow.commit()
+                    await self._embedding_repo.save(emb)
+                await self._uow.commit()
 
                 # 2. Call embedding generator
                 texts = [c.text for c in batch]
-                vectors = self._embedding_generator.batch_generate(texts)
+                vectors = await self._embedding_generator.batch_generate(texts)
 
                 # 3. Store vectors in VectorStore
                 payloads = []
@@ -158,20 +169,16 @@ class EmbeddingService:
                         {
                             "chunk_id": str(c.id),
                             "document_id": str(document_id),
-                            "user_id": str(document.user_id),
-                            "document_scope": document.scope.value
-                            if hasattr(document.scope, "value")
-                            else str(document.scope),
-                            "conversation_id": str(document.conversation_id)
-                            if document.conversation_id
-                            else None,
+                            "user_id": doc_user_id,
+                            "document_scope": doc_scope,
+                            "conversation_id": doc_conversation_id,
                             "chunk_index": c.chunk_index,
-                            "language": document.language or "en",
+                            "language": doc_language,
                             "metadata": c.metadata,
                         }
                     )
 
-                self._vector_store.upsert(
+                await self._vector_store.upsert(
                     vectors=vectors,
                     payloads=payloads,
                     ids=[c.id for c in batch],
@@ -180,7 +187,7 @@ class EmbeddingService:
                 # 4. Mark status as COMPLETED in DB
                 now = self._time_provider.get_now()
                 chunk_ids = [c.id for c in batch]
-                existing_embs = self._embedding_repo.get_by_chunk_ids(chunk_ids)
+                existing_embs = await self._embedding_repo.get_by_chunk_ids(chunk_ids)
                 emb_map = {emb.chunk_id: emb for emb in existing_embs}
 
                 for chunk in batch:
@@ -209,20 +216,22 @@ class EmbeddingService:
                         created_at=current_emb.created_at if current_emb else now,
                         updated_at=now,
                     )
-                    self._embedding_repo.save(emb)
-                self._uow.commit()
+                    await self._embedding_repo.save(emb)
+                await self._uow.commit()
 
             except Exception as batch_error:
                 logger.error(
                     f"Failed to process embedding batch of size {len(batch)}: {batch_error}"
                 )
-                self._uow.rollback()
+                await self._uow.rollback()
 
                 # Record batch chunks as FAILED in database
                 try:
                     now = self._time_provider.get_now()
                     chunk_ids = [c.id for c in batch]
-                    existing_embs = self._embedding_repo.get_by_chunk_ids(chunk_ids)
+                    existing_embs = await self._embedding_repo.get_by_chunk_ids(
+                        chunk_ids
+                    )
                     emb_map = {emb.chunk_id: emb for emb in existing_embs}
 
                     for chunk in batch:
@@ -256,26 +265,26 @@ class EmbeddingService:
                             created_at=current_emb.created_at if current_emb else now,
                             updated_at=now,
                         )
-                        self._embedding_repo.save(emb)
-                    self._uow.commit()
+                        await self._embedding_repo.save(emb)
+                    await self._uow.commit()
                 except Exception as fail_db_err:
-                    self._uow.rollback()
+                    await self._uow.rollback()
                     logger.critical(
                         f"Critical failure recording FAILED embedding state to DB: {fail_db_err}"
                     )
 
-    def delete_embeddings(self, document_id: UUID) -> None:
+    async def delete_embeddings(self, document_id: UUID) -> None:
         """
         Deletes all embeddings metadata and vectors associated with the document.
         """
         logger.info(f"Deleting embeddings and vectors for document {document_id}")
         try:
-            self._embedding_repo.delete_by_document(document_id)
-            self._uow.commit()
+            await self._embedding_repo.delete_by_document(document_id)
+            await self._uow.commit()
             # Deletion from vector store is executed after PostgreSQL commit.
-            self._vector_store.delete_document(document_id)
+            await self._vector_store.delete_document(document_id)
         except Exception as e:
-            self._uow.rollback()
+            await self._uow.rollback()
             logger.exception(
                 f"Failed to delete embeddings for document {document_id}: {e}"
             )

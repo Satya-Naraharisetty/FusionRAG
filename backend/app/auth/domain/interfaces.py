@@ -47,28 +47,28 @@ class TokenProvider(ABC):
 
 class UserRepository(ABC):
     @abstractmethod
-    def get_by_email(self, email: str) -> UserDomain | None:
+    async def get_by_email(self, email: str) -> UserDomain | None:
         """
         Fetch a user by email address.
         """
         pass
 
     @abstractmethod
-    def get_by_id(self, id: UUID) -> UserDomain | None:
+    async def get_by_id(self, id: UUID) -> UserDomain | None:
         """
         Fetch a user by UUID.
         """
         pass
 
     @abstractmethod
-    def save(self, user: UserDomain) -> UserDomain:
+    async def save(self, user: UserDomain) -> UserDomain:
         """
         Save a user entity.
         """
         pass
 
     @abstractmethod
-    def delete(self, user_id: UUID) -> None:
+    async def delete(self, user_id: UUID) -> None:
         """
         Permanently delete a user. Dependent rows (sessions, conversations,
         documents) are removed by the database ON DELETE CASCADE constraints.
@@ -76,7 +76,7 @@ class UserRepository(ABC):
         pass
 
     @abstractmethod
-    def get_by_oauth_sub(self, provider: str, sub: str) -> "UserDomain | None":
+    async def get_by_oauth_sub(self, provider: str, sub: str) -> "UserDomain | None":
         """
         Fetch a user by OAuth provider + subject identifier.
         """
@@ -85,42 +85,42 @@ class UserRepository(ABC):
 
 class SessionRepository(ABC):
     @abstractmethod
-    def find_active_by_token(self, token: str) -> SessionDomain | None:
+    async def find_active_by_token(self, token: str) -> SessionDomain | None:
         """
         Find an active session by raw refresh token.
         """
         pass
 
     @abstractmethod
-    def find_by_token(self, token: str) -> SessionDomain | None:
+    async def find_by_token(self, token: str) -> SessionDomain | None:
         """
         Find any session (active, expired, or revoked) by raw refresh token.
         """
         pass
 
     @abstractmethod
-    def create(self, session: SessionDomain, raw_token: str) -> SessionDomain:
+    async def create(self, session: SessionDomain, raw_token: str) -> SessionDomain:
         """
         Create a new session record.
         """
         pass
 
     @abstractmethod
-    def revoke(self, token: str) -> None:
+    async def revoke(self, token: str) -> None:
         """
         Revoke a session by raw refresh token.
         """
         pass
 
     @abstractmethod
-    def revoke_all_for_user(self, user_id: UUID) -> None:
+    async def revoke_all_for_user(self, user_id: UUID) -> None:
         """
         Revoke all active sessions for a user.
         """
         pass
 
     @abstractmethod
-    def update_last_used(self, token: str, last_used_at: datetime) -> None:
+    async def update_last_used(self, token: str, last_used_at: datetime) -> None:
         """
         Update the last_used_at timestamp of a session.
         """
@@ -147,14 +147,14 @@ class UUIDGenerator(ABC):
 
 class UnitOfWork(ABC):
     @abstractmethod
-    def commit(self) -> None:
+    async def commit(self) -> None:
         """
         Commit the active database transaction context.
         """
         pass
 
     @abstractmethod
-    def rollback(self) -> None:
+    async def rollback(self) -> None:
         """
         Rollback the active database transaction context.
         """

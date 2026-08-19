@@ -76,7 +76,7 @@ async def upload_document(
 
 
 @router.get("", response_model=list[DocumentResponse])
-def list_documents(
+async def list_documents(
     current_user: dict = Depends(get_current_user_context),
     document_service: DocumentService = Depends(get_document_service),
 ):
@@ -84,11 +84,11 @@ def list_documents(
     List uploaded persistent library documents for the currently authenticated user.
     """
     user_id = UUID(current_user["user_id"])
-    return document_service.list_documents(user_id)
+    return await document_service.list_documents(user_id)
 
 
 @router.get("/{id}", response_model=DocumentResponse)
-def get_document(
+async def get_document(
     id: UUID,
     current_user: dict = Depends(get_current_user_context),
     document_service: DocumentService = Depends(get_document_service),
@@ -97,11 +97,11 @@ def get_document(
     Retrieve details of a single document by UUID. Enforces owner authorization.
     """
     user_id = UUID(current_user["user_id"])
-    return document_service.get_document_by_id(id, user_id)
+    return await document_service.get_document_by_id(id, user_id)
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document(
+async def delete_document(
     id: UUID,
     current_user: dict = Depends(get_current_user_context),
     document_service: DocumentService = Depends(get_document_service),
@@ -110,12 +110,12 @@ def delete_document(
     Deletes a document and all its chunks from the repository and storage.
     """
     user_id = UUID(current_user["user_id"])
-    document_service.delete_document(id, user_id)
+    await document_service.delete_document(id, user_id)
     return None
 
 
 @router.post("/{id}/reprocess", response_model=DocumentResponse)
-def reprocess_document(
+async def reprocess_document(
     id: UUID,
     current_user: dict = Depends(get_current_user_context),
     document_service: DocumentService = Depends(get_document_service),
@@ -124,7 +124,7 @@ def reprocess_document(
     Manually triggers reprocessing of a document.
     """
     user_id = UUID(current_user["user_id"])
-    return document_service.reprocess_document(id, user_id)
+    return await document_service.reprocess_document(id, user_id)
 
 
 class EmbeddingStatusResponse(BaseModel):
@@ -137,7 +137,7 @@ class EmbeddingStatusResponse(BaseModel):
 
 
 @router.post("/{id}/embeddings/regenerate", status_code=status.HTTP_202_ACCEPTED)
-def regenerate_embeddings(
+async def regenerate_embeddings(
     id: UUID,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user_context),
@@ -148,7 +148,7 @@ def regenerate_embeddings(
     Manually triggers complete regeneration of embeddings for a document.
     """
     user_id = UUID(current_user["user_id"])
-    document = document_service.get_document_by_id(id, user_id)
+    document = await document_service.get_document_by_id(id, user_id)
 
     task_queue = FastAPIBackgroundTasksQueue(background_tasks)
     task_queue.enqueue(embedding_service.generate_embeddings, document.id, force=True)
@@ -157,7 +157,7 @@ def regenerate_embeddings(
 
 
 @router.delete("/{id}/embeddings", status_code=status.HTTP_204_NO_CONTENT)
-def delete_embeddings(
+async def delete_embeddings(
     id: UUID,
     current_user: dict = Depends(get_current_user_context),
     document_service: DocumentService = Depends(get_document_service),
@@ -167,14 +167,14 @@ def delete_embeddings(
     Deletes all embedding metadata and vector database entries for a document.
     """
     user_id = UUID(current_user["user_id"])
-    document = document_service.get_document_by_id(id, user_id)
+    document = await document_service.get_document_by_id(id, user_id)
 
-    embedding_service.delete_embeddings(document.id)
+    await embedding_service.delete_embeddings(document.id)
     return None
 
 
 @router.get("/{id}/embeddings/status", response_model=EmbeddingStatusResponse)
-def get_embeddings_status(
+async def get_embeddings_status(
     id: UUID,
     current_user: dict = Depends(get_current_user_context),
     document_service: DocumentService = Depends(get_document_service),
@@ -184,9 +184,9 @@ def get_embeddings_status(
     Retrieves the embedding generation status and counts for a document.
     """
     user_id = UUID(current_user["user_id"])
-    document = document_service.get_document_by_id(id, user_id)
+    document = await document_service.get_document_by_id(id, user_id)
 
-    chunks = embedding_service._chunk_repo.list_by_document(document.id)
+    chunks = await embedding_service._chunk_repo.list_by_document(document.id)
     if not chunks:
         return EmbeddingStatusResponse(
             status=EmbeddingStatus.PENDING.value,
@@ -197,7 +197,7 @@ def get_embeddings_status(
             model=embedding_service._model_name,
         )
 
-    embeddings = embedding_service._embedding_repo.list_by_document(document.id)
+    embeddings = await embedding_service._embedding_repo.list_by_document(document.id)
     existing_map = {emb.chunk_id: emb for emb in embeddings}
 
     chunks_total = len(chunks)

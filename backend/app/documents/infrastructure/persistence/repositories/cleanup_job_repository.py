@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.documents.domain.interfaces import CleanupJobRepository
 from app.documents.domain.models import CleanupJob
@@ -8,25 +9,23 @@ from app.documents.infrastructure.persistence.models import SQLAlchemyCleanupJob
 
 
 class SQLAlchemyCleanupJobRepository(CleanupJobRepository):
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    def get_by_id(self, id: UUID) -> CleanupJob | None:
-        db_job = (
-            self._db.query(SQLAlchemyCleanupJob)
-            .filter(SQLAlchemyCleanupJob.id == id)
-            .first()
+    async def get_by_id(self, id: UUID) -> CleanupJob | None:
+        result = await self._db.execute(
+            select(SQLAlchemyCleanupJob).where(SQLAlchemyCleanupJob.id == id)
         )
+        db_job = result.scalar_one_or_none()
         if not db_job:
             return None
         return self._to_domain(db_job)
 
-    def save(self, job: CleanupJob) -> CleanupJob:
-        db_job = (
-            self._db.query(SQLAlchemyCleanupJob)
-            .filter(SQLAlchemyCleanupJob.id == job.id)
-            .first()
+    async def save(self, job: CleanupJob) -> CleanupJob:
+        result = await self._db.execute(
+            select(SQLAlchemyCleanupJob).where(SQLAlchemyCleanupJob.id == job.id)
         )
+        db_job = result.scalar_one_or_none()
         if not db_job:
             db_job = SQLAlchemyCleanupJob(
                 id=job.id,
@@ -47,15 +46,16 @@ class SQLAlchemyCleanupJobRepository(CleanupJobRepository):
             db_job.updated_at = job.updated_at
             db_job.payload = job.payload
 
-        self._db.flush()
+        await self._db.flush()
         return self._to_domain(db_job)
 
-    def list_pending_or_failed(self) -> list[CleanupJob]:
-        db_jobs = (
-            self._db.query(SQLAlchemyCleanupJob)
-            .filter(SQLAlchemyCleanupJob.status.in_(["PENDING", "FAILED"]))
-            .all()
+    async def list_pending_or_failed(self) -> list[CleanupJob]:
+        result = await self._db.execute(
+            select(SQLAlchemyCleanupJob).where(
+                SQLAlchemyCleanupJob.status.in_(["PENDING", "FAILED"])
+            )
         )
+        db_jobs = result.scalars().all()
         return [self._to_domain(j) for j in db_jobs]
 
     def _to_domain(self, db_job: SQLAlchemyCleanupJob) -> CleanupJob:

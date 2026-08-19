@@ -39,6 +39,8 @@ def run_migrations_offline() -> None:
 
     """
     url = settings.DATABASE_URL
+    if url and url.startswith("postgresql+asyncpg://"):
+        url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -57,8 +59,11 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    url = settings.DATABASE_URL
+    if url and url.startswith("postgresql+asyncpg://"):
+        url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
     connectable = create_engine(
-        settings.DATABASE_URL,
+        url,
         poolclass=pool.NullPool,
     )
 

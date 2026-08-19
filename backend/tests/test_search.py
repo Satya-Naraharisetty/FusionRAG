@@ -3,8 +3,10 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi import status
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.api.dependencies import (
     get_conversation_manager,
@@ -12,7 +14,7 @@ from app.api.dependencies import (
     get_document_service,
     get_retrieval_service,
 )
-from app.auth.infrastructure.persistence.models import Base, SQLAlchemyUser
+from app.auth.infrastructure.persistence.models import SQLAlchemyUser
 from app.core.config import settings
 from app.documents.domain.exceptions import UnauthorizedDocumentAccess
 from app.documents.domain.models import Chunk, RetrievedChunk, SearchResult
@@ -28,24 +30,42 @@ from app.documents.services.retrieval_service import RetrievalService
 from tests.db import TEST_DATABASE_URL
 
 
+def _sync_setup_search_db(sync_engine):
+    sync_session_local = sessionmaker(
+        autocommit=False, autoflush=False, bind=sync_engine
+    )
+    db = sync_session_local()
+    try:
+        db.execute(text("DELETE FROM document_embeddings;"))
+        db.execute(text("DELETE FROM document_chunks;"))
+        db.execute(text("DELETE FROM documents;"))
+        db.execute(text("DELETE FROM refresh_sessions;"))
+        db.execute(text("DELETE FROM users;"))
+        db.commit()
+    finally:
+        db.close()
+    sync_engine.dispose()
+
+
 # --- DB Mock/Fixtures for Repository Integration Tests ---
 @pytest.fixture(scope="function")
 def search_test_db():
-    engine = create_engine(TEST_DATABASE_URL)
+    sync_engine = create_engine(TEST_DATABASE_URL, poolclass=NullPool)
+    async_url = TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    async_engine = create_async_engine(async_url, poolclass=NullPool)
     try:
-        Base.metadata.create_all(bind=engine)
-        session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        db = session_factory()
-        try:
-            db.execute(Base.metadata.tables["document_chunks"].delete())  # clean chunks
-            db.execute(Base.metadata.tables["documents"].delete())  # clean docs
-            db.execute(Base.metadata.tables["users"].delete())  # clean users
-            db.commit()
-        finally:
-            db.close()
-        yield session_factory
+        _sync_setup_search_db(sync_engine)
+
+        async_session_local = async_sessionmaker(
+            bind=async_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
+        yield async_session_local
     finally:
-        engine.dispose()
+        pass
 
 
 # --- 1. SearchRanker Unit Tests ---
@@ -95,8 +115,8 @@ def test_semantic_search_ranker():
 # --- 2. ChunkRepository Integration Tests ---
 @pytest.mark.asyncio
 async def test_chunk_repository_operations(search_test_db):
-    db = search_test_db()
-    try:
+    db_factory = search_test_db
+    async with db_factory() as db:
         repo = SQLAlchemyChunkRepository(db)
 
         # 1. Setup mock user and document in DB
@@ -110,7 +130,7 @@ async def test_chunk_repository_operations(search_test_db):
             updated_at=datetime.now(UTC),
         )
         db.add(db_user)
-        db.flush()
+        await db.flush()
 
         doc_id = uuid4()
         db_doc = SQLAlchemyDocument(
@@ -124,7 +144,7 @@ async def test_chunk_repository_operations(search_test_db):
             status="completed",
         )
         db.add(db_doc)
-        db.flush()
+        await db.flush()
 
         chunk_id = uuid4()
         db_chunk = SQLAlchemyChunk(
@@ -138,11 +158,11 @@ async def test_chunk_repository_operations(search_test_db):
             metadata_json={"source": "law"},
         )
         db.add(db_chunk)
-        db.commit()
+        await db.commit()
 
         # 2. Test load_chunk_text
-        text = await repo.load_chunk_text(chunk_id)
-        assert text == "Lorem Ipsum text content here."
+        text_val = await repo.load_chunk_text(chunk_id)
+        assert text_val == "Lorem Ipsum text content here."
 
         missing_text = await repo.load_chunk_text(uuid4())
         assert missing_text is None
@@ -177,9 +197,6 @@ async def test_chunk_repository_operations(search_test_db):
         assert chunks[0].text == "Lorem Ipsum text content here."
         # Verify that original_filename is eagerly loaded into metadata["document_name"]
         assert chunks[0].metadata["document_name"] == "legal_document.txt"
-
-    finally:
-        db.close()
 
 
 # --- 3. RetrievalService Unit Tests ---

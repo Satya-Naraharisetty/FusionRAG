@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import logging
 import os
 import subprocess
@@ -8,7 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import yaml
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.evaluation.domain.models import EvaluationDataset, EvaluationSample
 from app.evaluation.infrastructure.persistence.models import (
@@ -16,6 +17,14 @@ from app.evaluation.infrastructure.persistence.models import (
     SQLAlchemyEvaluationRun,
 )
 from app.evaluation.runners.evaluation_runner import EvaluationRunner
+
+
+async def _safe_commit(db: Any) -> None:
+    if hasattr(db, "commit"):
+        res = db.commit()
+        if inspect.isawaitable(res):
+            await res
+
 
 logger = logging.getLogger(__name__)
 
@@ -49,30 +58,33 @@ class BenchmarkRunner:
 
         # Fallback default configuration if manifest cannot be loaded
         return {
-            "quick": {"pipelines": ["retrieval"], "max_samples": 5},
-            "standard": {"pipelines": ["retrieval", "generation"], "max_samples": 50},
+            "quick": {"max_samples": 5, "pipelines": ["retrieval"]},
+            "standard": {"max_samples": 20, "pipelines": ["retrieval", "generation"]},
             "full": {
+                "max_samples": 100,
                 "pipelines": ["retrieval", "generation", "agent", "conversation"],
-                "max_samples": 200,
             },
             "nightly": {
+                "max_samples": 500,
                 "pipelines": ["retrieval", "generation", "agent", "conversation"],
-                "max_samples": 1000,
             },
         }
 
     def register_before_hook(self, hook: Callable[[], Any]) -> None:
+        """Register a pre-run lifecycle hook."""
         self._before_hooks.append(hook)
 
     def register_after_hook(
         self, hook: Callable[[SQLAlchemyEvaluationRun], Any]
     ) -> None:
+        """Register a post-run lifecycle hook."""
         self._after_hooks.append(hook)
 
     def _get_git_metadata(self) -> tuple[str, str]:
+        """Extract current git commit and branch name."""
         try:
             commit = (
-                subprocess.check_output(["git", "rev-parse", "HEAD"])
+                subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
                 .decode("utf-8")
                 .strip()
             )
@@ -94,7 +106,7 @@ class BenchmarkRunner:
 
     async def run_benchmark(
         self,
-        db: Session,
+        db: AsyncSession,
         dataset: EvaluationDataset,
         profile: str = "quick",
         pipelines: list[str] | None = None,
@@ -153,7 +165,7 @@ class BenchmarkRunner:
             },
         )
         db.add(benchmark_record)
-        db.commit()
+        await _safe_commit(db)
 
         # 2. Delegate execution to EvaluationRunner
         run_record = await self.evaluation_runner.run_evaluation(
@@ -178,7 +190,7 @@ class BenchmarkRunner:
             "total_cost": run_record.total_cost,
             "avg_latency": run_record.avg_latency,
         }
-        db.commit()
+        await _safe_commit(db)
 
         # 4. Execute After Hooks
         logger.info("Executing after-benchmark lifecycle hooks...")
@@ -191,5 +203,5 @@ class BenchmarkRunner:
             except Exception as e:
                 logger.error(f"Error executing after_benchmark hook: {e}")
 
-        db.commit()
+        await _safe_commit(db)
         return run_record

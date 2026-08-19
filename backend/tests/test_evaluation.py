@@ -204,7 +204,7 @@ async def test_benchmark_runner_and_regression_checks(db_session):
 
     # Verify Regression comparison
     regression_runner = RegressionRunner()
-    regression_result = regression_runner.compare_runs(
+    regression_result = await regression_runner.compare_runs(
         db=db_session,
         candidate_run_id=candidate_run.id,
         baseline_run_id=baseline_run.id,
@@ -289,7 +289,10 @@ async def test_api_routes(client, db_session):
     from app.main import app
 
     # Override get_db with the in-memory SQLite session used by other evaluation tests
-    app.dependency_overrides[get_db] = lambda: db_session
+    def _override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = _override_get_db
     # Mock admin override
     app.dependency_overrides[check_admin_user] = lambda: {
         "user_id": str(uuid.uuid4()),

@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.domain.interfaces import TimeProvider, UnitOfWork, UUIDGenerator
 
@@ -23,17 +23,17 @@ class SystemUUIDGenerator(UUIDGenerator):
 
 
 class SQLAlchemyUnitOfWork(UnitOfWork):
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    def commit(self) -> None:
+    async def commit(self) -> None:
         """
         Commit the active transaction.
         """
-        self._db.commit()
+        await self._db.commit()
 
-    def rollback(self) -> None:
+    async def rollback(self) -> None:
         """
         Rollback the active transaction.
         """
-        self._db.rollback()
+        await self._db.rollback()

@@ -1,9 +1,10 @@
 import redis.asyncio as async_redis
 from fastapi import Request
-from qdrant_client import QdrantClient
-from sqlalchemy import create_engine
-from sqlalchemy.engine import Engine
+from qdrant_client import AsyncQdrantClient
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+
+from app.core.config import settings
 
 
 class Base(DeclarativeBase):
@@ -17,7 +18,7 @@ class Base(DeclarativeBase):
 # Dependency Injection Provider Functions
 
 
-def get_db(request: Request):
+async def get_db(request: Request):
     """
     FastAPI dependency injection provider to retrieve PostgreSQL database sessions.
     Fetches the session factory initialized in lifespan from request app state.
@@ -28,15 +29,8 @@ def get_db(request: Request):
             "Database session factory is not initialized in application state."
         )
 
-    db = session_factory()
-    try:
-        yield db
-        # Commit the unit of work on successful request completion. Repositories
-        # that only flush() (e.g. the chat conversation/message stores) depend on
-        # this commit; without it their writes are rolled back on close().
-        db.commit()
-    finally:
-        db.close()
+    async with session_factory() as session:
+        yield session
 
 
 def get_redis(request: Request) -> async_redis.Redis:
@@ -49,7 +43,7 @@ def get_redis(request: Request) -> async_redis.Redis:
     return redis_client
 
 
-def get_qdrant(request: Request) -> QdrantClient:
+def get_qdrant(request: Request) -> AsyncQdrantClient:
     """
     FastAPI DI provider to retrieve the lifespan-managed Qdrant client.
     """
@@ -62,17 +56,23 @@ def get_qdrant(request: Request) -> QdrantClient:
 # Client Initialization Helper Functions
 
 
-def init_postgres_engine(database_url: str) -> Engine:
+def init_postgres_engine(database_url: str) -> AsyncEngine:
     """
-    Instantiates a database engine with connection pooling parameters.
+    Instantiates an async database engine with connection pooling parameters.
     """
     engine_kwargs = {
         "pool_pre_ping": True,
-        "pool_size": 50,
-        "max_overflow": 50,
+        "pool_size": settings.DATABASE_POOL_SIZE,
+        "max_overflow": settings.DATABASE_MAX_OVERFLOW,
     }
 
-    # Strip pgbouncer query parameter as psycopg2 doesn't support it
+    # Normalize url scheme to postgresql+asyncpg
+    if database_url.startswith("postgresql://"):
+        database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
+
+    # Strip pgbouncer query parameter as psycopg2/asyncpg doesn't support it
     if database_url and "pgbouncer=" in database_url.lower():
         from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
@@ -80,7 +80,7 @@ def init_postgres_engine(database_url: str) -> Engine:
         qsl = [(k, v) for k, v in parse_qsl(parsed.query) if k.lower() != "pgbouncer"]
         database_url = urlunparse(parsed._replace(query=urlencode(qsl)))
 
-    return create_engine(database_url, **engine_kwargs)
+    return create_async_engine(database_url, **engine_kwargs)
 
 
 _redis_pool = None
@@ -128,12 +128,12 @@ def init_qdrant_client(
     port: int | None = None,
     api_key: str | None = None,
     url: str | None = None,
-) -> QdrantClient:
+) -> AsyncQdrantClient:
     """
     Instantiates the Qdrant approximate nearest neighbor client.
     """
     if url:
-        return QdrantClient(url=url, api_key=api_key, timeout=3)
+        return AsyncQdrantClient(url=url, api_key=api_key, timeout=3)
     if host and (host.startswith("http://") or host.startswith("https://")):
-        return QdrantClient(url=host, api_key=api_key, timeout=3)
-    return QdrantClient(host=host, port=port, api_key=api_key, timeout=3)
+        return AsyncQdrantClient(url=host, api_key=api_key, timeout=3)
+    return AsyncQdrantClient(host=host, port=port, api_key=api_key, timeout=3)

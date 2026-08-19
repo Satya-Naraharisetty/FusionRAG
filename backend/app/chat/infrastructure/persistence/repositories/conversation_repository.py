@@ -1,7 +1,8 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.chat.domain.exceptions import ConversationConcurrentUpdateException
@@ -16,7 +17,7 @@ from app.chat.infrastructure.persistence.models import ConversationORM
 
 
 class SQLAlchemyConversationRepository(ConversationRepository):
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
     def _to_domain(self, orm: ConversationORM) -> Conversation:
@@ -49,21 +50,15 @@ class SQLAlchemyConversationRepository(ConversationRepository):
             last_message_at=conversation.last_message_at,
         )
         self._db.add(orm)
-        # Flush-only by design: the chat caller (ChatOrchestrator) commits a
-        # brand-new conversation BEFORE its id leaves the process — the first
-        # SSE metadata event triggers the frontend's attachment flush, whose
-        # verify_owner would 404 an uncommitted row. The /search caller relies
-        # on the request-scoped session's commit at teardown (its id only
-        # leaves at request end), as does everything else.
-        self._db.flush()
+        await self._db.flush()
+        await self._db.refresh(orm)
         return self._to_domain(orm)
 
     async def get_conversation(self, conversation_id: UUID) -> Conversation | None:
-        orm = (
-            self._db.query(ConversationORM)
-            .filter(ConversationORM.id == conversation_id)
-            .first()
+        result = await self._db.execute(
+            select(ConversationORM).where(ConversationORM.id == conversation_id)
         )
+        orm = result.scalar_one_or_none()
         if not orm:
             return None
         return self._to_domain(orm)
@@ -71,27 +66,25 @@ class SQLAlchemyConversationRepository(ConversationRepository):
     async def list_conversations(
         self, user_id: UUID, limit: int = 20, offset: int = 0
     ) -> list[Conversation]:
-        orms = (
-            self._db.query(ConversationORM)
-            .filter(
+        result = await self._db.execute(
+            select(ConversationORM)
+            .where(
                 ConversationORM.user_id == user_id,
                 ConversationORM.state != ConversationState.DELETED.value,
             )
             .order_by(ConversationORM.last_message_at.desc())
             .limit(limit)
             .offset(offset)
-            .all()
         )
+        orms = result.scalars().all()
         return [self._to_domain(orm) for orm in orms]
 
     async def update_conversation(self, conversation: Conversation) -> Conversation:
-        orm = (
-            self._db.query(ConversationORM)
-            .filter(ConversationORM.id == conversation.id)
-            .first()
+        result = await self._db.execute(
+            select(ConversationORM).where(ConversationORM.id == conversation.id)
         )
+        orm = result.scalar_one_or_none()
         if not orm:
-            # We can create it if not exists, but typically it should exist
             raise RuntimeError(f"Conversation {conversation.id} not found for update.")
 
         if conversation.version != orm.version:
@@ -110,7 +103,8 @@ class SQLAlchemyConversationRepository(ConversationRepository):
         orm.version = conversation.version
 
         try:
-            self._db.flush()
+            await self._db.flush()
+            await self._db.refresh(orm)
         except StaleDataError as e:
             raise ConversationConcurrentUpdateException(
                 f"Concurrent update conflict on conversation {conversation.id}: {e}"
@@ -120,12 +114,11 @@ class SQLAlchemyConversationRepository(ConversationRepository):
 
     async def delete_conversation(self, conversation_id: UUID) -> None:
         # Soft delete
-        orm = (
-            self._db.query(ConversationORM)
-            .filter(ConversationORM.id == conversation_id)
-            .first()
+        result = await self._db.execute(
+            select(ConversationORM).where(ConversationORM.id == conversation_id)
         )
+        orm = result.scalar_one_or_none()
         if orm:
             orm.state = ConversationState.DELETED.value
             orm.updated_at = datetime.now(UTC)
-            self._db.flush()
+            await self._db.flush()

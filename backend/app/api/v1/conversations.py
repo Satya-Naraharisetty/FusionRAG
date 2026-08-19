@@ -60,7 +60,7 @@ async def list_conversations(
     List all active conversations for the authenticated user, ordered by last activity.
     """
     user_id = UUID(user_context["user_id"])
-    conversations = await manager._conversation_repo.list_conversations(
+    conversations = await manager.list_conversations(
         user_id=user_id, limit=limit, offset=offset
     )
     return ConversationsListResponse(
@@ -81,13 +81,7 @@ async def get_conversation(
     """
     user_id = UUID(user_context["user_id"])
     try:
-        await manager._access_service.verify_owner(id, user_id)
-        conversation = await manager._conversation_repo.get_conversation(id)
-        if not conversation:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Conversation {id} not found.",
-            )
+        conversation = await manager.get_conversation(id, user_id)
         return conversation
     except ConversationNotFoundException as e:
         raise HTTPException(
@@ -113,21 +107,12 @@ async def patch_conversation(
     """
     user_id = UUID(user_context["user_id"])
     try:
-        await manager._access_service.verify_owner(id, user_id)
-        conversation = await manager._conversation_repo.get_conversation(id)
-        if not conversation:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Conversation {id} not found.",
-            )
-
-        # Apply updates
-        if request.title is not None:
-            conversation.title = request.title.strip()
-        if request.settings is not None:
-            conversation.settings = request.settings
-
-        updated = await manager._conversation_repo.update_conversation(conversation)
+        updated = await manager.patch_conversation(
+            conversation_id=id,
+            user_id=user_id,
+            title=request.title,
+            settings=request.settings,
+        )
         return updated
     except ConversationNotFoundException as e:
         raise HTTPException(
@@ -183,9 +168,8 @@ async def list_messages(
     """
     user_id = UUID(user_context["user_id"])
     try:
-        await manager._access_service.verify_owner(id, user_id)
-        messages = await manager._message_repo.get_recent_messages(
-            conversation_id=id, limit=limit, offset=offset
+        messages = await manager.list_messages(
+            conversation_id=id, user_id=user_id, limit=limit, offset=offset
         )
         return MessagesListResponse(
             messages=messages,
@@ -223,13 +207,7 @@ async def upload_conversation_document(
     user_id = UUID(user_context["user_id"])
 
     try:
-        await manager._access_service.verify_owner(conversation_id, user_id)
-        conv = await manager._conversation_repo.get_conversation(conversation_id)
-        if not conv:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Conversation {conversation_id} not found.",
-            )
+        conv = await manager.get_conversation(conversation_id, user_id)
         if conv.state in (ConversationState.DELETED, ConversationState.ARCHIVED):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -275,7 +253,9 @@ async def list_conversation_documents(
     user_id = UUID(user_context["user_id"])
     try:
         await manager._access_service.verify_owner(conversation_id, user_id)
-        docs = document_service.list_documents_by_conversation(conversation_id, user_id)
+        docs = await document_service.list_documents_by_conversation(
+            conversation_id, user_id
+        )
         from app.documents.domain.models import DocumentScope
 
         return [

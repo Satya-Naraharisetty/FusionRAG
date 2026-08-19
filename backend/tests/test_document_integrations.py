@@ -1,10 +1,12 @@
 import uuid
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import status
 from sqlalchemy import create_engine, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.db.models import Base
 from app.documents.domain.models import ExtractionResult
@@ -12,30 +14,60 @@ from tests.db import TEST_DATABASE_URL
 
 
 @pytest.fixture(scope="function")
-def doc_test_db(client):
+async def doc_test_db(client):
     """
     Sets up a clean database for document tests.
     """
-    engine = create_engine(TEST_DATABASE_URL)
+    sync_engine = create_engine(TEST_DATABASE_URL, poolclass=NullPool)
+    async_url = TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    async_engine = create_async_engine(async_url, poolclass=NullPool)
     try:
-        Base.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=sync_engine)
 
-        session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        sync_session_local = sessionmaker(
+            autocommit=False, autoflush=False, bind=sync_engine
+        )
 
-        db = session_local()
+        db = sync_session_local()
         try:
-            db.execute(text("TRUNCATE TABLE document_chunks CASCADE;"))
-            db.execute(text("TRUNCATE TABLE documents CASCADE;"))
-            db.execute(text("TRUNCATE TABLE refresh_sessions CASCADE;"))
-            db.execute(text("TRUNCATE TABLE users CASCADE;"))
+            db.execute(text("DELETE FROM document_chunks;"))
+            db.execute(text("DELETE FROM documents;"))
+            db.execute(text("DELETE FROM refresh_sessions;"))
+            db.execute(text("DELETE FROM users;"))
             db.commit()
         finally:
             db.close()
 
-        client.app.state.db_session_factory = session_local
-        yield session_local
+        async_session_local = async_sessionmaker(
+            bind=async_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
+
+        client.app.state.db_session_factory = async_session_local
+
+        from app.api.dependencies import get_db
+
+        http_engine = create_async_engine(async_url, poolclass=NullPool)
+        http_session_factory = async_sessionmaker(
+            bind=http_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
+
+        async def _http_get_db():
+            async with http_session_factory() as session:
+                yield session
+
+        client.app.dependency_overrides[get_db] = _http_get_db
+        yield sync_session_local
+        client.app.dependency_overrides.clear()
     finally:
-        engine.dispose()
+        sync_engine.dispose()
 
 
 # Helper function to register and authenticate a user
@@ -616,23 +648,23 @@ def test_delete_document_cascades(client, doc_test_db):
     assert res_get.status_code == status.HTTP_404_NOT_FOUND
 
 
+@pytest.mark.asyncio
 @patch("app.documents.infrastructure.extractors.TXTExtractor.extract")
-def test_concurrent_processing_guard(mock_extract, client, doc_test_db):
-    import threading
+async def test_concurrent_processing_guard(mock_extract, client, doc_test_db):
+    import asyncio
     import uuid
 
-    # We want Thread A to block in extraction
-    event_started = threading.Event()
-    event_proceed = threading.Event()
+    # We want Task A to block in extraction
+    event_started = asyncio.Event()
+    event_proceed = asyncio.Event()
 
-    def blocking_extract(file_bytes):
+    async def blocking_extract(file_bytes):
         event_started.set()
-        event_proceed.wait(timeout=5.0)  # Wait for main thread signal
+        await event_proceed.wait()
         return ExtractionResult(text="extracted plain text content", page_count=1)
 
     mock_extract.side_effect = blocking_extract
 
-    # Let's get the document processing service instance
     db_session = doc_test_db()
 
     # Let's register a user in DB first
@@ -658,89 +690,93 @@ def test_concurrent_processing_guard(mock_extract, client, doc_test_db):
     db_session.commit()
     db_session.close()
 
-    # Set up thread worker
     results = []
 
-    def run_pipeline(name):
-        from unittest.mock import MagicMock
+    async def run_pipeline(name):
+        from app.auth.infrastructure.providers import (
+            SQLAlchemyUnitOfWork,
+            SystemTimeProvider,
+        )
+        from app.documents.infrastructure.extractors import ExtractorFactory
+        from app.documents.infrastructure.persistence.repositories.chunk_repository import (
+            SQLAlchemyChunkRepository,
+        )
+        from app.documents.infrastructure.persistence.repositories.document_repository import (
+            SQLAlchemyDocumentRepository,
+        )
+        from app.documents.services.chunking import ChunkingService
+        from app.documents.services.document_processing_service import (
+            DocumentProcessingService,
+        )
+        from app.documents.services.metadata_extractor import MetadataExtractor
+        from app.documents.services.text_cleaner import TextCleaner
 
-        engine = create_engine(TEST_DATABASE_URL)
-        session_factory = sessionmaker(bind=engine)
-        db = session_factory()
-        try:
-            from app.auth.infrastructure.providers import (
-                SQLAlchemyUnitOfWork,
-                SystemTimeProvider,
-            )
-            from app.documents.infrastructure.extractors import ExtractorFactory
-            from app.documents.infrastructure.persistence.repositories.chunk_repository import (
-                SQLAlchemyChunkRepository,
-            )
-            from app.documents.infrastructure.persistence.repositories.document_repository import (
-                SQLAlchemyDocumentRepository,
-            )
-            from app.documents.services.chunking import ChunkingService
-            from app.documents.services.document_processing_service import (
-                DocumentProcessingService,
-            )
-            from app.documents.services.metadata_extractor import MetadataExtractor
-            from app.documents.services.text_cleaner import TextCleaner
+        async_url = TEST_DATABASE_URL.replace(
+            "postgresql://", "postgresql+asyncpg://", 1
+        )
+        async_engine = create_async_engine(async_url)
+        async_session_factory = async_sessionmaker(
+            bind=async_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
 
-            # Mock storage provider get to return dummy text
-            storage = MagicMock()
-            storage.get.return_value = b"some file content"
+        async with async_session_factory() as db:
+            try:
+                storage = MagicMock()
+                storage.get = AsyncMock(return_value=b"some file content")
 
-            proc_service = DocumentProcessingService(
-                document_repo=SQLAlchemyDocumentRepository(db),
-                chunk_repo=SQLAlchemyChunkRepository(db),
-                storage_provider=storage,
-                extractor_factory=ExtractorFactory(),
-                text_cleaner=TextCleaner(),
-                metadata_extractor=MetadataExtractor(),
-                chunking_service=ChunkingService(),
-                uow=SQLAlchemyUnitOfWork(db),
-                time_provider=SystemTimeProvider(),
-            )
+                proc_service = DocumentProcessingService(
+                    document_repo=SQLAlchemyDocumentRepository(db),
+                    chunk_repo=SQLAlchemyChunkRepository(db),
+                    storage_provider=storage,
+                    extractor_factory=ExtractorFactory(),
+                    text_cleaner=TextCleaner(),
+                    metadata_extractor=MetadataExtractor(),
+                    chunking_service=ChunkingService(),
+                    uow=SQLAlchemyUnitOfWork(db),
+                    time_provider=SystemTimeProvider(),
+                )
 
-            proc_service.process_document(doc_id)
-            results.append((name, "success", None))
-        except Exception as e:
-            results.append((name, "error", str(e)))
-        finally:
-            db.close()
-            engine.dispose()
+                await proc_service.process_document(doc_id)
+                results.append((name, "success", None))
+            except Exception as e:
+                results.append((name, "error", str(e)))
+            finally:
+                await async_engine.dispose()
 
-    # Start Thread A
-    t_a = threading.Thread(target=run_pipeline, args=("ThreadA",))
-    t_a.start()
+    # Start Task A
+    task_a = asyncio.create_task(run_pipeline("TaskA"))
 
-    # Wait until Thread A reaches the blocking extractor
-    event_started.wait(timeout=5.0)
+    # Wait until Task A reaches the blocking extractor
+    await event_started.wait()
 
-    # Start Thread B concurrently
-    t_b = threading.Thread(target=run_pipeline, args=("ThreadB",))
-    t_b.start()
-    t_b.join()  # Thread B should finish instantly because status is PROCESSING
+    # Start Task B concurrently
+    task_b = asyncio.create_task(run_pipeline("TaskB"))
+    await task_b  # Task B should finish instantly because status is PROCESSING
 
-    # Allow Thread A to continue and finish
+    # Allow Task A to continue and finish
     event_proceed.set()
-    t_a.join()
+    await task_a
 
     # Verify results
     assert len(results) == 2
-    thread_a_res = [r for r in results if r[0] == "ThreadA"][0]
-    thread_b_res = [r for r in results if r[0] == "ThreadB"][0]
+    task_a_res = [r for r in results if r[0] == "TaskA"][0]
+    task_b_res = [r for r in results if r[0] == "TaskB"][0]
 
-    if thread_a_res[1] == "error":
-        raise RuntimeError(f"Thread A failed with: {thread_a_res[2]}")
-    if thread_b_res[1] == "error":
-        raise RuntimeError(f"Thread B failed with: {thread_b_res[2]}")
+    if task_a_res[1] == "error":
+        raise RuntimeError(f"Task A failed with: {task_a_res[2]}")
+    if task_b_res[1] == "error":
+        raise RuntimeError(f"Task B failed with: {task_b_res[2]}")
 
-    assert thread_a_res[1] == "success"
-    assert thread_b_res[1] == "success"
+    assert task_a_res[1] == "success"
+    assert task_b_res[1] == "success"
 
 
-def test_document_processing_invalidates_index_cache(client, doc_test_db):
+@pytest.mark.asyncio
+async def test_document_processing_invalidates_index_cache(client, doc_test_db):
     """
     Successfully ingesting a document must invalidate the user's entry in the
     shared index cache. A chat request made before the upload cached the
@@ -749,7 +785,6 @@ def test_document_processing_invalidates_index_cache(client, doc_test_db):
     serves the freshly indexed knowledge instead of a general answer.
     """
     import uuid
-    from unittest.mock import MagicMock
 
     from app.auth.infrastructure.providers import (
         SQLAlchemyUnitOfWork,
@@ -798,30 +833,36 @@ def test_document_processing_invalidates_index_cache(client, doc_test_db):
     cache.set(user_id, index_data=None, stats={"count": 0, "max_created_at": None})
     assert cache.get_stats(user_id) == {"count": 0, "max_created_at": None}
 
-    engine = create_engine(TEST_DATABASE_URL)
-    session_factory = sessionmaker(bind=engine)
-    db = session_factory()
-    try:
-        storage = MagicMock()
-        storage.get.return_value = b"uploaded plain text content"
+    async_url = TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    async_engine = create_async_engine(async_url)
+    async_session_factory = async_sessionmaker(
+        bind=async_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+    async with async_session_factory() as db:
+        try:
+            storage = MagicMock()
+            storage.get = AsyncMock(return_value=b"uploaded plain text content")
 
-        proc_service = DocumentProcessingService(
-            document_repo=SQLAlchemyDocumentRepository(db),
-            chunk_repo=SQLAlchemyChunkRepository(db),
-            storage_provider=storage,
-            extractor_factory=ExtractorFactory(),
-            text_cleaner=TextCleaner(),
-            metadata_extractor=MetadataExtractor(),
-            chunking_service=ChunkingService(),
-            uow=SQLAlchemyUnitOfWork(db),
-            time_provider=SystemTimeProvider(),
-            index_cache=cache,
-        )
+            proc_service = DocumentProcessingService(
+                document_repo=SQLAlchemyDocumentRepository(db),
+                chunk_repo=SQLAlchemyChunkRepository(db),
+                storage_provider=storage,
+                extractor_factory=ExtractorFactory(),
+                text_cleaner=TextCleaner(),
+                metadata_extractor=MetadataExtractor(),
+                chunking_service=ChunkingService(),
+                uow=SQLAlchemyUnitOfWork(db),
+                time_provider=SystemTimeProvider(),
+                index_cache=cache,
+            )
 
-        proc_service.process_document(doc_id)
-    finally:
-        db.close()
-        engine.dispose()
+            await proc_service.process_document(doc_id)
+        finally:
+            await async_engine.dispose()
 
     # The cached "no chunks" flag must be invalidated after ingestion so the
     # next chat message re-checks the DB and sees the new chunks.
@@ -829,6 +870,8 @@ def test_document_processing_invalidates_index_cache(client, doc_test_db):
     assert cache.get(user_id) is None
 
     # Sanity: the pipeline really did commit chunks for the user.
+    sync_engine = create_engine(TEST_DATABASE_URL)
+    session_factory = sessionmaker(bind=sync_engine)
     verify_db = session_factory()
     try:
         row = verify_db.execute(
@@ -838,3 +881,4 @@ def test_document_processing_invalidates_index_cache(client, doc_test_db):
         assert row[0] > 0
     finally:
         verify_db.close()
+        sync_engine.dispose()

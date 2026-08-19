@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.documents.domain.interfaces import DocumentRepository
 from app.documents.domain.models import Document, DocumentScope, DocumentStatus
@@ -8,72 +9,71 @@ from app.documents.infrastructure.persistence.models import SQLAlchemyDocument
 
 
 class SQLAlchemyDocumentRepository(DocumentRepository):
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    def get_by_id(self, id: UUID) -> Document | None:
-        db_doc = (
-            self._db.query(SQLAlchemyDocument)
-            .filter(SQLAlchemyDocument.id == id)
-            .first()
+    async def get_by_id(self, id: UUID) -> Document | None:
+        result = await self._db.execute(
+            select(SQLAlchemyDocument).where(SQLAlchemyDocument.id == id)
         )
+        db_doc = result.scalar_one_or_none()
         if not db_doc:
             return None
         return self._to_domain(db_doc)
 
-    def get_by_id_for_update(self, id: UUID) -> Document | None:
-        db_doc = (
-            self._db.query(SQLAlchemyDocument)
-            .filter(SQLAlchemyDocument.id == id)
+    async def get_by_id_for_update(self, id: UUID) -> Document | None:
+        result = await self._db.execute(
+            select(SQLAlchemyDocument)
+            .where(SQLAlchemyDocument.id == id)
             .with_for_update()
-            .first()
         )
+        db_doc = result.scalar_one_or_none()
         if not db_doc:
             return None
         return self._to_domain(db_doc)
 
-    def get_by_checksum_and_user(self, checksum: str, user_id: UUID) -> Document | None:
-        db_doc = (
-            self._db.query(SQLAlchemyDocument)
-            .filter(
+    async def get_by_checksum_and_user(
+        self, checksum: str, user_id: UUID
+    ) -> Document | None:
+        result = await self._db.execute(
+            select(SQLAlchemyDocument).where(
                 SQLAlchemyDocument.checksum == checksum,
                 SQLAlchemyDocument.user_id == user_id,
             )
-            .first()
         )
+        db_doc = result.scalar_one_or_none()
         if not db_doc:
             return None
         return self._to_domain(db_doc)
 
-    def list_by_user(self, user_id: UUID) -> list[Document]:
-        db_docs = (
-            self._db.query(SQLAlchemyDocument)
-            .filter(SQLAlchemyDocument.user_id == user_id)
+    async def list_by_user(self, user_id: UUID) -> list[Document]:
+        result = await self._db.execute(
+            select(SQLAlchemyDocument)
+            .where(SQLAlchemyDocument.user_id == user_id)
             .order_by(SQLAlchemyDocument.created_at.desc())
-            .all()
         )
+        db_docs = result.scalars().all()
         return [self._to_domain(d) for d in db_docs]
 
-    def list_by_conversation(
+    async def list_by_conversation(
         self, conversation_id: UUID, user_id: UUID
     ) -> list[Document]:
-        db_docs = (
-            self._db.query(SQLAlchemyDocument)
-            .filter(
+        result = await self._db.execute(
+            select(SQLAlchemyDocument)
+            .where(
                 SQLAlchemyDocument.conversation_id == conversation_id,
                 SQLAlchemyDocument.user_id == user_id,
             )
             .order_by(SQLAlchemyDocument.created_at.desc())
-            .all()
         )
+        db_docs = result.scalars().all()
         return [self._to_domain(d) for d in db_docs]
 
-    def save(self, document: Document) -> Document:
-        db_doc = (
-            self._db.query(SQLAlchemyDocument)
-            .filter(SQLAlchemyDocument.id == document.id)
-            .first()
+    async def save(self, document: Document) -> Document:
+        result = await self._db.execute(
+            select(SQLAlchemyDocument).where(SQLAlchemyDocument.id == document.id)
         )
+        db_doc = result.scalar_one_or_none()
         if not db_doc:
             db_doc = SQLAlchemyDocument(
                 id=document.id,
@@ -110,18 +110,18 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
             db_doc.processing_started_at = document.processing_started_at
             db_doc.processing_completed_at = document.processing_completed_at
 
-        self._db.flush()
+        await self._db.flush()
+        await self._db.refresh(db_doc)
         return self._to_domain(db_doc)
 
-    def delete(self, id: UUID) -> None:
-        db_doc = (
-            self._db.query(SQLAlchemyDocument)
-            .filter(SQLAlchemyDocument.id == id)
-            .first()
+    async def delete(self, id: UUID) -> None:
+        result = await self._db.execute(
+            select(SQLAlchemyDocument).where(SQLAlchemyDocument.id == id)
         )
+        db_doc = result.scalar_one_or_none()
         if db_doc:
-            self._db.delete(db_doc)
-            self._db.flush()
+            await self._db.delete(db_doc)
+            await self._db.flush()
 
     def _to_domain(self, db_doc: SQLAlchemyDocument) -> Document:
         return Document(

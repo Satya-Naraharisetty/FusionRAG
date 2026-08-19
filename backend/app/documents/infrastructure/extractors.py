@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import io
 import logging
@@ -16,13 +17,14 @@ logger = logging.getLogger(__name__)
 
 
 class PDFExtractor(DocumentExtractor):
-    def extract(self, file_bytes: bytes) -> ExtractionResult:
+    async def extract(self, file_bytes: bytes) -> ExtractionResult:
         """
-        Parses text from PDF using pypdf.
+        Parses text from PDF using pypdf inside a thread pool.
         """
         if not file_bytes:
             raise DocumentCorrupted("PDF file is empty.")
-        try:
+
+        def _parse():
             reader = PdfReader(io.BytesIO(file_bytes))
             if len(reader.pages) == 0:
                 raise DocumentCorrupted("PDF has 0 pages.")
@@ -32,6 +34,9 @@ class PDFExtractor(DocumentExtractor):
                 text += page.extract_text() or ""
 
             return ExtractionResult(text=text, page_count=len(reader.pages))
+
+        try:
+            return await asyncio.to_thread(_parse)
         except DocumentCorrupted:
             raise
         except Exception as e:
@@ -41,13 +46,14 @@ class PDFExtractor(DocumentExtractor):
 
 
 class DOCXExtractor(DocumentExtractor):
-    def extract(self, file_bytes: bytes) -> ExtractionResult:
+    async def extract(self, file_bytes: bytes) -> ExtractionResult:
         """
-        Parses text from Word docx paragraphs and tables.
+        Parses text from Word docx paragraphs and tables inside a thread pool.
         """
         if not file_bytes:
             raise DocumentCorrupted("DOCX file is empty.")
-        try:
+
+        def _parse():
             doc = docx.Document(io.BytesIO(file_bytes))
 
             # Read paragraphs
@@ -72,6 +78,9 @@ class DOCXExtractor(DocumentExtractor):
                 text=full_text,
                 page_count=1,  # DOCX does not explicitly store page count
             )
+
+        try:
+            return await asyncio.to_thread(_parse)
         except Exception as e:
             raise DocumentCorrupted(
                 f"Failed to parse DOCX document. It may be corrupted: {e}"
@@ -79,7 +88,7 @@ class DOCXExtractor(DocumentExtractor):
 
 
 class TXTExtractor(DocumentExtractor):
-    def extract(self, file_bytes: bytes) -> ExtractionResult:
+    async def extract(self, file_bytes: bytes) -> ExtractionResult:
         """
         Parses plain text using UTF-8 decoding.
         """
@@ -91,7 +100,7 @@ class TXTExtractor(DocumentExtractor):
 
 
 class MarkdownExtractor(DocumentExtractor):
-    def extract(self, file_bytes: bytes) -> ExtractionResult:
+    async def extract(self, file_bytes: bytes) -> ExtractionResult:
         """
         Parses markdown text using UTF-8 decoding.
         """
@@ -106,43 +115,33 @@ class ImageExtractor(DocumentExtractor):
     def __init__(self, mime_type: str) -> None:
         self.mime_type = mime_type
 
-    def extract(self, file_bytes: bytes) -> ExtractionResult:
+    async def extract(self, file_bytes: bytes) -> ExtractionResult:
         """
-        Uses a Vision LLM (Gemini or OpenAI depending on active configuration) to extract text and describe the image.
+        Uses Google Gemini Vision to extract text and describe the image.
         """
         if not file_bytes:
             raise DocumentCorrupted("Image file is empty.")
 
-        extracted_text = ""
+        if not settings.GEMINI_API_KEY:
+            raise UnsupportedDocumentType(
+                "GEMINI_API_KEY is required for image vision processing."
+            )
+
         prompt = (
             "Analyze the attached image. Extract all readable text word-for-word (OCR). "
             "Then, provide a detailed description of any charts, diagrams, tables, figures, or visual structures in the image. "
             "Do not include conversational filler in your response; output only the extracted text and the semantic description."
         )
 
-        if settings.GEMINI_API_KEY:
-            try:
-                extracted_text = self._extract_via_gemini(file_bytes, prompt)
-            except Exception as e:
-                logger.warning(
-                    f"Failed to extract image content via Gemini: {e}. Falling back to OpenAI if available."
-                )
-                if settings.OPENAI_API_KEY:
-                    extracted_text = self._extract_via_openai(file_bytes, prompt)
-                else:
-                    raise DocumentCorrupted(
-                        f"Gemini image extraction failed and OpenAI credentials not configured. Error: {e}"
-                    )
-        elif settings.OPENAI_API_KEY:
-            extracted_text = self._extract_via_openai(file_bytes, prompt)
-        else:
-            raise UnsupportedDocumentType(
-                "No API keys found for image vision processing (Gemini or OpenAI required)."
-            )
+        try:
+            extracted_text = await self._extract_via_gemini(file_bytes, prompt)
+        except Exception as e:
+            logger.error(f"Failed to extract image content via Gemini: {e}")
+            raise DocumentCorrupted(f"Gemini image extraction failed: {e}") from e
 
         return ExtractionResult(text=extracted_text, page_count=1)
 
-    def _extract_via_gemini(self, file_bytes: bytes, prompt: str) -> str:
+    async def _extract_via_gemini(self, file_bytes: bytes, prompt: str) -> str:
         base64_data = base64.b64encode(file_bytes).decode("utf-8")
         payload = {
             "contents": [
@@ -161,11 +160,10 @@ class ImageExtractor(DocumentExtractor):
             "generationConfig": {"temperature": 0.0, "maxOutputTokens": 2048},
         }
 
-        # Call gemini-2.5-flash which is multimodal and fast
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
 
-        with httpx.Client(timeout=60.0) as client:
-            resp = client.post(url, json=payload)
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(url, json=payload)
             resp.raise_for_status()
             data = resp.json()
 
@@ -174,45 +172,7 @@ class ImageExtractor(DocumentExtractor):
             except (KeyError, IndexError) as e:
                 raise RuntimeError(
                     f"Unexpected response structure from Gemini API: {e}"
-                )
-
-    def _extract_via_openai(self, file_bytes: bytes, prompt: str) -> str:
-        base64_data = base64.b64encode(file_bytes).decode("utf-8")
-        headers = {
-            "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": "gpt-4o-mini",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{self.mime_type};base64,{base64_data}"
-                            },
-                        },
-                    ],
-                }
-            ],
-            "temperature": 0.0,
-            "max_tokens": 2048,
-        }
-
-        url = "https://api.openai.com/v1/chat/completions"
-        with httpx.Client(timeout=60.0) as client:
-            resp = client.post(url, headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            try:
-                return data["choices"][0]["message"]["content"]
-            except (KeyError, IndexError) as e:
-                raise RuntimeError(
-                    f"Unexpected response structure from OpenAI API: {e}"
-                )
+                ) from e
 
 
 class ExtractorFactory:

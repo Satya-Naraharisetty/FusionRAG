@@ -12,7 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.sql import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -94,7 +94,7 @@ def run_startup_validations() -> None:
 
     # Dynamically validate S3 settings if storage provider is S3
     if settings.STORAGE_PROVIDER.lower() == "s3":
-        infra_vars["S3_BUCKET"] = settings.S3_BUCKET
+        infra_vars["S3_BUCKET"] = getattr(settings, "S3_BUCKET", None)
 
     empty_infra = [k for k, v in infra_vars.items() if not v or not str(v).strip()]
 
@@ -120,15 +120,7 @@ def run_startup_validations() -> None:
         )
 
     # Validate API keys based on configured providers
-    key_vars: dict[str, str | None] = {}
-    active_providers = {
-        settings.LLM_PROVIDER.lower(),
-        settings.LLM_PROVIDER_BACKUP.lower(),
-    }
-    if "gemini" in active_providers:
-        key_vars["GEMINI_API_KEY"] = settings.GEMINI_API_KEY
-    if "openai" in active_providers or settings.EMBEDDING_PROVIDER.lower() == "openai":
-        key_vars["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
+    key_vars: dict[str, str | None] = {"GEMINI_API_KEY": settings.GEMINI_API_KEY}
 
     empty_keys = [k for k, v in key_vars.items() if not v or not str(v).strip()]
     if empty_keys:
@@ -144,7 +136,7 @@ def run_startup_validations() -> None:
             )
 
 
-def verify_postgres_connectivity(engine) -> None:
+async def verify_postgres_connectivity(engine) -> None:
     """
     Verifies that the PostgreSQL database container is online and accepting connections.
     """
@@ -162,8 +154,8 @@ def verify_postgres_connectivity(engine) -> None:
     logger.info("Testing PostgreSQL connection readiness...")
     for attempt in range(1, 6):
         try:
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
             logger.info("PostgreSQL database connection verified.")
             return
         except Exception as e:
@@ -172,12 +164,12 @@ def verify_postgres_connectivity(engine) -> None:
                 "Retrying in 2.0 seconds..."
             )
             if attempt < 5:
-                time.sleep(2.0)
+                await asyncio.sleep(2.0)
 
     raise ConfigurationError("PostgreSQL database connection could not be established.")
 
 
-def verify_alembic_migrations(engine) -> None:
+async def verify_alembic_migrations(engine) -> None:
     """
     Verifies that the database schema is up-to-date with the latest Alembic migration.
     Fails startup if it isn't.
@@ -221,10 +213,13 @@ def verify_alembic_migrations(engine) -> None:
         )
         return
 
+    def get_revision(conn):
+        context = MigrationContext.configure(conn)
+        return context.get_current_revision()
+
     try:
-        with engine.connect() as conn:
-            context = MigrationContext.configure(conn)
-            current_revision = context.get_current_revision()
+        async with engine.connect() as conn:
+            current_revision = await conn.run_sync(get_revision)
     except Exception as e:
         raise ConfigurationError(
             f"Database migrations check failed. Unable to read current revision: {e}"
@@ -264,64 +259,81 @@ async def lifespan(app: FastAPI):
         )
 
         engine = init_postgres_engine(settings.DATABASE_URL or "")
-        verify_postgres_connectivity(engine)
-        verify_alembic_migrations(engine)
+        await verify_postgres_connectivity(engine)
+        await verify_alembic_migrations(engine)
 
         app.state.db_engine = engine
-        app.state.db_session_factory = sessionmaker(
-            autocommit=False, autoflush=False, bind=engine
+        app.state.db_session_factory = async_sessionmaker(
+            bind=engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
         )
 
         # Seed and enforce single default admin user from environment settings if configured
-        if settings.ADMIN_EMAIL and settings.ADMIN_PASSWORD:
+        if (
+            settings.ENV != "testing"
+            and settings.ADMIN_EMAIL
+            and settings.ADMIN_PASSWORD
+        ):
             logger.info("Enforcing single default admin account seeding...")
-            db_session = app.state.db_session_factory()
-            try:
-                from app.auth.infrastructure.crypto.password_hasher import (
-                    Argon2PasswordHasher,
-                )
-                from app.auth.infrastructure.persistence.models import SQLAlchemyUser
+            async with app.state.db_session_factory() as db_session:
+                try:
+                    from sqlalchemy import select, update
 
-                email = settings.ADMIN_EMAIL.strip().lower()
-
-                # 1. Demote any other admin users to "user" to maintain single admin constraint
-                db_session.query(SQLAlchemyUser).filter(
-                    SQLAlchemyUser.role == "admin", SQLAlchemyUser.email != email
-                ).update({SQLAlchemyUser.role: "user"})
-
-                # 2. Check if the configured admin user exists
-                existing_admin = (
-                    db_session.query(SQLAlchemyUser)
-                    .filter(SQLAlchemyUser.email == email)
-                    .first()
-                )
-                if not existing_admin:
-                    hasher = Argon2PasswordHasher()
-                    hashed_pwd = hasher.hash(settings.ADMIN_PASSWORD)
-                    new_admin = SQLAlchemyUser(
-                        id=uuid.uuid4(),
-                        email=email,
-                        hashed_password=hashed_pwd,
-                        role="admin",
-                        is_active=True,
-                        created_at=datetime.now(UTC),
-                        updated_at=datetime.now(UTC),
+                    from app.auth.infrastructure.crypto.password_hasher import (
+                        Argon2PasswordHasher,
                     )
-                    db_session.add(new_admin)
-                    logger.info(f"Successfully seeded default admin account: {email}")
-                else:
-                    if existing_admin.role != "admin":
-                        existing_admin.role = "admin"
-                        logger.info(
-                            f"Successfully promoted existing user {email} to admin."
-                        )
+                    from app.auth.infrastructure.persistence.models import (
+                        SQLAlchemyUser,
+                    )
 
-                db_session.commit()
-            except Exception as e:
-                logger.error(f"Failed to seed/enforce default admin account: {e}")
-                db_session.rollback()
-            finally:
-                db_session.close()
+                    email = settings.ADMIN_EMAIL.strip().lower()
+
+                    # 1. Demote any other admin users to "user" to maintain single admin constraint
+                    await db_session.execute(
+                        update(SQLAlchemyUser)
+                        .where(
+                            SQLAlchemyUser.role == "admin",
+                            SQLAlchemyUser.email != email,
+                        )
+                        .values(role="user")
+                    )
+
+                    # 2. Check if the configured admin user exists
+                    existing_admin_res = await db_session.execute(
+                        select(SQLAlchemyUser).where(SQLAlchemyUser.email == email)
+                    )
+                    existing_admin = existing_admin_res.scalar_one_or_none()
+
+                    if not existing_admin:
+                        hasher = Argon2PasswordHasher()
+                        hashed_pwd = hasher.hash(settings.ADMIN_PASSWORD)
+                        new_admin = SQLAlchemyUser(
+                            id=uuid.uuid4(),
+                            email=email,
+                            hashed_password=hashed_pwd,
+                            role="admin",
+                            is_active=True,
+                            created_at=datetime.now(UTC),
+                            updated_at=datetime.now(UTC),
+                        )
+                        db_session.add(new_admin)
+                        logger.info(
+                            f"Successfully seeded default admin account: {email}"
+                        )
+                    else:
+                        if existing_admin.role != "admin":
+                            existing_admin.role = "admin"
+                            logger.info(
+                                f"Successfully promoted existing user {email} to admin."
+                            )
+
+                    await db_session.commit()
+                except Exception as e:
+                    logger.error(f"Failed to seed/enforce default admin account: {e}")
+                    await db_session.rollback()
 
         app.state.redis = init_redis_client(
             host=settings.REDIS_HOST,
@@ -376,7 +388,7 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(1.0)
 
         if hasattr(app.state, "db_engine"):
-            app.state.db_engine.dispose()
+            await app.state.db_engine.dispose()
             logger.info("PostgreSQL connection engine disposed.")
         if hasattr(app.state, "redis"):
             await app.state.redis.close()

@@ -125,7 +125,7 @@ class DocumentService:
 
         # 5. Generate checksum & check for duplicate for THIS user
         checksum = self._checksum_generator.generate(file_bytes)
-        existing = self._document_repo.get_by_checksum_and_user(checksum, user_id)
+        existing = await self._document_repo.get_by_checksum_and_user(checksum, user_id)
         if existing:
             raise DuplicateDocumentException(
                 f"A document with identical content already exists in your library (ID: {existing.id})."
@@ -133,7 +133,7 @@ class DocumentService:
 
         # 6. Generate UUID & save to storage
         document_id = self._uuid_generator.generate()
-        storage_key = self._storage_provider.save(
+        storage_key = await self._storage_provider.save(
             filename=safe_original_name,
             content=file_bytes,
             user_id=user_id,
@@ -165,12 +165,12 @@ class DocumentService:
         )
 
         try:
-            saved_doc = self._document_repo.save(document)
-            self._uow.commit()
+            saved_doc = await self._document_repo.save(document)
+            await self._uow.commit()
         except Exception:
-            self._uow.rollback()
+            await self._uow.rollback()
             # Clean up the file from storage if DB write fails
-            self._storage_provider.delete(storage_key)
+            await self._storage_provider.delete(storage_key)
             raise
 
         # 8. Trigger asynchronous processing task
@@ -180,7 +180,7 @@ class DocumentService:
 
         return saved_doc
 
-    def list_documents(self, user_id: UUID) -> list[Document]:
+    async def list_documents(self, user_id: UUID) -> list[Document]:
         """
         Lists the user's GLOBAL documents — the ones uploaded from the Documents
         section (``conversation_id`` is NULL). Chat-scoped documents belong to
@@ -188,25 +188,22 @@ class DocumentService:
         so they are excluded here. They are reachable via
         ``list_documents_by_conversation`` and ``get_document_by_id``.
         """
-        return [
-            doc
-            for doc in self._document_repo.list_by_user(user_id)
-            if doc.scope == DocumentScope.LIBRARY
-        ]
+        docs = await self._document_repo.list_by_user(user_id)
+        return [doc for doc in docs if doc.scope == DocumentScope.LIBRARY]
 
-    def list_documents_by_conversation(
+    async def list_documents_by_conversation(
         self, conversation_id: UUID, user_id: UUID
     ) -> list[Document]:
         """
         Lists all documents belonging to a conversation.
         """
-        return self._document_repo.list_by_conversation(conversation_id, user_id)
+        return await self._document_repo.list_by_conversation(conversation_id, user_id)
 
-    def get_document_by_id(self, id: UUID, user_id: UUID) -> Document:
+    async def get_document_by_id(self, id: UUID, user_id: UUID) -> Document:
         """
         Retrieves a document. Validates existence and ownership.
         """
-        document = self._document_repo.get_by_id(id)
+        document = await self._document_repo.get_by_id(id)
         if not document:
             raise DocumentNotFound(f"Document with ID {id} not found.")
 
@@ -217,24 +214,24 @@ class DocumentService:
 
         return document
 
-    def delete_document(self, id: UUID, user_id: UUID) -> None:
+    async def delete_document(self, id: UUID, user_id: UUID) -> None:
         """
         Deletes the document database record first (source of truth) and then deletes the storage file.
         """
         # Verify document exists and belongs to the user
-        document = self.get_document_by_id(id, user_id)
+        document = await self.get_document_by_id(id, user_id)
 
         try:
             # Delete DB record (will cascade delete chunks and document_embeddings in PostgreSQL)
-            self._document_repo.delete(id)
-            self._uow.commit()
+            await self._document_repo.delete(id)
+            await self._uow.commit()
         except Exception:
-            self._uow.rollback()
+            await self._uow.rollback()
             raise
 
         # Clean up vectors from the vector store after PostgreSQL commit is successful
         try:
-            self._embedding_service.delete_embeddings(document.id)
+            await self._embedding_service.delete_embeddings(document.id)
         except Exception as e:
             logger.error(
                 f"Failed to delete Qdrant vectors during document deletion {document.id}: {e}"
@@ -250,23 +247,25 @@ class DocumentService:
                 )
 
         # Attempt storage deletion (failures are logged, not raised)
-        self._storage_provider.delete(document.filename)
+        await self._storage_provider.delete(document.filename)
 
-    def delete_documents_by_conversation(
+    async def delete_documents_by_conversation(
         self, conversation_id: UUID, user_id: UUID
     ) -> int:
         """
         Deletes all documents belonging to a conversation.
         Returns the count of deleted documents.
         """
-        documents = self._document_repo.list_by_conversation(conversation_id, user_id)
+        documents = await self._document_repo.list_by_conversation(
+            conversation_id, user_id
+        )
         conversation_docs = [
             d for d in documents if d.scope == DocumentScope.CONVERSATION
         ]
         count = 0
         for doc in conversation_docs:
             try:
-                self.delete_document(doc.id, user_id)
+                await self.delete_document(doc.id, user_id)
                 count += 1
             except Exception as e:
                 logger.error(
@@ -274,13 +273,13 @@ class DocumentService:
                 )
         return count
 
-    def reprocess_document(self, id: UUID, user_id: UUID) -> Document:
+    async def reprocess_document(self, id: UUID, user_id: UUID) -> Document:
         """
         Triggers reprocessing for a document by resetting its status to QUEUED.
         """
         # Fetch and verify ownership with row locking
         try:
-            document = self._document_repo.get_by_id_for_update(id)
+            document = await self._document_repo.get_by_id_for_update(id)
             if not document:
                 raise DocumentNotFound(f"Document with ID {id} not found.")
 
@@ -296,10 +295,10 @@ class DocumentService:
             document.processing_completed_at = None
             document.updated_at = self._time_provider.get_now()
 
-            saved_doc = self._document_repo.save(document)
-            self._uow.commit()
+            saved_doc = await self._document_repo.save(document)
+            await self._uow.commit()
         except Exception:
-            self._uow.rollback()
+            await self._uow.rollback()
             raise
 
         # Enqueue processing task

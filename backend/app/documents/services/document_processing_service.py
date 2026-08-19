@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from uuid import UUID
 
@@ -45,16 +46,16 @@ class DocumentProcessingService:
         self._event_dispatcher = event_dispatcher
         self._index_cache = index_cache
 
-    def process_document(self, document_id: UUID) -> None:
+    async def process_document(self, document_id: UUID) -> None:
         """
         Coordinates the ingestion pipeline end-to-end for a given document.
-        Enforces locking and database transaction boundaries.
+        Enforces locking and database transaction boundaries asynchronously.
         """
         logger.info(f"Starting background processing for document {document_id}")
 
         # 1. Fetch document and lock row to initialize processing state
         try:
-            document = self._document_repo.get_by_id_for_update(document_id)
+            document = await self._document_repo.get_by_id_for_update(document_id)
             if not document:
                 logger.error(f"Document {document_id} not found for processing.")
                 return
@@ -71,10 +72,10 @@ class DocumentProcessingService:
             document.processing_started_at = self._time_provider.get_now()
             document.failure_reason = None
             document.updated_at = self._time_provider.get_now()
-            self._document_repo.save(document)
-            self._uow.commit()
+            await self._document_repo.save(document)
+            await self._uow.commit()
         except Exception as e:
-            self._uow.rollback()
+            await self._uow.rollback()
             logger.exception(
                 f"Failed to transition document {document_id} to PROCESSING: {e}"
             )
@@ -82,7 +83,7 @@ class DocumentProcessingService:
 
         # 2. Execute extraction, cleaning, metadata gathering, and chunking
         try:
-            file_bytes = self._storage_provider.get(document.filename)
+            file_bytes = await self._storage_provider.get(document.filename)
 
             # Retrieve strategy class
             extractor = self._extractor_factory.get_extractor(
@@ -90,31 +91,37 @@ class DocumentProcessingService:
             )
 
             # Extraction
-            extraction_result = extractor.extract(file_bytes)
+            extraction_result = await extractor.extract(file_bytes)
 
-            # Text cleaning
-            cleaned_text = self._text_cleaner.clean(extraction_result.text)
-
-            # Metadata extraction
-            metadata = self._metadata_extractor.extract_metadata(
-                cleaned_text, extraction_result.page_count
+            # Text cleaning (CPU bound, run in thread)
+            cleaned_text = await asyncio.to_thread(
+                self._text_cleaner.clean, extraction_result.text
             )
 
-            # Chunk generation
-            chunk_result = self._chunking_service.chunk_document(
-                cleaned_text, document.id
+            # Metadata extraction (CPU bound, run in thread)
+            metadata = await asyncio.to_thread(
+                self._metadata_extractor.extract_metadata,
+                cleaned_text,
+                extraction_result.page_count,
+            )
+
+            # Chunk generation (CPU bound, run in thread)
+            chunk_result = await asyncio.to_thread(
+                self._chunking_service.chunk_document,
+                cleaned_text,
+                document.id,
             )
 
             # 3. Batch commit results (idempotent: delete previous chunks first)
-            document = self._document_repo.get_by_id_for_update(document_id)
+            document = await self._document_repo.get_by_id_for_update(document_id)
             if not document:
                 raise RuntimeError("Document was deleted during pipeline execution.")
 
             # Delete previous chunks first (in the same transaction)
-            self._chunk_repo.delete_by_document(document.id)
+            await self._chunk_repo.delete_by_document(document.id)
 
             # Save the new chunks
-            self._chunk_repo.save_bulk(chunk_result.chunks)
+            await self._chunk_repo.save_bulk(chunk_result.chunks)
 
             # Enforce valid transition and update status/metadata
             document.transition_to(DocumentStatus.COMPLETED)
@@ -123,14 +130,12 @@ class DocumentProcessingService:
             document.language = metadata.language
             document.processing_completed_at = self._time_provider.get_now()
             document.updated_at = self._time_provider.get_now()
-            self._document_repo.save(document)
+            await self._document_repo.save(document)
 
-            self._uow.commit()
+            await self._uow.commit()
             logger.info(f"Ingestion completed successfully for document {document_id}")
 
-            # Invalidate the user's index-cache entry (BM25 index AND the cached
-            # "no chunks" determination) so the next retrieval/chat request sees
-            # the freshly committed chunks instead of the pre-upload state.
+            # Invalidate the user's index-cache entry
             if self._index_cache is not None:
                 self._index_cache.invalidate(document.user_id)
 
@@ -148,23 +153,23 @@ class DocumentProcessingService:
                     )
 
         except Exception as e:
-            self._uow.rollback()
+            await self._uow.rollback()
             logger.exception(
                 f"Ingestion pipeline execution failed for document {document_id}: {e}"
             )
 
             # Transition document state to FAILED
             try:
-                document = self._document_repo.get_by_id_for_update(document_id)
+                document = await self._document_repo.get_by_id_for_update(document_id)
                 if document:
                     document.transition_to(DocumentStatus.FAILED)
                     document.failure_reason = str(e)
                     document.processing_completed_at = self._time_provider.get_now()
                     document.updated_at = self._time_provider.get_now()
-                    self._document_repo.save(document)
-                    self._uow.commit()
+                    await self._document_repo.save(document)
+                    await self._uow.commit()
             except Exception as fe:
-                self._uow.rollback()
+                await self._uow.rollback()
                 logger.critical(
                     f"Failed to record FAILED status for document {document_id}: {fe}"
                 )

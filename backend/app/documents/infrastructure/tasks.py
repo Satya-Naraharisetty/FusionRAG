@@ -22,4 +22,13 @@ class SyncTaskQueue(TaskQueue):
         """
         Executes task immediately and synchronously (for test isolation).
         """
-        func(*args, **kwargs)
+        import asyncio
+        import inspect
+
+        res = func(*args, **kwargs)
+        if inspect.iscoroutine(res):
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(res)
+            except RuntimeError:
+                asyncio.run(res)

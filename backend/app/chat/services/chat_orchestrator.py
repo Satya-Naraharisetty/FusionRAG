@@ -58,7 +58,7 @@ class ChatOrchestrator:
             return question, False
         return cleaned, priority
 
-    def _ensure_conversation_durable(self) -> None:
+    async def _ensure_conversation_durable(self) -> None:
         """
         Make a just-created conversation durable BEFORE its id leaves this
         process. The streaming path announces the id in the first SSE metadata
@@ -80,7 +80,7 @@ class ChatOrchestrator:
         repo = getattr(self.conversation_manager, "_conversation_repo", None)
         db = getattr(repo, "_db", None)
         if db is not None:
-            db.commit()
+            await db.commit()
         elif repo is not None:
             logger.warning(
                 "Could not resolve DB session to commit a new conversation "
@@ -224,7 +224,7 @@ class ChatOrchestrator:
         # A brand-new conversation must be committed before its id leaves this
         # process (the streaming path announces it in the first SSE metadata
         # event, which triggers the frontend's attachment flush).
-        self._ensure_conversation_durable()
+        await self._ensure_conversation_durable()
 
         # Enforce budget checks on system prompt and baseline question size
         system_prompt = self.prompt_builder.get_system_prompt()
@@ -493,7 +493,7 @@ class ChatOrchestrator:
         # A brand-new conversation must be committed before its id leaves this
         # process (the streaming path announces it in the first SSE metadata
         # event, which triggers the frontend's attachment flush).
-        self._ensure_conversation_durable()
+        await self._ensure_conversation_durable()
 
         # Enforce budget checks on system prompt and baseline question size
         system_prompt = self.prompt_builder.get_system_prompt()

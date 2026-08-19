@@ -1,9 +1,9 @@
-import concurrent.futures
-
 import pytest
 from fastapi import status
 from sqlalchemy import create_engine, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.api.dependencies import get_account_delete_rate_limiter
 from app.core.config import settings
@@ -14,8 +14,8 @@ from tests.db import TEST_DATABASE_URL
 
 def _truncate_auth_tables(session) -> None:
     """Delete every user and session so tests start from (and end on) a clean slate."""
-    session.execute(text("TRUNCATE TABLE refresh_sessions CASCADE;"))
-    session.execute(text("TRUNCATE TABLE users CASCADE;"))
+    session.execute(text("DELETE FROM refresh_sessions;"))
+    session.execute(text("DELETE FROM users;"))
     session.commit()
 
 
@@ -25,36 +25,45 @@ def test_db(client):
     Fixture to set up a clean Postgres test database connection,
     truncating users and sessions before each test runs.
     """
-    engine = create_engine(TEST_DATABASE_URL)
+    sync_engine = create_engine(TEST_DATABASE_URL, poolclass=NullPool)
+    async_url = TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    async_engine = create_async_engine(async_url, poolclass=NullPool)
     try:
-        Base.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=sync_engine)
 
-        session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        sync_session_local = sessionmaker(
+            autocommit=False, autoflush=False, bind=sync_engine
+        )
 
         # Clean the tables to guarantee test isolation
-        db = session_local()
+        db = sync_session_local()
         try:
             _truncate_auth_tables(db)
         finally:
             db.close()
 
-        # Wire our test database session factory into the application state
-        client.app.state.db_session_factory = session_local
+        async_session_local = async_sessionmaker(
+            bind=async_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
 
-        yield session_local
+        # Wire our test database session factory into the application state
+        client.app.state.db_session_factory = async_session_local
+
+        yield async_session_local
 
         # Teardown: truncate again as hygiene so no test (not even the last one in
-        # the file) leaves users/sessions behind. This is the dedicated
-        # hybrid_rag_test database, so leftovers would be harmless anyway — the
-        # pre-test truncation above alone would leak whatever the final test
-        # creates, e.g. concurrent@example.com from test_refresh_concurrency_fails.
-        db = session_local()
+        # the file) leaves users/sessions behind.
+        db = sync_session_local()
         try:
             _truncate_auth_tables(db)
         finally:
             db.close()
     finally:
-        engine.dispose()
+        sync_engine.dispose()
 
 
 def test_register_user_success(client, test_db):
@@ -274,18 +283,19 @@ def test_delete_account_success_cascades(client, test_db):
     assert "refresh_token=" in response.headers.get("set-cookie", "")
 
     # The user row and its sessions must be gone (DB-level cascade)
-    db = client.app.state.db_session_factory()
+    sync_engine = create_engine(TEST_DATABASE_URL)
     try:
-        user_count = db.execute(
-            text("SELECT count(*) FROM users WHERE id = :uid"),
-            {"uid": user_id},
-        ).scalar()
-        session_count = db.execute(
-            text("SELECT count(*) FROM refresh_sessions WHERE user_id = :uid"),
-            {"uid": user_id},
-        ).scalar()
+        with sync_engine.connect() as conn:
+            user_count = conn.execute(
+                text("SELECT count(*) FROM users WHERE id = :uid"),
+                {"uid": user_id},
+            ).scalar()
+            session_count = conn.execute(
+                text("SELECT count(*) FROM refresh_sessions WHERE user_id = :uid"),
+                {"uid": user_id},
+            ).scalar()
     finally:
-        db.close()
+        sync_engine.dispose()
     assert user_count == 0
     assert session_count == 0
 
@@ -434,36 +444,51 @@ def test_delete_account_missing_user_returns_not_found(client, test_db):
     assert second.json()["error"]["code"] == "USER_NOT_FOUND"
 
 
-def test_refresh_concurrency_fails(client, test_db):
+@pytest.mark.asyncio
+async def test_refresh_concurrency_fails(client, test_db):
     """
     Test two simultaneous refresh requests using the same refresh token.
     Exactly one request must succeed, and the other must trigger reuse/revocation and fail.
     """
-    client.post(
-        "/api/v1/auth/register",
-        json={"email": "concurrent@example.com", "password": "SecurePassword123!"},
-    )
-    login_res = client.post(
-        "/api/v1/auth/login",
-        json={"email": "concurrent@example.com", "password": "SecurePassword123!"},
-    )
-    cookie_v1 = login_res.cookies[settings.COOKIE_NAME]
+    import asyncio
 
-    def do_refresh():
-        from fastapi.testclient import TestClient
+    import httpx
+    from httpx import ASGITransport
 
-        from app.main import app
+    async with httpx.AsyncClient(
+        transport=ASGITransport(app=client.app), base_url="http://test"
+    ) as async_client:
+        await async_client.post(
+            "/api/v1/auth/register",
+            json={"email": "concurrent@example.com", "password": "SecurePassword123!"},
+        )
+        login_res = await async_client.post(
+            "/api/v1/auth/login",
+            json={"email": "concurrent@example.com", "password": "SecurePassword123!"},
+        )
+        cookie_v1 = login_res.cookies.get(settings.COOKIE_NAME)
 
-        thread_client = TestClient(app)
-        thread_client.app.state.db_session_factory = client.app.state.db_session_factory
-        thread_client.cookies.set(settings.COOKIE_NAME, cookie_v1)
-        return thread_client.post("/api/v1/auth/refresh")
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [executor.submit(do_refresh) for _ in range(2)]
-        results = [f.result() for f in futures]
+        client1 = httpx.AsyncClient(
+            transport=ASGITransport(app=client.app),
+            base_url="http://test",
+            cookies={settings.COOKIE_NAME: cookie_v1},
+        )
+        client2 = httpx.AsyncClient(
+            transport=ASGITransport(app=client.app),
+            base_url="http://test",
+            cookies={settings.COOKIE_NAME: cookie_v1},
+        )
+        try:
+            results = await asyncio.gather(
+                client1.post("/api/v1/auth/refresh"),
+                client2.post("/api/v1/auth/refresh"),
+                return_exceptions=True,
+            )
+        finally:
+            await client1.aclose()
+            await client2.aclose()
 
     # Exactly one request must succeed (200 OK), and one must fail (401)
-    status_codes = [r.status_code for r in results]
+    status_codes = [r.status_code for r in results if not isinstance(r, Exception)]
     assert 200 in status_codes
     assert 401 in status_codes

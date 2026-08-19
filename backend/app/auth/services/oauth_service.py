@@ -2,10 +2,8 @@
 OAuthService — handles the Google OAuth 2.0 Authorization Code Flow.
 
 Flow:
-  1. get_authorization_url()  → builds the Google consent URL + state cookie value
-  2. exchange_code()          → exchanges the auth code for a profile, upserts the
-                                user in the DB (merging by email when an account
-                                already exists), and returns the UserDomain.
+  1. get_google_authorization_url() / get_github_authorization_url()  → builds consent URL + state
+  2. exchange_*_code()  → exchanges code for profile via httpx.AsyncClient, upserts user, returns UserDomain.
 """
 
 import logging
@@ -102,7 +100,7 @@ class OAuthService:
 
     # ── 2. Exchange code → upsert user ────────────────────────────────────────
 
-    def exchange_google_code(self, code: str, state: str) -> UserDomain:
+    async def exchange_google_code(self, code: str, state: str) -> UserDomain:
         """
         Exchange the authorization *code* for a Google profile, then upsert
         and return the local user record.
@@ -110,7 +108,7 @@ class OAuthService:
         Raises ``InvalidCredentialsException`` on any provider-level error.
         """
         try:
-            profile = self._fetch_google_profile(code)
+            profile = await self._fetch_google_profile(code)
         except Exception as exc:
             logger.warning("Google OAuth token exchange failed: %s", exc)
             raise InvalidCredentialsException(
@@ -125,19 +123,19 @@ class OAuthService:
                 "Google did not return a valid email address."
             )
 
-        return self._upsert_user(provider="google", sub=sub, email=email)
+        return await self._upsert_user(provider="google", sub=sub, email=email)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    def _fetch_google_profile(self, code: str) -> dict:
+    async def _fetch_google_profile(self, code: str) -> dict:
         """Exchange authorization code for an access token, then fetch profile."""
         callback_url = (
             f"{settings.OAUTH_REDIRECT_BASE_URL}"
             f"{settings.API_V1_STR}/auth/oauth/google/callback"
         )
-        with httpx.Client(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=10) as client:
             # Step 1: exchange code → tokens
-            token_resp = client.post(
+            token_resp = await client.post(
                 _GOOGLE_TOKEN_URL,
                 data={
                     "code": code,
@@ -151,14 +149,14 @@ class OAuthService:
             access_token: str = token_resp.json()["access_token"]
 
             # Step 2: fetch user profile
-            profile_resp = client.get(
+            profile_resp = await client.get(
                 _GOOGLE_USERINFO_URL,
                 headers={"Authorization": f"Bearer {access_token}"},
             )
             profile_resp.raise_for_status()
             return profile_resp.json()
 
-    def exchange_github_code(self, code: str, state: str) -> UserDomain:
+    async def exchange_github_code(self, code: str, state: str) -> UserDomain:
         """
         Exchange the authorization *code* for a GitHub profile, then upsert
         and return the local user record.
@@ -166,7 +164,7 @@ class OAuthService:
         Raises ``InvalidCredentialsException`` on any provider-level error.
         """
         try:
-            profile = self._fetch_github_profile(code)
+            profile = await self._fetch_github_profile(code)
         except Exception as exc:
             logger.warning("GitHub OAuth token exchange failed: %s", exc)
             raise InvalidCredentialsException(
@@ -184,9 +182,9 @@ class OAuthService:
                 "GitHub did not return a valid email address."
             )
 
-        return self._upsert_user(provider="github", sub=sub, email=email)
+        return await self._upsert_user(provider="github", sub=sub, email=email)
 
-    def _fetch_github_profile(self, code: str) -> dict:
+    async def _fetch_github_profile(self, code: str) -> dict:
         """Exchange authorization code for an access token, then fetch profile and emails."""
         callback_url = (
             f"{settings.OAUTH_REDIRECT_BASE_URL}"
@@ -196,9 +194,9 @@ class OAuthService:
             "Accept": "application/json",
             "User-Agent": "Hybrid-RAG-Chatbot",
         }
-        with httpx.Client(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=10) as client:
             # Step 1: exchange code → tokens
-            token_resp = client.post(
+            token_resp = await client.post(
                 _GITHUB_TOKEN_URL,
                 headers=headers,
                 data={
@@ -224,7 +222,7 @@ class OAuthService:
                 **headers,
                 "Authorization": f"Bearer {access_token}",
             }
-            profile_resp = client.get(
+            profile_resp = await client.get(
                 _GITHUB_USERINFO_URL,
                 headers=profile_headers,
             )
@@ -232,7 +230,7 @@ class OAuthService:
             profile = profile_resp.json()
 
             # Step 3: fetch emails (in case primary email is private)
-            emails_resp = client.get(
+            emails_resp = await client.get(
                 _GITHUB_EMAILS_URL,
                 headers=profile_headers,
             )
@@ -272,7 +270,7 @@ class OAuthService:
 
             return profile
 
-    def _upsert_user(self, provider: str, sub: str, email: str) -> UserDomain:
+    async def _upsert_user(self, provider: str, sub: str, email: str) -> UserDomain:
         """
         Find an existing user by OAuth sub *or* by email, then create or update.
 
@@ -285,7 +283,7 @@ class OAuthService:
             now = self._time_provider.get_now()
 
             # 1. Look up by (provider, sub)
-            user = self._user_repo.get_by_oauth_sub(provider, sub)
+            user = await self._user_repo.get_by_oauth_sub(provider, sub)
 
             if user:
                 # Touch updated_at so the DB record stays fresh
@@ -295,12 +293,12 @@ class OAuthService:
                         "updated_at": now,
                     }
                 )
-                saved = self._user_repo.save(updated)
-                self._uow.commit()
+                saved = await self._user_repo.save(updated)
+                await self._uow.commit()
                 return saved
 
             # 2. Look up by email (merge with existing account)
-            user = self._user_repo.get_by_email(email)
+            user = await self._user_repo.get_by_email(email)
             if user:
                 updated = UserDomain(
                     **{
@@ -310,8 +308,8 @@ class OAuthService:
                         "updated_at": now,
                     }
                 )
-                saved = self._user_repo.save(updated)
-                self._uow.commit()
+                saved = await self._user_repo.save(updated)
+                await self._uow.commit()
                 return saved
 
             # 3. Brand-new OAuth user — no password
@@ -326,10 +324,10 @@ class OAuthService:
                 oauth_provider=provider,
                 oauth_sub=sub,
             )
-            saved = self._user_repo.save(new_user)
-            self._uow.commit()
+            saved = await self._user_repo.save(new_user)
+            await self._uow.commit()
             return saved
 
         except Exception:
-            self._uow.rollback()
+            await self._uow.rollback()
             raise

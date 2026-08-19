@@ -2,6 +2,9 @@ import json
 import uuid
 from typing import Any
 
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
 from app.chat.domain.agents import (
     ToolCategory,
     ToolContext,
@@ -60,7 +63,27 @@ class CitationLookupTool(BuiltinTool):
             )
 
         db = context.db_session
-        chunk = db.query(SQLAlchemyChunk).filter(SQLAlchemyChunk.id == chunk_id).first()
+        if hasattr(db, "execute"):
+            stmt = (
+                select(SQLAlchemyChunk)
+                .options(selectinload(SQLAlchemyChunk.document))
+                .where(SQLAlchemyChunk.id == chunk_id)
+            )
+            import inspect
+
+            if inspect.iscoroutinefunction(db.execute) or inspect.isawaitable(
+                db.execute(stmt)
+            ):
+                res = await db.execute(stmt)
+            else:
+                res = db.execute(stmt)
+            chunk = res.scalar_one_or_none()
+        elif hasattr(db, "query"):
+            chunk = (
+                db.query(SQLAlchemyChunk).filter(SQLAlchemyChunk.id == chunk_id).first()
+            )
+        else:
+            chunk = None
 
         if not chunk:
             return ToolResult(

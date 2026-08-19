@@ -1,3 +1,4 @@
+import inspect
 import os
 from typing import Any
 from uuid import UUID
@@ -5,7 +6,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import get_benchmark_runner, get_current_user_context, get_db
 from app.core.config import settings
@@ -86,7 +89,7 @@ class RegressionRequest(BaseModel):
 @router.post("/benchmark", status_code=status.HTTP_202_ACCEPTED)
 async def start_benchmark(
     req: RunBenchmarkRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     loader: DatasetLoader = Depends(get_dataset_loader),
     runner: BenchmarkRunner = Depends(get_benchmark_runner),
     report_gen: ReportGenerator = Depends(get_report_generator),
@@ -144,7 +147,7 @@ async def start_benchmark(
 @router.post("/regression", response_model=None)
 async def run_regression_check(
     req: RegressionRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     runner: RegressionRunner = Depends(get_regression_runner),
     report_gen: ReportGenerator = Depends(get_report_generator),
     _admin: dict[str, Any] = Depends(check_admin_user),
@@ -153,7 +156,7 @@ async def run_regression_check(
     Compare two runs in the database to detect regressions.
     """
     try:
-        regression_result = runner.compare_runs(
+        regression_result = await runner.compare_runs(
             db=db,
             candidate_run_id=req.candidate_run_id,
             baseline_run_id=req.baseline_run_id,
@@ -161,11 +164,15 @@ async def run_regression_check(
         )
 
         # Optionally regenerate candidate reports to embed the regression comparison details
-        candidate_run = (
-            db.query(SQLAlchemyEvaluationRun)
-            .filter(SQLAlchemyEvaluationRun.id == req.candidate_run_id)
-            .first()
+        stmt = (
+            select(SQLAlchemyEvaluationRun)
+            .options(selectinload(SQLAlchemyEvaluationRun.results))
+            .where(SQLAlchemyEvaluationRun.id == req.candidate_run_id)
         )
+        candidate_res: Any = db.execute(stmt)
+        if inspect.isawaitable(candidate_res):
+            candidate_res = await candidate_res
+        candidate_run = candidate_res.scalar_one_or_none()
         if candidate_run:
             report_gen.generate_all_reports(candidate_run, regression_result)
 
@@ -187,17 +194,20 @@ async def run_regression_check(
 
 
 @router.get("/runs", response_model=None)
-def list_evaluation_runs(
-    db: Session = Depends(get_db), _admin: dict[str, Any] = Depends(check_admin_user)
+async def list_evaluation_runs(
+    db: AsyncSession = Depends(get_db),
+    _admin: dict[str, Any] = Depends(check_admin_user),
 ) -> list[dict[str, Any]]:
     """
     Retrieve all historical evaluation runs from database.
     """
-    runs = (
-        db.query(SQLAlchemyEvaluationRun)
-        .order_by(SQLAlchemyEvaluationRun.created_at.desc())
-        .all()
+    stmt = select(SQLAlchemyEvaluationRun).order_by(
+        SQLAlchemyEvaluationRun.created_at.desc()
     )
+    runs_res: Any = db.execute(stmt)
+    if inspect.isawaitable(runs_res):
+        runs_res = await runs_res
+    runs = list(runs_res.scalars().all())
     return [
         {
             "id": str(r.id),

@@ -1,10 +1,12 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
 import pytest
 from fastapi import status
 from sqlalchemy import create_engine, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.api.dependencies import get_embedding_generator, get_vector_store
 from app.db.models import Base
@@ -13,31 +15,60 @@ from tests.db import TEST_DATABASE_URL
 
 
 @pytest.fixture(scope="function")
-def emb_test_db(client):
+async def emb_test_db(client):
     """
     Sets up a clean database for embedding integration tests.
     """
-    engine = create_engine(TEST_DATABASE_URL)
+    sync_engine = create_engine(TEST_DATABASE_URL, poolclass=NullPool)
+    async_url = TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    async_engine = create_async_engine(async_url, poolclass=NullPool)
     try:
-        Base.metadata.create_all(bind=engine)
-        session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        Base.metadata.create_all(bind=sync_engine)
+        sync_session_local = sessionmaker(
+            autocommit=False, autoflush=False, bind=sync_engine
+        )
 
-        db = session_local()
+        db = sync_session_local()
         try:
-            db.execute(text("TRUNCATE TABLE document_embeddings CASCADE;"))
-            db.execute(text("TRUNCATE TABLE document_chunks CASCADE;"))
-            db.execute(text("TRUNCATE TABLE documents CASCADE;"))
-            db.execute(text("TRUNCATE TABLE refresh_sessions CASCADE;"))
-            db.execute(text("TRUNCATE TABLE users CASCADE;"))
+            db.execute(text("DELETE FROM document_embeddings;"))
+            db.execute(text("DELETE FROM document_chunks;"))
+            db.execute(text("DELETE FROM documents;"))
+            db.execute(text("DELETE FROM refresh_sessions;"))
+            db.execute(text("DELETE FROM users;"))
             db.commit()
         finally:
             db.close()
 
-        client.app.state.db_session_factory = session_local
-        yield session_local
+        async_session_local = async_sessionmaker(
+            bind=async_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
+
+        client.app.state.db_session_factory = async_session_local
+
+        from app.api.dependencies import get_db
+
+        http_engine = create_async_engine(async_url, poolclass=NullPool)
+        http_session_factory = async_sessionmaker(
+            bind=http_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
+
+        async def _http_get_db():
+            async with http_session_factory() as session:
+                yield session
+
+        client.app.dependency_overrides[get_db] = _http_get_db
+        yield sync_session_local
         client.app.dependency_overrides.clear()
     finally:
-        engine.dispose()
+        sync_engine.dispose()
 
 
 def get_user_token(client, email="user_emb@example.com", password="SecurePassword123!"):
@@ -53,10 +84,11 @@ def test_full_pipeline_ingestion_generates_embeddings(
     mock_pdf_extract, client, emb_test_db
 ):
     mock_generator = MagicMock()
-    mock_generator.batch_generate.return_value = [[0.1] * 1536]
+    mock_generator.batch_generate = AsyncMock(return_value=[[0.1] * 768])
 
     mock_vector_store = MagicMock()
-    mock_vector_store.health.return_value = True
+    mock_vector_store.health = AsyncMock(return_value=True)
+    mock_vector_store.upsert = AsyncMock()
 
     client.app.dependency_overrides[get_embedding_generator] = lambda: mock_generator
     client.app.dependency_overrides[get_vector_store] = lambda: mock_vector_store
@@ -96,9 +128,11 @@ def test_full_pipeline_ingestion_generates_embeddings(
 @patch("app.documents.infrastructure.extractors.PDFExtractor.extract")
 def test_embeddings_regenerate(mock_pdf_extract, client, emb_test_db):
     mock_generator = MagicMock()
-    mock_generator.batch_generate.return_value = [[0.1] * 1536]
+    mock_generator.batch_generate = AsyncMock(return_value=[[0.1] * 768])
     mock_vector_store = MagicMock()
-    mock_vector_store.health.return_value = True
+    mock_vector_store.health = AsyncMock(return_value=True)
+    mock_vector_store.delete_document = AsyncMock()
+    mock_vector_store.upsert = AsyncMock()
 
     client.app.dependency_overrides[get_embedding_generator] = lambda: mock_generator
     client.app.dependency_overrides[get_vector_store] = lambda: mock_vector_store
@@ -134,9 +168,11 @@ def test_embeddings_regenerate(mock_pdf_extract, client, emb_test_db):
 @patch("app.documents.infrastructure.extractors.PDFExtractor.extract")
 def test_embeddings_delete(mock_pdf_extract, client, emb_test_db):
     mock_generator = MagicMock()
-    mock_generator.batch_generate.return_value = [[0.1] * 1536]
+    mock_generator.batch_generate = AsyncMock(return_value=[[0.1] * 1536])
     mock_vector_store = MagicMock()
-    mock_vector_store.health.return_value = True
+    mock_vector_store.health = AsyncMock(return_value=True)
+    mock_vector_store.upsert = AsyncMock()
+    mock_vector_store.delete_document = AsyncMock()
 
     client.app.dependency_overrides[get_embedding_generator] = lambda: mock_generator
     client.app.dependency_overrides[get_vector_store] = lambda: mock_vector_store
@@ -180,9 +216,11 @@ def test_document_deletion_cascade_clears_vectors_and_metadata(
     mock_pdf_extract, client, emb_test_db
 ):
     mock_generator = MagicMock()
-    mock_generator.batch_generate.return_value = [[0.1] * 1536]
+    mock_generator.batch_generate = AsyncMock(return_value=[[0.1] * 1536])
     mock_vector_store = MagicMock()
-    mock_vector_store.health.return_value = True
+    mock_vector_store.health = AsyncMock(return_value=True)
+    mock_vector_store.upsert = AsyncMock()
+    mock_vector_store.delete_document = AsyncMock()
 
     client.app.dependency_overrides[get_embedding_generator] = lambda: mock_generator
     client.app.dependency_overrides[get_vector_store] = lambda: mock_vector_store

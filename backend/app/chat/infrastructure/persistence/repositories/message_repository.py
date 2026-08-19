@@ -2,8 +2,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat.domain.interfaces import MessageRepository
 from app.chat.domain.models import (
@@ -15,7 +15,7 @@ from app.chat.infrastructure.persistence.models import ConversationMessageORM
 
 
 class SQLAlchemyMessageRepository(MessageRepository):
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
     async def _next_created_at(
@@ -31,11 +31,12 @@ class SQLAlchemyMessageRepository(MessageRepository):
         """
         if proposed is None:
             proposed = datetime.now(UTC)
-        latest = (
-            self._db.query(func.max(ConversationMessageORM.created_at))
-            .filter(ConversationMessageORM.conversation_id == conversation_id)
-            .scalar()
+        result = await self._db.execute(
+            select(func.max(ConversationMessageORM.created_at)).where(
+                ConversationMessageORM.conversation_id == conversation_id
+            )
         )
+        latest = result.scalar()
         if latest is not None and proposed <= latest:
             proposed = latest + timedelta(microseconds=1)
         return proposed
@@ -77,36 +78,36 @@ class SQLAlchemyMessageRepository(MessageRepository):
             created_at=created_at,
         )
         self._db.add(orm)
-        self._db.flush()
+        await self._db.flush()
+        await self._db.refresh(orm)
         return self._to_domain(orm)
 
     async def get_recent_messages(
         self, conversation_id: UUID, limit: int, offset: int = 0
     ) -> list[ConversationMessage]:
-        orms = (
-            self._db.query(ConversationMessageORM)
-            .filter(ConversationMessageORM.conversation_id == conversation_id)
-            # Secondary sort on id keeps ordering deterministic when created_at
-            # timestamps tie (messages created within the same microsecond).
+        result = await self._db.execute(
+            select(ConversationMessageORM)
+            .where(ConversationMessageORM.conversation_id == conversation_id)
             .order_by(
                 ConversationMessageORM.created_at.desc(),
                 ConversationMessageORM.id.desc(),
             )
             .limit(limit)
             .offset(offset)
-            .all()
         )
+        orms = result.scalars().all()
         # We fetch in descending order, but let's reverse them so they are in chronological order
-        result = [self._to_domain(orm) for orm in orms]
-        result.reverse()
-        return result
+        result_list = [self._to_domain(orm) for orm in orms]
+        result_list.reverse()
+        return result_list
 
     async def count_messages(self, conversation_id: UUID) -> int:
-        return (
-            self._db.query(ConversationMessageORM)
-            .filter(ConversationMessageORM.conversation_id == conversation_id)
-            .count()
+        result = await self._db.execute(
+            select(func.count(ConversationMessageORM.id)).where(
+                ConversationMessageORM.conversation_id == conversation_id
+            )
         )
+        return result.scalar_one()
 
     async def create_assistant_message(
         self,
@@ -125,15 +126,17 @@ class SQLAlchemyMessageRepository(MessageRepository):
             created_at=created_at,
         )
         self._db.add(orm)
-        self._db.flush()
+        await self._db.flush()
+        await self._db.refresh(orm)
         return self._to_domain(orm)
 
     async def append_stream_chunk(self, message_id: UUID, content_chunk: str) -> None:
-        orm = (
-            self._db.query(ConversationMessageORM)
-            .filter(ConversationMessageORM.id == message_id)
-            .first()
+        result = await self._db.execute(
+            select(ConversationMessageORM).where(
+                ConversationMessageORM.id == message_id
+            )
         )
+        orm = result.scalar_one_or_none()
         if orm:
             from app.chat.domain.exceptions import InvalidStatusTransitionException
 
@@ -146,7 +149,7 @@ class SQLAlchemyMessageRepository(MessageRepository):
                 )
             orm.content = (orm.content or "") + content_chunk
             orm.status = MessageStatus.STREAMING.value
-            self._db.flush()
+            await self._db.flush()
 
     async def complete_message(
         self,
@@ -157,11 +160,12 @@ class SQLAlchemyMessageRepository(MessageRepository):
         content: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> ConversationMessage:
-        orm = (
-            self._db.query(ConversationMessageORM)
-            .filter(ConversationMessageORM.id == message_id)
-            .first()
+        result = await self._db.execute(
+            select(ConversationMessageORM).where(
+                ConversationMessageORM.id == message_id
+            )
         )
+        orm = result.scalar_one_or_none()
         if not orm:
             raise RuntimeError(f"Message {message_id} not found to complete.")
 
@@ -187,17 +191,19 @@ class SQLAlchemyMessageRepository(MessageRepository):
                 current_meta.update(metadata)
                 orm.metadata_json = current_meta
         orm.status = MessageStatus.COMPLETED.value
-        self._db.flush()
+        await self._db.flush()
+        await self._db.refresh(orm)
         return self._to_domain(orm)
 
     async def fail_message(
         self, message_id: UUID, error_message: str | None = None
     ) -> ConversationMessage:
-        orm = (
-            self._db.query(ConversationMessageORM)
-            .filter(ConversationMessageORM.id == message_id)
-            .first()
+        result = await self._db.execute(
+            select(ConversationMessageORM).where(
+                ConversationMessageORM.id == message_id
+            )
         )
+        orm = result.scalar_one_or_none()
         if not orm:
             raise RuntimeError(f"Message {message_id} not found to fail.")
 
@@ -217,7 +223,8 @@ class SQLAlchemyMessageRepository(MessageRepository):
             meta["error_message"] = error_message
             orm.metadata_json = meta
 
-        self._db.flush()
+        await self._db.flush()
+        await self._db.refresh(orm)
         return self._to_domain(orm)
 
     async def interrupt_message(
@@ -232,11 +239,12 @@ class SQLAlchemyMessageRepository(MessageRepository):
         sweep after abnormal stream termination without racing the normal
         finalize/fail path.
         """
-        orm = (
-            self._db.query(ConversationMessageORM)
-            .filter(ConversationMessageORM.id == message_id)
-            .first()
+        result = await self._db.execute(
+            select(ConversationMessageORM).where(
+                ConversationMessageORM.id == message_id
+            )
         )
+        orm = result.scalar_one_or_none()
         if not orm:
             raise RuntimeError(f"Message {message_id} not found to interrupt.")
 
@@ -252,5 +260,6 @@ class SQLAlchemyMessageRepository(MessageRepository):
             meta["interrupt_reason"] = reason
             orm.metadata_json = meta
 
-        self._db.flush()
+        await self._db.flush()
+        await self._db.refresh(orm)
         return self._to_domain(orm)

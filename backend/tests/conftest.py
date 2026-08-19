@@ -1,7 +1,9 @@
 import os
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
 # 1. Set environment variables
 os.environ["ENV"] = "testing"
@@ -11,33 +13,57 @@ os.environ["POSTGRES_PASSWORD"] = "mock_password"
 os.environ["POSTGRES_DB"] = "mock_db"
 os.environ["REDIS_HOST"] = "mock_redis"
 os.environ["QDRANT_HOST"] = "mock_qdrant"
-os.environ["OPENAI_API_KEY"] = "mock-key"
-os.environ["JWT_SECRET"] = "mock_secret"
+os.environ["GEMINI_API_KEY"] = "mock-gemini-key"
+os.environ["JWT_SECRET"] = "mock_secret_key_at_least_32_bytes_long_for_tests!"
 os.environ["BACKEND_CORS_ORIGINS"] = (
     '["http://localhost:5173","http://127.0.0.1:5173","http://localhost","http://127.0.0.1"]'
 )
 
 
 # 2. Patch database connection helper functions before app.main imports them
-from sqlalchemy import create_engine
-
 import app.db.session  # noqa: E402
 
 app.db.session.init_postgres_engine = MagicMock(
     side_effect=lambda url: (
-        create_engine(url)
+        create_async_engine(
+            url.replace("postgresql://", "postgresql+asyncpg://", 1),
+            poolclass=NullPool,
+        )
         if ("test" in str(url) or "5433" in str(url))
-        else MagicMock()
+        else AsyncMock()
     )
 )
-app.db.session.init_redis_client = MagicMock(return_value=MagicMock())
+
+
+def _create_mock_redis_client(*args, **kwargs):
+    mock_redis = AsyncMock()
+    mock_pipe = AsyncMock()
+    mock_pipe.__aenter__.return_value = mock_pipe
+    mock_pipe.__aexit__.return_value = None
+    mock_pipe.execute = AsyncMock(return_value=[None, 0, None, None])
+    mock_pipe.zremrangebyscore = MagicMock()
+    mock_pipe.zcard = MagicMock()
+    mock_pipe.zadd = MagicMock()
+    mock_pipe.expire = MagicMock()
+    mock_redis.pipeline = MagicMock(return_value=mock_pipe)
+    return mock_redis
+
+
+app.db.session.init_redis_client = MagicMock(side_effect=_create_mock_redis_client)
 app.db.session.init_qdrant_client = MagicMock(return_value=MagicMock())
 
 # 3. Patch application main startup checks
 import app.main  # noqa: E402
 
-app.main.verify_postgres_connectivity = MagicMock()
+app.main.verify_postgres_connectivity = AsyncMock()
+app.main.verify_alembic_migrations = AsyncMock()
 app.main.run_startup_validations = MagicMock()
+
+# 4. Patch the durable cleanup worker so it does not open real asyncpg connections
+import app.documents.services.cleanup_worker  # noqa: E402
+
+app.documents.services.cleanup_worker.run_durable_cleanup_recovery = MagicMock()
+
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -46,19 +72,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 def _reset_process_global_state():
     """
     Reset process-level singletons between tests so no test inherits state from
-    a previous one, keeping the suite order-independent:
-
-    * The in-memory rate-limit fallback store (and its sweep-deadline
-      bookkeeping) plus the Redis health circuit breaker. The store is a
-      module-level singleton shared across requests by design (it must survive
-      the per-request RateLimiter instances), which makes it process-global.
-    * The shared InMemoryIndexCache (user_has_chunks / BM25 cache). It is a
-      module-level singleton so the cached "no chunks" determination actually
-      survives between requests; clearing it keeps tests isolated.
-
-    The shared embedding generator is NOT reset: it is stateless after
-    construction and loading its model is the expensive step we deliberately
-    pay only once per process.
+    a previous one, keeping the suite order-independent.
     """
     import app.core.security.rate_limiter as rate_limiter_module
 

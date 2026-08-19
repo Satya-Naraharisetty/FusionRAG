@@ -5,7 +5,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user_context, get_db
 from app.chat.infrastructure.persistence.models import ConversationMessageORM
@@ -84,19 +85,18 @@ def calculate_estimated_cost(prompt_tokens: int, completion_tokens: int) -> floa
     response_model=ObservabilityMetricsResponse,
     dependencies=[Depends(check_admin_user)],
 )
-def get_observability_metrics(db: Session = Depends(get_db)) -> Any:
+async def get_observability_metrics(db: AsyncSession = Depends(get_db)) -> Any:
     """
     Fetch aggregated observability metrics over the last 30 days.
     """
     # Fetch completed assistant messages
-    messages = (
-        db.query(ConversationMessageORM)
-        .filter(
+    result = await db.execute(
+        select(ConversationMessageORM).where(
             ConversationMessageORM.role == "assistant",
             ConversationMessageORM.status == "completed",
         )
-        .all()
     )
+    messages = list(result.scalars().all())
 
     total_prompt = 0
     total_completion = 0
@@ -191,41 +191,49 @@ def get_observability_metrics(db: Session = Depends(get_db)) -> Any:
     response_model=TraceListResponse,
     dependencies=[Depends(check_admin_user)],
 )
-def get_observability_traces(
+async def get_observability_traces(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Any:
     """
     Fetch paginated traces of recent completed assistant messages.
     """
-    query = db.query(ConversationMessageORM).filter(
+    base_filter = (
         ConversationMessageORM.role == "assistant",
         ConversationMessageORM.status == "completed",
     )
 
-    total = query.count()
+    total = (
+        await db.scalar(
+            select(func.count()).select_from(ConversationMessageORM).where(*base_filter)
+        )
+        or 0
+    )
 
-    messages = (
-        query.order_by(ConversationMessageORM.created_at.desc())
+    messages_result = await db.execute(
+        select(ConversationMessageORM)
+        .where(*base_filter)
+        .order_by(ConversationMessageORM.created_at.desc())
         .limit(limit)
         .offset(offset)
-        .all()
     )
+    messages = list(messages_result.scalars().all())
 
     trace_items = []
     for msg in messages:
         # Find preceding user message for this conversation
-        user_msg = (
-            db.query(ConversationMessageORM)
-            .filter(
+        user_msg_result = await db.execute(
+            select(ConversationMessageORM)
+            .where(
                 ConversationMessageORM.conversation_id == msg.conversation_id,
                 ConversationMessageORM.role == "user",
                 ConversationMessageORM.created_at < msg.created_at,
             )
             .order_by(ConversationMessageORM.created_at.desc())
-            .first()
+            .limit(1)
         )
+        user_msg = user_msg_result.scalar_one_or_none()
 
         question = user_msg.content if user_msg else "N/A"
         prompt_t = msg.prompt_tokens or 0

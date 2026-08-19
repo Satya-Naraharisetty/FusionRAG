@@ -1,11 +1,14 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
+
+import pytest
 
 from app.documents.infrastructure.persistence.vector_store import QdrantVectorStore
 
 
-def test_qdrant_vector_store_upsert():
-    mock_client = MagicMock()
+@pytest.mark.asyncio
+async def test_qdrant_vector_store_upsert():
+    mock_client = AsyncMock()
     mock_client.get_collection.return_value = MagicMock()
 
     store = QdrantVectorStore(mock_client, "test_collection", 1536)
@@ -14,7 +17,7 @@ def test_qdrant_vector_store_upsert():
     vectors = [[0.1] * 1536, [0.2] * 1536]
     payloads = [{"doc": "1"}, {"doc": "2"}]
 
-    store.upsert(vectors, payloads, vector_ids)
+    await store.upsert(vectors, payloads, vector_ids)
 
     mock_client.upsert.assert_called_once()
     _, kwargs = mock_client.upsert.call_args
@@ -26,14 +29,15 @@ def test_qdrant_vector_store_upsert():
     assert points[0].payload == payloads[0]
 
 
-def test_qdrant_vector_store_delete():
-    mock_client = MagicMock()
+@pytest.mark.asyncio
+async def test_qdrant_vector_store_delete():
+    mock_client = AsyncMock()
     mock_client.get_collection.return_value = MagicMock()
 
     store = QdrantVectorStore(mock_client, "test_collection", 1536)
 
     vector_ids = [uuid4(), uuid4()]
-    store.delete(vector_ids)
+    await store.delete(vector_ids)
 
     mock_client.delete.assert_called_once()
     _, kwargs = mock_client.delete.call_args
@@ -41,14 +45,15 @@ def test_qdrant_vector_store_delete():
     assert kwargs["points_selector"].points == [str(vid) for vid in vector_ids]
 
 
-def test_qdrant_vector_store_delete_document():
-    mock_client = MagicMock()
+@pytest.mark.asyncio
+async def test_qdrant_vector_store_delete_document():
+    mock_client = AsyncMock()
     mock_client.get_collection.return_value = MagicMock()
 
     store = QdrantVectorStore(mock_client, "test_collection", 1536)
 
     doc_id = uuid4()
-    store.delete_document(doc_id)
+    await store.delete_document(doc_id)
 
     mock_client.delete.assert_called_once()
     _, kwargs = mock_client.delete.call_args
@@ -58,23 +63,25 @@ def test_qdrant_vector_store_delete_document():
     assert filter_cond.match.value == str(doc_id)
 
 
-def test_qdrant_vector_store_health_success():
-    mock_client = MagicMock()
+@pytest.mark.asyncio
+async def test_qdrant_vector_store_health_success():
+    mock_client = AsyncMock()
 
     mock_collection_info = MagicMock()
     mock_collection_info.config.params.vectors.size = 1536
     mock_client.get_collection.return_value = mock_collection_info
 
     store = QdrantVectorStore(mock_client, "test_collection", 1536)
-    assert store.health() is True
+    assert await store.health() is True
 
 
-def test_qdrant_vector_store_health_dimension_mismatch():
-    mock_client = MagicMock()
+@pytest.mark.asyncio
+async def test_qdrant_vector_store_health_dimension_mismatch():
+    mock_client = AsyncMock()
 
     mock_collection_info = MagicMock()
     mock_collection_info.config.params.vectors.size = 512
     mock_client.get_collection.return_value = mock_collection_info
 
     store = QdrantVectorStore(mock_client, "test_collection", 1536)
-    assert store.health() is False
+    assert await store.health() is False

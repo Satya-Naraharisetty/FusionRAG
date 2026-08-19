@@ -1,7 +1,9 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.documents.domain.interfaces import ChunkRepository
 from app.documents.domain.models import Chunk
@@ -12,10 +14,10 @@ from app.documents.infrastructure.persistence.models import (
 
 
 class SQLAlchemyChunkRepository(ChunkRepository):
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    def save_bulk(self, chunks: list[Chunk]) -> None:
+    async def save_bulk(self, chunks: list[Chunk]) -> None:
         """
         Bulk inserts chunks.
         """
@@ -34,27 +36,27 @@ class SQLAlchemyChunkRepository(ChunkRepository):
             for chunk in chunks
         ]
         self._db.add_all(db_chunks)
-        self._db.flush()
+        await self._db.flush()
 
-    def delete_by_document(self, document_id: UUID) -> None:
+    async def delete_by_document(self, document_id: UUID) -> None:
         """
         Deletes all chunks associated with a document.
         """
-        self._db.query(SQLAlchemyChunk).filter(
-            SQLAlchemyChunk.document_id == document_id
-        ).delete(synchronize_session=False)
-        self._db.flush()
+        await self._db.execute(
+            delete(SQLAlchemyChunk).where(SQLAlchemyChunk.document_id == document_id)
+        )
+        await self._db.flush()
 
-    def list_by_document(self, document_id: UUID) -> list[Chunk]:
+    async def list_by_document(self, document_id: UUID) -> list[Chunk]:
         """
         Fetches all chunks associated with a document, sorted by chunk_index.
         """
-        db_chunks = (
-            self._db.query(SQLAlchemyChunk)
-            .filter(SQLAlchemyChunk.document_id == document_id)
+        result = await self._db.execute(
+            select(SQLAlchemyChunk)
+            .where(SQLAlchemyChunk.document_id == document_id)
             .order_by(SQLAlchemyChunk.chunk_index.asc())
-            .all()
         )
+        db_chunks = result.scalars().all()
         return [
             Chunk(
                 id=c.id,
@@ -74,22 +76,20 @@ class SQLAlchemyChunkRepository(ChunkRepository):
         """
         Loads the text of a single chunk.
         """
-        db_chunk = (
-            self._db.query(SQLAlchemyChunk)
-            .filter(SQLAlchemyChunk.id == chunk_id)
-            .first()
+        result = await self._db.execute(
+            select(SQLAlchemyChunk).where(SQLAlchemyChunk.id == chunk_id)
         )
+        db_chunk = result.scalar_one_or_none()
         return db_chunk.text if db_chunk else None
 
     async def load_metadata(self, chunk_id: UUID) -> dict[str, Any] | None:
         """
         Loads the metadata of a single chunk.
         """
-        db_chunk = (
-            self._db.query(SQLAlchemyChunk)
-            .filter(SQLAlchemyChunk.id == chunk_id)
-            .first()
+        result = await self._db.execute(
+            select(SQLAlchemyChunk).where(SQLAlchemyChunk.id == chunk_id)
         )
+        db_chunk = result.scalar_one_or_none()
         return db_chunk.metadata_json if db_chunk else None
 
     async def batch_lookup(self, chunk_ids: list[UUID]) -> list[Chunk]:
@@ -100,12 +100,12 @@ class SQLAlchemyChunkRepository(ChunkRepository):
         if not chunk_ids:
             return []
 
-        db_chunks = (
-            self._db.query(SQLAlchemyChunk)
+        result = await self._db.execute(
+            select(SQLAlchemyChunk)
             .options(joinedload(SQLAlchemyChunk.document))
-            .filter(SQLAlchemyChunk.id.in_(chunk_ids))
-            .all()
+            .where(SQLAlchemyChunk.id.in_(chunk_ids))
         )
+        db_chunks = result.scalars().all()
 
         chunks = []
         for c in db_chunks:
@@ -117,15 +117,17 @@ class SQLAlchemyChunkRepository(ChunkRepository):
                 character_start=c.character_start,
                 character_end=c.character_end,
                 token_estimate=c.token_estimate,
-                metadata=dict(c.metadata_json),
+                metadata=dict(c.metadata_json) if c.metadata_json else {},
                 created_at=c.created_at,
             )
-            # Embed original filename and scope details in metadata so it is accessible downstream
-            chunk.metadata["document_name"] = c.document.original_filename
-            chunk.metadata["document_scope"] = c.document.scope
-            chunk.metadata["conversation_id"] = (
-                str(c.document.conversation_id) if c.document.conversation_id else None
-            )
+            if c.document:
+                chunk.metadata["document_name"] = c.document.original_filename
+                chunk.metadata["document_scope"] = c.document.scope
+                chunk.metadata["conversation_id"] = (
+                    str(c.document.conversation_id)
+                    if c.document.conversation_id
+                    else None
+                )
             chunks.append(chunk)
 
         return chunks
@@ -140,14 +142,15 @@ class SQLAlchemyChunkRepository(ChunkRepository):
             return True
 
         unique_ids = list(set(document_ids))
-        count = (
-            self._db.query(SQLAlchemyDocument)
-            .filter(
+        from sqlalchemy import func
+
+        result = await self._db.execute(
+            select(func.count(SQLAlchemyDocument.id)).where(
                 SQLAlchemyDocument.id.in_(unique_ids),
                 SQLAlchemyDocument.user_id == user_id,
             )
-            .count()
         )
+        count = result.scalar_one()
         return count == len(unique_ids)
 
     async def get_filtered_chunks(
@@ -158,15 +161,16 @@ class SQLAlchemyChunkRepository(ChunkRepository):
         filter_metadata: dict[str, Any] | None = None,
     ) -> list[Chunk]:
         query = (
-            self._db.query(SQLAlchemyChunk)
+            select(SQLAlchemyChunk)
             .options(joinedload(SQLAlchemyChunk.document))
             .join(SQLAlchemyDocument)
-            .filter(SQLAlchemyDocument.user_id == user_id)
+            .where(SQLAlchemyDocument.user_id == user_id)
         )
         if document_ids:
-            query = query.filter(SQLAlchemyChunk.document_id.in_(document_ids))
+            query = query.where(SQLAlchemyChunk.document_id.in_(document_ids))
 
-        db_chunks = query.all()
+        result = await self._db.execute(query)
+        db_chunks = result.scalars().all()
 
         chunks = []
         for c in db_chunks:
@@ -201,11 +205,14 @@ class SQLAlchemyChunkRepository(ChunkRepository):
                 metadata=meta,
                 created_at=c.created_at,
             )
-            chunk.metadata["document_name"] = c.document.original_filename
-            chunk.metadata["document_scope"] = c.document.scope
-            chunk.metadata["conversation_id"] = (
-                str(c.document.conversation_id) if c.document.conversation_id else None
-            )
+            if c.document:
+                chunk.metadata["document_name"] = c.document.original_filename
+                chunk.metadata["document_scope"] = c.document.scope
+                chunk.metadata["conversation_id"] = (
+                    str(c.document.conversation_id)
+                    if c.document.conversation_id
+                    else None
+                )
             chunks.append(chunk)
 
         return chunks
@@ -213,18 +220,18 @@ class SQLAlchemyChunkRepository(ChunkRepository):
     async def get_chunks_metadata_stats(self, user_id: UUID) -> dict[str, Any]:
         from sqlalchemy import func
 
-        result = (
-            self._db.query(
+        result = await self._db.execute(
+            select(
                 func.count(SQLAlchemyChunk.id).label("count"),
                 func.max(SQLAlchemyChunk.created_at).label("max_created_at"),
             )
             .join(SQLAlchemyDocument)
-            .filter(SQLAlchemyDocument.user_id == user_id)
-            .first()
+            .where(SQLAlchemyDocument.user_id == user_id)
         )
+        row = result.first()
         return {
-            "count": result[0] if result and result[0] is not None else 0,
-            "max_created_at": result[1] if result and result[1] is not None else None,
+            "count": row[0] if row and row[0] is not None else 0,
+            "max_created_at": row[1] if row and row[1] is not None else None,
         }
 
     async def get_allowed_document_ids(self, retrieval_scope: Any) -> list[UUID]:
@@ -235,9 +242,6 @@ class SQLAlchemyChunkRepository(ChunkRepository):
         Returns [] immediately (without a DB query) when both include_* flags
         are False, since no document can match an empty scope.
         """
-        # Fast path: if no scope type is requested, nothing can match.
-        # This avoids an unnecessary DB query and is the correct semantic
-        # (an empty scope grants zero access).
         include_library = retrieval_scope.include_library_documents
         include_conversation = (
             retrieval_scope.include_conversation_documents
@@ -248,14 +252,12 @@ class SQLAlchemyChunkRepository(ChunkRepository):
 
         from sqlalchemy import and_, or_
 
-        query = self._db.query(SQLAlchemyDocument.id).filter(
+        query = select(SQLAlchemyDocument.id).where(
             SQLAlchemyDocument.user_id == retrieval_scope.user_id
         )
 
         if retrieval_scope.document_ids is not None:
-            query = query.filter(
-                SQLAlchemyDocument.id.in_(retrieval_scope.document_ids)
-            )
+            query = query.where(SQLAlchemyDocument.id.in_(retrieval_scope.document_ids))
 
         conditions = []
         if include_library:
@@ -270,6 +272,7 @@ class SQLAlchemyChunkRepository(ChunkRepository):
                 )
             )
 
-        query = query.filter(or_(*conditions))
-        db_doc_ids = query.all()
+        query = query.where(or_(*conditions))
+        result = await self._db.execute(query)
+        db_doc_ids = result.all()
         return [row[0] for row in db_doc_ids]

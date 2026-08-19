@@ -43,13 +43,13 @@ class AuthService:
         self._uuid_generator = uuid_generator
         self._uow = uow
 
-    def register_user(self, email: str, password: str) -> UserDomain:
+    async def register_user(self, email: str, password: str) -> UserDomain:
         """
         Register a new user account after validating credentials and unique email check.
         """
         try:
             normalized_email = email.strip().lower()
-            existing = self._user_repo.get_by_email(normalized_email)
+            existing = await self._user_repo.get_by_email(normalized_email)
             if existing:
                 # Return a duplicate account error to prevent registration conflicts
                 raise DuplicateAccountException("Email is already registered.")
@@ -64,19 +64,19 @@ class AuthService:
                 created_at=self._time_provider.get_now(),
                 updated_at=self._time_provider.get_now(),
             )
-            saved_user = self._user_repo.save(user)
-            self._uow.commit()
+            saved_user = await self._user_repo.save(user)
+            await self._uow.commit()
             return saved_user
         except Exception:
-            self._uow.rollback()
+            await self._uow.rollback()
             raise
 
-    def authenticate_user(self, email: str, password: str) -> UserDomain:
+    async def authenticate_user(self, email: str, password: str) -> UserDomain:
         """
         Authenticate user credentials during login.
         """
         normalized_email = email.strip().lower()
-        user = self._user_repo.get_by_email(normalized_email)
+        user = await self._user_repo.get_by_email(normalized_email)
         if not user:
             raise InvalidCredentialsException("Invalid email or password.")
 
@@ -91,7 +91,7 @@ class AuthService:
 
         return user
 
-    def create_session(
+    async def create_session(
         self,
         user_id: UUID,
         user_agent: str | None = None,
@@ -101,7 +101,7 @@ class AuthService:
         Create a new active session, generating access and refresh tokens.
         """
         try:
-            user = self._user_repo.get_by_id(user_id)
+            user = await self._user_repo.get_by_id(user_id)
             if not user:
                 raise InvalidCredentialsException("User not found.")
 
@@ -126,15 +126,15 @@ class AuthService:
                 user_agent=user_agent,
                 ip_address=ip_address,
             )
-            self._session_repo.create(session, refresh_token)
-            self._uow.commit()
+            await self._session_repo.create(session, refresh_token)
+            await self._uow.commit()
 
             return access_token, refresh_token
         except Exception:
-            self._uow.rollback()
+            await self._uow.rollback()
             raise
 
-    def refresh_session(
+    async def refresh_session(
         self,
         raw_refresh_token: str,
         user_agent: str | None = None,
@@ -145,15 +145,15 @@ class AuthService:
         """
         try:
             # 1. Locate active session (locks the row via with_for_update)
-            session = self._session_repo.find_active_by_token(raw_refresh_token)
+            session = await self._session_repo.find_active_by_token(raw_refresh_token)
 
             if not session:
                 # Token reuse / theft detection check:
-                past_session = self._session_repo.find_by_token(raw_refresh_token)
+                past_session = await self._session_repo.find_by_token(raw_refresh_token)
                 if past_session:
                     user_id = past_session.user_id
                     # Revoke all active sessions for this user to protect the account
-                    self._session_repo.revoke_all_for_user(user_id)
+                    await self._session_repo.revoke_all_for_user(user_id)
                     logger.warning(
                         "Refresh token reuse detected",
                         extra={
@@ -161,15 +161,15 @@ class AuthService:
                             "event": "refresh_token_reuse",
                         },
                     )
-                    self._uow.commit()  # Commit the mass revocation immediately
+                    await self._uow.commit()  # Commit the mass revocation immediately
                 raise InvalidSessionException(
                     "Session is invalid, expired, or revoked."
                 )
 
-            user = self._user_repo.get_by_id(session.user_id)
+            user = await self._user_repo.get_by_id(session.user_id)
             if not user or not user.is_active:
-                self._session_repo.revoke(raw_refresh_token)
-                self._uow.commit()
+                await self._session_repo.revoke(raw_refresh_token)
+                await self._uow.commit()
                 if not user:
                     raise InvalidSessionException(
                         "User associated with session no longer exists."
@@ -177,12 +177,12 @@ class AuthService:
                 else:
                     raise AccountDisabledException("Account has been deactivated.")
 
-            # 3. Update last_used_at (IMPROVEMENT 5)
+            # 3. Update last_used_at
             now = self._time_provider.get_now()
-            self._session_repo.update_last_used(raw_refresh_token, now)
+            await self._session_repo.update_last_used(raw_refresh_token, now)
 
             # 4. Revoke old session
-            self._session_repo.revoke(raw_refresh_token)
+            await self._session_repo.revoke(raw_refresh_token)
 
             # 5. Create new session
             claims = {
@@ -205,28 +205,28 @@ class AuthService:
                 user_agent=user_agent,
                 ip_address=ip_address,
             )
-            self._session_repo.create(new_session, new_refresh_token)
+            await self._session_repo.create(new_session, new_refresh_token)
 
             # 6. Commit atomically
-            self._uow.commit()
+            await self._uow.commit()
 
             return new_access_token, new_refresh_token
         except Exception:
-            self._uow.rollback()
+            await self._uow.rollback()
             raise
 
-    def revoke_session(self, raw_refresh_token: str) -> None:
+    async def revoke_session(self, raw_refresh_token: str) -> None:
         """
         Revoke an active refresh token session (logout).
         """
         try:
-            self._session_repo.revoke(raw_refresh_token)
-            self._uow.commit()
+            await self._session_repo.revoke(raw_refresh_token)
+            await self._uow.commit()
         except Exception:
-            self._uow.rollback()
+            await self._uow.rollback()
             raise
 
-    def verify_user_password(self, user_id: UUID, password: str) -> None:
+    async def verify_user_password(self, user_id: UUID, password: str) -> None:
         """
         Re-verify a user's password before a destructive action (account deletion).
 
@@ -239,7 +239,7 @@ class AuthService:
         InvalidCredentialsException with a descriptive message for OAuth-only
         accounts that have no local password set.
         """
-        user = self._user_repo.get_by_id(user_id)
+        user = await self._user_repo.get_by_id(user_id)
         if not user:
             raise UserNotFoundException("User account no longer exists.")
         # OAuth-only accounts have no local password — inform the caller.
@@ -251,7 +251,7 @@ class AuthService:
         if not self._hasher.verify(password, user.hashed_password):
             raise InvalidCredentialsException("Invalid email or password.")
 
-    def delete_user(self, user_id: UUID) -> None:
+    async def delete_user(self, user_id: UUID) -> None:
         """
         Permanently delete a user account.
 
@@ -260,17 +260,17 @@ class AuthService:
         UserNotFoundException if the account no longer exists.
         """
         try:
-            user = self._user_repo.get_by_id(user_id)
+            user = await self._user_repo.get_by_id(user_id)
             if not user:
                 raise UserNotFoundException("User account no longer exists.")
-            self._user_repo.delete(user_id)
-            self._uow.commit()
+            await self._user_repo.delete(user_id)
+            await self._uow.commit()
         except Exception:
-            self._uow.rollback()
+            await self._uow.rollback()
             raise
 
-    def get_user_by_id(self, user_id: UUID) -> UserDomain | None:
+    async def get_user_by_id(self, user_id: UUID) -> UserDomain | None:
         """
         Query a user by UUID.
         """
-        return self._user_repo.get_by_id(user_id)
+        return await self._user_repo.get_by_id(user_id)

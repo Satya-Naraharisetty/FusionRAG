@@ -1,9 +1,7 @@
 import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import boto3
 import pytest
-from moto import mock_aws
 
 from app.documents.domain.exceptions import (
     DocumentCorrupted,
@@ -23,7 +21,7 @@ from app.documents.infrastructure.extractors import (
     PDFExtractor,
     TXTExtractor,
 )
-from app.documents.infrastructure.storage import LocalStorageProvider, S3StorageProvider
+from app.documents.infrastructure.storage import LocalStorageProvider
 from app.documents.services.chunking import ChunkingService
 from app.documents.services.metadata_extractor import MetadataExtractor
 from app.documents.services.text_cleaner import TextCleaner
@@ -65,9 +63,7 @@ def test_state_machine_invalid_transitions():
         )
 
     with pytest.raises(InvalidStateTransitionException):
-        DocumentStateMachine.validate_transition(
-            DocumentStatus.COMPLETED, DocumentStatus.COMPLETED
-        )  # wait, identical transitions are allowed in code, but let's test a distinct invalid one
+        # identical transitions are allowed in code, but let's test a distinct invalid one
         DocumentStateMachine.validate_transition(
             DocumentStatus.COMPLETED, DocumentStatus.FAILED
         )
@@ -130,7 +126,8 @@ def test_checksum_generator():
 # --- Storage Provider Tests ---
 
 
-def test_local_storage_provider(tmp_path):
+@pytest.mark.asyncio
+async def test_local_storage_provider(tmp_path):
     storage = LocalStorageProvider(upload_dir=str(tmp_path))
     user_id = uuid.uuid4()
     doc_id = uuid.uuid4()
@@ -138,16 +135,16 @@ def test_local_storage_provider(tmp_path):
     content = b"Hello Storage"
 
     # Save
-    key = storage.save(filename, content, user_id, doc_id)
+    key = await storage.save(filename, content, user_id, doc_id)
     assert key == f"user_{user_id}/{doc_id}.txt"
 
     # Get
-    assert storage.get(key) == content
+    assert await storage.get(key) == content
 
     # Delete
-    storage.delete(key)
+    await storage.delete(key)
     with pytest.raises(FileNotFoundError):
-        storage.get(key)
+        await storage.get(key)
 
 
 # --- Chunker Tests ---
@@ -173,7 +170,6 @@ def test_chunking_service():
 
 def test_chunking_service_min_size():
     chunker = ChunkingService(chunk_size=50, chunk_overlap=10, min_chunk_size=20)
-    # Substring is smaller than min size
     text = "Long text here that is large enough.\n\nShort."
     result = chunker.chunk_document(text, uuid.uuid4())
     # Should exclude the "Short." chunk if it falls under 20 characters and there are multiple chunks
@@ -183,22 +179,24 @@ def test_chunking_service_min_size():
 # --- Extractor Strategy Tests ---
 
 
+@pytest.mark.asyncio
 @patch("app.documents.infrastructure.extractors.PdfReader")
-def test_pdf_extractor(mock_pdf_reader):
+async def test_pdf_extractor(mock_pdf_reader):
     # Setup mock
     mock_page = MagicMock()
     mock_page.extract_text.return_value = "PDF Page Text"
     mock_pdf_reader.return_value.pages = [mock_page, mock_page]
 
     extractor = PDFExtractor()
-    res = extractor.extract(b"dummy pdf bytes")
+    res = await extractor.extract(b"dummy pdf bytes")
 
     assert res.text == "PDF Page TextPDF Page Text"
     assert res.page_count == 2
 
 
+@pytest.mark.asyncio
 @patch("app.documents.infrastructure.extractors.docx.Document")
-def test_docx_extractor(mock_docx_doc):
+async def test_docx_extractor(mock_docx_doc):
     # Setup mock
     mock_para = MagicMock()
     mock_para.text = "Para Text"
@@ -213,26 +211,28 @@ def test_docx_extractor(mock_docx_doc):
     mock_docx_doc.return_value.tables = [mock_table]
 
     extractor = DOCXExtractor()
-    res = extractor.extract(b"dummy docx bytes")
+    res = await extractor.extract(b"dummy docx bytes")
 
     assert "Para Text" in res.text
     assert "Cell Text" in res.text
     assert res.page_count == 1
 
 
-def test_txt_extractor():
+@pytest.mark.asyncio
+async def test_txt_extractor():
     extractor = TXTExtractor()
-    res = extractor.extract(b"Plain text content")
+    res = await extractor.extract(b"Plain text content")
     assert res.text == "Plain text content"
     assert res.page_count == 1
 
     with pytest.raises(DocumentCorrupted):
-        extractor.extract(b"\x80abc")  # invalid utf-8
+        await extractor.extract(b"\x80abc")  # invalid utf-8
 
 
-def test_markdown_extractor():
+@pytest.mark.asyncio
+async def test_markdown_extractor():
     extractor = MarkdownExtractor()
-    res = extractor.extract(b"# Header\n\nContent")
+    res = await extractor.extract(b"# Header\n\nContent")
     assert res.text == "# Header\n\nContent"
     assert res.page_count == 1
 
@@ -255,49 +255,12 @@ def test_extractor_factory():
         factory.get_extractor("application/unknown", "doc.unknown")
 
 
-@mock_aws
-def test_s3_storage_provider():
-    # Setup mock S3 environment
-    s3 = boto3.client("s3", region_name="us-east-1")
-    s3.create_bucket(Bucket="test-bucket")
-
-    # Verify connection
-    storage = S3StorageProvider(bucket_name="test-bucket", region_name="us-east-1")
-    storage.verify_connection()
-    storage.verify_write_access()
-
-    user_id = uuid.uuid4()
-    doc_id = uuid.uuid4()
-    filename = "test.txt"
-    content = b"Hello S3"
-
-    # Save
-    key = storage.save(filename, content, user_id, doc_id)
-    assert key == f"user_{user_id}/{doc_id}.txt"
-
-    # Get
-    assert storage.get(key) == content
-
-    # Generate presigned URLs
-    upload_url = storage.generate_presigned_upload_url(key)
-    assert "test-bucket" in upload_url
-    assert key in upload_url
-
-    download_url = storage.generate_presigned_download_url(key)
-    assert "test-bucket" in download_url
-    assert key in download_url
-
-    # Delete
-    storage.delete(key)
-    with pytest.raises(FileNotFoundError):
-        storage.get(key)
-
-
 # --- Image Extractor Tests ---
 
 
-@patch("app.documents.infrastructure.extractors.httpx.Client")
-def test_image_extractor_gemini(mock_client_class):
+@pytest.mark.asyncio
+@patch("app.documents.infrastructure.extractors.httpx.AsyncClient")
+async def test_image_extractor_gemini(mock_client_class):
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.json.return_value = {
@@ -310,15 +273,15 @@ def test_image_extractor_gemini(mock_client_class):
         ]
     }
     mock_response.raise_for_status = MagicMock()
-    mock_client.post.return_value = mock_response
-    mock_client_class.return_value.__enter__.return_value = mock_client
+    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client_class.return_value.__aenter__.return_value = mock_client
 
     with patch("app.documents.infrastructure.extractors.settings") as mock_settings:
         mock_settings.GEMINI_API_KEY = "mock-gemini-key"
         mock_settings.OPENAI_API_KEY = "mock-openai-key"
 
         extractor = ImageExtractor("image/png")
-        res = extractor.extract(b"dummy png bytes")
+        res = await extractor.extract(b"dummy png bytes")
 
         assert res.text == "Extracted text and chart details from Gemini"
         assert res.page_count == 1
@@ -329,34 +292,14 @@ def test_image_extractor_gemini(mock_client_class):
         assert "mock-gemini-key" in args[0]
 
 
-@patch("app.documents.infrastructure.extractors.httpx.Client")
-def test_image_extractor_openai(mock_client_class):
-    mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "choices": [
-            {"message": {"content": "Extracted text and chart details from OpenAI"}}
-        ]
-    }
-    mock_response.raise_for_status = MagicMock()
-    mock_client.post.return_value = mock_response
-    mock_client_class.return_value.__enter__.return_value = mock_client
-
+@pytest.mark.asyncio
+async def test_image_extractor_missing_key():
     with patch("app.documents.infrastructure.extractors.settings") as mock_settings:
         mock_settings.GEMINI_API_KEY = ""
-        mock_settings.OPENAI_API_KEY = "mock-openai-key"
 
         extractor = ImageExtractor("image/jpeg")
-        res = extractor.extract(b"dummy jpeg bytes")
-
-        assert res.text == "Extracted text and chart details from OpenAI"
-        assert res.page_count == 1
-
-        mock_client.post.assert_called_once()
-        args, kwargs = mock_client.post.call_args
-        assert "api.openai.com" in args[0]
-        headers = kwargs["headers"]
-        assert headers["Authorization"] == "Bearer mock-openai-key"
+        with pytest.raises(UnsupportedDocumentType):
+            await extractor.extract(b"dummy jpeg bytes")
 
 
 def test_image_extractor_factory():

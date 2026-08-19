@@ -34,13 +34,13 @@ _OAUTH_STATE_COOKIE = "oauth_state"
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(check_rate_limit)],
 )
-def register(
+async def register(
     payload: UserCreateSchema, auth_service: AuthService = Depends(get_auth_service)
 ):
     """
     Register a new user account canonicalizing their email and enforcing credentials checks.
     """
-    user = auth_service.register_user(payload.email, payload.password)
+    user = await auth_service.register_user(payload.email, payload.password)
     return user
 
 
@@ -49,7 +49,7 @@ def register(
     response_model=TokenResponseSchema,
     dependencies=[Depends(check_rate_limit)],
 )
-def login(
+async def login(
     response: Response,
     request: Request,
     payload: UserLoginSchema,
@@ -62,10 +62,10 @@ def login(
     ip_address = request.client.host if request.client else None
 
     # Authenticate credentials
-    user = auth_service.authenticate_user(payload.email, payload.password)
+    user = await auth_service.authenticate_user(payload.email, payload.password)
 
     # Establish session
-    access_token, refresh_token = auth_service.create_session(
+    access_token, refresh_token = await auth_service.create_session(
         user_id=user.id, user_agent=user_agent, ip_address=ip_address
     )
 
@@ -88,7 +88,7 @@ def login(
 
 
 @router.post("/refresh", response_model=TokenResponseSchema)
-def refresh(
+async def refresh(
     response: Response,
     request: Request,
     auth_service: AuthService = Depends(get_auth_service),
@@ -106,7 +106,7 @@ def refresh(
     user_agent = request.headers.get("User-Agent")
     ip_address = request.client.host if request.client else None
 
-    access_token, new_refresh_token = auth_service.refresh_session(
+    access_token, new_refresh_token = await auth_service.refresh_session(
         raw_refresh_token=token, user_agent=user_agent, ip_address=ip_address
     )
 
@@ -129,7 +129,7 @@ def refresh(
 
 
 @router.post("/logout")
-def logout(
+async def logout(
     response: Response,
     request: Request,
     auth_service: AuthService = Depends(get_auth_service),
@@ -139,7 +139,7 @@ def logout(
     """
     token = request.cookies.get(settings.COOKIE_NAME)
     if token:
-        auth_service.revoke_session(token)
+        await auth_service.revoke_session(token)
 
     # Instruct client browser to clear cookies
     response.delete_cookie(
@@ -154,7 +154,7 @@ def logout(
 
 
 @router.get("/me", response_model=UserResponseSchema)
-def get_me(
+async def get_me(
     current_user: dict[str, Any] = Depends(get_current_user_context),
     auth_service: AuthService = Depends(get_auth_service),
 ):
@@ -162,7 +162,7 @@ def get_me(
     Retrieve profile details for the currently authenticated user.
     """
     user_id = UUID(current_user["user_id"])
-    user = auth_service.get_user_by_id(user_id)
+    user = await auth_service.get_user_by_id(user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -176,7 +176,7 @@ def get_me(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(check_account_delete_rate_limit)],
 )
-def delete_account(
+async def delete_account(
     response: Response,
     payload: DeleteAccountSchema,
     current_user: dict[str, Any] = Depends(get_current_user_context),
@@ -193,8 +193,8 @@ def delete_account(
     cookie is cleared so the browser no longer holds a stale session.
     """
     user_id = UUID(current_user["user_id"])
-    auth_service.verify_user_password(user_id, payload.password)
-    auth_service.delete_user(user_id)
+    await auth_service.verify_user_password(user_id, payload.password)
+    await auth_service.delete_user(user_id)
 
     response.delete_cookie(
         key=settings.COOKIE_NAME,
@@ -252,7 +252,7 @@ def google_oauth_initiate(response: Response):
 
 
 @router.get("/oauth/google/callback", tags=["OAuth"])
-def google_oauth_callback(
+async def google_oauth_callback(
     request: Request,
     response: Response,
     code: str | None = None,
@@ -292,7 +292,7 @@ def google_oauth_callback(
 
     # ── Exchange code → user ───────────────────────────────────────────────────
     try:
-        user = oauth_service.exchange_google_code(code=code, state=state)
+        user = await oauth_service.exchange_google_code(code=code, state=state)
     except Exception:
         return RedirectResponse(
             url=f"{frontend_base}/login?oauth_error=exchange_failed",
@@ -303,7 +303,7 @@ def google_oauth_callback(
     try:
         user_agent = request.headers.get("User-Agent")
         ip_address = request.client.host if request.client else None
-        access_token, refresh_token = auth_service.create_session(
+        access_token, refresh_token = await auth_service.create_session(
             user_id=user.id, user_agent=user_agent, ip_address=ip_address
         )
     except Exception:
@@ -373,7 +373,7 @@ def github_oauth_initiate(
 
 
 @router.get("/oauth/github/callback", tags=["OAuth"])
-def github_oauth_callback(
+async def github_oauth_callback(
     request: Request,
     response: Response,
     code: str | None = None,
@@ -413,7 +413,7 @@ def github_oauth_callback(
 
     # ── Exchange code → user ───────────────────────────────────────────────────
     try:
-        user = oauth_service.exchange_github_code(code=code, state=state)
+        user = await oauth_service.exchange_github_code(code=code, state=state)
     except Exception:
         return RedirectResponse(
             url=f"{frontend_base}/login?oauth_error=exchange_failed",
@@ -424,7 +424,7 @@ def github_oauth_callback(
     try:
         user_agent = request.headers.get("User-Agent")
         ip_address = request.client.host if request.client else None
-        access_token, refresh_token = auth_service.create_session(
+        access_token, refresh_token = await auth_service.create_session(
             user_id=user.id, user_agent=user_agent, ip_address=ip_address
         )
     except Exception:

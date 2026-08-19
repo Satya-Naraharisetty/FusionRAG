@@ -2,6 +2,8 @@ import json
 import uuid
 from typing import Any
 
+from sqlalchemy import select
+
 from app.chat.domain.agents import (
     ToolCategory,
     ToolContext,
@@ -57,9 +59,25 @@ class RetrieveDocumentTool(BuiltinTool):
             )
 
         db = context.db_session
-        doc = (
-            db.query(SQLAlchemyDocument).filter(SQLAlchemyDocument.id == doc_id).first()
-        )
+        if hasattr(db, "execute"):
+            stmt = select(SQLAlchemyDocument).where(SQLAlchemyDocument.id == doc_id)
+            import inspect
+
+            if inspect.iscoroutinefunction(db.execute) or inspect.isawaitable(
+                db.execute(stmt)
+            ):
+                res = await db.execute(stmt)
+            else:
+                res = db.execute(stmt)
+            doc = res.scalar_one_or_none()
+        elif hasattr(db, "query"):
+            doc = (
+                db.query(SQLAlchemyDocument)
+                .filter(SQLAlchemyDocument.id == doc_id)
+                .first()
+            )
+        else:
+            doc = None
 
         if not doc:
             return ToolResult(

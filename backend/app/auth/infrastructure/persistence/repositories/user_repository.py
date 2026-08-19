@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.domain.interfaces import UserRepository
 from app.auth.domain.schemas import UserDomain
@@ -8,52 +9,56 @@ from app.auth.infrastructure.persistence.models import SQLAlchemyUser
 
 
 class SQLAlchemyUserRepository(UserRepository):
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    def get_by_email(self, email: str) -> UserDomain | None:
+    async def get_by_email(self, email: str) -> UserDomain | None:
         """
         Query a user by normalized email address.
         """
-        db_user = (
-            self._db.query(SQLAlchemyUser).filter(SQLAlchemyUser.email == email).first()
+        result = await self._db.execute(
+            select(SQLAlchemyUser).where(SQLAlchemyUser.email == email)
         )
+        db_user = result.scalar_one_or_none()
         if not db_user:
             return None
         return UserDomain.model_validate(db_user)
 
-    def get_by_id(self, id: UUID) -> UserDomain | None:
+    async def get_by_id(self, id: UUID) -> UserDomain | None:
         """
         Query a user by UUID.
         """
-        db_user = self._db.query(SQLAlchemyUser).filter(SQLAlchemyUser.id == id).first()
+        result = await self._db.execute(
+            select(SQLAlchemyUser).where(SQLAlchemyUser.id == id)
+        )
+        db_user = result.scalar_one_or_none()
         if not db_user:
             return None
         return UserDomain.model_validate(db_user)
 
-    def get_by_oauth_sub(self, provider: str, sub: str) -> UserDomain | None:
+    async def get_by_oauth_sub(self, provider: str, sub: str) -> UserDomain | None:
         """
         Query a user by OAuth provider + subject identifier.
         """
-        db_user = (
-            self._db.query(SQLAlchemyUser)
-            .filter(
+        result = await self._db.execute(
+            select(SQLAlchemyUser).where(
                 SQLAlchemyUser.oauth_provider == provider,
                 SQLAlchemyUser.oauth_sub == sub,
             )
-            .first()
         )
+        db_user = result.scalar_one_or_none()
         if not db_user:
             return None
         return UserDomain.model_validate(db_user)
 
-    def save(self, user: UserDomain) -> UserDomain:
+    async def save(self, user: UserDomain) -> UserDomain:
         """
         Save/persist a user model in the database transaction context.
         """
-        db_user = (
-            self._db.query(SQLAlchemyUser).filter(SQLAlchemyUser.id == user.id).first()
+        result = await self._db.execute(
+            select(SQLAlchemyUser).where(SQLAlchemyUser.id == user.id)
         )
+        db_user = result.scalar_one_or_none()
         if not db_user:
             db_user = SQLAlchemyUser(
                 id=user.id,
@@ -79,19 +84,21 @@ class SQLAlchemyUserRepository(UserRepository):
             if user.oauth_sub is not None:
                 db_user.oauth_sub = user.oauth_sub
 
-        self._db.flush()
+        await self._db.flush()
+        await self._db.refresh(db_user)
         return UserDomain.model_validate(db_user)
 
-    def delete(self, user_id: UUID) -> None:
+    async def delete(self, user_id: UUID) -> None:
         """
         Permanently delete a user by UUID.
 
         The database ON DELETE CASCADE constraints remove the user's sessions,
         conversations, and documents.
         """
-        db_user = (
-            self._db.query(SQLAlchemyUser).filter(SQLAlchemyUser.id == user_id).first()
+        result = await self._db.execute(
+            select(SQLAlchemyUser).where(SQLAlchemyUser.id == user_id)
         )
+        db_user = result.scalar_one_or_none()
         if db_user:
-            self._db.delete(db_user)
-            self._db.flush()
+            await self._db.delete(db_user)
+            await self._db.flush()

@@ -1,9 +1,11 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from fastapi import status
 
 
-def test_liveness_check(client):
+@pytest.mark.asyncio
+async def test_liveness_check(client):
     """
     Asserts GET /api/v1/health/liveness returns HTTP 200 and 'alive' status.
     """
@@ -12,15 +14,24 @@ def test_liveness_check(client):
     assert response.json() == {"status": "alive"}
 
 
-def test_readiness_check_all_healthy(client):
+@pytest.mark.asyncio
+async def test_readiness_check_all_healthy(client):
     """
     Asserts GET /api/v1/health/readiness returns healthy indicators.
     """
     mock_db = MagicMock()
+    mock_db.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_db.__aexit__ = AsyncMock()
+    mock_db.execute = AsyncMock()
+
     # Mock the session factory stored in app state to return our mock db session
     client.app.state.db_session_factory = MagicMock(return_value=mock_db)
-    client.app.state.redis.ping.return_value = True
-    client.app.state.qdrant.get_collections.return_value = MagicMock()
+
+    # Redis ping mock (async)
+    client.app.state.redis.ping = AsyncMock(return_value=True)
+
+    # Qdrant get_collections mock (async)
+    client.app.state.qdrant.get_collections = AsyncMock()
 
     response = client.get("/api/v1/health/readiness")
     assert response.status_code == status.HTTP_200_OK
@@ -33,16 +44,21 @@ def test_readiness_check_all_healthy(client):
     assert "x-request-id" in response.headers
 
 
-def test_readiness_check_postgres_down(client):
+@pytest.mark.asyncio
+async def test_readiness_check_postgres_down(client):
     """
     Asserts health readiness probe fails if PostgreSQL connection throws an exception.
     """
     mock_db = MagicMock()
+    mock_db.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_db.__aexit__ = AsyncMock()
     # Simulate Postgres failure on query execution rather than session creation
-    mock_db.execute.side_effect = Exception("PostgreSQL connection timed out")
+    mock_db.execute = AsyncMock(
+        side_effect=Exception("PostgreSQL connection timed out")
+    )
     client.app.state.db_session_factory = MagicMock(return_value=mock_db)
-    client.app.state.redis.ping.return_value = True
-    client.app.state.qdrant.get_collections.return_value = MagicMock()
+    client.app.state.redis.ping = AsyncMock(return_value=True)
+    client.app.state.qdrant.get_collections = AsyncMock()
 
     response = client.get("/api/v1/health/readiness")
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
@@ -54,14 +70,18 @@ def test_readiness_check_postgres_down(client):
     assert data["services"]["vector_db"] == "connected"
 
 
-def test_readiness_check_redis_down(client):
+@pytest.mark.asyncio
+async def test_readiness_check_redis_down(client):
     """
     Asserts health readiness probe fails if Redis ping returns False.
     """
     mock_db = MagicMock()
+    mock_db.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_db.__aexit__ = AsyncMock()
+    mock_db.execute = AsyncMock()
     client.app.state.db_session_factory = MagicMock(return_value=mock_db)
-    client.app.state.redis.ping.return_value = False
-    client.app.state.qdrant.get_collections.return_value = MagicMock()
+    client.app.state.redis.ping = AsyncMock(return_value=False)
+    client.app.state.qdrant.get_collections = AsyncMock()
 
     response = client.get("/api/v1/health/readiness")
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE

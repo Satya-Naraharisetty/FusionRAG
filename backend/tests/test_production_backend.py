@@ -372,9 +372,9 @@ async def test_llm_provider_router_failover():
     backup = AsyncMock(spec=LLMProvider)
     backup.generate.return_value = backup_response
 
-    providers = {"gemini": primary, "openai": backup}
+    providers = {"gemini": primary, "fallback": backup}
     policy = SettingsRoutingPolicy(
-        primary_provider_key="gemini", backup_provider_key="openai"
+        primary_provider_key="gemini", backup_provider_key="fallback"
     )
 
     router = LLMProviderRouter(

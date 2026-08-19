@@ -62,15 +62,10 @@ class DeepEvalProvider(EvaluationProvider):
             from deepeval.metrics import AnswerRelevancyMetric, HallucinationMetric
             from deepeval.test_case import LLMTestCase
 
-            if settings.EVALUATION_PROVIDER == "gemini":
-                os.environ["OPENAI_API_KEY"] = settings.GEMINI_API_KEY
-                os.environ["OPENAI_API_BASE"] = (
-                    "https://generativelanguage.googleapis.com/v1beta/openai/"
-                )
-            else:
-                os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
-                if "OPENAI_API_BASE" in os.environ:
-                    del os.environ["OPENAI_API_BASE"]
+            os.environ["OPENAI_API_KEY"] = settings.GEMINI_API_KEY
+            os.environ["OPENAI_API_BASE"] = (
+                "https://generativelanguage.googleapis.com/v1beta/openai/"
+            )
 
             results = []
             for sample in samples:
@@ -91,19 +86,19 @@ class DeepEvalProvider(EvaluationProvider):
                 if "hallucination" in metrics:
                     # In DeepEval, HallucinationMetric calculates score as percentage of hallucinated info
                     # Hallucination score ranges from 0 to 1. 0 means NO hallucination, 1 means FULL hallucination.
-                    metric = HallucinationMetric(threshold=0.5)
-                    metric.measure(test_case)
+                    hal_metric = HallucinationMetric(threshold=0.5)
+                    hal_metric.measure(test_case)
                     # DeepEval score ranges (closer to 1 is better for pass, but hallucination metric is often 0 for no hallucination)
                     # In DeepEval, HallucinationMetric.score represents the hallucination score itself.
                     # metric.is_successful() checks if score is <= threshold.
-                    score = float(metric.score)
-                    passed = bool(metric.is_successful())
+                    score = float(hal_metric.score or 0.0)
+                    passed = bool(hal_metric.is_successful())
                     metric_results.append(
                         MetricResult(
                             name="hallucination",
                             score=score,
                             passed=passed,
-                            reason=metric.reason,
+                            reason=hal_metric.reason,
                         )
                     )
 
@@ -158,14 +153,14 @@ class DeepEvalProvider(EvaluationProvider):
                 if "answer_relevancy" in metrics and "answer_relevancy" not in [
                     m.name for m in metric_results
                 ]:
-                    metric = AnswerRelevancyMetric(threshold=0.5)
-                    metric.measure(test_case)
+                    rel_metric = AnswerRelevancyMetric(threshold=0.5)
+                    rel_metric.measure(test_case)
                     metric_results.append(
                         MetricResult(
                             name="answer_relevancy",
-                            score=float(metric.score),
-                            passed=bool(metric.is_successful()),
-                            reason=metric.reason,
+                            score=float(rel_metric.score or 0.0),
+                            passed=bool(rel_metric.is_successful()),
+                            reason=rel_metric.reason,
                         )
                     )
 

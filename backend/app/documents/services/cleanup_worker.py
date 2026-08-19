@@ -2,7 +2,8 @@ import asyncio
 import logging
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.reliability.retry import retry_with_backoff
 from app.documents.domain.interfaces import IndexCache, StorageProvider, VectorStore
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 class DurableCleanupWorker:
     def __init__(
         self,
-        db: Session,
+        db: AsyncSession,
         storage_provider: StorageProvider,
         vector_store: VectorStore,
         index_cache: IndexCache | None = None,
@@ -31,11 +32,10 @@ class DurableCleanupWorker:
         Marks job status as COMPLETED upon success, or FAILED on final failure.
         """
         # Fetch the job from the database
-        db_job = (
-            self._db.query(SQLAlchemyCleanupJob)
-            .filter(SQLAlchemyCleanupJob.id == job_id)
-            .first()
+        result = await self._db.execute(
+            select(SQLAlchemyCleanupJob).where(SQLAlchemyCleanupJob.id == job_id)
         )
+        db_job = result.scalar_one_or_none()
         if not db_job:
             logger.error(f"Cleanup job {job_id} not found in database.")
             return
@@ -46,8 +46,8 @@ class DurableCleanupWorker:
 
         db_job.status = "PROCESSING"
         db_job.attempts += 1
-        self._db.flush()
-        self._db.commit()
+        await self._db.flush()
+        await self._db.commit()
 
         payload = db_job.payload
         document_id = payload.get("document_id")
@@ -61,7 +61,7 @@ class DurableCleanupWorker:
 
                 async def delete_vectors():
                     point_uuids = [UUID(pid) for pid in qdrant_point_ids]
-                    self._vector_store.delete(point_uuids)
+                    await self._vector_store.delete(point_uuids)
 
                 try:
                     await retry_with_backoff(delete_vectors, max_attempts=3)
@@ -74,7 +74,7 @@ class DurableCleanupWorker:
             if document_id:
 
                 async def delete_doc_vectors():
-                    self._vector_store.delete_document(UUID(document_id))
+                    await self._vector_store.delete_document(UUID(document_id))
 
                 try:
                     await retry_with_backoff(delete_doc_vectors, max_attempts=3)
@@ -87,7 +87,7 @@ class DurableCleanupWorker:
             if storage_key:
 
                 async def delete_storage():
-                    self._storage_provider.delete(storage_key)
+                    await self._storage_provider.delete(storage_key)
 
                 try:
                     await retry_with_backoff(delete_storage, max_attempts=3)
@@ -104,11 +104,10 @@ class DurableCleanupWorker:
                     )
 
             # Refetch job to mark completed
-            db_job = (
-                self._db.query(SQLAlchemyCleanupJob)
-                .filter(SQLAlchemyCleanupJob.id == job_id)
-                .first()
+            result = await self._db.execute(
+                select(SQLAlchemyCleanupJob).where(SQLAlchemyCleanupJob.id == job_id)
             )
+            db_job = result.scalar_one_or_none()
             if db_job:
                 db_job.status = "COMPLETED"
                 db_job.last_error = None
@@ -116,43 +115,41 @@ class DurableCleanupWorker:
 
         except Exception as err:
             logger.exception(f"Fatal error processing cleanup job {job_id}: {err}")
-            db_job = (
-                self._db.query(SQLAlchemyCleanupJob)
-                .filter(SQLAlchemyCleanupJob.id == job_id)
-                .first()
+            result = await self._db.execute(
+                select(SQLAlchemyCleanupJob).where(SQLAlchemyCleanupJob.id == job_id)
             )
+            db_job = result.scalar_one_or_none()
             if db_job:
                 db_job.status = "FAILED"
                 db_job.last_error = str(err)
 
         finally:
             try:
-                self._db.flush()
-                self._db.commit()
+                await self._db.flush()
+                await self._db.commit()
             except Exception as e:
                 logger.error(f"Failed to commit cleanup job status update: {e}")
-                self._db.rollback()
+                await self._db.rollback()
 
-    def process_pending_jobs(self) -> None:
+    async def process_pending_jobs(self) -> None:
         """
-        Synchronously scans and retries all PENDING or FAILED cleanup jobs.
-        Useful for startup polling or fallback cron execution.
+        Scans and retries all PENDING or FAILED cleanup jobs asynchronously.
         """
-        db_jobs = (
-            self._db.query(SQLAlchemyCleanupJob)
-            .filter(SQLAlchemyCleanupJob.status.in_(["PENDING", "FAILED"]))
-            .all()
+        result = await self._db.execute(
+            select(SQLAlchemyCleanupJob).where(
+                SQLAlchemyCleanupJob.status.in_(["PENDING", "FAILED"])
+            )
         )
+        db_jobs = result.scalars().all()
         if not db_jobs:
             return
 
         logger.info(f"Found {len(db_jobs)} pending/failed cleanup jobs. Executing...")
         for job in db_jobs:
             try:
-                # Run synchronously
-                asyncio.run(self.process_job(job.id))
+                await self.process_job(job.id)
             except Exception as e:
-                logger.error(f"Failed to run job {job.id} synchronously: {e}")
+                logger.error(f"Failed to run job {job.id}: {e}")
 
 
 def run_durable_cleanup_recovery() -> None:
@@ -165,8 +162,7 @@ def run_durable_cleanup_recovery() -> None:
 async def async_durable_cleanup_recovery() -> None:
     logger.info("Starting durable cleanup recovery scan...")
     try:
-        # Query database for pending/failed jobs in a separate thread to maintain thread-safety
-        job_ids = await asyncio.to_thread(_query_pending_failed_jobs)
+        job_ids = await _query_pending_failed_jobs()
         if not job_ids:
             logger.info(
                 "No pending or failed cleanup jobs found during startup recovery."
@@ -177,17 +173,16 @@ async def async_durable_cleanup_recovery() -> None:
             f"Durable cleanup recovery found {len(job_ids)} jobs to process. Dispatched in background."
         )
 
-        # Trigger async execution of these jobs using a helper that manages its own DB session
         await _run_cleanup_jobs_async(job_ids)
 
     except Exception as e:
         logger.error(f"Error during durable cleanup startup recovery: {e}")
 
 
-def _query_pending_failed_jobs() -> list[UUID]:
+async def _query_pending_failed_jobs() -> list[UUID]:
     import sys
 
-    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker
 
     from app.core.config import settings
     from app.db.session import init_postgres_engine
@@ -205,26 +200,25 @@ def _query_pending_failed_jobs() -> list[UUID]:
         return []
 
     engine = init_postgres_engine(db_url)
-    session_factory = sessionmaker(bind=engine)
-    db = session_factory()
-    try:
-        limit = getattr(settings, "CLEANUP_RECOVERY_BATCH_SIZE", 20)
-        jobs = (
-            db.query(SQLAlchemyCleanupJob)
-            .filter(SQLAlchemyCleanupJob.status.in_(["PENDING", "FAILED"]))
-            .limit(limit)
-            .all()
-        )
-        return [job.id for job in jobs]
-    finally:
-        db.close()
-        engine.dispose()
+    session_factory = async_sessionmaker(bind=engine)
+    async with session_factory() as db:
+        try:
+            limit = getattr(settings, "CLEANUP_RECOVERY_BATCH_SIZE", 20)
+            result = await db.execute(
+                select(SQLAlchemyCleanupJob)
+                .where(SQLAlchemyCleanupJob.status.in_(["PENDING", "FAILED"]))
+                .limit(limit)
+            )
+            jobs = result.scalars().all()
+            return [job.id for job in jobs]
+        finally:
+            await engine.dispose()
 
 
 async def _run_cleanup_jobs_async(job_ids: list[UUID]) -> None:
     import sys
 
-    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker
 
     from app.api.dependencies import (
         get_index_cache,
@@ -246,20 +240,21 @@ async def _run_cleanup_jobs_async(job_ids: list[UUID]) -> None:
         return
 
     engine = init_postgres_engine(db_url)
-    session_factory = sessionmaker(bind=engine)
-    db = session_factory()
-    try:
-        storage_provider = get_storage_provider(db)
-        vector_store = get_vector_store()
-        index_cache = get_index_cache()
-        worker = DurableCleanupWorker(db, storage_provider, vector_store, index_cache)
-        for jid in job_ids:
-            try:
-                await worker.process_job(jid)
-            except Exception as e:
-                logger.error(
-                    f"Error processing cleanup job {jid} in startup recovery: {e}"
-                )
-    finally:
-        db.close()
-        engine.dispose()
+    session_factory = async_sessionmaker(bind=engine)
+    async with session_factory() as db:
+        try:
+            storage_provider = get_storage_provider(db)
+            vector_store = get_vector_store()
+            index_cache = get_index_cache()
+            worker = DurableCleanupWorker(
+                db, storage_provider, vector_store, index_cache
+            )
+            for jid in job_ids:
+                try:
+                    await worker.process_job(jid)
+                except Exception as e:
+                    logger.error(
+                        f"Error processing cleanup job {jid} in startup recovery: {e}"
+                    )
+        finally:
+            await engine.dispose()

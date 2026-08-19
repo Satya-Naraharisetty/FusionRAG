@@ -4,7 +4,7 @@ from typing import Any
 import jwt
 from fastapi import BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.domain.interfaces import TokenProvider
 from app.auth.infrastructure.crypto.password_hasher import Argon2PasswordHasher
@@ -65,7 +65,7 @@ def get_token_provider() -> TokenProvider:
     return JWTTokenProvider()
 
 
-def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
+def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
     """
     Composition Root for Dependency Injection.
     Wires domain interfaces to concrete infrastructure implementations.
@@ -89,7 +89,7 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
     )
 
 
-def get_oauth_service(db: Session = Depends(get_db)) -> OAuthService:
+def get_oauth_service(db: AsyncSession = Depends(get_db)) -> OAuthService:
     """
     Composition root for OAuthService.
     """
@@ -258,24 +258,15 @@ def get_checksum_generator() -> SHA256ChecksumGenerator:
     return SHA256ChecksumGenerator()
 
 
-def get_storage_provider(db: Session | None = None) -> Any:
+def get_storage_provider(db: AsyncSession | None = None) -> Any:
     from app.core.config import settings
     from app.documents.infrastructure.storage import (
         DatabaseStorageProvider,
         LocalStorageProvider,
-        S3StorageProvider,
     )
 
     provider_type = settings.STORAGE_PROVIDER.lower()
-    if provider_type == "s3":
-        return S3StorageProvider(
-            bucket_name=settings.S3_BUCKET,
-            aws_access_key_id=settings.S3_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.S3_SECRET_ACCESS_KEY,
-            region_name=settings.S3_REGION_NAME,
-            endpoint_url=settings.S3_ENDPOINT_URL,
-        )
-    elif provider_type == "local":
+    if provider_type == "local":
         return LocalStorageProvider(upload_dir=settings.UPLOAD_DIR)
     else:
         if db is None:
@@ -316,28 +307,16 @@ def get_embedding_generator() -> EmbeddingGenerator:
 
     # Singleton: construct once per process (both API and background workers).
     if _embedding_generator_instance is None:
-        if settings.EMBEDDING_PROVIDER.lower() == "gemini":
-            from app.documents.infrastructure.embedding_generator import (
-                GeminiEmbeddingGenerator,
-            )
+        from app.documents.infrastructure.embedding_generator import (
+            GeminiEmbeddingGenerator,
+        )
 
-            logger.info("Using GeminiEmbeddingGenerator")
-            _embedding_generator_instance = GeminiEmbeddingGenerator(
-                api_key=settings.GEMINI_API_KEY,
-                model=settings.EMBEDDING_MODEL,
-                dimension=settings.EMBEDDING_DIMENSION,
-            )
-        else:
-            from app.documents.infrastructure.embedding_generator import (
-                OpenAIEmbeddingGenerator,
-            )
-
-            logger.info("Using OpenAIEmbeddingGenerator")
-            _embedding_generator_instance = OpenAIEmbeddingGenerator(
-                api_key=settings.OPENAI_API_KEY,
-                model=settings.EMBEDDING_MODEL,
-                dimension=settings.EMBEDDING_DIMENSION,
-            )
+        logger.info("Using GeminiEmbeddingGenerator")
+        _embedding_generator_instance = GeminiEmbeddingGenerator(
+            api_key=settings.GEMINI_API_KEY,
+            model=settings.EMBEDDING_MODEL,
+            dimension=settings.EMBEDDING_DIMENSION,
+        )
 
     return _embedding_generator_instance
 
@@ -369,7 +348,7 @@ def get_vector_store(request: Request = None) -> VectorStore:  # type: ignore[as
     )
 
 
-def get_embedding_repository(db: Session = Depends(get_db)) -> EmbeddingRepository:
+def get_embedding_repository(db: AsyncSession = Depends(get_db)) -> EmbeddingRepository:
     from app.documents.infrastructure.persistence.repositories.embedding_repository import (
         SQLAlchemyEmbeddingRepository,
     )
@@ -378,7 +357,7 @@ def get_embedding_repository(db: Session = Depends(get_db)) -> EmbeddingReposito
 
 
 def get_embedding_service(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     generator: EmbeddingGenerator = Depends(get_embedding_generator),
     vector_store: VectorStore = Depends(get_vector_store),
 ) -> EmbeddingService:
@@ -402,7 +381,7 @@ def get_embedding_service(
 
 
 def get_document_processing_service(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     embedding_service: EmbeddingService = Depends(get_embedding_service),
     request: Request = None,  # type: ignore[assignment]  # FastAPI injects Request
 ) -> DocumentProcessingService:
@@ -470,7 +449,7 @@ def get_index_cache():
 def get_document_service(
     background_tasks: BackgroundTasks,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     processing_service: DocumentProcessingService = Depends(
         get_document_processing_service
     ),
@@ -508,7 +487,7 @@ def get_document_service(
     )
 
 
-def get_chunk_repository(db: Session = Depends(get_db)) -> ChunkRepository:
+def get_chunk_repository(db: AsyncSession = Depends(get_db)) -> ChunkRepository:
     from app.documents.infrastructure.persistence.repositories.chunk_repository import (
         SQLAlchemyChunkRepository,
     )
@@ -589,20 +568,9 @@ def get_token_estimator():
 
 
 def get_llm_provider():
-    from app.chat.infrastructure.failover_proxy import ProviderFailoverProxy
     from app.chat.infrastructure.gemini_provider import GeminiProvider
-    from app.chat.infrastructure.openai_provider import OpenAIProvider
 
-    primary = GeminiProvider(api_key=settings.GEMINI_API_KEY)
-    backup = OpenAIProvider(api_key=settings.OPENAI_API_KEY)
-
-    # ProviderFailoverProxy coordinates fallback policies
-    return ProviderFailoverProxy(
-        primary=primary,
-        backup=backup,
-        failure_threshold=settings.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
-        recovery_timeout=settings.CIRCUIT_BREAKER_RECOVERY_TIMEOUT,
-    )
+    return GeminiProvider(api_key=settings.GEMINI_API_KEY)
 
 
 # Global PromptBuilder instance cached system prompt at startup
@@ -631,7 +599,7 @@ def get_context_builder(
     )
 
 
-def get_conversation_repository(db: Session = Depends(get_db)) -> Any:
+def get_conversation_repository(db: AsyncSession = Depends(get_db)) -> Any:
     from app.chat.infrastructure.persistence.repositories import (
         SQLAlchemyConversationRepository,
     )
@@ -639,7 +607,7 @@ def get_conversation_repository(db: Session = Depends(get_db)) -> Any:
     return SQLAlchemyConversationRepository(db)
 
 
-def get_message_repository(db: Session = Depends(get_db)) -> Any:
+def get_message_repository(db: AsyncSession = Depends(get_db)) -> Any:
     from app.chat.infrastructure.persistence.repositories import (
         SQLAlchemyMessageRepository,
     )
@@ -647,7 +615,7 @@ def get_message_repository(db: Session = Depends(get_db)) -> Any:
     return SQLAlchemyMessageRepository(db)
 
 
-def get_summary_repository(db: Session = Depends(get_db)) -> Any:
+def get_summary_repository(db: AsyncSession = Depends(get_db)) -> Any:
     from app.chat.infrastructure.persistence.repositories import (
         SQLAlchemySummaryRepository,
     )
@@ -696,11 +664,7 @@ def get_history_rewriter(
 ) -> Any:
     from app.chat.services.history_rewriter import LLMHistoryRewriter
 
-    model = (
-        settings.GEMINI_CHAT_MODEL
-        if settings.LLM_PROVIDER == "gemini"
-        else settings.OPENAI_CHAT_MODEL
-    )
+    model = settings.GEMINI_CHAT_MODEL
     return LLMHistoryRewriter(
         llm_provider, model=model, cache=cache, cache_ttl_seconds=3600
     )
@@ -711,11 +675,7 @@ def get_conversation_title_generator(
 ) -> Any:
     from app.chat.services.title_generator import LLMConversationTitleGenerator
 
-    model = (
-        settings.GEMINI_CHAT_MODEL
-        if settings.LLM_PROVIDER == "gemini"
-        else settings.OPENAI_CHAT_MODEL
-    )
+    model = settings.GEMINI_CHAT_MODEL
     return LLMConversationTitleGenerator(llm_provider, model=model)
 
 
@@ -740,45 +700,41 @@ async def run_background_summarization(
     import logging
 
     logger = logging.getLogger(__name__)
-    db = db_session_factory()
-    try:
-        from app.chat.infrastructure.persistence.repositories import (
-            SQLAlchemyMessageRepository,
-            SQLAlchemySummaryRepository,
-        )
-        from app.chat.services.conversation_summarizer import LLMConversationSummarizer
-
-        message_repo = SQLAlchemyMessageRepository(db)
-        summary_repo = SQLAlchemySummaryRepository(db)
-
-        count = await message_repo.count_messages(conversation_id)
-        if count >= settings.SUMMARY_TRIGGER_MESSAGES:
-            model = (
-                settings.GEMINI_CHAT_MODEL
-                if settings.LLM_PROVIDER == "gemini"
-                else settings.OPENAI_CHAT_MODEL
+    async with db_session_factory() as db:
+        try:
+            from app.chat.infrastructure.persistence.repositories import (
+                SQLAlchemyMessageRepository,
+                SQLAlchemySummaryRepository,
             )
-            summarizer = LLMConversationSummarizer(
-                llm_provider=llm_provider_instance,
-                summary_repo=summary_repo,
-                message_repo=message_repo,
-                model=model,
-                summary_max_tokens=settings.SUMMARY_MAX_TOKENS,
+            from app.chat.services.conversation_summarizer import (
+                LLMConversationSummarizer,
             )
 
-            # Fetch all messages in chronological order
-            messages = await message_repo.get_recent_messages(
-                conversation_id, limit=1000
-            )
-            up_to_idx = count - settings.MAX_MESSAGES_PER_CONTEXT - 1
-            if up_to_idx >= 0:
-                up_to_msg = messages[up_to_idx]
-                await summarizer.summarize(conversation_id, up_to_msg.id)
-                db.commit()
-    except Exception as e:
-        logger.exception(f"Error during background summarization task: {e}")
-    finally:
-        db.close()
+            message_repo = SQLAlchemyMessageRepository(db)
+            summary_repo = SQLAlchemySummaryRepository(db)
+
+            count = await message_repo.count_messages(conversation_id)
+            if count >= settings.SUMMARY_TRIGGER_MESSAGES:
+                model = settings.GEMINI_CHAT_MODEL
+                summarizer = LLMConversationSummarizer(
+                    llm_provider=llm_provider_instance,
+                    summary_repo=summary_repo,
+                    message_repo=message_repo,
+                    model=model,
+                    summary_max_tokens=settings.SUMMARY_MAX_TOKENS,
+                )
+
+                # Fetch all messages in chronological order
+                messages = await message_repo.get_recent_messages(
+                    conversation_id, limit=1000
+                )
+                up_to_idx = count - settings.MAX_MESSAGES_PER_CONTEXT - 1
+                if up_to_idx >= 0:
+                    up_to_msg = messages[up_to_idx]
+                    await summarizer.summarize(conversation_id, up_to_msg.id)
+                    await db.commit()
+        except Exception as e:
+            logger.exception(f"Error during background summarization task: {e}")
 
 
 def get_event_dispatcher(
@@ -796,7 +752,11 @@ def get_event_dispatcher(
         def handle_message_added(event: ConversationMessageCreated) -> None:
             # Resolve task queue
             task_queue: Any
-            if request and hasattr(request, "background_tasks"):
+            if (
+                settings.ENV != "testing"
+                and request
+                and hasattr(request, "background_tasks")
+            ):
                 task_queue = FastAPIBackgroundTasksQueue(request.background_tasks)
             else:
                 from app.documents.infrastructure.tasks import SyncTaskQueue
@@ -809,13 +769,17 @@ def get_event_dispatcher(
                 else None
             )
             if not session_factory:
-                from sqlalchemy.orm import sessionmaker
+                from sqlalchemy.ext.asyncio import async_sessionmaker
 
                 from app.db.session import init_postgres_engine
 
                 database_url = settings.DATABASE_URL or ""
                 engine = init_postgres_engine(database_url)
-                session_factory = sessionmaker(bind=engine)
+                session_factory = async_sessionmaker(
+                    bind=engine,
+                    class_=AsyncSession,
+                    expire_on_commit=False,
+                )
 
             task_queue.enqueue(
                 run_background_summarization,
@@ -832,7 +796,7 @@ def get_event_dispatcher(
 
 def get_conversation_manager(
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     conversation_repo=Depends(get_conversation_repository),
     message_repo=Depends(get_message_repository),
     summary_repo=Depends(get_summary_repository),
@@ -870,11 +834,7 @@ def get_answer_generation_service(
 ) -> Any:
     from app.chat.services.answer_generation_service import AnswerGenerationService
 
-    model = (
-        settings.GEMINI_CHAT_MODEL
-        if settings.LLM_PROVIDER == "gemini"
-        else settings.OPENAI_CHAT_MODEL
-    )
+    model = settings.GEMINI_CHAT_MODEL
     return AnswerGenerationService(
         retrieval_service=retrieval_service,
         prompt_builder=prompt_builder,
@@ -966,11 +926,7 @@ def get_chat_orchestrator(
     from app.chat.services.llm_generation_service import LLMGenerationService
 
     llm_gen = LLMGenerationService(llm_provider)
-    model = (
-        settings.GEMINI_CHAT_MODEL
-        if settings.LLM_PROVIDER == "gemini"
-        else settings.OPENAI_CHAT_MODEL
-    )
+    model = settings.GEMINI_CHAT_MODEL
     return ChatOrchestrator(
         retrieval_service=retrieval_service,
         prompt_builder=prompt_builder,
@@ -1133,7 +1089,7 @@ def get_idempotency_manager(request: Request = None) -> Any:  # type: ignore[ass
 
 
 def get_resource_quota_service(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     request: Request = None,  # type: ignore[assignment]  # FastAPI injects Request
 ) -> Any:
     from app.core.security.quotas import ResourceQuotaService

@@ -2,6 +2,9 @@ import json
 import uuid
 from typing import Any
 
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
 from app.chat.domain.agents import (
     ToolCategory,
     ToolContext,
@@ -18,14 +21,14 @@ class RetrieveChunkTool(BuiltinTool):
     def definition(self) -> ToolDefinition:
         return ToolDefinition(
             name="retrieve_chunk",
-            description="Retrieve the raw text content and metadata of a specific chunk by its UUID.",
+            description="Fetch the text and metadata of a specific chunk by its UUID.",
             parameters={
                 "type": "object",
                 "properties": {
                     "chunk_id": {
                         "type": "string",
                         "format": "uuid",
-                        "description": "The unique UUID of the text chunk.",
+                        "description": "The unique UUID of the chunk.",
                     }
                 },
                 "required": ["chunk_id"],
@@ -57,7 +60,27 @@ class RetrieveChunkTool(BuiltinTool):
             )
 
         db = context.db_session
-        chunk = db.query(SQLAlchemyChunk).filter(SQLAlchemyChunk.id == chunk_id).first()
+        if hasattr(db, "execute"):
+            stmt = (
+                select(SQLAlchemyChunk)
+                .options(selectinload(SQLAlchemyChunk.document))
+                .where(SQLAlchemyChunk.id == chunk_id)
+            )
+            import inspect
+
+            if inspect.iscoroutinefunction(db.execute) or inspect.isawaitable(
+                db.execute(stmt)
+            ):
+                res = await db.execute(stmt)
+            else:
+                res = db.execute(stmt)
+            chunk = res.scalar_one_or_none()
+        elif hasattr(db, "query"):
+            chunk = (
+                db.query(SQLAlchemyChunk).filter(SQLAlchemyChunk.id == chunk_id).first()
+            )
+        else:
+            chunk = None
 
         if not chunk:
             return ToolResult(

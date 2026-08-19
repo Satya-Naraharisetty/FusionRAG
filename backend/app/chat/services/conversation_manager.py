@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import BackgroundTasks
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat.domain.events import ConversationCreated, ConversationMessageCreated
 from app.chat.domain.exceptions import ConversationNotFoundException
@@ -44,7 +44,7 @@ class ConversationManager:
         title_generator: ConversationTitleGenerator,
         event_dispatcher: EventDispatcher,
         document_service: DocumentService | None = None,
-        db: Session | None = None,
+        db: AsyncSession | None = None,
         background_tasks: BackgroundTasks | None = None,
     ) -> None:
         self._conversation_repo = conversation_repo
@@ -151,6 +151,10 @@ class ConversationManager:
         )
         await self._conversation_repo.update_conversation(conversation)
 
+        # COMMIT the transaction to make the user message durable.
+        if self._db:
+            await self._db.commit()
+
         # Build Context containing loaded memory
         context = ConversationContext(
             conversation=conversation,
@@ -219,6 +223,10 @@ class ConversationManager:
             )
             await self._conversation_repo.update_conversation(conversation)
 
+        # COMMIT the transaction to finalize the assistant message and updates.
+        if self._db:
+            await self._db.commit()
+
         # 4. Dispatch domain event to handle background tasks (like summarization)
         self._event_dispatcher.dispatch(
             ConversationMessageCreated(
@@ -228,6 +236,69 @@ class ConversationManager:
             )
         )
 
+    async def list_conversations(
+        self, user_id: UUID, limit: int, offset: int
+    ) -> list[Conversation]:
+        """
+        List all active conversations for the authenticated user, ordered by last activity.
+        """
+        return await self._conversation_repo.list_conversations(
+            user_id=user_id, limit=limit, offset=offset
+        )
+
+    async def get_conversation(
+        self, conversation_id: UUID, user_id: UUID
+    ) -> Conversation:
+        """
+        Retrieve a specific conversation session, verifying ownership.
+        """
+        await self._access_service.verify_owner(conversation_id, user_id)
+        conversation = await self._conversation_repo.get_conversation(conversation_id)
+        if not conversation:
+            raise ConversationNotFoundException(
+                f"Conversation {conversation_id} not found."
+            )
+        return conversation
+
+    async def patch_conversation(
+        self,
+        conversation_id: UUID,
+        user_id: UUID,
+        title: str | None = None,
+        settings: ConversationSettings | None = None,
+    ) -> Conversation:
+        """
+        Update title or toggle settings for a specific conversation session, verifying ownership.
+        """
+        await self._access_service.verify_owner(conversation_id, user_id)
+        conversation = await self._conversation_repo.get_conversation(conversation_id)
+        if not conversation:
+            raise ConversationNotFoundException(
+                f"Conversation {conversation_id} not found."
+            )
+
+        # Apply updates
+        if title is not None:
+            conversation.title = title.strip()
+        if settings is not None:
+            conversation.settings = settings
+
+        updated = await self._conversation_repo.update_conversation(conversation)
+        if self._db:
+            await self._db.commit()
+        return updated
+
+    async def list_messages(
+        self, conversation_id: UUID, user_id: UUID, limit: int, offset: int
+    ) -> list[ConversationMessage]:
+        """
+        Retrieve message history for a conversation, verifying ownership.
+        """
+        await self._access_service.verify_owner(conversation_id, user_id)
+        return await self._message_repo.get_recent_messages(
+            conversation_id=conversation_id, limit=limit, offset=offset
+        )
+
     async def delete_conversation(self, conversation_id: UUID, user_id: UUID) -> int:
         """
         Deletes a conversation and all associated documents durably.
@@ -235,6 +306,9 @@ class ConversationManager:
         """
         # Verify ownership first
         await self._access_service.verify_owner(conversation_id, user_id)
+
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
 
         from app.core.config import settings
         from app.documents.infrastructure.persistence.models import (
@@ -247,15 +321,17 @@ class ConversationManager:
 
         if self._db:
             # Query conversation-scoped documents and their chunks before deleting them
-            db_docs = (
-                self._db.query(SQLAlchemyDocument)
-                .filter(
+            stmt = (
+                select(SQLAlchemyDocument)
+                .options(selectinload(SQLAlchemyDocument.chunks))
+                .where(
                     SQLAlchemyDocument.conversation_id == conversation_id,
                     SQLAlchemyDocument.user_id == user_id,
                     SQLAlchemyDocument.scope == "CONVERSATION",
                 )
-                .all()
             )
+            result = await self._db.execute(stmt)
+            db_docs = result.scalars().all()
             deleted_docs_count = len(db_docs)
 
             for doc in db_docs:
@@ -270,14 +346,12 @@ class ConversationManager:
 
                 # Uniqueness / Idempotency check:
                 # If a job already exists for this document, reset it to PENDING.
-                existing_job = (
-                    self._db.query(SQLAlchemyCleanupJob)
-                    .filter(
-                        SQLAlchemyCleanupJob.resource_type == "document",
-                        SQLAlchemyCleanupJob.resource_id == doc.id,
-                    )
-                    .first()
+                stmt_job = select(SQLAlchemyCleanupJob).where(
+                    SQLAlchemyCleanupJob.resource_type == "document",
+                    SQLAlchemyCleanupJob.resource_id == doc.id,
                 )
+                res_job = await self._db.execute(stmt_job)
+                existing_job = res_job.scalars().first()
 
                 if not existing_job:
                     job = SQLAlchemyCleanupJob(
@@ -297,14 +371,14 @@ class ConversationManager:
                     job_ids.append(existing_job.id)
 
                 # Delete the document record from Postgres (cascades delete to chunks and embeddings)
-                self._db.delete(doc)
+                await self._db.delete(doc)
 
             # Delete the conversation (soft delete)
             await self._conversation_repo.delete_conversation(conversation_id)
 
-            self._db.flush()
+            await self._db.flush()
             # Commit the PostgreSQL transaction atomically
-            self._db.commit()
+            await self._db.commit()
 
             # Trigger asynchronous external cleanup jobs after commit
             if job_ids and self._background_tasks:
@@ -318,7 +392,11 @@ class ConversationManager:
         """
         import sys
 
-        from sqlalchemy.orm import sessionmaker
+        from sqlalchemy.ext.asyncio import (
+            AsyncSession,
+            async_sessionmaker,
+            create_async_engine,
+        )
 
         from app.api.dependencies import (
             get_index_cache,
@@ -326,7 +404,6 @@ class ConversationManager:
             get_vector_store,
         )
         from app.core.config import settings
-        from app.db.session import init_postgres_engine
         from app.documents.services.cleanup_worker import DurableCleanupWorker
 
         db_url = settings.DATABASE_URL
@@ -341,10 +418,18 @@ class ConversationManager:
         if not db_url:
             raise ValueError("DATABASE_URL setting is not configured.")
 
-        engine = init_postgres_engine(db_url)
-        session_factory = sessionmaker(bind=engine)
-        db = session_factory()
-        try:
+        # Replace postgresql:// with postgresql+asyncpg://
+        async_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        engine = create_async_engine(async_url)
+        session_factory = async_sessionmaker(
+            bind=engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
+
+        async with session_factory() as db:
             storage_provider = get_storage_provider(db)
             vector_store = get_vector_store()
             index_cache = get_index_cache()
@@ -359,5 +444,4 @@ class ConversationManager:
                     logger.error(
                         f"Error processing cleanup job {jid} in background: {e}"
                     )
-        finally:
-            db.close()
+        await engine.dispose()

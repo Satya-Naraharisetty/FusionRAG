@@ -114,8 +114,8 @@ def test_production_fails_when_secrets_missing():
             GEMINI_API_KEY="",
         )
 
-    # 2. Missing OpenAI key when openai is active LLM provider
-    with pytest.raises(ConfigurationError, match="OPENAI_API_KEY is required"):
+    # 2. Missing JWT secret
+    with pytest.raises(ConfigurationError, match="JWT_SECRET is required"):
         Settings(
             ENV="production",
             POSTGRES_SERVER="localhost",
@@ -124,10 +124,8 @@ def test_production_fails_when_secrets_missing():
             POSTGRES_DB="test_database",
             REDIS_HOST="localhost",
             QDRANT_HOST="localhost",
-            JWT_SECRET="a_very_long_secure_secret_signing_key_32_bytes_long",
-            LLM_PROVIDER="openai",
+            JWT_SECRET="",
             GEMINI_API_KEY="valid_key",
-            OPENAI_API_KEY="",
         )
 
 

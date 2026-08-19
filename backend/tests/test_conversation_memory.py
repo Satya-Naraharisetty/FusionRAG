@@ -4,12 +4,10 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import status
 from sqlalchemy import create_engine, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 
-from app.api.dependencies import (
-    get_chat_orchestrator,
-    get_conversation_manager,
-)
 from app.auth.infrastructure.persistence.models import SQLAlchemyUser
 from app.chat.domain.exceptions import (
     ConversationConcurrentUpdateException,
@@ -44,67 +42,153 @@ from app.chat.services.history_rewriter import LLMHistoryRewriter
 from app.chat.services.prompt_builder import PromptBuilder
 from app.chat.services.rolling_memory import RollingConversationMemory
 from app.chat.services.token_estimator import CharacterTokenEstimator
-from app.db.models import Base
 from app.documents.domain.models import RetrievedChunk, SearchResult
 from tests.db import TEST_DATABASE_URL
+
+
+def _sync_setup_db(sync_engine):
+    """
+    Truncate conversation-related tables to give each test a clean slate.
+
+    Does NOT call Base.metadata.create_all() — the test DB schema is already
+    managed by Alembic migrations and the tables exist. Calling create_all()
+    inside a test process that also holds a TestClient (which owns live DB
+    connections via asyncpg) causes DDL lock contention that deadlocks
+    indefinitely on PostgreSQL.
+    """
+    sync_session_local = sessionmaker(
+        autocommit=False, autoflush=False, bind=sync_engine
+    )
+    db = sync_session_local()
+    try:
+        db.execute(text("DELETE FROM conversation_summaries;"))
+        db.execute(text("DELETE FROM conversation_messages;"))
+        db.execute(text("DELETE FROM conversations;"))
+        db.execute(text("DELETE FROM refresh_sessions;"))
+        db.execute(text("DELETE FROM users;"))
+        db.commit()
+    finally:
+        db.close()
+    sync_engine.dispose()
 
 
 @pytest.fixture(scope="function")
 def chat_test_db(client):
     """
     Sets up a clean database for conversation memory tests.
+    Returns an async_sessionmaker that yields AsyncSession objects.
+
+    This is intentionally a SYNC fixture even though it wraps async SQLAlchemy.
+    Rationale:
+      - create_async_engine / async_sessionmaker are pure Python constructors;
+        they perform no network I/O and are safe to call from sync code.
+      - The asyncpg connection pool is opened lazily on the first
+        `async with session()` call, which happens inside each test's own
+        pytest-asyncio event loop — no cross-loop conflict.
+      - All blocking DDL / TRUNCATE runs via psycopg2 (sync), which is safe
+        in a sync fixture running in pytest's main thread.
+      - Avoiding asyncio.to_thread eliminates the anyio/pytest-asyncio executor
+        deadlock that occurs when a module-scoped TestClient owns an anyio loop
+        and a function-scoped async fixture tries to submit thread work to it.
     """
-    engine = create_engine(TEST_DATABASE_URL)
+    sync_engine = create_engine(TEST_DATABASE_URL, poolclass=NullPool)
+    async_url = TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    async_engine = create_async_engine(async_url, poolclass=NullPool)
     try:
-        Base.metadata.create_all(bind=engine)
+        _sync_setup_db(sync_engine)  # blocking DDL + truncation — safe in sync fixture
 
-        session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        async_session_local = async_sessionmaker(
+            bind=async_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
 
-        db = session_local()
-        try:
-            db.execute(text("TRUNCATE TABLE conversation_summaries CASCADE;"))
-            db.execute(text("TRUNCATE TABLE conversation_messages CASCADE;"))
-            db.execute(text("TRUNCATE TABLE conversations CASCADE;"))
-            db.execute(text("TRUNCATE TABLE refresh_sessions CASCADE;"))
-            db.execute(text("TRUNCATE TABLE users CASCADE;"))
-            db.commit()
-        finally:
-            db.close()
-
-        client.app.state.db_session_factory = session_local
-        yield session_local
+        client.app.state.db_session_factory = async_session_local
+        yield async_session_local
     finally:
-        engine.dispose()
+        pass
 
 
 @pytest.fixture(scope="function")
-def test_users(chat_test_db):
+async def patch_client_db(client, chat_test_db):
+    """
+    Configures the TestClient app to use the real test DB for HTTP requests,
+    while also providing an independent async session factory for test-body
+    direct repo access.
+
+    Cross-loop problem: asyncpg binds its connection pool to the first event
+    loop that opens a connection. TestClient runs requests in its own anyio
+    event loop; pytest-asyncio tests run in a separate per-function loop.
+    Sharing a single async_sessionmaker between both loops raises:
+        RuntimeError: Future attached to a different loop
+
+    Fix: override the `get_db` FastAPI dependency with a factory that creates
+    sessions inside TestClient's loop (correct for HTTP requests), and yield
+    a separate async_sessionmaker backed by a second independent engine for
+    direct test-body DB access (runs in pytest-asyncio's loop).
+    """
+    from app.api.dependencies import get_db
+
+    # Build a second async engine exclusively for test-body direct repo calls.
+    # This pool will bind to pytest-asyncio's per-function loop on first use.
+    async_url = TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    test_body_engine = create_async_engine(async_url, poolclass=NullPool)
+    test_body_factory = async_sessionmaker(
+        bind=test_body_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+
+    # Override get_db so HTTP requests use a fresh session inside TestClient's loop.
+    # The lambda captures the URL so create_async_engine runs lazily inside the request.
+    async def _http_get_db():
+        http_engine = create_async_engine(async_url, poolclass=NullPool)
+        async with async_sessionmaker(
+            bind=http_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )() as session:
+            yield session
+
+    client.app.dependency_overrides[get_db] = _http_get_db
+    try:
+        yield test_body_factory
+    finally:
+        client.app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture(scope="function")
+async def test_users(chat_test_db):
     """
     Registers two test users in the database to satisfy foreign keys.
     """
-    db = chat_test_db()
+    async with chat_test_db() as db:
+        user1 = SQLAlchemyUser(
+            id=uuid4(),
+            email=f"test_1_{uuid4()}@example.com",
+            hashed_password="hashedpassword123",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        user2 = SQLAlchemyUser(
+            id=uuid4(),
+            email=f"test_2_{uuid4()}@example.com",
+            hashed_password="hashedpassword123",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        db.add(user1)
+        db.add(user2)
+        await db.commit()
 
-    user1 = SQLAlchemyUser(
-        id=uuid4(),
-        email=f"test_1_{uuid4()}@example.com",
-        hashed_password="hashedpassword123",
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-    )
-    user2 = SQLAlchemyUser(
-        id=uuid4(),
-        email=f"test_2_{uuid4()}@example.com",
-        hashed_password="hashedpassword123",
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-    )
-    db.add(user1)
-    db.add(user2)
-    db.commit()
-
-    user1_id, user2_id = user1.id, user2.id
-    db.close()
-    return user1_id, user2_id
+        user1_id, user2_id = user1.id, user2.id
+        return user1_id, user2_id
 
 
 # Helper function to register and authenticate a user
@@ -179,116 +263,113 @@ class MockRetrievalService:
 
 @pytest.mark.asyncio
 async def test_conversation_repository_crud(chat_test_db, test_users):
-    db = chat_test_db()
-    repo = SQLAlchemyConversationRepository(db)
-    user_id, _ = test_users
-    conv_id = uuid4()
+    async with chat_test_db() as db:
+        repo = SQLAlchemyConversationRepository(db)
+        user_id, _ = test_users
+        conv_id = uuid4()
 
-    conv = Conversation(
-        id=conv_id,
-        user_id=user_id,
-        title="Initial Title",
-        state=ConversationState.ACTIVE,
-        version=1,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-        last_message_at=datetime.now(UTC),
-    )
-
-    # Create
-    created = await repo.create_conversation(conv)
-    assert created.id == conv_id
-    assert created.title == "Initial Title"
-
-    # Get
-    fetched = await repo.get_conversation(conv_id)
-    assert fetched is not None
-    assert fetched.title == "Initial Title"
-
-    # Update (optimistic locking check)
-    fetched.title = "Updated Title"
-    updated = await repo.update_conversation(fetched)
-    assert updated.title == "Updated Title"
-    assert updated.version == 2  # Automatically incremented by version_id_col
-    db.commit()
-
-    # Concurrent update check
-    fetched_stale = await repo.get_conversation(conv_id)
-
-    # Simulate concurrent update in a separate database connection transaction
-    engine = db.bind
-    with engine.connect() as conn:
-        conn.execute(
-            text(
-                "UPDATE conversations SET version = 3, title = 'External Update' WHERE id = :id"
-            ),
-            {"id": conv_id},
+        conv = Conversation(
+            id=conv_id,
+            user_id=user_id,
+            title="Initial Title",
+            state=ConversationState.ACTIVE,
+            version=1,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            last_message_at=datetime.now(UTC),
         )
-        conn.commit()
 
-    # Since fetched_stale has version=2, trying to update it will fail because DB has version=3
-    fetched_stale.title = "Stale Update Attempt"
-    with pytest.raises(ConversationConcurrentUpdateException):
-        await repo.update_conversation(fetched_stale)
+        # Create
+        created = await repo.create_conversation(conv)
+        assert created.id == conv_id
+        assert created.title == "Initial Title"
 
-    # Soft Delete
-    await repo.delete_conversation(conv_id)
-    fetched_deleted = await repo.get_conversation(conv_id)
-    assert fetched_deleted.state == ConversationState.DELETED
+        # Get
+        fetched = await repo.get_conversation(conv_id)
+        assert fetched is not None
+        assert fetched.title == "Initial Title"
 
-    # List
-    active_conv_id = uuid4()
-    active_conv = Conversation(
-        id=active_conv_id,
-        user_id=user_id,
-        title="Active Conv",
-        state=ConversationState.ACTIVE,
-        version=1,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-        last_message_at=datetime.now(UTC),
-    )
-    await repo.create_conversation(active_conv)
-    listed = await repo.list_conversations(user_id)
-    assert len(listed) == 1  # Only ACTIVE, not DELETED
-    assert listed[0].id == active_conv_id
+        # Update (optimistic locking check)
+        fetched.title = "Updated Title"
+        updated = await repo.update_conversation(fetched)
+        assert updated.title == "Updated Title"
+        assert updated.version == 2  # Automatically incremented by version_id_col
+        await db.commit()
 
-    db.close()
+        # Concurrent update check
+        fetched_stale = await repo.get_conversation(conv_id)
+
+        # Simulate concurrent update in a separate database connection transaction
+        sync_engine = create_engine(TEST_DATABASE_URL)
+        with sync_engine.connect() as conn:
+            conn.execute(
+                text(
+                    "UPDATE conversations SET version = 3, title = 'External Update' WHERE id = :id"
+                ),
+                {"id": conv_id},
+            )
+            conn.commit()
+        sync_engine.dispose()
+
+        # Since fetched_stale has version=2, trying to update it will fail because DB has version=3
+        fetched_stale.title = "Stale Update Attempt"
+        with pytest.raises(ConversationConcurrentUpdateException):
+            await repo.update_conversation(fetched_stale)
+
+        # Soft Delete
+        await repo.delete_conversation(conv_id)
+        fetched_deleted = await repo.get_conversation(conv_id)
+        assert fetched_deleted.state == ConversationState.DELETED
+
+        # List
+        active_conv_id = uuid4()
+        active_conv = Conversation(
+            id=active_conv_id,
+            user_id=user_id,
+            title="Active Conv",
+            state=ConversationState.ACTIVE,
+            version=1,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            last_message_at=datetime.now(UTC),
+        )
+        await repo.create_conversation(active_conv)
+        listed = await repo.list_conversations(user_id)
+        assert len(listed) == 1  # Only ACTIVE, not DELETED
+        assert listed[0].id == active_conv_id
 
 
 @pytest.mark.asyncio
 async def test_conversation_access_service(chat_test_db, test_users):
-    db = chat_test_db()
-    repo = SQLAlchemyConversationRepository(db)
-    access_service = ConversationAccessService(repo)
+    async with chat_test_db() as db:
+        repo = SQLAlchemyConversationRepository(db)
+        access_service = ConversationAccessService(repo)
 
-    user1, user2 = test_users
-    conv_id = uuid4()
+        user1, user2 = test_users
+        conv_id = uuid4()
 
-    conv = Conversation(
-        id=conv_id,
-        user_id=user1,
-        title="User 1 Conversation",
-        state=ConversationState.ACTIVE,
-        version=1,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-        last_message_at=datetime.now(UTC),
-    )
-    await repo.create_conversation(conv)
+        conv = Conversation(
+            id=conv_id,
+            user_id=user1,
+            title="User 1 Conversation",
+            state=ConversationState.ACTIVE,
+            version=1,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            last_message_at=datetime.now(UTC),
+        )
+        await repo.create_conversation(conv)
 
-    # Verify Owner Success
-    await access_service.verify_owner(conv_id, user1)
+        # Verify Owner Success
+        await access_service.verify_owner(conv_id, user1)
 
-    # Verify Owner Unauthorized
-    with pytest.raises(UnauthorizedConversationAccessException):
-        await access_service.verify_owner(conv_id, user2)
+        # Verify Owner Unauthorized
+        with pytest.raises(UnauthorizedConversationAccessException):
+            await access_service.verify_owner(conv_id, user2)
 
-    # Verify Not Found
-    with pytest.raises(ConversationNotFoundException):
-        await access_service.verify_owner(uuid4(), user1)
-
-    db.close()
+        # Verify Not Found
+        with pytest.raises(ConversationNotFoundException):
+            await access_service.verify_owner(uuid4(), user1)
 
 
 # --- 2. Message Repository Unit Tests ---
@@ -296,86 +377,87 @@ async def test_conversation_access_service(chat_test_db, test_users):
 
 @pytest.mark.asyncio
 async def test_message_repository_lifecycle(chat_test_db, test_users):
-    db = chat_test_db()
-    conv_repo = SQLAlchemyConversationRepository(db)
-    msg_repo = SQLAlchemyMessageRepository(db)
-    user_id, _ = test_users
+    async with chat_test_db() as db:
+        conv_repo = SQLAlchemyConversationRepository(db)
+        msg_repo = SQLAlchemyMessageRepository(db)
+        user_id, _ = test_users
 
-    conv_id = uuid4()
-    conv = Conversation(
-        id=conv_id,
-        user_id=user_id,
-        title="Chat",
-        state=ConversationState.ACTIVE,
-        version=1,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-        last_message_at=datetime.now(UTC),
-    )
-    await conv_repo.create_conversation(conv)
+        conv_id = uuid4()
+        conv = Conversation(
+            id=conv_id,
+            user_id=user_id,
+            title="Chat",
+            state=ConversationState.ACTIVE,
+            version=1,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            last_message_at=datetime.now(UTC),
+        )
+        await conv_repo.create_conversation(conv)
 
-    # User message addition
-    user_msg_id = uuid4()
-    user_msg = ConversationMessage(
-        id=user_msg_id,
-        conversation_id=conv_id,
-        role=MessageRole.USER,
-        content="Hello!",
-        status=MessageStatus.COMPLETED,
-        created_at=datetime.now(UTC),
-    )
-    await msg_repo.add_message(user_msg)
+        # User message addition
+        user_msg_id = uuid4()
+        user_msg = ConversationMessage(
+            id=user_msg_id,
+            conversation_id=conv_id,
+            role=MessageRole.USER,
+            content="Hello!",
+            status=MessageStatus.COMPLETED,
+            created_at=datetime.now(UTC),
+        )
+        await msg_repo.add_message(user_msg)
 
-    # Assistant streaming message lifecycle
-    assistant_msg_id = uuid4()
-    await msg_repo.create_assistant_message(
-        conv_id, assistant_msg_id, MessageRole.ASSISTANT
-    )
+        # Assistant streaming message lifecycle
+        assistant_msg_id = uuid4()
+        await msg_repo.create_assistant_message(
+            conv_id, assistant_msg_id, MessageRole.ASSISTANT
+        )
 
-    # Verify PENDING status
-    messages = await msg_repo.get_recent_messages(conv_id, limit=10)
-    assistant_loaded = next(m for m in messages if m.id == assistant_msg_id)
-    assert assistant_loaded.status == MessageStatus.PENDING
+        # Verify PENDING status
+        messages = await msg_repo.get_recent_messages(conv_id, limit=10)
+        assistant_loaded = next(m for m in messages if m.id == assistant_msg_id)
+        assert assistant_loaded.status == MessageStatus.PENDING
 
-    # Append stream chunk
-    await msg_repo.append_stream_chunk(assistant_msg_id, "chunk 1")
-    await msg_repo.append_stream_chunk(assistant_msg_id, " chunk 2")
+        # Append stream chunk
+        await msg_repo.append_stream_chunk(assistant_msg_id, "chunk 1")
+        await msg_repo.append_stream_chunk(assistant_msg_id, " chunk 2")
 
-    messages = await msg_repo.get_recent_messages(conv_id, limit=10)
-    assistant_loaded = next(m for m in messages if m.id == assistant_msg_id)
-    assert assistant_loaded.status == MessageStatus.STREAMING
-    assert assistant_loaded.content == "chunk 1 chunk 2"
+        messages = await msg_repo.get_recent_messages(conv_id, limit=10)
+        assistant_loaded = next(m for m in messages if m.id == assistant_msg_id)
+        assert assistant_loaded.status == MessageStatus.STREAMING
+        assert assistant_loaded.content == "chunk 1 chunk 2"
 
-    # Complete message
-    citations = [{"chunk_id": str(uuid4())}]
-    await msg_repo.complete_message(
-        assistant_msg_id, prompt_tokens=10, completion_tokens=20, citations=citations
-    )
+        # Complete message
+        citations = [{"chunk_id": str(uuid4())}]
+        await msg_repo.complete_message(
+            assistant_msg_id,
+            prompt_tokens=10,
+            completion_tokens=20,
+            citations=citations,
+        )
 
-    messages = await msg_repo.get_recent_messages(conv_id, limit=10)
-    assistant_loaded = next(m for m in messages if m.id == assistant_msg_id)
-    assert assistant_loaded.status == MessageStatus.COMPLETED
-    assert assistant_loaded.citations == citations
-    assert assistant_loaded.prompt_tokens == 10
-    assert assistant_loaded.completion_tokens == 20
+        messages = await msg_repo.get_recent_messages(conv_id, limit=10)
+        assistant_loaded = next(m for m in messages if m.id == assistant_msg_id)
+        assert assistant_loaded.status == MessageStatus.COMPLETED
+        assert assistant_loaded.citations == citations
+        assert assistant_loaded.prompt_tokens == 10
+        assert assistant_loaded.completion_tokens == 20
 
-    # Fail message test
-    failed_msg_id = uuid4()
-    await msg_repo.create_assistant_message(
-        conv_id, failed_msg_id, MessageRole.ASSISTANT
-    )
-    await msg_repo.fail_message(failed_msg_id, "Network timeout error")
+        # Fail message test
+        failed_msg_id = uuid4()
+        await msg_repo.create_assistant_message(
+            conv_id, failed_msg_id, MessageRole.ASSISTANT
+        )
+        await msg_repo.fail_message(failed_msg_id, "Network timeout error")
 
-    messages = await msg_repo.get_recent_messages(conv_id, limit=10)
-    failed_loaded = next(m for m in messages if m.id == failed_msg_id)
-    assert failed_loaded.status == MessageStatus.FAILED
-    assert failed_loaded.metadata["error_message"] == "Network timeout error"
+        messages = await msg_repo.get_recent_messages(conv_id, limit=10)
+        failed_loaded = next(m for m in messages if m.id == failed_msg_id)
+        assert failed_loaded.status == MessageStatus.FAILED
+        assert failed_loaded.metadata["error_message"] == "Network timeout error"
 
-    # Count
-    count = await msg_repo.count_messages(conv_id)
-    assert count == 3
-
-    db.close()
+        # Count
+        count = await msg_repo.count_messages(conv_id)
+        assert count == 3
 
 
 # --- 3. Memory Pruning & Summarization Tests ---
@@ -383,128 +465,124 @@ async def test_message_repository_lifecycle(chat_test_db, test_users):
 
 @pytest.mark.asyncio
 async def test_rolling_conversation_memory(chat_test_db, test_users):
-    db = chat_test_db()
-    conv_repo = SQLAlchemyConversationRepository(db)
-    msg_repo = SQLAlchemyMessageRepository(db)
-    sum_repo = SQLAlchemySummaryRepository(db)
-    user_id, _ = test_users
+    async with chat_test_db() as db:
+        conv_repo = SQLAlchemyConversationRepository(db)
+        msg_repo = SQLAlchemyMessageRepository(db)
+        sum_repo = SQLAlchemySummaryRepository(db)
+        user_id, _ = test_users
 
-    conv_id = uuid4()
-    conv = Conversation(
-        id=conv_id,
-        user_id=user_id,
-        title="Chat",
-        state=ConversationState.ACTIVE,
-        version=1,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-        last_message_at=datetime.now(UTC),
-    )
-    await conv_repo.create_conversation(conv)
-
-    # Create 5 messages
-    msg_ids = [uuid4() for _ in range(5)]
-    for i, mid in enumerate(msg_ids):
-        msg = ConversationMessage(
-            id=mid,
-            conversation_id=conv_id,
-            role=MessageRole.USER if i % 2 == 0 else MessageRole.ASSISTANT,
-            content=f"Message {i}",
-            status=MessageStatus.COMPLETED,
-            created_at=datetime.now(UTC) + timedelta(milliseconds=i),
+        conv_id = uuid4()
+        conv = Conversation(
+            id=conv_id,
+            user_id=user_id,
+            title="Chat",
+            state=ConversationState.ACTIVE,
+            version=1,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            last_message_at=datetime.now(UTC),
         )
-        await msg_repo.add_message(msg)
+        await conv_repo.create_conversation(conv)
 
-    # 1. Without summary, loads recent messages (capped to max_messages)
-    memory = RollingConversationMemory(msg_repo, sum_repo, max_messages=3)
-    loaded_msgs, loaded_summary = await memory.load_memory(conv_id)
-    assert loaded_summary is None
-    assert len(loaded_msgs) == 3
-    assert loaded_msgs[0].content == "Message 2"
-    assert loaded_msgs[2].content == "Message 4"
+        # Create 5 messages
+        msg_ids = [uuid4() for _ in range(5)]
+        for i, mid in enumerate(msg_ids):
+            msg = ConversationMessage(
+                id=mid,
+                conversation_id=conv_id,
+                role=MessageRole.USER if i % 2 == 0 else MessageRole.ASSISTANT,
+                content=f"Message {i}",
+                status=MessageStatus.COMPLETED,
+                created_at=datetime.now(UTC) + timedelta(milliseconds=i),
+            )
+            await msg_repo.add_message(msg)
 
-    # 2. Add summary covering up to message 2 (Message index 2)
-    summary_obj = ConversationSummary(
-        id=uuid4(),
-        conversation_id=conv_id,
-        summary="Summary of first 3 messages",
-        summary_version=1,
-        covered_from_message_id=msg_ids[0],
-        covered_until_message_id=msg_ids[2],
-        message_count=3,
-        created_at=datetime.now(UTC),
-    )
-    await sum_repo.save_summary(summary_obj)
+        # 1. Without summary, loads recent messages (capped to max_messages)
+        memory = RollingConversationMemory(msg_repo, sum_repo, max_messages=3)
+        loaded_msgs, loaded_summary = await memory.load_memory(conv_id)
+        assert loaded_summary is None
+        assert len(loaded_msgs) == 3
+        assert loaded_msgs[0].content == "Message 2"
+        assert loaded_msgs[2].content == "Message 4"
 
-    # Memory loads summary and only messages AFTER Message 2 (indices 3 and 4)
-    loaded_msgs, loaded_summary = await memory.load_memory(conv_id)
-    assert loaded_summary is not None
-    assert loaded_summary.summary == "Summary of first 3 messages"
-    assert len(loaded_msgs) == 2
-    assert loaded_msgs[0].content == "Message 3"
-    assert loaded_msgs[1].content == "Message 4"
+        # 2. Add summary covering up to message 2 (Message index 2)
+        summary_obj = ConversationSummary(
+            id=uuid4(),
+            conversation_id=conv_id,
+            summary="Summary of first 3 messages",
+            summary_version=1,
+            covered_from_message_id=msg_ids[0],
+            covered_until_message_id=msg_ids[2],
+            message_count=3,
+            created_at=datetime.now(UTC),
+        )
+        await sum_repo.save_summary(summary_obj)
 
-    db.close()
+        # Memory loads summary and only messages AFTER Message 2 (indices 3 and 4)
+        loaded_msgs, loaded_summary = await memory.load_memory(conv_id)
+        assert loaded_summary is not None
+        assert loaded_summary.summary == "Summary of first 3 messages"
+        assert len(loaded_msgs) == 2
+        assert loaded_msgs[0].content == "Message 3"
+        assert loaded_msgs[1].content == "Message 4"
 
 
 @pytest.mark.asyncio
 async def test_conversation_summarizer(chat_test_db, test_users):
-    db = chat_test_db()
-    conv_repo = SQLAlchemyConversationRepository(db)
-    msg_repo = SQLAlchemyMessageRepository(db)
-    sum_repo = SQLAlchemySummaryRepository(db)
-    user_id, _ = test_users
+    async with chat_test_db() as db:
+        conv_repo = SQLAlchemyConversationRepository(db)
+        msg_repo = SQLAlchemyMessageRepository(db)
+        sum_repo = SQLAlchemySummaryRepository(db)
+        user_id, _ = test_users
 
-    conv_id = uuid4()
-    conv = Conversation(
-        id=conv_id,
-        user_id=user_id,
-        title="Chat",
-        state=ConversationState.ACTIVE,
-        version=1,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-        last_message_at=datetime.now(UTC),
-    )
-    await conv_repo.create_conversation(conv)
-
-    # Add messages
-    msg_ids = []
-    for i in range(5):
-        mid = uuid4()
-        msg_ids.append(mid)
-        msg = ConversationMessage(
-            id=mid,
-            conversation_id=conv_id,
-            role=MessageRole.USER if i % 2 == 0 else MessageRole.ASSISTANT,
-            content=f"Exchange {i}",
-            status=MessageStatus.COMPLETED,
-            created_at=datetime.now(UTC) + timedelta(milliseconds=i),
+        conv_id = uuid4()
+        conv = Conversation(
+            id=conv_id,
+            user_id=user_id,
+            title="Chat",
+            state=ConversationState.ACTIVE,
+            version=1,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            last_message_at=datetime.now(UTC),
         )
-        await msg_repo.add_message(msg)
+        await conv_repo.create_conversation(conv)
 
-    llm_provider = MockLLMProvider("Consolidated rolling summary text.")
-    summarizer = LLMConversationSummarizer(
-        llm_provider=llm_provider,
-        summary_repo=sum_repo,
-        message_repo=msg_repo,
-        model="gemini-2.5-flash-lite",
-    )
+        # Add messages
+        msg_ids = []
+        for i in range(5):
+            mid = uuid4()
+            msg_ids.append(mid)
+            msg = ConversationMessage(
+                id=mid,
+                conversation_id=conv_id,
+                role=MessageRole.USER if i % 2 == 0 else MessageRole.ASSISTANT,
+                content=f"Exchange {i}",
+                status=MessageStatus.COMPLETED,
+                created_at=datetime.now(UTC) + timedelta(milliseconds=i),
+            )
+            await msg_repo.add_message(msg)
 
-    # Generate initial summary up to message index 2
-    summary = await summarizer.summarize(conv_id, msg_ids[2])
-    assert summary.summary == "Consolidated rolling summary text."
-    assert summary.summary_version == 1
-    assert summary.covered_from_message_id == msg_ids[0]
-    assert summary.covered_until_message_id == msg_ids[2]
+        llm_provider = MockLLMProvider("Consolidated rolling summary text.")
+        summarizer = LLMConversationSummarizer(
+            llm_provider=llm_provider,
+            summary_repo=sum_repo,
+            message_repo=msg_repo,
+            model="gemini-2.5-flash-lite",
+        )
 
-    # Generate second summary up to message index 4
-    summary2 = await summarizer.summarize(conv_id, msg_ids[4])
-    assert summary2.summary_version == 2
-    assert summary2.covered_from_message_id == msg_ids[0]
-    assert summary2.covered_until_message_id == msg_ids[4]
+        # Generate initial summary up to message index 2
+        summary = await summarizer.summarize(conv_id, msg_ids[2])
+        assert summary.summary == "Consolidated rolling summary text."
+        assert summary.summary_version == 1
+        assert summary.covered_from_message_id == msg_ids[0]
+        assert summary.covered_until_message_id == msg_ids[2]
 
-    db.close()
+        # Generate second summary up to message index 4
+        summary2 = await summarizer.summarize(conv_id, msg_ids[4])
+        assert summary2.summary_version == 2
+        assert summary2.covered_from_message_id == msg_ids[0]
+        assert summary2.covered_until_message_id == msg_ids[4]
 
 
 # --- 4. Query Rewriter Caching & Heuristics ---
@@ -669,150 +747,153 @@ class _StubDocService:
     "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
 )
 async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
-    db = chat_test_db()
-    conv_repo = SQLAlchemyConversationRepository(db)
-    msg_repo = SQLAlchemyMessageRepository(db)
-    sum_repo = SQLAlchemySummaryRepository(db)
-    user_id, _ = test_users
+    async with chat_test_db() as db:
+        conv_repo = SQLAlchemyConversationRepository(db)
+        msg_repo = SQLAlchemyMessageRepository(db)
+        sum_repo = SQLAlchemySummaryRepository(db)
+        user_id, _ = test_users
 
-    # Resolving and wiring services
-    llm = MockLLMProvider("Direct grounded response.")
-    estimator = CharacterTokenEstimator()
-    prompt_builder = PromptBuilder("")
-    context_builder = ConversationContextBuilder()
+        # Resolving and wiring services
+        llm = MockLLMProvider("Direct grounded response.")
+        estimator = CharacterTokenEstimator()
+        prompt_builder = PromptBuilder("")
+        context_builder = ConversationContextBuilder()
 
-    doc_id = uuid4()
-    chunk_id = uuid4()
-    chunks = [
-        RetrievedChunk(
-            chunk_id=chunk_id,
-            document_id=doc_id,
-            document_name="doc.txt",
-            text="Python was created in 1991.",
-            similarity_score=0.95,
-            chunk_index=0,
+        doc_id = uuid4()
+        chunk_id = uuid4()
+        chunks = [
+            RetrievedChunk(
+                chunk_id=chunk_id,
+                document_id=doc_id,
+                document_name="doc.txt",
+                text="Python was created in 1991.",
+                similarity_score=0.95,
+                chunk_index=0,
+            )
+        ]
+        retrieval_service = MockRetrievalService(chunks)
+
+        conv_id = uuid4()
+        conv = Conversation(
+            id=conv_id,
+            user_id=user_id,
+            title="New Conversation",
+            state=ConversationState.ACTIVE,
+            version=1,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            last_message_at=datetime.now(UTC),
         )
-    ]
-    retrieval_service = MockRetrievalService(chunks)
+        await conv_repo.create_conversation(conv)
 
-    conv_id = uuid4()
-    conv = Conversation(
-        id=conv_id,
-        user_id=user_id,
-        title="New Conversation",
-        state=ConversationState.ACTIVE,
-        version=1,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-        last_message_at=datetime.now(UTC),
-    )
-    await conv_repo.create_conversation(conv)
+        # Stub Title Generator
+        from app.chat.services.title_generator import FallbackConversationTitleGenerator
 
-    # Stub Title Generator
-    from app.chat.services.title_generator import FallbackConversationTitleGenerator
+        title_generator = FallbackConversationTitleGenerator()
 
-    title_generator = FallbackConversationTitleGenerator()
+        # Stub event dispatcher
+        from app.documents.infrastructure.event_dispatcher import SimpleEventDispatcher
 
-    # Stub event dispatcher
-    from app.documents.infrastructure.event_dispatcher import SimpleEventDispatcher
+        dispatcher = SimpleEventDispatcher()
 
-    dispatcher = SimpleEventDispatcher()
+        access_service = ConversationAccessService(conv_repo)
+        memory = RollingConversationMemory(msg_repo, sum_repo, max_messages=12)
+        rewriter = LLMHistoryRewriter(
+            llm, "gemini-2.5-flash-lite", MemoryRewriteCache()
+        )
 
-    access_service = ConversationAccessService(conv_repo)
-    memory = RollingConversationMemory(msg_repo, sum_repo, max_messages=12)
-    rewriter = LLMHistoryRewriter(llm, "gemini-2.5-flash-lite", MemoryRewriteCache())
+        manager = ConversationManager(
+            conversation_repo=conv_repo,
+            message_repo=msg_repo,
+            summary_repo=sum_repo,
+            access_service=access_service,
+            memory=memory,
+            rewriter=rewriter,
+            title_generator=title_generator,
+            event_dispatcher=dispatcher,
+            document_service=_StubDocService(doc_id),
+        )
 
-    manager = ConversationManager(
-        conversation_repo=conv_repo,
-        message_repo=msg_repo,
-        summary_repo=sum_repo,
-        access_service=access_service,
-        memory=memory,
-        rewriter=rewriter,
-        title_generator=title_generator,
-        event_dispatcher=dispatcher,
-        document_service=_StubDocService(doc_id),
-    )
+        service = AnswerGenerationService(
+            retrieval_service=retrieval_service,
+            prompt_builder=prompt_builder,
+            llm_provider=llm,
+            token_estimator=estimator,
+            conversation_manager=manager,
+            context_builder=context_builder,
+            model="gemini-2.5-flash-lite",
+            temperature=0.0,
+            max_response_tokens=100,
+            system_prompt_tokens_limit=500,
+            max_context_tokens=1000,
+            reserved_completion_tokens=50,
+            enable_conversation_memory=True,
+        )
 
-    service = AnswerGenerationService(
-        retrieval_service=retrieval_service,
-        prompt_builder=prompt_builder,
-        llm_provider=llm,
-        token_estimator=estimator,
-        conversation_manager=manager,
-        context_builder=context_builder,
-        model="gemini-2.5-flash-lite",
-        temperature=0.0,
-        max_response_tokens=100,
-        system_prompt_tokens_limit=500,
-        max_context_tokens=1000,
-        reserved_completion_tokens=50,
-        enable_conversation_memory=True,
-    )
+        # 1. Test generate_answer (Sync). Global documents are only retrieved on
+        # the @documents mention (two-tier model), which also exercises the
+        # mention-stripping path.
+        response = await service.generate_answer(
+            question="@documents When was Python created?",
+            user_id=user_id,
+            top_k=10,
+            conversation_id=conv_id,
+        )
 
-    # 1. Test generate_answer (Sync). Global documents are only retrieved on
-    # the @documents mention (two-tier model), which also exercises the
-    # mention-stripping path.
-    response = await service.generate_answer(
-        question="@documents When was Python created?",
-        user_id=user_id,
-        top_k=10,
-        conversation_id=conv_id,
-    )
+        assert response.answer == "Direct grounded response."
+        assert response.conversation_id == conv_id
+        assert response.diagnostics is not None
+        assert response.diagnostics.fusion_count == 1
+        # Retrieval ran normally (documents exist) — the skip marker stays False.
+        assert response.diagnostics.retrieval_skipped is False
+        assert len(response.citations) == 1
+        assert response.citations[0].document_name == "doc.txt"
 
-    assert response.answer == "Direct grounded response."
-    assert response.conversation_id == conv_id
-    assert response.diagnostics is not None
-    assert response.diagnostics.fusion_count == 1
-    # Retrieval ran normally (documents exist) — the skip marker stays False.
-    assert response.diagnostics.retrieval_skipped is False
-    assert len(response.citations) == 1
-    assert response.citations[0].document_name == "doc.txt"
+        # Confirm message count in database
+        count = await msg_repo.count_messages(conv_id)
+        assert count == 2  # User question + Assistant reply
 
-    # Confirm message count in database
-    count = await msg_repo.count_messages(conv_id)
-    assert count == 2  # User question + Assistant reply
+        # 2. Test generate_answer_stream (Streaming compatibility)
+        events = []
+        async for event in service.generate_answer_stream(
+            question="@documents What about Java?",
+            user_id=user_id,
+            top_k=10,
+            conversation_id=conv_id,
+        ):
+            events.append(event)
 
-    # 2. Test generate_answer_stream (Streaming compatibility)
-    events = []
-    async for event in service.generate_answer_stream(
-        question="@documents What about Java?",
-        user_id=user_id,
-        top_k=10,
-        conversation_id=conv_id,
-    ):
-        events.append(event)
+        assert len(events) >= 3
+        assert events[0]["event"] == "metadata"
+        assert events[-1]["event"] == "done"
+        assert "Mocked Answer" in events[-1]["data"]["answer"]
 
-    assert len(events) >= 3
-    assert events[0]["event"] == "metadata"
-    assert events[-1]["event"] == "done"
-    assert "Mocked Answer" in events[-1]["data"]["answer"]
-
-    # Confirm count updated
-    count = await msg_repo.count_messages(conv_id)
-    assert count == 4  # 2 more messages added (User + Assistant)
-
-    db.close()
+        # Confirm count updated
+        count = await msg_repo.count_messages(conv_id)
+        assert count == 4  # 2 more messages added (User + Assistant)
 
 
 # --- 7. API Router Endpoint Integration Tests ---
 
 
+@pytest.mark.asyncio
 @pytest.mark.filterwarnings(
     "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
 )
-def test_conversations_api_flow(client, chat_test_db):
+async def test_conversations_api_flow(client, patch_client_db):
     # 1. Setup mock services and configure overrides at start
-    db_session = chat_test_db()
-
-    from app.documents.infrastructure.event_dispatcher import SimpleEventDispatcher
-
-    dispatcher = SimpleEventDispatcher()
+    from app.api.dependencies import (
+        get_conversation_title_generator,
+        get_document_service,
+        get_history_rewriter,
+        get_llm_provider,
+        get_prompt_builder,
+        get_retrieval_service,
+    )
+    from app.chat.services.title_generator import FallbackConversationTitleGenerator
 
     llm = MockLLMProvider("AI Response Title generator")
-    estimator = CharacterTokenEstimator()
     prompt_builder = PromptBuilder("")
-    context_builder = ConversationContextBuilder()
 
     doc_id = uuid4()
     chunk_id = uuid4()
@@ -827,49 +908,17 @@ def test_conversations_api_flow(client, chat_test_db):
         )
     ]
     retrieval_service = MockRetrievalService(chunks)
-
-    conv_repo = SQLAlchemyConversationRepository(db_session)
-    msg_repo = SQLAlchemyMessageRepository(db_session)
-    sum_repo = SQLAlchemySummaryRepository(db_session)
-    access_service = ConversationAccessService(conv_repo)
-    memory = RollingConversationMemory(msg_repo, sum_repo, max_messages=12)
-    rewriter = LLMHistoryRewriter(llm, "gemini-2.5-flash-lite", MemoryRewriteCache())
-
-    # Title generator
-    from app.chat.services.title_generator import FallbackConversationTitleGenerator
-
+    rewriter = IdentityHistoryRewriter()
     title_generator = FallbackConversationTitleGenerator()
 
-    manager = ConversationManager(
-        conversation_repo=conv_repo,
-        message_repo=msg_repo,
-        summary_repo=sum_repo,
-        access_service=access_service,
-        memory=memory,
-        rewriter=rewriter,
-        title_generator=title_generator,
-        event_dispatcher=dispatcher,
-        db=db_session,
+    client.app.dependency_overrides[get_llm_provider] = lambda: llm
+    client.app.dependency_overrides[get_retrieval_service] = lambda: retrieval_service
+    client.app.dependency_overrides[get_history_rewriter] = lambda: rewriter
+    client.app.dependency_overrides[get_conversation_title_generator] = lambda: (
+        title_generator
     )
-
-    real_service = AnswerGenerationService(
-        retrieval_service=retrieval_service,
-        prompt_builder=prompt_builder,
-        llm_provider=llm,
-        token_estimator=estimator,
-        conversation_manager=manager,
-        context_builder=context_builder,
-        model="gemini-2.5-flash-lite",
-        temperature=0.0,
-        max_response_tokens=100,
-        system_prompt_tokens_limit=500,
-        max_context_tokens=1000,
-        reserved_completion_tokens=50,
-        enable_conversation_memory=True,
-    )
-
-    client.app.dependency_overrides[get_chat_orchestrator] = lambda: real_service
-    client.app.dependency_overrides[get_conversation_manager] = lambda: manager
+    client.app.dependency_overrides[get_prompt_builder] = lambda: prompt_builder
+    client.app.dependency_overrides[get_document_service] = lambda: None
 
     # Setup token & user
     token, user_id = get_user_token_and_id(client)
@@ -884,9 +933,6 @@ def test_conversations_api_flow(client, chat_test_db):
     assert chat_resp.status_code == status.HTTP_200_OK
     conv_id = chat_resp.json()["conversation_id"]
     assert conv_id is not None
-
-    # Commit any changes so list endpoint sees them in test transaction isolation
-    db_session.commit()
 
     # 3. Get Paginated Conversations List
     list_resp = client.get("/api/v1/conversations?limit=10&offset=0", headers=headers)
@@ -927,7 +973,6 @@ def test_conversations_api_flow(client, chat_test_db):
             "stream": False,
         },
     )
-    db_session.commit()
 
     msgs_resp = client.get(
         f"/api/v1/conversations/{conv_id}/messages?limit=10&offset=0", headers=headers
@@ -942,7 +987,6 @@ def test_conversations_api_flow(client, chat_test_db):
     # 7. Delete conversation (soft delete)
     del_resp = client.delete(f"/api/v1/conversations/{conv_id}", headers=headers)
     assert del_resp.status_code == status.HTTP_204_NO_CONTENT
-    db_session.commit()
 
     # Verify conversation is omitted from active list
     list_resp2 = client.get("/api/v1/conversations?limit=10&offset=0", headers=headers)
@@ -950,7 +994,6 @@ def test_conversations_api_flow(client, chat_test_db):
     assert len(list_resp2.json()["conversations"]) == 0
 
     client.app.dependency_overrides.clear()
-    db_session.close()
 
 
 # --- 8. Chat Persistence & Client-Disconnect Handling ---
@@ -969,18 +1012,18 @@ class IdentityHistoryRewriter:
 
 
 @pytest.fixture(scope="function")
-def real_chat_wiring(client, chat_test_db):
+async def real_chat_wiring(client, chat_test_db):
     """
-    Wires the real chat dependency graph — real request-scoped get_db session,
-    real ConversationManager and real orchestrator — with only the external
-    services (LLM, retrieval, titles, rewrites) mocked. Persistence therefore
-    depends entirely on the get_db commit at request teardown, which is the
-    behavior these regression tests guard.
-    """
-    db = chat_test_db()
+    Wires the real chat dependency graph against the test DB.
 
+    Uses the get_db dependency override pattern (same as patch_client_db) so
+    HTTP requests inside TestClient's anyio loop get their own asyncpg pool
+    bound to that loop. This avoids the cross-loop RuntimeError that occurs
+    when a pool initialized in pytest-asyncio's loop is reused in TestClient's loop.
+    """
     from app.api.dependencies import (
         get_conversation_title_generator,
+        get_db,
         get_document_service,
         get_history_rewriter,
         get_llm_provider,
@@ -988,6 +1031,21 @@ def real_chat_wiring(client, chat_test_db):
         get_retrieval_service,
     )
     from app.chat.services.title_generator import FallbackConversationTitleGenerator
+
+    async_url = TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    # get_db override: sessions created inside TestClient's loop.
+    async def _http_get_db():
+        http_engine = create_async_engine(async_url)
+        async with async_sessionmaker(
+            bind=http_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )() as session:
+            yield session
+        await http_engine.dispose()
 
     llm = MockLLMProvider("Mocked Answer")
     chunk = RetrievedChunk(
@@ -999,6 +1057,7 @@ def real_chat_wiring(client, chat_test_db):
         chunk_index=0,
     )
 
+    client.app.dependency_overrides[get_db] = _http_get_db
     client.app.dependency_overrides[get_llm_provider] = lambda: llm
     client.app.dependency_overrides[get_retrieval_service] = lambda: (
         MockRetrievalService([chunk])
@@ -1012,19 +1071,19 @@ def real_chat_wiring(client, chat_test_db):
     client.app.dependency_overrides[get_prompt_builder] = lambda: PromptBuilder("")
     client.app.dependency_overrides[get_document_service] = lambda: None
 
-    yield db
+    yield None  # tests using real_chat_wiring use HTTP API + psycopg2 for verification
 
     client.app.dependency_overrides.clear()
-    db.close()
 
 
 def _assert_persisted_turn(client, token, question, *, stream):
     """
     Runs one chat request and asserts conversation + messages persist.
 
-    Critically, no manual db.commit() is ever called: persistence must come
-    from get_db's commit at request teardown (regression guard for the chat
-    persistence fix). Rows are read through a fresh session.
+    Uses psycopg2 (synchronous) for DB verification so it never touches the
+    asyncpg pool and has no event-loop dependency. This avoids the cross-loop
+    RuntimeError that occurs when asyncpg connections from TestClient's anyio
+    loop are reused in pytest-asyncio's per-function loop.
     """
     headers = {"Authorization": f"Bearer {token}"}
     resp = client.post(
@@ -1037,18 +1096,19 @@ def _assert_persisted_turn(client, token, question, *, stream):
         assert "text/event-stream" in resp.headers["content-type"]
         assert "Mocked Answer" in resp.text
 
-    db = client.app.state.db_session_factory()
-    try:
-        rows = db.execute(
+    # Verify persistence using psycopg2 (sync) — no asyncpg/event-loop dependency.
+    sync_engine = create_engine(TEST_DATABASE_URL)
+    with sync_engine.connect() as conn:
+        result = conn.execute(
             text(
                 "SELECT c.id, m.role, m.status, m.content "
                 "FROM conversations c "
                 "JOIN conversation_messages m ON m.conversation_id = c.id "
                 "ORDER BY m.created_at, m.id"
             )
-        ).fetchall()
-    finally:
-        db.close()
+        )
+        rows = result.fetchall()
+    sync_engine.dispose()
 
     assert len(rows) == 2, f"expected user + assistant messages, got {len(rows)}"
     roles = [r[1] for r in rows]
@@ -1061,14 +1121,16 @@ def _assert_persisted_turn(client, token, question, *, stream):
     return rows[0][0]
 
 
+@pytest.mark.asyncio
 @pytest.mark.filterwarnings(
     "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
 )
-def test_api_chat_stream_persists_conversation_and_messages(client, real_chat_wiring):
+async def test_api_chat_stream_persists_conversation_and_messages(
+    client, real_chat_wiring
+):
     """
     Regression: after a streaming /chat request, the conversation, the user
-    question and the completed assistant answer must be persisted in the DB
-    even though no code path calls db.commit() explicitly (get_db owns it).
+    question and the completed assistant answer must be persisted in the DB.
     """
     token, _user_id = get_user_token_and_id(client)
     conv_id = _assert_persisted_turn(
@@ -1077,10 +1139,13 @@ def test_api_chat_stream_persists_conversation_and_messages(client, real_chat_wi
     assert conv_id is not None
 
 
+@pytest.mark.asyncio
 @pytest.mark.filterwarnings(
     "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
 )
-def test_api_chat_sync_persists_conversation_and_messages(client, real_chat_wiring):
+async def test_api_chat_sync_persists_conversation_and_messages(
+    client, real_chat_wiring
+):
     """
     Same persistence regression guard for the synchronous (non-streaming) path.
     """
@@ -1149,8 +1214,8 @@ def _build_answer_service(db):
     return service
 
 
-def _read_messages(db, conversation_id):
-    return db.execute(
+async def _read_messages(db, conversation_id):
+    result = await db.execute(
         text(
             "SELECT role, status, content, metadata "
             "FROM conversation_messages "
@@ -1158,7 +1223,8 @@ def _read_messages(db, conversation_id):
             "ORDER BY created_at, id"
         ),
         {"c": conversation_id},
-    ).fetchall()
+    )
+    return result.fetchall()
 
 
 @pytest.mark.asyncio
@@ -1169,10 +1235,8 @@ async def test_stream_disconnect_persists_partial_answer_as_interrupted(
     chat_test_db, test_users
 ):
     """
-    When a client disconnects mid-stream (the generator is closed while a
-    stream is in flight), the partial assistant answer must be persisted in a
-    terminal INTERRUPTED status — not left STREAMING — while the user question
-    and conversation remain.
+    When a client disconnects mid-stream, the partial assistant answer must be persisted in a
+    terminal INTERRUPTED status.
     """
     db = chat_test_db()
     user_id, _ = test_users
@@ -1189,16 +1253,14 @@ async def test_stream_disconnect_persists_partial_answer_as_interrupted(
     second = await agen.__anext__()
     assert second["event"] == "text"
 
-    # Client disconnects: closing the async generator delivers GeneratorExit
-    # into the orchestrator, which triggers the interrupt sweep.
     await agen.aclose()
 
-    db.commit()
+    await db.commit()
     fresh = chat_test_db()
     try:
-        rows = _read_messages(fresh, conv_id)
+        rows = await _read_messages(fresh, conv_id)
     finally:
-        fresh.close()
+        await fresh.close()
 
     assert len(rows) == 2
     assert rows[0][0] == "user"
@@ -1215,7 +1277,7 @@ async def test_stream_disconnect_persists_partial_answer_as_interrupted(
         meta = json.loads(meta)
     assert meta.get("interrupt_reason") == "client_disconnected"
 
-    db.close()
+    await db.close()
 
 
 @pytest.mark.asyncio
@@ -1227,8 +1289,7 @@ async def test_stream_disconnect_before_first_chunk_persists_interrupted(
 ):
     """
     Disconnecting after the metadata event but before any text chunk must still
-    leave a terminal INTERRUPTED record (empty partial content), never a PENDING
-    message stuck in the DB.
+    leave a terminal INTERRUPTED record.
     """
     db = chat_test_db()
     user_id, _ = test_users
@@ -1244,85 +1305,83 @@ async def test_stream_disconnect_before_first_chunk_persists_interrupted(
 
     await agen.aclose()
 
-    db.commit()
+    await db.commit()
     fresh = chat_test_db()
     try:
-        rows = _read_messages(fresh, conv_id)
+        rows = await _read_messages(fresh, conv_id)
     finally:
-        fresh.close()
+        await fresh.close()
 
     assert len(rows) == 2
     assert rows[1][0] == "assistant"
     assert rows[1][1] == "interrupted"
     assert rows[1][2] == ""
 
-    db.close()
+    await db.close()
 
 
 @pytest.mark.asyncio
 async def test_message_repository_interrupt_lifecycle(chat_test_db, test_users):
     """
-    Repo-level coverage of interrupt_message: PENDING/STREAMING -> INTERRUPTED
-    with partial content preserved, idempotent no-op on terminal messages, and
-    illegal transitions out of INTERRUPTED rejected.
+    Repo-level coverage of interrupt_message.
     """
-    db = chat_test_db()
-    conv_repo = SQLAlchemyConversationRepository(db)
-    msg_repo = SQLAlchemyMessageRepository(db)
-    user_id, _ = test_users
+    async with chat_test_db() as db:
+        conv_repo = SQLAlchemyConversationRepository(db)
+        msg_repo = SQLAlchemyMessageRepository(db)
+        user_id, _ = test_users
 
-    conv_id = uuid4()
-    conv = Conversation(
-        id=conv_id,
-        user_id=user_id,
-        title="Chat",
-        state=ConversationState.ACTIVE,
-        version=1,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-        last_message_at=datetime.now(UTC),
-    )
-    await conv_repo.create_conversation(conv)
+        conv_id = uuid4()
+        conv = Conversation(
+            id=conv_id,
+            user_id=user_id,
+            title="Chat",
+            state=ConversationState.ACTIVE,
+            version=1,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            last_message_at=datetime.now(UTC),
+        )
+        await conv_repo.create_conversation(conv)
 
-    # PENDING -> INTERRUPTED with reason recorded
-    pending_id = uuid4()
-    await msg_repo.create_assistant_message(conv_id, pending_id, MessageRole.ASSISTANT)
-    interrupted = await msg_repo.interrupt_message(
-        pending_id, reason="client_disconnected"
-    )
-    assert interrupted.status == MessageStatus.INTERRUPTED
-    assert interrupted.metadata["interrupt_reason"] == "client_disconnected"
+        # PENDING -> INTERRUPTED with reason recorded
+        pending_id = uuid4()
+        await msg_repo.create_assistant_message(
+            conv_id, pending_id, MessageRole.ASSISTANT
+        )
+        interrupted = await msg_repo.interrupt_message(
+            pending_id, reason="client_disconnected"
+        )
+        assert interrupted.status == MessageStatus.INTERRUPTED
+        assert interrupted.metadata["interrupt_reason"] == "client_disconnected"
 
-    # STREAMING (with partial content) -> INTERRUPTED, content preserved
-    streaming_id = uuid4()
-    await msg_repo.create_assistant_message(
-        conv_id, streaming_id, MessageRole.ASSISTANT
-    )
-    await msg_repo.append_stream_chunk(streaming_id, "partial ")
-    await msg_repo.append_stream_chunk(streaming_id, "answer")
-    interrupted2 = await msg_repo.interrupt_message(streaming_id)
-    assert interrupted2.status == MessageStatus.INTERRUPTED
-    assert interrupted2.content == "partial answer"
+        # STREAMING (with partial content) -> INTERRUPTED, content preserved
+        streaming_id = uuid4()
+        await msg_repo.create_assistant_message(
+            conv_id, streaming_id, MessageRole.ASSISTANT
+        )
+        await msg_repo.append_stream_chunk(streaming_id, "partial ")
+        await msg_repo.append_stream_chunk(streaming_id, "answer")
+        interrupted2 = await msg_repo.interrupt_message(streaming_id)
+        assert interrupted2.status == MessageStatus.INTERRUPTED
+        assert interrupted2.content == "partial answer"
 
-    # No-op on already-completed messages
-    completed_id = uuid4()
-    await msg_repo.create_assistant_message(
-        conv_id, completed_id, MessageRole.ASSISTANT
-    )
-    completed = await msg_repo.complete_message(completed_id, 1, 2)
-    noop = await msg_repo.interrupt_message(completed_id)
-    assert noop.status == MessageStatus.COMPLETED
-    assert completed.status == MessageStatus.COMPLETED
+        # No-op on already-completed messages
+        completed_id = uuid4()
+        await msg_repo.create_assistant_message(
+            conv_id, completed_id, MessageRole.ASSISTANT
+        )
+        completed = await msg_repo.complete_message(completed_id, 1, 2)
+        noop = await msg_repo.interrupt_message(completed_id)
+        assert noop.status == MessageStatus.COMPLETED
+        assert completed.status == MessageStatus.COMPLETED
 
-    # Illegal transitions OUT of INTERRUPTED are rejected
-    with pytest.raises(InvalidStatusTransitionException):
-        await msg_repo.complete_message(pending_id, 1, 2)
-    with pytest.raises(InvalidStatusTransitionException):
-        await msg_repo.append_stream_chunk(pending_id, "more")
-    with pytest.raises(InvalidStatusTransitionException):
-        await msg_repo.fail_message(pending_id, "nope")
-
-    db.close()
+        # Illegal transitions OUT of INTERRUPTED are rejected
+        with pytest.raises(InvalidStatusTransitionException):
+            await msg_repo.complete_message(pending_id, 1, 2)
+        with pytest.raises(InvalidStatusTransitionException):
+            await msg_repo.append_stream_chunk(pending_id, "more")
+        with pytest.raises(InvalidStatusTransitionException):
+            await msg_repo.fail_message(pending_id, "nope")
 
 
 # --- 9. No-Documents Fallback & @documents Mention ---
@@ -1337,100 +1396,97 @@ async def test_answer_generation_skips_rewrite_and_retrieval_without_documents(
 ):
     """
     When the user has no uploaded documents, the LLM query-rewrite step is
-    skipped (no wasted LLM call) and retrieval is skipped entirely — the bot
-    answers from general knowledge with empty citations.
+    skipped and retrieval is skipped entirely.
     """
-    db = chat_test_db()
-    conv_repo = SQLAlchemyConversationRepository(db)
-    msg_repo = SQLAlchemyMessageRepository(db)
-    sum_repo = SQLAlchemySummaryRepository(db)
-    user_id, _ = test_users
+    async with chat_test_db() as db:
+        conv_repo = SQLAlchemyConversationRepository(db)
+        msg_repo = SQLAlchemyMessageRepository(db)
+        sum_repo = SQLAlchemySummaryRepository(db)
+        user_id, _ = test_users
 
-    llm = MockLLMProvider("General knowledge answer.")
-    estimator = CharacterTokenEstimator()
-    prompt_builder = PromptBuilder("")
-    context_builder = ConversationContextBuilder()
+        llm = MockLLMProvider("General knowledge answer.")
+        estimator = CharacterTokenEstimator()
+        prompt_builder = PromptBuilder("")
+        context_builder = ConversationContextBuilder()
 
-    retrieval_service = MockRetrievalService([], user_has_chunks=False)
+        retrieval_service = MockRetrievalService([], user_has_chunks=False)
 
-    class RecordingRewriter:
-        """Fails the test if the rewrite LLM call is ever invoked."""
+        class RecordingRewriter:
+            """Fails the test if the rewrite LLM call is ever invoked."""
 
-        def __init__(self):
-            self.calls = 0
+            def __init__(self):
+                self.calls = 0
 
-        async def rewrite(self, question, history):
-            self.calls += 1
-            return HistoryRewriteResult(
-                original_query=question,
-                rewritten_query=question,
-                rewrite_reason="should not be reached",
-                rewrite_applied=True,
-            )
+            async def rewrite(self, question, history):
+                self.calls += 1
+                return HistoryRewriteResult(
+                    original_query=question,
+                    rewritten_query=question,
+                    rewrite_reason="should not be reached",
+                    rewrite_applied=True,
+                )
 
-    from app.chat.services.title_generator import FallbackConversationTitleGenerator
-    from app.documents.infrastructure.event_dispatcher import SimpleEventDispatcher
+        from app.chat.services.title_generator import FallbackConversationTitleGenerator
+        from app.documents.infrastructure.event_dispatcher import SimpleEventDispatcher
 
-    rewriter = RecordingRewriter()
-    manager = ConversationManager(
-        conversation_repo=conv_repo,
-        message_repo=msg_repo,
-        summary_repo=sum_repo,
-        access_service=ConversationAccessService(conv_repo),
-        memory=RollingConversationMemory(msg_repo, sum_repo, max_messages=12),
-        rewriter=rewriter,
-        title_generator=FallbackConversationTitleGenerator(),
-        event_dispatcher=SimpleEventDispatcher(),
-    )
+        rewriter = RecordingRewriter()
+        manager = ConversationManager(
+            conversation_repo=conv_repo,
+            message_repo=msg_repo,
+            summary_repo=sum_repo,
+            access_service=ConversationAccessService(conv_repo),
+            memory=RollingConversationMemory(msg_repo, sum_repo, max_messages=12),
+            rewriter=rewriter,
+            title_generator=FallbackConversationTitleGenerator(),
+            event_dispatcher=SimpleEventDispatcher(),
+        )
 
-    service = AnswerGenerationService(
-        retrieval_service=retrieval_service,
-        prompt_builder=prompt_builder,
-        llm_provider=llm,
-        token_estimator=estimator,
-        conversation_manager=manager,
-        context_builder=context_builder,
-        model="gemini-2.5-flash-lite",
-        temperature=0.0,
-        max_response_tokens=100,
-        system_prompt_tokens_limit=500,
-        max_context_tokens=1000,
-        reserved_completion_tokens=50,
-        enable_conversation_memory=True,
-    )
+        service = AnswerGenerationService(
+            retrieval_service=retrieval_service,
+            prompt_builder=prompt_builder,
+            llm_provider=llm,
+            token_estimator=estimator,
+            conversation_manager=manager,
+            context_builder=context_builder,
+            model="gemini-2.5-flash-lite",
+            temperature=0.0,
+            max_response_tokens=100,
+            system_prompt_tokens_limit=500,
+            max_context_tokens=1000,
+            reserved_completion_tokens=50,
+            enable_conversation_memory=True,
+        )
 
-    response = await service.generate_answer(
-        question="Who created Python?", user_id=user_id, top_k=10
-    )
+        response = await service.generate_answer(
+            question="Who created Python?", user_id=user_id, top_k=10
+        )
 
-    assert response.answer == "General knowledge answer."
-    assert response.citations == []
-    assert rewriter.calls == 0  # rewrite LLM call skipped
-    assert retrieval_service.retrieve_calls == 0  # retrieval skipped
-    # The marker tells the frontend this answer came from general knowledge.
-    assert response.diagnostics is not None
-    assert response.diagnostics.retrieval_skipped is True
-    # The fallback prompt relaxes the "ONLY use provided context" rule.
-    system_prompt = llm.last_messages[0].content
-    assert "general knowledge" in system_prompt
+        assert response.answer == "General knowledge answer."
+        assert response.citations == []
+        assert rewriter.calls == 0  # rewrite LLM call skipped
+        assert retrieval_service.retrieve_calls == 0  # retrieval skipped
+        # The marker tells the frontend this answer came from general knowledge.
+        assert response.diagnostics is not None
+        assert response.diagnostics.retrieval_skipped is True
+        # The fallback prompt relaxes the "ONLY use provided context" rule.
+        system_prompt = llm.last_messages[0].content
+        assert "general knowledge" in system_prompt
 
-    # The streaming path uses the same skip logic.
-    events = []
-    async for event in service.generate_answer_stream(
-        question="Tell me about the moon.", user_id=user_id, top_k=10
-    ):
-        events.append(event)
+        # The streaming path uses the same skip logic.
+        events = []
+        async for event in service.generate_answer_stream(
+            question="Tell me about the moon.", user_id=user_id, top_k=10
+        ):
+            events.append(event)
 
-    assert rewriter.calls == 0  # still no rewrite LLM call
-    assert retrieval_service.retrieve_calls == 0  # still no retrieval
-    assert events[0]["event"] == "metadata"
-    assert events[0]["data"]["diagnostics"]["retrieval_skipped"] is True
-    assert events[-1]["event"] == "done"
-    assert events[-1]["data"]["citations"] == []
-    assert events[-1]["data"]["diagnostics"]["retrieval_skipped"] is True
-    assert "Mocked Answer" in events[-1]["data"]["answer"]
-
-    db.close()
+        assert rewriter.calls == 0  # still no rewrite LLM call
+        assert retrieval_service.retrieve_calls == 0  # still no retrieval
+        assert events[0]["event"] == "metadata"
+        assert events[0]["data"]["diagnostics"]["retrieval_skipped"] is True
+        assert events[-1]["event"] == "done"
+        assert events[-1]["data"]["citations"] == []
+        assert events[-1]["data"]["diagnostics"]["retrieval_skipped"] is True
+        assert "Mocked Answer" in events[-1]["data"]["answer"]
 
 
 def _override_empty_retrieval(client):
@@ -1441,13 +1497,13 @@ def _override_empty_retrieval(client):
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.filterwarnings(
     "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
 )
-def test_api_chat_without_documents_answers_generally(client, real_chat_wiring):
+async def test_api_chat_without_documents_answers_generally(client, real_chat_wiring):
     """
-    No documents uploaded / nothing matched: the chatbot must still answer
-    (general-knowledge fallback) with no citations instead of erroring.
+    No documents uploaded / nothing matched.
     """
     _override_empty_retrieval(client)
     token, _user_id = get_user_token_and_id(client)
@@ -1462,19 +1518,19 @@ def test_api_chat_without_documents_answers_generally(client, real_chat_wiring):
     data = resp.json()
     assert data["answer"] == "Mocked Answer"
     assert data["citations"] == []
-    # Two-tier model: without the @documents mention (and with no chat-scoped
-    # documents), the global knowledge base is NOT searched — the skip marker
-    # fires and the bot answers from general knowledge.
+    # Two-tier model
     assert data["diagnostics"]["retrieval_skipped"] is True
 
 
+@pytest.mark.asyncio
 @pytest.mark.filterwarnings(
     "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
 )
-def test_api_chat_stream_without_documents_answers_generally(client, real_chat_wiring):
+async def test_api_chat_stream_without_documents_answers_generally(
+    client, real_chat_wiring
+):
     """
-    Same fallback for the SSE streaming path: done event with a general answer,
-    no citations.
+    Same fallback for the SSE streaming path.
     """
     _override_empty_retrieval(client)
     token, _user_id = get_user_token_and_id(client)
@@ -1492,13 +1548,15 @@ def test_api_chat_stream_without_documents_answers_generally(client, real_chat_w
     assert "NO_RELEVANT_CONTEXT" not in resp.text
 
 
+@pytest.mark.asyncio
 @pytest.mark.filterwarnings(
     "ignore:AnswerGenerationService is deprecated:DeprecationWarning"
 )
-def test_api_chat_documents_mention_persists_clean_question(client, real_chat_wiring):
+async def test_api_chat_documents_mention_persists_clean_question(
+    client, real_chat_wiring
+):
     """
-    @documents with nothing relevant: the request succeeds, no citations are
-    returned, and the persisted user message has the control mention stripped.
+    @documents with nothing relevant: clean persisted content.
     """
     _override_empty_retrieval(client)
     token, _user_id = get_user_token_and_id(client)
@@ -1515,13 +1573,16 @@ def test_api_chat_documents_mention_persists_clean_question(client, real_chat_wi
     assert resp.status_code == status.HTTP_200_OK
     assert resp.json()["citations"] == []
 
-    db = client.app.state.db_session_factory()
-    try:
-        rows = db.execute(
+    async_url = TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    direct_engine = create_async_engine(async_url, poolclass=NullPool)
+    direct_factory = async_sessionmaker(
+        bind=direct_engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with direct_factory() as session:
+        result = await session.execute(
             text("SELECT content FROM conversation_messages ORDER BY created_at, id")
-        ).fetchall()
-    finally:
-        db.close()
+        )
+        rows = result.fetchall()
     assert len(rows) == 2
     assert rows[0][0] == "When was Python created?"
     assert "@documents" not in rows[0][0]

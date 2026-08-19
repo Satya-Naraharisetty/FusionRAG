@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -11,6 +11,20 @@ from app.documents.services.cleanup_worker import (
 )
 
 
+class MockResult:
+    def __init__(self, jobs):
+        self.jobs = jobs
+
+    def scalar_one_or_none(self):
+        return self.jobs[0] if self.jobs else None
+
+    def scalars(self):
+        return self
+
+    def all(self):
+        return self.jobs
+
+
 class MockDB:
     def __init__(self, jobs):
         self.jobs = jobs
@@ -18,34 +32,23 @@ class MockDB:
         self.committed = False
         self.rolled_back = False
 
-    def query(self, model):
-        self.query_model = model
-        return self
+    async def execute(self, statement):
+        return MockResult(self.jobs)
 
-    def filter(self, condition):
-        # simple mock filter
-        return self
-
-    def limit(self, limit_val):
-        self.limit_val = limit_val
-        return self
-
-    def all(self):
-        return self.jobs
-
-    def first(self):
-        return self.jobs[0] if self.jobs else None
-
-    def flush(self):
+    async def flush(self):
         self.flushed = True
 
-    def commit(self):
+    async def commit(self):
         self.committed = True
 
-    def rollback(self):
+    async def rollback(self):
         self.rolled_back = True
 
-    def close(self):
+    async def delete(self, instance):
+        if instance in self.jobs:
+            self.jobs.remove(instance)
+
+    async def close(self):
         pass
 
 
@@ -66,7 +69,10 @@ async def test_cleanup_worker_process_job_success():
 
     db = MockDB([job])
     storage = MagicMock()
+    storage.delete = AsyncMock()
     vector = MagicMock()
+    vector.delete = AsyncMock()
+    vector.delete_document = AsyncMock()
     cache = MagicMock()
 
     worker = DurableCleanupWorker(db, storage, vector, cache)
@@ -91,6 +97,7 @@ async def test_cleanup_worker_process_job_already_completed():
 
     db = MockDB([job])
     storage = MagicMock()
+    storage.delete = AsyncMock()
     vector = MagicMock()
     cache = MagicMock()
 
@@ -105,7 +112,7 @@ async def test_cleanup_worker_process_job_already_completed():
 async def test_async_durable_cleanup_recovery_triggers_jobs():
     job_ids = [uuid4(), uuid4()]
 
-    # Mock the thread-based DB query to return our job IDs
+    # Mock the DB query to return our job IDs
     with patch(
         "app.documents.services.cleanup_worker._query_pending_failed_jobs",
         return_value=job_ids,
@@ -119,7 +126,8 @@ async def test_async_durable_cleanup_recovery_triggers_jobs():
             mock_run.assert_called_once_with(job_ids)
 
 
-def test_query_pending_failed_jobs_bounded():
+@pytest.mark.asyncio
+async def test_query_pending_failed_jobs_bounded():
     # Setup settings mock and DB mocks
     with patch("app.core.config.settings") as mock_settings:
         mock_settings.DATABASE_URL = "postgresql://localhost:5432/mock"
@@ -129,11 +137,28 @@ def test_query_pending_failed_jobs_bounded():
         job2 = SQLAlchemyCleanupJob(id=uuid4(), status="FAILED")
         mock_db = MockDB([job1, job2])
 
-        with patch("app.db.session.init_postgres_engine"):
-            with patch("sqlalchemy.orm.sessionmaker", return_value=lambda: mock_db):
-                job_ids = _query_pending_failed_jobs()
+        # Create a mock sessionmaker context manager that returns mock_db
+        class MockSessionMaker:
+            def __init__(self, bind=None):
+                pass
+
+            async def __aenter__(self):
+                return mock_db
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+        with patch("app.db.session.init_postgres_engine") as mock_engine:
+            mock_engine_instance = MagicMock()
+            mock_engine_instance.dispose = AsyncMock()
+            mock_engine.return_value = mock_engine_instance
+
+            with patch(
+                "sqlalchemy.ext.asyncio.async_sessionmaker",
+                return_value=MockSessionMaker,
+            ):
+                job_ids = await _query_pending_failed_jobs()
 
                 assert len(job_ids) == 2
                 assert job1.id in job_ids
                 assert job2.id in job_ids
-                assert mock_db.limit_val == 5

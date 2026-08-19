@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import pytest
+
 from app.documents.domain.models import (
     Chunk,
     Document,
@@ -15,23 +17,25 @@ class MockUnitOfWork:
         self.committed = False
         self.rolled_back = False
 
-    def commit(self):
+    async def commit(self):
         self.committed = True
 
-    def rollback(self):
+    async def rollback(self):
         self.rolled_back = True
 
 
-def test_embedding_service_batch_success(mocker):
-    generator = mocker.MagicMock()
-    generator.batch_generate.side_effect = lambda texts: [[0.1] * 1536 for _ in texts]
+@pytest.mark.asyncio
+async def test_embedding_service_batch_success(mocker):
+    generator = mocker.AsyncMock()
+    generator.batch_generate.side_effect = lambda texts: [[0.1] * 768 for _ in texts]
 
-    vector_store = mocker.MagicMock()
-    embedding_repo = mocker.MagicMock()
+    vector_store = mocker.AsyncMock()
+    embedding_repo = mocker.AsyncMock()
     embedding_repo.list_by_document.return_value = []
     embedding_repo.get_by_chunk.return_value = None
+    embedding_repo.get_by_chunk_ids.return_value = []
 
-    chunk_repo = mocker.MagicMock()
+    chunk_repo = mocker.AsyncMock()
     doc_id = uuid4()
     chunks = [
         Chunk(
@@ -48,7 +52,7 @@ def test_embedding_service_batch_success(mocker):
     ]
     chunk_repo.list_by_document.return_value = chunks
 
-    document_repo = mocker.MagicMock()
+    document_repo = mocker.AsyncMock()
     document = Document(
         id=doc_id,
         user_id=uuid4(),
@@ -81,36 +85,38 @@ def test_embedding_service_batch_success(mocker):
         time_provider=time_provider,
         uuid_generator=uuid_generator,
         batch_size=2,
-        provider_name="openai",
-        model_name="text-embedding-3-small",
-        dimension=1536,
+        provider_name="gemini",
+        model_name="text-embedding-004",
+        dimension=768,
         embedding_version="v1",
     )
 
-    service.generate_embeddings(doc_id)
+    await service.generate_embeddings(doc_id)
 
     assert generator.batch_generate.call_count == 3
     assert vector_store.upsert.call_count == 3
     assert embedding_repo.save.call_count == 10  # 5 for GENERATING, 5 for COMPLETED
 
 
-def test_embedding_service_batch_failure_isolation(mocker):
-    generator = mocker.MagicMock()
+@pytest.mark.asyncio
+async def test_embedding_service_batch_failure_isolation(mocker):
+    generator = mocker.AsyncMock()
 
     # Batch 1 (0, 1) succeeds, Batch 2 (2, 3) fails, Batch 3 (4) succeeds
-    def mock_batch_generate(texts):
+    async def mock_batch_generate(texts):
         if "chunk 2" in texts or "chunk 3" in texts:
-            raise RuntimeError("OpenAI API limit exceeded")
-        return [[0.1] * 1536 for _ in texts]
+            raise RuntimeError("Gemini API limit exceeded")
+        return [[0.1] * 768 for _ in texts]
 
     generator.batch_generate.side_effect = mock_batch_generate
 
-    vector_store = mocker.MagicMock()
-    embedding_repo = mocker.MagicMock()
+    vector_store = mocker.AsyncMock()
+    embedding_repo = mocker.AsyncMock()
     embedding_repo.list_by_document.return_value = []
     embedding_repo.get_by_chunk.return_value = None
+    embedding_repo.get_by_chunk_ids.return_value = []
 
-    chunk_repo = mocker.MagicMock()
+    chunk_repo = mocker.AsyncMock()
     doc_id = uuid4()
     chunks = [
         Chunk(
@@ -127,7 +133,7 @@ def test_embedding_service_batch_failure_isolation(mocker):
     ]
     chunk_repo.list_by_document.return_value = chunks
 
-    document_repo = mocker.MagicMock()
+    document_repo = mocker.AsyncMock()
     document = Document(
         id=doc_id,
         user_id=uuid4(),
@@ -160,13 +166,13 @@ def test_embedding_service_batch_failure_isolation(mocker):
         time_provider=time_provider,
         uuid_generator=uuid_generator,
         batch_size=2,
-        provider_name="openai",
-        model_name="text-embedding-3-small",
-        dimension=1536,
+        provider_name="gemini",
+        model_name="text-embedding-004",
+        dimension=768,
         embedding_version="v1",
     )
 
-    service.generate_embeddings(doc_id)
+    await service.generate_embeddings(doc_id)
 
     # Gather saved embedding records from repo mock
     saved_embeddings = [call[0][0] for call in embedding_repo.save.call_args_list]
@@ -190,18 +196,23 @@ def test_embedding_service_batch_failure_isolation(mocker):
     assert chunks[3].id in failed_ids
 
 
-def test_embedding_service_batch_no_n_plus_1(mocker):
-    generator = mocker.MagicMock()
-    generator.batch_generate.side_effect = lambda texts: [[0.1] * 1536 for _ in texts]
+@pytest.mark.asyncio
+async def test_embedding_service_batch_no_n_plus_1(mocker):
+    generator = mocker.AsyncMock()
+    generator.batch_generate.side_effect = lambda texts: [[0.1] * 768 for _ in texts]
 
-    vector_store = mocker.MagicMock()
-    embedding_repo = mocker.MagicMock()
+    vector_store = mocker.AsyncMock()
+    embedding_repo = mocker.AsyncMock()
+    embedding_repo.list_by_document.return_value = []
     embedding_repo.get_by_chunk_ids.return_value = []
-    embedding_repo.get_by_chunk.side_effect = AssertionError(
-        "get_by_chunk was called! Expected N+1 query elimination."
-    )
 
-    chunk_repo = mocker.MagicMock()
+    # get_by_chunk has side_effect raise AssertionError
+    async def raise_assert(*args, **kwargs):
+        raise AssertionError("get_by_chunk was called! Expected N+1 query elimination.")
+
+    embedding_repo.get_by_chunk.side_effect = raise_assert
+
+    chunk_repo = mocker.AsyncMock()
     doc_id = uuid4()
     chunks = [
         Chunk(
@@ -218,7 +229,7 @@ def test_embedding_service_batch_no_n_plus_1(mocker):
     ]
     chunk_repo.list_by_document.return_value = chunks
 
-    document_repo = mocker.MagicMock()
+    document_repo = mocker.AsyncMock()
     document = Document(
         id=doc_id,
         user_id=uuid4(),
@@ -249,13 +260,13 @@ def test_embedding_service_batch_no_n_plus_1(mocker):
         time_provider=time_provider,
         uuid_generator=uuid_generator,
         batch_size=2,
-        provider_name="openai",
-        model_name="text-embedding-3-small",
-        dimension=1536,
+        provider_name="gemini",
+        model_name="text-embedding-004",
+        dimension=768,
         embedding_version="v1",
     )
 
-    service.generate_embeddings(doc_id)
+    await service.generate_embeddings(doc_id)
 
     # Verify that get_by_chunk was never called
     embedding_repo.get_by_chunk.assert_not_called()

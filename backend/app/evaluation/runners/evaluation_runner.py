@@ -1,9 +1,11 @@
+import inspect
 import logging
 import time
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.evaluation.domain.models import EvaluationDataset
@@ -19,6 +21,13 @@ from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
 from app.evaluation.services.tool_evaluator import ToolEvaluator
 
 logger = logging.getLogger(__name__)
+
+
+async def _safe_commit(db: Any) -> None:
+    if hasattr(db, "commit"):
+        res = db.commit()
+        if inspect.isawaitable(res):
+            await res
 
 
 class EvaluationRunner:
@@ -45,7 +54,7 @@ class EvaluationRunner:
 
     async def run_evaluation(
         self,
-        db: Session,
+        db: AsyncSession,
         dataset: EvaluationDataset,
         profile: str,
         pipelines: list[str],
@@ -66,9 +75,7 @@ class EvaluationRunner:
             dataset_id=dataset.dataset_id,
             dataset_version=dataset.version,
             provider=settings.LLM_PROVIDER,
-            model=settings.GEMINI_CHAT_MODEL
-            if settings.LLM_PROVIDER == "gemini"
-            else settings.OPENAI_CHAT_MODEL,
+            model=settings.GEMINI_CHAT_MODEL,
             temperature=settings.TEMPERATURE,
             embedding_model=settings.EMBEDDING_MODEL,
             reranker="identity_reranker",
@@ -81,7 +88,7 @@ class EvaluationRunner:
             completed_samples=0,
         )
         db.add(run_record)
-        db.commit()
+        await _safe_commit(db)
 
         start_time = time.perf_counter()
 
@@ -111,11 +118,8 @@ class EvaluationRunner:
                 for sample in samples:
                     if "actual_answer" not in sample.metadata:
                         sample.metadata["actual_answer"] = (
-                            f"This is a simulated grounded answer containing references to ground truth: {sample.expected_answer or ''}"
+                            f"Simulated generated response for: {sample.question}"
                         )
-                        sample.metadata["input_tokens"] = 300
-                        sample.metadata["output_tokens"] = 150
-                        sample.metadata["cost"] = 0.00045
 
                 generation_results = await self.ragas_provider.evaluate(
                     samples,
@@ -128,22 +132,17 @@ class EvaluationRunner:
                     mock=mock,
                 )
 
-            # --- Pipeline C: Agent Benchmark ---
+            # --- Pipeline C: Agentic Benchmark ---
             agent_results = []
             if "agent" in pipelines:
-                logger.info("Starting Agent Pipeline...")
-                for sample in samples:
-                    if "reasoning_steps" not in sample.metadata:
-                        sample.metadata["reasoning_steps"] = (
-                            2 if sample.tools_required else 0
-                        )
-                        sample.metadata["actual_tools"] = sample.expected_tools or []
-
+                logger.info("Starting Agentic Tools Pipeline...")
                 agent_results = await self.agent_evaluator.evaluate_samples(
                     samples, mock=mock
                 )
+                for ag, sample in zip(agent_results, samples, strict=True):
+                    sample.metadata["tool_calls"] = ag.metadata.get("tool_calls", [])
 
-            # --- Pipeline D: Conversation Benchmark ---
+            # --- Pipeline D: Conversation & Rewrite Benchmark ---
             conversation_results = []
             if "conversation" in pipelines:
                 logger.info("Starting Conversation Pipeline...")
@@ -164,6 +163,11 @@ class EvaluationRunner:
                 )
 
             # 2. Consolidate results for each sample
+            total_in = 0
+            total_out = 0
+            total_cost = 0.0
+            latencies: list[float] = []
+
             for idx, sample in enumerate(samples):
                 sample_metrics = []
                 sample_contexts = []
@@ -192,6 +196,11 @@ class EvaluationRunner:
                         cost += res.cost
                         if res.error_category != "None":
                             error_cat = res.error_category
+
+                total_in += in_tokens
+                total_out += out_tokens
+                total_cost += cost
+                latencies.append(latency)
 
                 # Save SQLAlchemyResult
                 db_result = SQLAlchemyEvaluationResult(
@@ -223,14 +232,9 @@ class EvaluationRunner:
                 run_record.completed_samples += 1
 
             # 3. Update Aggregates & Cost details
-            db.commit()
+            await _safe_commit(db)
 
             total_duration = time.perf_counter() - start_time
-            total_in = sum(r.input_tokens for r in run_record.results)
-            total_out = sum(r.output_tokens for r in run_record.results)
-            total_cost = sum(r.cost for r in run_record.results)
-            latencies = [r.latency for r in run_record.results]
-
             run_record.total_input_tokens = total_in
             run_record.total_output_tokens = total_out
             run_record.total_cost = total_cost
@@ -248,7 +252,7 @@ class EvaluationRunner:
             logger.exception("Evaluation run crashed during execution.")
             run_record.status = "FAILED"
             run_record.error_message = str(e)
-            db.commit()
+            await _safe_commit(db)
 
-        db.commit()
+        await _safe_commit(db)
         return run_record
