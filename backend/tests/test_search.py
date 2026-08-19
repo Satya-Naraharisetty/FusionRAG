@@ -16,6 +16,7 @@ from app.api.dependencies import (
 )
 from app.auth.infrastructure.persistence.models import SQLAlchemyUser
 from app.core.config import settings
+from app.db.models import Base
 from app.documents.domain.exceptions import UnauthorizedDocumentAccess
 from app.documents.domain.models import Chunk, RetrievedChunk, SearchResult
 from app.documents.infrastructure.persistence.models import (
@@ -31,6 +32,7 @@ from tests.db import TEST_DATABASE_URL
 
 
 def _sync_setup_search_db(sync_engine):
+    Base.metadata.create_all(bind=sync_engine)
     sync_session_local = sessionmaker(
         autocommit=False, autoflush=False, bind=sync_engine
     )

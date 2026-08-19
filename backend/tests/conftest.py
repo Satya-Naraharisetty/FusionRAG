@@ -87,6 +87,27 @@ def _reset_process_global_state():
     app.main.app.dependency_overrides.clear()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _ensure_test_database_schema():
+    """
+    Ensure all database tables exist before any tests run, supporting
+    arbitrary test execution order against fresh databases (e.g. CI).
+    """
+    try:
+        from sqlalchemy import create_engine
+        from sqlalchemy.pool import NullPool
+
+        from app.db.models import Base
+        from tests.db import TEST_DATABASE_URL
+
+        sync_engine = create_engine(TEST_DATABASE_URL, poolclass=NullPool)
+        Base.metadata.create_all(bind=sync_engine)
+        sync_engine.dispose()
+    except Exception:
+        # Non-database testing environments
+        pass
+
+
 @pytest.fixture(scope="module")
 def client():
     """

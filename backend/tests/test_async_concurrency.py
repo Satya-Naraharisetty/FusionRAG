@@ -3,7 +3,7 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -11,6 +11,7 @@ from app.auth.domain.schemas import UserDomain
 from app.auth.infrastructure.persistence.repositories.user_repository import (
     SQLAlchemyUserRepository,
 )
+from app.db.models import Base
 from tests.db import TEST_DATABASE_URL
 
 ASYNC_TEST_DATABASE_URL = (
@@ -22,6 +23,12 @@ ASYNC_TEST_DATABASE_URL = (
 
 @pytest.fixture(scope="function")
 async def concurrency_async_db():
+    sync_engine = create_engine(TEST_DATABASE_URL, poolclass=NullPool)
+    try:
+        Base.metadata.create_all(bind=sync_engine)
+    finally:
+        sync_engine.dispose()
+
     engine = create_async_engine(ASYNC_TEST_DATABASE_URL, poolclass=NullPool)
     session_factory = async_sessionmaker(
         bind=engine,
