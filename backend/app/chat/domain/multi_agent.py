@@ -33,6 +33,14 @@ class AgentFailureReason(str, Enum):
     UNAUTHORIZED = "UNAUTHORIZED"
 
 
+class EvaluationDecision(str, Enum):
+    SUFFICIENT = "SUFFICIENT"
+    INSUFFICIENT = "INSUFFICIENT"
+    PARTIAL = "PARTIAL"
+    RETRYABLE_FAILURE = "RETRYABLE_FAILURE"
+    TERMINAL_FAILURE = "TERMINAL_FAILURE"
+
+
 class EvidenceItem(BaseModel):
     chunk_id: UUID | None = None
     document_id: UUID | None = None
@@ -49,6 +57,10 @@ class AgentTask(BaseModel):
     dependencies: list[str] = Field(default_factory=list)
     parameters: dict[str, Any] = Field(default_factory=dict)
     priority: int = 0
+    expected_outputs: list[str] = Field(default_factory=list)
+    required_evidence: list[str] = Field(default_factory=list)
+    is_required: bool = True
+    retryable: bool = True
 
 
 class AgentResult(BaseModel):
@@ -63,6 +75,26 @@ class AgentResult(BaseModel):
     error: str | None = None
     failure_reason: AgentFailureReason | None = None
     execution_time_ms: float = 0.0
+
+
+class MissingRequirement(BaseModel):
+    requirement: str
+    reason: str
+    suggested_agent_type: AgentType | None = None
+    priority: int = 0
+
+
+class ResultEvaluation(BaseModel):
+    decision: EvaluationDecision
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    evidence_count: int = 0
+    successful_tasks: list[str] = Field(default_factory=list)
+    failed_tasks: list[str] = Field(default_factory=list)
+    missing_requirements: list[MissingRequirement] = Field(default_factory=list)
+    contradictions: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+    should_replan: bool = False
+    reason: str = ""
 
 
 class AgentExecutionContext(BaseModel):
@@ -107,6 +139,16 @@ class MultiAgentDiagnostics(BaseModel):
     task_latencies: dict[str, float] = Field(default_factory=dict)
     failed_tasks: list[str] = Field(default_factory=list)
     limits_reached: list[str] = Field(default_factory=list)
+    evaluation_count: int = 0
+    replans: int = 0
+    initial_task_count: int = 0
+    final_task_count: int = 0
+    avoided_duplicate_tasks: int = 0
+    retry_count: int = 0
+    evaluation_latency_ms: float = 0.0
+    planning_latency_ms: float = 0.0
+    execution_latency_ms: float = 0.0
+    synthesis_latency_ms: float = 0.0
 
 
 class MultiAgentResponse(BaseModel):

@@ -13,14 +13,14 @@ from app.chat.domain.multi_agent import (
 logger = logging.getLogger(__name__)
 
 SYNTHESIS_SYSTEM_PROMPT = """You are a precise, grounded synthesis agent in a multi-agent system.
-Your responsibility is to synthesize a final answer to the user's question using ONLY the provided evidence and specialist findings.
+Your responsibility is to synthesize a final answer to the user's question using ONLY the provided evidence items and successful specialist findings.
 
 STRICT EVIDENCE INTEGRITY RULES:
-1. Ground your response strictly in the provided evidence items and specialist results.
-2. Do NOT invent or hallucinate document IDs, chunk IDs, URLs, citations, or facts.
-3. If the provided evidence is empty, conflicting, or insufficient to answer the question completely, you MUST explicitly state that the evidence is insufficient.
-4. If a specialist task reported a failure, acknowledge the limitation honestly without speculating.
-5. Provide clear, well-structured, and helpful answers matching the user's requested detail."""
+1. Ground your factual statements strictly in the provided evidence items and successful specialist outputs.
+2. Failed or skipped specialist task descriptions are diagnostic warnings only. Do NOT treat failed task error messages or unexecuted steps as factual evidence.
+3. Do NOT invent or hallucinate document IDs, chunk IDs, URLs, citations, or facts.
+4. If the provided evidence is empty, conflicting, or insufficient to answer the question completely, you MUST explicitly state that the evidence is insufficient.
+5. If a specialist task reported a failure or was skipped, acknowledge the limitation honestly without speculating."""
 
 
 class SynthesisAgent:
@@ -41,11 +41,12 @@ class SynthesisAgent:
     def _build_synthesis_prompt(self, request: SynthesisRequest) -> list[ChatMessage]:
         """Constructs grounded chat messages from specialist results and original user query."""
         evidence_sections: list[str] = []
-        specialist_summaries: list[str] = []
+        successful_summaries: list[str] = []
+        diagnostic_failures: list[str] = []
 
         for res in request.specialist_results:
             if res.success:
-                specialist_summaries.append(
+                successful_summaries.append(
                     f"[{res.agent_type.value} Task '{res.task_id}']:\n{res.output}"
                 )
                 for ev in res.evidence:
@@ -54,8 +55,8 @@ class SynthesisAgent:
                         f"--- Source: {doc_label} ---\n{ev.content}"
                     )
             else:
-                specialist_summaries.append(
-                    f"[{res.agent_type.value} Task '{res.task_id}' (FAILED)]: {res.error or 'Task failed'}"
+                diagnostic_failures.append(
+                    f"[{res.agent_type.value} Task '{res.task_id}' ({res.status.value})]: {res.error or 'Task failed'}"
                 )
 
         combined_evidence = (
@@ -63,16 +64,22 @@ class SynthesisAgent:
             if evidence_sections
             else "(No document chunks retrieved)"
         )
-        combined_specialist = (
-            "\n\n".join(specialist_summaries)
-            if specialist_summaries
-            else "(No specialist outputs)"
+        combined_successful = (
+            "\n\n".join(successful_summaries)
+            if successful_summaries
+            else "(No successful specialist outputs)"
+        )
+        combined_failures = (
+            "\n".join(diagnostic_failures)
+            if diagnostic_failures
+            else "(None - all tasks executed successfully)"
         )
 
         user_content = (
             f"User Question: {request.original_request}\n\n"
-            f"=== Specialist Agent Findings ===\n{combined_specialist}\n\n"
+            f"=== Successful Specialist Findings ===\n{combined_successful}\n\n"
             f"=== Grounded Evidence ===\n{combined_evidence}\n\n"
+            f"=== Diagnostic Notices / Incomplete Operations ===\n{combined_failures}\n\n"
             f"Please synthesize the final answer for the user based strictly on the above evidence:"
         )
 
