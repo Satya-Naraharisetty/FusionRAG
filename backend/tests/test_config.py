@@ -1,4 +1,6 @@
-from app.core.config import Settings
+import pytest
+
+from app.core.config import ConfigurationError, Settings
 
 
 def test_settings_parsing():
@@ -30,16 +32,7 @@ def test_cors_origins_single_source_of_truth():
     dockerized frontend (port 80) origins change, update this test AND the
     default in app/core/config.py together.
     """
-    settings = Settings(
-        POSTGRES_SERVER="localhost",
-        POSTGRES_USER="test_user",
-        POSTGRES_PASSWORD="test_password",
-        POSTGRES_DB="test_database",
-        REDIS_HOST="localhost",
-        QDRANT_HOST="localhost",
-    )
-
-    origins = settings.BACKEND_CORS_ORIGINS
+    origins = Settings.model_fields["BACKEND_CORS_ORIGINS"].default
 
     # Vite dev server origins must always be allowed.
     assert "http://localhost:5173" in origins
@@ -100,3 +93,114 @@ def test_supabase_url_parsing_and_pgbouncer_strip():
         settings.DATABASE_URL
         == "postgresql://user:pass@pooler.supabase.com:6543/db?sslmode=require"
     )
+
+
+def test_production_fails_when_secrets_missing():
+    """
+    Verify that in production mode (ENV=production), required secrets cannot be missing.
+    """
+    # 1. Missing Gemini key when gemini is active LLM provider
+    with pytest.raises(ConfigurationError, match="GEMINI_API_KEY is required"):
+        Settings(
+            ENV="production",
+            POSTGRES_SERVER="localhost",
+            POSTGRES_USER="test_user",
+            POSTGRES_PASSWORD="test_password",
+            POSTGRES_DB="test_database",
+            REDIS_HOST="localhost",
+            QDRANT_HOST="localhost",
+            JWT_SECRET="a_very_long_secure_secret_signing_key_32_bytes_long",
+            LLM_PROVIDER="gemini",
+            GEMINI_API_KEY="",
+        )
+
+    # 2. Missing OpenAI key when openai is active LLM provider
+    with pytest.raises(ConfigurationError, match="OPENAI_API_KEY is required"):
+        Settings(
+            ENV="production",
+            POSTGRES_SERVER="localhost",
+            POSTGRES_USER="test_user",
+            POSTGRES_PASSWORD="test_password",
+            POSTGRES_DB="test_database",
+            REDIS_HOST="localhost",
+            QDRANT_HOST="localhost",
+            JWT_SECRET="a_very_long_secure_secret_signing_key_32_bytes_long",
+            LLM_PROVIDER="openai",
+            GEMINI_API_KEY="valid_key",
+            OPENAI_API_KEY="",
+        )
+
+
+def test_production_rejects_insecure_jwt_secret():
+    """
+    Verify that in production mode, short or placeholder JWT_SECRET is rejected.
+    """
+    # Too short
+    with pytest.raises(
+        ConfigurationError, match="JWT_SECRET must be at least 32 characters"
+    ):
+        Settings(
+            ENV="production",
+            POSTGRES_SERVER="localhost",
+            POSTGRES_USER="test_user",
+            POSTGRES_PASSWORD="test_password",
+            POSTGRES_DB="test_database",
+            REDIS_HOST="localhost",
+            QDRANT_HOST="localhost",
+            JWT_SECRET="short_secret",
+            GEMINI_API_KEY="valid_key",
+        )
+
+    # Development placeholder
+    with pytest.raises(
+        ConfigurationError,
+        match="JWT_SECRET contains an insecure development/testing placeholder",
+    ):
+        Settings(
+            ENV="production",
+            POSTGRES_SERVER="localhost",
+            POSTGRES_USER="test_user",
+            POSTGRES_PASSWORD="test_password",
+            POSTGRES_DB="test_database",
+            REDIS_HOST="localhost",
+            QDRANT_HOST="localhost",
+            JWT_SECRET="super_secure_random_development_signing_key_32_bytes_at_least",
+            GEMINI_API_KEY="valid_key",
+        )
+
+
+def test_oauth_client_secret_required():
+    """
+    Verify that in production mode, if an OAuth client ID is set, the corresponding secret is required.
+    """
+    # Google OAuth ID set but secret missing
+    with pytest.raises(ConfigurationError, match="GOOGLE_CLIENT_SECRET is required"):
+        Settings(
+            ENV="production",
+            POSTGRES_SERVER="localhost",
+            POSTGRES_USER="test_user",
+            POSTGRES_PASSWORD="test_password",
+            POSTGRES_DB="test_database",
+            REDIS_HOST="localhost",
+            QDRANT_HOST="localhost",
+            JWT_SECRET="a_very_long_secure_secret_signing_key_32_bytes_long",
+            GEMINI_API_KEY="valid_key",
+            GOOGLE_CLIENT_ID="google_id",
+            GOOGLE_CLIENT_SECRET="",
+        )
+
+    # GitHub OAuth ID set but secret missing
+    with pytest.raises(ConfigurationError, match="GITHUB_CLIENT_SECRET is required"):
+        Settings(
+            ENV="production",
+            POSTGRES_SERVER="localhost",
+            POSTGRES_USER="test_user",
+            POSTGRES_PASSWORD="test_password",
+            POSTGRES_DB="test_database",
+            REDIS_HOST="localhost",
+            QDRANT_HOST="localhost",
+            JWT_SECRET="a_very_long_secure_secret_signing_key_32_bytes_long",
+            GEMINI_API_KEY="valid_key",
+            GITHUB_CLIENT_ID="github_id",
+            GITHUB_CLIENT_SECRET="",
+        )

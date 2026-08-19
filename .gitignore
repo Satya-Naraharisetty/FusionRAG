@@ -148,8 +148,13 @@ activemq-data/
 *.sage.py
 
 # Environments
+# Real .env files (never commit these)
 .env
+.env.*
 .envrc
+# ALWAYS allow example/template env files to be tracked
+!.env.example
+!.env.*.example
 .venv
 .venv/
 env/
@@ -234,13 +239,43 @@ node_modules/
 .env*.local
 *.local
 
-# SSL certificates and keys
+# Frontend environment files (only .env.example should be tracked)
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+!frontend/.env.*.example
+
+# Private keys, certificates, and credential files
 nginx-ssl/
 *.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
+.netrc
+id_rsa
+id_ed25519
+id_ecdsa
+*.asc
 
-# Environment files with secrets
+# Environment files with secrets (belt-and-suspenders)
 .env.production
 .env.production.local
+
+# Secret scanner reports (never commit scan output with potential matches)
+gitleaks-report.json
+gitleaks-report.sarif
+.secrets.baseline
+
+# Local database files
+*.db
+*.sqlite
+*.sqlite3
+!*example*.sqlite3
 
 
 .vscode/

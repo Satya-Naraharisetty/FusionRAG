@@ -1,0 +1,9 @@
+[allowlist]
+description = "Global allowlist for examples, templates, and tests"
+paths = [
+    '''backend/\.env\.example$''',
+    '''frontend/\.env\.example$''',
+    '''backend/tests/.*''',
+    '''docs/SECURITY\.md$''',
+    '''\.gitleaks\.toml$''',
+]

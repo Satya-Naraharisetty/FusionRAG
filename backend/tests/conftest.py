@@ -13,6 +13,9 @@ os.environ["REDIS_HOST"] = "mock_redis"
 os.environ["QDRANT_HOST"] = "mock_qdrant"
 os.environ["OPENAI_API_KEY"] = "mock-key"
 os.environ["JWT_SECRET"] = "mock_secret"
+os.environ["BACKEND_CORS_ORIGINS"] = (
+    '["http://localhost:5173","http://127.0.0.1:5173","http://localhost","http://127.0.0.1"]'
+)
 
 
 # 2. Patch database connection helper functions before app.main imports them

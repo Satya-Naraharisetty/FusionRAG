@@ -2,7 +2,7 @@ import json
 import os
 from typing import Annotated, Any, Literal
 
-from pydantic import ValidationInfo, field_validator
+from pydantic import ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -345,6 +345,98 @@ class Settings(BaseSettings):
         if v <= 0:
             raise ValueError("INDEX_CACHE_MAX_USERS must be greater than zero.")
         return v
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if self.ENV == "production":
+            # 1. JWT_SECRET checks
+            if not getattr(self, "JWT_SECRET", None):
+                raise ConfigurationError("JWT_SECRET is required in production.")
+
+            jwt_sec = self.JWT_SECRET
+            # Check length: sufficiently long (>= 32 bytes)
+            if len(jwt_sec) < 32:
+                raise ConfigurationError(
+                    "JWT_SECRET must be at least 32 characters long in production."
+                )
+
+            # Known placeholders check
+            known_placeholders = {
+                "super_secure_random_development_signing_key_32_bytes_at_least",
+                "testing_secret",
+                "mock_secret",
+                "ci_test_secret",
+                "placeholder",
+            }
+            if jwt_sec.lower() in known_placeholders or any(
+                p in jwt_sec.lower() for p in ["development", "testing", "mock"]
+            ):
+                raise ConfigurationError(
+                    "JWT_SECRET contains an insecure development/testing placeholder in production."
+                )
+
+            # 2. LLM Provider keys
+            # Gemini key check
+            if (
+                getattr(self, "LLM_PROVIDER", None) == "gemini"
+                or getattr(self, "EMBEDDING_PROVIDER", None) == "gemini"
+            ):
+                gemini_key = getattr(self, "GEMINI_API_KEY", "")
+                if not gemini_key or gemini_key.strip() in (
+                    "",
+                    "your_gemini_api_key_here",
+                ):
+                    raise ConfigurationError(
+                        "GEMINI_API_KEY is required in production when Gemini is enabled."
+                    )
+
+            # OpenAI key check
+            if (
+                getattr(self, "LLM_PROVIDER", None) == "openai"
+                or getattr(self, "LLM_PROVIDER_BACKUP", None) == "openai"
+            ):
+                openai_key = getattr(self, "OPENAI_API_KEY", "")
+                if not openai_key or openai_key.strip() in (
+                    "",
+                    "your_openai_api_key_here",
+                    "mock_key",
+                ):
+                    raise ConfigurationError(
+                        "OPENAI_API_KEY is required in production when OpenAI is active or backup."
+                    )
+
+            # 3. OAuth checks
+            google_id = getattr(self, "GOOGLE_CLIENT_ID", "")
+            google_secret = getattr(self, "GOOGLE_CLIENT_SECRET", "")
+            if google_id and not google_secret:
+                raise ConfigurationError(
+                    "GOOGLE_CLIENT_SECRET is required when GOOGLE_CLIENT_ID is configured."
+                )
+
+            github_id = getattr(self, "GITHUB_CLIENT_ID", "")
+            github_secret = getattr(self, "GITHUB_CLIENT_SECRET", "")
+            if github_id and not github_secret:
+                raise ConfigurationError(
+                    "GITHUB_CLIENT_SECRET is required when GITHUB_CLIENT_ID is configured."
+                )
+
+        return self
+
+    def __repr__(self) -> str:
+        sensitive_patterns = {"key", "secret", "password", "url"}
+        public_fields = {}
+        for k, v in self.__dict__.items():
+            if any(pattern in k.lower() for pattern in sensitive_patterns) and v:
+                public_fields[k] = "********"
+            else:
+                public_fields[k] = v
+        field_reprs = [
+            f"{k}={repr(v)}" for k, v in public_fields.items() if not k.startswith("_")
+        ]
+        return f"Settings({', '.join(field_reprs)})"
+
+    def __str__(self) -> str:
+        return self.__repr__()
 
     model_config = SettingsConfigDict(
         case_sensitive=True,

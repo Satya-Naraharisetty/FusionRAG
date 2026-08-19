@@ -15,7 +15,6 @@ jobs:
       POSTGRES_DB: hybrid_rag
       REDIS_HOST: localhost
       QDRANT_HOST: localhost
-      JWT_SECRET: testing_secret
     services:
       postgres:
         image: postgres:15
@@ -33,6 +32,9 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Generate CI JWT secret
+        run: echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Set up Python
         uses: actions/setup-python@v5
