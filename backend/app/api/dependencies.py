@@ -495,6 +495,14 @@ def get_chunk_repository(db: AsyncSession = Depends(get_db)) -> ChunkRepository:
     return SQLAlchemyChunkRepository(db)
 
 
+def get_document_repository(db: AsyncSession = Depends(get_db)) -> Any:
+    from app.documents.infrastructure.persistence.repositories.document_repository import (
+        SQLAlchemyDocumentRepository,
+    )
+
+    return SQLAlchemyDocumentRepository(db)
+
+
 def get_search_ranker() -> SearchRanker:
     from app.documents.services.ranking import SemanticSearchRanker
 
@@ -913,6 +921,68 @@ def get_agent_executor(
     )
 
 
+def get_research_agent(
+    retrieval_service=Depends(get_retrieval_service),
+) -> Any:
+    from app.chat.services.multi_agent.research_agent import ResearchAgent
+
+    return ResearchAgent(retrieval_service)
+
+
+def get_document_agent(
+    document_repo=Depends(get_document_repository),
+    chunk_repo=Depends(get_chunk_repository),
+) -> Any:
+    from app.chat.services.multi_agent.document_agent import DocumentAgent
+
+    return DocumentAgent(document_repo=document_repo, chunk_repo=chunk_repo)
+
+
+def get_analysis_agent() -> Any:
+    from app.chat.services.multi_agent.analysis_agent import AnalysisAgent
+
+    return AnalysisAgent()
+
+
+def get_agent_execution_engine(
+    research_agent=Depends(get_research_agent),
+    document_agent=Depends(get_document_agent),
+    analysis_agent=Depends(get_analysis_agent),
+) -> Any:
+    from app.chat.services.multi_agent.execution_engine import AgentExecutionEngine
+
+    return AgentExecutionEngine(
+        specialist_agents=[research_agent, document_agent, analysis_agent],
+        max_specialist_tasks=settings.MAX_SPECIALIST_TASKS,
+        max_total_calls=settings.MAX_TOTAL_AGENT_CALLS,
+        task_timeout=settings.MULTI_AGENT_TASK_TIMEOUT,
+    )
+
+
+def get_synthesis_agent(
+    llm_provider=Depends(get_llm_provider),
+) -> Any:
+    from app.chat.services.multi_agent.synthesis_agent import SynthesisAgent
+
+    return SynthesisAgent(llm_provider)
+
+
+def get_master_agent(
+    llm_provider=Depends(get_llm_provider),
+    execution_engine=Depends(get_agent_execution_engine),
+    synthesis_agent=Depends(get_synthesis_agent),
+) -> Any:
+    from app.chat.services.multi_agent.master_agent import MasterAgent
+
+    return MasterAgent(
+        llm_provider=llm_provider,
+        execution_engine=execution_engine,
+        synthesis_agent=synthesis_agent,
+        max_plan_iterations=settings.MAX_PLAN_ITERATIONS,
+        max_total_calls=settings.MAX_TOTAL_AGENT_CALLS,
+    )
+
+
 def get_chat_orchestrator(
     retrieval_service=Depends(get_retrieval_service),
     prompt_builder=Depends(get_prompt_builder),
@@ -921,6 +991,7 @@ def get_chat_orchestrator(
     conversation_manager=Depends(get_conversation_manager),
     conversation_context_builder=Depends(get_conversation_context_builder),
     agent_executor=Depends(get_agent_executor),
+    master_agent=Depends(get_master_agent),
 ) -> Any:
     from app.chat.services.chat_orchestrator import ChatOrchestrator
     from app.chat.services.llm_generation_service import LLMGenerationService
@@ -935,6 +1006,7 @@ def get_chat_orchestrator(
         conversation_manager=conversation_manager,
         context_builder=conversation_context_builder,
         agent_executor=agent_executor,
+        master_agent=master_agent,
         model=model,
         temperature=settings.TEMPERATURE,
         max_response_tokens=settings.MAX_RESPONSE_TOKENS,
@@ -944,6 +1016,7 @@ def get_chat_orchestrator(
         max_memory_tokens=settings.MAX_MEMORY_TOKENS,
         enable_conversation_memory=settings.ENABLE_CONVERSATION_MEMORY,
         enable_tool_calling=settings.ENABLE_TOOL_CALLING,
+        enable_multi_agent=settings.ENABLE_MULTI_AGENT,
     )
 
 

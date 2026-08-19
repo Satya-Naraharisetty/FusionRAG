@@ -249,6 +249,13 @@ class Settings(BaseSettings):
     TOOL_AUTO_RETRY_COUNT: int = 1
     TOOL_RECURSION_PROTECTION: bool = True
 
+    # Multi-Agent Master-Worker Configurations
+    ENABLE_MULTI_AGENT: bool = True
+    MAX_PLAN_ITERATIONS: int = 2
+    MAX_SPECIALIST_TASKS: int = 5
+    MAX_TOTAL_AGENT_CALLS: int = 8
+    MULTI_AGENT_TASK_TIMEOUT: float = 20.0
+
     # Evaluation & Benchmarking Configurations
     ENABLE_EVALUATION: bool = True
     ENABLE_RAGAS: bool = True

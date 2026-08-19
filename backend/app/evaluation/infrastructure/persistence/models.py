@@ -43,7 +43,10 @@ class SQLAlchemyEvaluationRun(Base):
     )
 
     results: Mapped[list["SQLAlchemyEvaluationResult"]] = relationship(
-        "SQLAlchemyEvaluationResult", back_populates="run", cascade="all, delete-orphan"
+        "SQLAlchemyEvaluationResult",
+        back_populates="run",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
 

@@ -55,7 +55,7 @@ async def main() -> None:
     print("=" * 40)
 
     # Calculate averages
-    averages = {}
+    averages: dict[str, list[float]] = {}
     for r in results:
         for m in r.metrics:
             averages[m.name] = averages.get(m.name, []) + [m.score]

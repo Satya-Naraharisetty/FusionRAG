@@ -6,7 +6,7 @@ import sys
 # Ensure backend directory is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.dependencies import (
     get_chunk_repository,
@@ -52,20 +52,23 @@ async def main() -> None:
     args = parser.parse_args()
 
     # 1. Establish DB session
-    engine = init_postgres_engine(settings.DATABASE_URL)
+    engine = init_postgres_engine(settings.DATABASE_URL or "")
 
     # Ensure all evaluation models are created (since they might be missing from alembic migrations)
     from app.evaluation.infrastructure.persistence.models import Base
 
-    Base.metadata.create_all(bind=engine)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
-    session_local = sessionmaker(bind=engine)
+    session_local = async_sessionmaker(
+        bind=engine, class_=AsyncSession, expire_on_commit=False
+    )
     db = session_local()
 
     try:
         # 2. Resolve retrieval service and evaluators
         generator = get_embedding_generator()
-        vector_store = get_vector_store(request=None)
+        vector_store = get_vector_store()
         chunk_repo = get_chunk_repository(db)
         index_cache = get_index_cache()
 
@@ -139,8 +142,8 @@ async def main() -> None:
         traceback.print_exc()
         sys.exit(1)
     finally:
-        db.close()
-        engine.dispose()
+        await db.close()
+        await engine.dispose()
 
 
 if __name__ == "__main__":

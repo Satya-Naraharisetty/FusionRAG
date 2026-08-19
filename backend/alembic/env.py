@@ -59,8 +59,8 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    url = settings.DATABASE_URL
-    if url and url.startswith("postgresql+asyncpg://"):
+    url = str(settings.DATABASE_URL or "")
+    if url.startswith("postgresql+asyncpg://"):
         url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
     connectable = create_engine(
         url,

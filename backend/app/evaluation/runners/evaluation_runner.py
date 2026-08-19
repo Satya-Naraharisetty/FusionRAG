@@ -252,7 +252,20 @@ class EvaluationRunner:
             logger.exception("Evaluation run crashed during execution.")
             run_record.status = "FAILED"
             run_record.error_message = str(e)
-            await _safe_commit(db)
-
         await _safe_commit(db)
+        try:
+            from sqlalchemy import select
+            from sqlalchemy.orm import selectinload
+
+            stmt = (
+                select(SQLAlchemyEvaluationRun)
+                .options(selectinload(SQLAlchemyEvaluationRun.results))
+                .where(SQLAlchemyEvaluationRun.id == run_record.id)
+            )
+            query_res = await db.execute(stmt)
+            loaded_run = query_res.scalar_one_or_none()
+            if loaded_run:
+                return loaded_run
+        except Exception:
+            pass
         return run_record

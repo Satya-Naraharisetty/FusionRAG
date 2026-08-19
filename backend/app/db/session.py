@@ -1,3 +1,5 @@
+from typing import Any
+
 import redis.asyncio as async_redis
 from fastapi import Request
 from qdrant_client import AsyncQdrantClient
@@ -60,7 +62,7 @@ def init_postgres_engine(database_url: str) -> AsyncEngine:
     """
     Instantiates an async database engine with connection pooling parameters.
     """
-    engine_kwargs = {
+    engine_kwargs: dict[str, Any] = {
         "pool_pre_ping": True,
         "pool_size": settings.DATABASE_POOL_SIZE,
         "max_overflow": settings.DATABASE_MAX_OVERFLOW,
@@ -79,6 +81,9 @@ def init_postgres_engine(database_url: str) -> AsyncEngine:
         parsed = urlparse(database_url)
         qsl = [(k, v) for k, v in parse_qsl(parsed.query) if k.lower() != "pgbouncer"]
         database_url = urlunparse(parsed._replace(query=urlencode(qsl)))
+
+    # Set statement_cache_size=0 for pgbouncer/shared pool compatibility
+    engine_kwargs["connect_args"] = {"statement_cache_size": 0}
 
     return create_async_engine(database_url, **engine_kwargs)
 

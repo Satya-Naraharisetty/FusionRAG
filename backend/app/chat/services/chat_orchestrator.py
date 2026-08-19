@@ -174,15 +174,17 @@ class ChatOrchestrator:
         conversation_manager: ConversationManager,
         context_builder: ConversationContextBuilder,
         agent_executor: AgentExecutor,
-        model: str,
-        temperature: float,
-        max_response_tokens: int,
-        system_prompt_tokens_limit: int,
-        max_context_tokens: int,
-        reserved_completion_tokens: int,
+        master_agent: Any | None = None,
+        model: str = "gemini-2.5-flash-lite",
+        temperature: float = 0.0,
+        max_response_tokens: int = 1000,
+        system_prompt_tokens_limit: int = 1000,
+        max_context_tokens: int = 4000,
+        reserved_completion_tokens: int = 500,
         max_memory_tokens: int = 3000,
         enable_conversation_memory: bool = True,
         enable_tool_calling: bool = True,
+        enable_multi_agent: bool = True,
     ) -> None:
         self.retrieval_service = retrieval_service
         self.prompt_builder = prompt_builder
@@ -191,6 +193,7 @@ class ChatOrchestrator:
         self.conversation_manager = conversation_manager
         self.context_builder = context_builder
         self.agent_executor = agent_executor
+        self.master_agent = master_agent
         self.model = model
         self.temperature = temperature
         self.max_response_tokens = max_response_tokens
@@ -200,6 +203,7 @@ class ChatOrchestrator:
         self.max_memory_tokens = max_memory_tokens
         self.enable_conversation_memory = enable_conversation_memory
         self.enable_tool_calling = enable_tool_calling
+        self.enable_multi_agent = enable_multi_agent
 
     async def generate_answer(
         self,
@@ -358,10 +362,32 @@ class ChatOrchestrator:
             role=MessageRole.ASSISTANT,
         )
 
-        # 8. Call LLM or Agent Loop
+        # 8. Call LLM, Multi-Agent, or Single-Agent Loop
         gen_start_time = time.perf_counter()
         try:
-            if self.enable_tool_calling and final_chunks:
+            if self.enable_multi_agent and self.master_agent is not None:
+                from app.chat.domain.multi_agent import AgentExecutionContext
+
+                agent_ctx = AgentExecutionContext(
+                    request_id=request_id_ctx.get() or str(uuid.uuid4()),
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    include_library_documents=documents_priority,
+                    include_conversation_documents=True,
+                    document_ids=retrieval_doc_ids,
+                )
+                multi_resp = await self.master_agent.execute_request(
+                    request=question,
+                    context=agent_ctx,
+                    model=self.model,
+                    temperature=self.temperature,
+                    max_tokens=self.max_response_tokens,
+                )
+                answer_text = multi_resp.answer
+                usage = multi_resp.usage
+                if multi_resp.citations:
+                    citations = multi_resp.citations
+            elif self.enable_tool_calling and final_chunks:
                 # Instantiate thread-safe execution context
                 tool_context = ToolContext(
                     user_id=user_id,
@@ -677,13 +703,48 @@ class ChatOrchestrator:
                 },
             }
 
-            # 9. Execute streaming flow (Agent or Standard)
+            # 9. Execute streaming flow (Multi-Agent, Single-Agent, or Standard)
             gen_start_time = time.perf_counter()
             full_answer_list = []
             final_usage = None
 
             try:
-                if self.enable_tool_calling and final_chunks:
+                if self.enable_multi_agent and self.master_agent is not None:
+                    from app.chat.domain.multi_agent import AgentExecutionContext
+
+                    agent_ctx = AgentExecutionContext(
+                        request_id=request_id_ctx.get() or str(uuid.uuid4()),
+                        user_id=user_id,
+                        conversation_id=conversation_id,
+                        include_library_documents=documents_priority,
+                        include_conversation_documents=True,
+                        document_ids=retrieval_doc_ids,
+                    )
+                    async for event in self.master_agent.execute_request_stream(
+                        request=question,
+                        context=agent_ctx,
+                        model=self.model,
+                        temperature=self.temperature,
+                        max_tokens=self.max_response_tokens,
+                    ):
+                        if event.get("event") == "text":
+                            text_val = event["data"]["text"]
+                            full_answer_list.append(text_val)
+                            await self.conversation_manager._message_repo.append_stream_chunk(
+                                assistant_message_id, text_val
+                            )
+                        elif event.get("event") == "synthesis_done":
+                            if "usage" in event.get("data", {}):
+                                u_data = event["data"]["usage"]
+                                final_usage = Usage(
+                                    prompt_tokens=u_data.get("prompt_tokens", 0),
+                                    completion_tokens=u_data.get(
+                                        "completion_tokens", 0
+                                    ),
+                                    total_tokens=u_data.get("total_tokens", 0),
+                                )
+                        yield event
+                elif self.enable_tool_calling and final_chunks:
                     tool_context = ToolContext(
                         user_id=user_id,
                         conversation_id=conversation_id,
@@ -747,52 +808,50 @@ class ChatOrchestrator:
                         if chunk.usage:
                             final_usage = chunk.usage
 
-                    generation_time_ms = (time.perf_counter() - gen_start_time) * 1000
-                    total_time_ms = (time.perf_counter() - start_time) * 1000
-                    full_answer = "".join(full_answer_list)
+                generation_time_ms = (time.perf_counter() - gen_start_time) * 1000
+                total_time_ms = (time.perf_counter() - start_time) * 1000
+                full_answer = "".join(full_answer_list)
 
-                    if not final_usage:
-                        prompt_tokens_est = self.token_estimator.estimate(str(messages))
-                        completion_tokens_est = self.token_estimator.estimate(
-                            full_answer
-                        )
-                        final_usage = Usage(
-                            prompt_tokens=prompt_tokens_est,
-                            completion_tokens=completion_tokens_est,
-                            total_tokens=prompt_tokens_est + completion_tokens_est,
-                        )
-
-                    metadata = {
-                        "retrieval_time_ms": retrieval_time_ms,
-                        "generation_time_ms": generation_time_ms,
-                        "total_time_ms": total_time_ms,
-                    }
-                    # Persist standard completion details
-                    await self.conversation_manager.finalize_message(
-                        conversation_id=conversation_id,
-                        message_id=assistant_message_id,
-                        assistant_content=full_answer,
-                        prompt_tokens=final_usage.prompt_tokens,
-                        completion_tokens=final_usage.completion_tokens,
-                        citations=citations_data,
-                        metadata=metadata,
+                if not final_usage:
+                    prompt_tokens_est = self.token_estimator.estimate(str(messages))
+                    completion_tokens_est = self.token_estimator.estimate(full_answer)
+                    final_usage = Usage(
+                        prompt_tokens=prompt_tokens_est,
+                        completion_tokens=completion_tokens_est,
+                        total_tokens=prompt_tokens_est + completion_tokens_est,
                     )
-                    message_finalized = True
 
-                    # Yield done event
-                    yield {
-                        "event": "done",
-                        "data": {
-                            "answer": full_answer,
-                            "citations": [cit.model_dump() for cit in citations],
-                            "generation_time_ms": round(generation_time_ms, 2),
-                            "total_time_ms": round(total_time_ms, 2),
-                            "model": self.model,
-                            "usage": final_usage.model_dump(),
-                            "conversation_id": str(conversation_id),
-                            "diagnostics": diagnostics.model_dump(),
-                        },
-                    }
+                metadata = {
+                    "retrieval_time_ms": retrieval_time_ms,
+                    "generation_time_ms": generation_time_ms,
+                    "total_time_ms": total_time_ms,
+                }
+                # Persist standard completion details
+                await self.conversation_manager.finalize_message(
+                    conversation_id=conversation_id,
+                    message_id=assistant_message_id,
+                    assistant_content=full_answer,
+                    prompt_tokens=final_usage.prompt_tokens,
+                    completion_tokens=final_usage.completion_tokens,
+                    citations=citations_data,
+                    metadata=metadata,
+                )
+                message_finalized = True
+
+                # Yield done event
+                yield {
+                    "event": "done",
+                    "data": {
+                        "answer": full_answer,
+                        "citations": [cit.model_dump() for cit in citations],
+                        "generation_time_ms": round(generation_time_ms, 2),
+                        "total_time_ms": round(total_time_ms, 2),
+                        "model": self.model,
+                        "usage": final_usage.model_dump(),
+                        "conversation_id": str(conversation_id),
+                        "diagnostics": diagnostics.model_dump(),
+                    },
+                }
             except StreamingCancelled:
                 # Client-initiated disconnect. Let the outer finally persist the
                 # partial answer as INTERRUPTED rather than marking it FAILED.

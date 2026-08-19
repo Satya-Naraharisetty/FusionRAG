@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import os
 import sys
 import uuid
@@ -6,7 +7,8 @@ import uuid
 # Ensure backend directory is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import settings
 from app.db.session import init_postgres_engine
@@ -14,7 +16,7 @@ from app.evaluation.infrastructure.persistence.models import SQLAlchemyEvaluatio
 from app.evaluation.runners.regression_runner import RegressionRunner
 
 
-def main() -> None:
+async def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run regression check between two evaluation runs."
     )
@@ -32,8 +34,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    engine = init_postgres_engine(settings.DATABASE_URL)
-    session_local = sessionmaker(bind=engine)
+    engine = init_postgres_engine(settings.DATABASE_URL or "")
+    session_local = async_sessionmaker(
+        bind=engine, class_=AsyncSession, expire_on_commit=False
+    )
     db = session_local()
 
     try:
@@ -43,13 +47,14 @@ def main() -> None:
 
         if not candidate_id or not baseline_id:
             print("Resolving evaluation runs automatically from database...")
-            completed_runs = (
-                db.query(SQLAlchemyEvaluationRun)
+            stmt = (
+                select(SQLAlchemyEvaluationRun)
                 .filter(SQLAlchemyEvaluationRun.status == "COMPLETED")
                 .order_by(SQLAlchemyEvaluationRun.created_at.desc())
                 .limit(2)
-                .all()
             )
+            res = await db.execute(stmt)
+            completed_runs = list(res.scalars().all())
 
             if len(completed_runs) < 2:
                 print(
@@ -76,7 +81,7 @@ def main() -> None:
 
         # Execute regression check
         runner = RegressionRunner()
-        regression_result = runner.compare_runs(
+        regression_result = await runner.compare_runs(
             db=db,
             candidate_run_id=uuid.UUID(candidate_id),
             baseline_run_id=uuid.UUID(baseline_id),
@@ -87,16 +92,14 @@ def main() -> None:
         print("REGRESSION COMPARISON RESULTS")
         print("=" * 50)
         status_text = (
-            "🟢 PASSED"
-            if regression_result.passed
-            else "🔴 FAILED (REGRESSION DETECTED)"
+            "[PASSED]" if regression_result.passed else "[FAILED (REGRESSION DETECTED)]"
         )
         print(f"Status: {status_text}")
         print("-" * 50)
 
         # Display deltas
         for metric, delta in regression_result.metric_deltas.items():
-            icon = "▲" if delta > 0.01 else ("▼" if delta < -0.01 else "-")
+            icon = "(+)" if delta > 0.01 else ("(-)" if delta < -0.01 else "(=)")
             print(f"{metric}: {delta:+.3f} {icon}")
         print("=" * 50)
 
@@ -118,9 +121,9 @@ def main() -> None:
         traceback.print_exc()
         sys.exit(1)
     finally:
-        db.close()
-        engine.dispose()
+        await db.close()
+        await engine.dispose()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
