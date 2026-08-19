@@ -4,12 +4,10 @@ FROM python:3.12-slim AS builder
 WORKDIR /build
 
 # Copy dependency files
-COPY requirements.txt requirements.cpu.txt ./
+COPY requirements.txt ./
 
 # Install dependencies using pip
-# requirements.cpu.txt adds the PyTorch CPU index so torch resolves to the
-# +cpu wheel instead of the multi-GB CUDA build (keeps the image ~3x smaller).
-RUN pip install --no-cache-dir -r requirements.cpu.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code after installing dependencies
 COPY . .
