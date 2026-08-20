@@ -100,6 +100,11 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
             )
             self._db.add(db_doc)
         else:
+            db_doc.filename = document.filename
+            db_doc.original_filename = document.original_filename
+            db_doc.content_type = document.content_type
+            db_doc.file_size = document.file_size
+            db_doc.checksum = document.checksum
             db_doc.status = document.status.value
             db_doc.extractor_version = document.extractor_version
             db_doc.failure_reason = document.failure_reason

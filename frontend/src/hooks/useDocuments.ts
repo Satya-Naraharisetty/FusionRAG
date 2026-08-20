@@ -212,3 +212,66 @@ export const useRegenerateEmbeddings = () => {
     },
   });
 };
+
+export const useReplaceDocument = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      file,
+      onProgress,
+      signal,
+    }: {
+      id: string;
+      file: File;
+      onProgress?: (progressEvent: unknown) => void;
+      signal?: AbortSignal;
+    }) => documentsApi.replaceDocument(id, file, onProgress, signal),
+    onMutate: async ({ id, file }) => {
+      await queryClient.cancelQueries({ queryKey: [QUERY_KEYS.DOCUMENTS] });
+
+      const previousDocs = queryClient.getQueryData<Document[]>([QUERY_KEYS.DOCUMENTS]);
+
+      queryClient.setQueryData<Document[]>([QUERY_KEYS.DOCUMENTS], (old) => {
+        if (!old) return [];
+        return old.map((d) =>
+          d.id === id
+            ? {
+                ...d,
+                original_filename: file.name,
+                file_size: file.size,
+                status: "pending" as const,
+                updated_at: new Date().toISOString(),
+              }
+            : d
+        );
+      });
+
+      return { previousDocs };
+    },
+    onError: (err, _variables, context) => {
+      if (context?.previousDocs) {
+        queryClient.setQueryData([QUERY_KEYS.DOCUMENTS], context.previousDocs);
+      }
+      const isCancelled = err instanceof DOMException && err.name === "AbortError";
+      if (!isCancelled) {
+        toast.error(`Failed to replace document: ${(err as Error).message || err}`);
+      }
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData<Document[]>([QUERY_KEYS.DOCUMENTS], (old) => {
+        if (!old) return [data];
+        return old.map((d) => (d.id === data.id ? data : d));
+      });
+      queryClient.invalidateQueries({
+        queryKey: [QUERY_KEYS.EMBEDDING_STATUS, data.id],
+      });
+      toast.success(`File "${data.original_filename}" replaced successfully.`);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.DOCUMENTS] });
+    },
+  });
+};
+

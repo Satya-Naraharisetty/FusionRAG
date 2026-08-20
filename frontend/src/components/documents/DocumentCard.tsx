@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   MoreVertical,
   RefreshCw,
@@ -14,6 +14,7 @@ import {
   FolderOpen,
   Eye,
   AlertTriangle,
+  UploadCloud,
 } from "lucide-react";
 import { Document } from "../../types";
 import { UploadStage, VECTORIZATION_FAILED_MESSAGE } from "../../lib/uploadStages";
@@ -48,6 +49,7 @@ interface DocumentCardProps {
   onDelete: (id: string) => Promise<unknown>;
   onReprocess: (id: string) => Promise<unknown>;
   onRegenerateEmbeddings: (id: string) => Promise<unknown>;
+  onReplace?: (id: string, file: File) => Promise<unknown>;
   isSelected: boolean;
   onSelectToggle: () => void;
   documentFolders: { id: string; name: string }[];
@@ -74,6 +76,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
   onDelete,
   onReprocess,
   onRegenerateEmbeddings,
+  onReplace,
   isSelected,
   onSelectToggle,
   documentFolders,
@@ -88,6 +91,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting]             = useState(false);
   const [isRegenerating, setIsRegenerating]     = useState(false);
+  const fileInputRef                            = useRef<HTMLInputElement>(null);
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -105,6 +109,18 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
       await onRegenerateEmbeddings(document.id);
     } finally {
       setIsRegenerating(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onReplace) return;
+    try {
+      await onReplace(document.id, file);
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -216,6 +232,25 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
+
+                {onReplace && (
+                  <>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      accept=".pdf,.docx,.txt,.md"
+                      onChange={handleFileChange}
+                    />
+                    <DropdownMenuItem
+                      onClick={() => fileInputRef.current?.click()}
+                      className="gap-2 cursor-pointer"
+                    >
+                      <UploadCloud size={12} />
+                      <span>Replace File</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
 
                 <DropdownMenuItem
                   onClick={() => onReprocess(document.id)}

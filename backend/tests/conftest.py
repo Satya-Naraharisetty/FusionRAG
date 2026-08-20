@@ -49,8 +49,20 @@ def _create_mock_redis_client(*args, **kwargs):
     return mock_redis
 
 
+def _create_mock_qdrant_client(*args, **kwargs):
+    mock_qdrant = AsyncMock()
+    mock_qdrant.get_collection = AsyncMock()
+    mock_qdrant.create_collection = AsyncMock()
+    mock_qdrant.create_payload_index = AsyncMock()
+    mock_qdrant.delete = AsyncMock()
+    mock_qdrant.upsert = AsyncMock()
+    mock_qdrant.search = AsyncMock(return_value=[])
+    mock_qdrant.get_collections = AsyncMock(return_value=MagicMock())
+    return mock_qdrant
+
+
 app.db.session.init_redis_client = MagicMock(side_effect=_create_mock_redis_client)
-app.db.session.init_qdrant_client = MagicMock(return_value=MagicMock())
+app.db.session.init_qdrant_client = MagicMock(side_effect=_create_mock_qdrant_client)
 
 # 3. Patch application main startup checks
 import app.main  # noqa: E402

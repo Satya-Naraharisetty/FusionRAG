@@ -65,6 +65,7 @@ from app.documents.domain.exceptions import (
     DocumentCorrupted,
     DocumentExtractionFailed,
     DocumentNotFound,
+    DocumentProcessingInProgressException,
     DocumentTooLarge,
     DuplicateDocumentException,
     InvalidStateTransitionException,
@@ -743,6 +744,17 @@ async def invalid_state_transition_handler(
         code="INVALID_STATE_TRANSITION",
         message=str(exc),
         status_code=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+@app.exception_handler(DocumentProcessingInProgressException)
+async def document_processing_in_progress_handler(
+    _request: Request, exc: DocumentProcessingInProgressException
+):
+    return format_error_response(
+        code="DOCUMENT_PROCESSING_IN_PROGRESS",
+        message=str(exc),
+        status_code=status.HTTP_409_CONFLICT,
     )
 
 

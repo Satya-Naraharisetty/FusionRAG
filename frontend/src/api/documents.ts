@@ -14,11 +14,12 @@ function uploadWithProgress(
   formData: FormData,
   onProgress?: (progressEvent: { loaded: number; total: number }) => void,
   signal?: AbortSignal,
-  query = ""
+  query = "",
+  method = "POST"
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", BASE_URL + path + (query ? `?${query}` : ""));
+    xhr.open(method, BASE_URL + path + (query ? `?${query}` : ""));
     xhr.withCredentials = true;
     const token = getAccessToken();
     if (token) {
@@ -94,6 +95,24 @@ export const documentsApi = {
       onUploadProgress,
       signal,
       query
+    ) as Promise<Document>;
+  },
+
+  replaceDocument(
+    id: string,
+    file: File,
+    onUploadProgress?: (progressEvent: unknown) => void,
+    signal?: AbortSignal
+  ): Promise<Document> {
+    const formData = new FormData();
+    formData.append("file", file);
+    return uploadWithProgress(
+      `/documents/${id}`,
+      formData,
+      onUploadProgress,
+      signal,
+      "",
+      "PUT"
     ) as Promise<Document>;
   },
 

@@ -225,6 +225,14 @@ class EmbeddingService:
                 )
                 await self._uow.rollback()
 
+                # Compensatory purge: ensure partial vectors in vector store are cleaned up
+                try:
+                    await self._vector_store.delete_document(document_id)
+                except Exception as del_err:
+                    logger.warning(
+                        f"Failed to purge partial vectors for document {document_id} during batch failure cleanup: {del_err}"
+                    )
+
                 # Record batch chunks as FAILED in database
                 try:
                     now = self._time_provider.get_now()

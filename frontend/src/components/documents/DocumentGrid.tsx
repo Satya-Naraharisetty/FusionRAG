@@ -25,6 +25,7 @@ interface DocumentGridProps {
   onDelete: (id: string) => Promise<unknown>;
   onReprocess: (id: string) => Promise<unknown>;
   onRegenerateEmbeddings: (id: string) => Promise<unknown>;
+  onReplace?: (id: string, file: File) => Promise<unknown>;
   folders: { id: string; name: string }[];
   folderMappings: Record<string, string>;
   setFolderMappings: React.Dispatch<React.SetStateAction<Record<string, string>>>;
@@ -57,6 +58,7 @@ export const DocumentGrid: React.FC<DocumentGridProps> = ({
   onDelete,
   onReprocess,
   onRegenerateEmbeddings,
+  onReplace,
   folders,
   folderMappings,
   setFolderMappings,
@@ -137,6 +139,7 @@ export const DocumentGrid: React.FC<DocumentGridProps> = ({
               onDelete={onDelete}
             onReprocess={onReprocess}
             onRegenerateEmbeddings={onRegenerateEmbeddings}
+            onReplace={onReplace}
             isSelected={selectedIds.includes(doc.id)}
             onSelectToggle={() => handleSelectToggle(doc.id)}
             documentFolders={folders}

@@ -8,6 +8,7 @@ from app.auth.domain.interfaces import TimeProvider, UnitOfWork, UUIDGenerator
 from app.documents.domain.exceptions import (
     DocumentCorrupted,
     DocumentNotFound,
+    DocumentProcessingInProgressException,
     DocumentTooLarge,
     DuplicateDocumentException,
     UnauthorizedDocumentAccess,
@@ -302,6 +303,148 @@ class DocumentService:
             raise
 
         # Enqueue processing task
+        self._task_queue.enqueue(
+            self._document_processing_service.process_document, saved_doc.id
+        )
+
+        return saved_doc
+
+    async def replace_document_content(
+        self,
+        id: UUID,
+        user_id: UUID,
+        file_bytes: bytes,
+        original_filename: str,
+        content_type: str,
+    ) -> Document:
+        """
+        Replaces an existing document's content with a new file.
+        Preserves document ID, user ownership, scope, and conversation_id.
+        """
+        # 1. Reject empty files
+        if not file_bytes or len(file_bytes) == 0:
+            raise DocumentCorrupted("Uploaded file is empty.")
+
+        # 2. Validate file size
+        if len(file_bytes) > self._max_upload_size:
+            raise DocumentTooLarge(
+                f"File size {len(file_bytes)} exceeds maximum limit {self._max_upload_size}."
+            )
+
+        # 3. Sanitize filename
+        safe_original_name = self._sanitize_filename(original_filename)
+
+        # 4. Validate MIME and extension support
+        try:
+            self._extractor_factory.get_extractor(content_type, safe_original_name)
+        except UnsupportedDocumentType:
+            raise
+        except Exception as e:
+            raise UnsupportedDocumentType(f"Validation failed: {e}") from e
+
+        # 4b. Scan for malware if scanner is present
+        if self._malware_scanner:
+            import os
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                tmp_file.write(file_bytes)
+                tmp_path = tmp_file.name
+
+            try:
+                is_clean = await self._malware_scanner.scan(tmp_path)
+                if not is_clean:
+                    raise DocumentCorrupted(
+                        f"Malware or virus signature detected in file: {safe_original_name}"
+                    )
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+
+        # 5. Acquire row-level lock and verify document ownership & status
+        try:
+            document = await self._document_repo.get_by_id_for_update(id)
+            if not document:
+                raise DocumentNotFound(f"Document with ID {id} not found.")
+
+            if document.user_id != user_id:
+                raise UnauthorizedDocumentAccess(
+                    "You do not have permission to update this document."
+                )
+
+            # Concurrency check: Reject if already QUEUED or PROCESSING
+            if document.status in (DocumentStatus.QUEUED, DocumentStatus.PROCESSING):
+                raise DocumentProcessingInProgressException(
+                    f"Document {id} is currently in '{document.status.value}' state. "
+                    "Please wait for processing to complete before replacing."
+                )
+
+            # 6. Checksum check: Same checksum on current doc is a definitive No-Op
+            checksum = self._checksum_generator.generate(file_bytes)
+            if document.checksum == checksum:
+                logger.info(
+                    f"Replacement file for document {id} has identical checksum {checksum}. Returning existing document unchanged."
+                )
+                await self._uow.rollback()
+                return document
+
+            # Duplicate check: Check if ANOTHER document owned by this user has this checksum
+            existing = await self._document_repo.get_by_checksum_and_user(
+                checksum, user_id
+            )
+            if existing and existing.id != id:
+                raise DuplicateDocumentException(
+                    f"A document with identical content already exists in your library (ID: {existing.id})."
+                )
+
+            # 6b. Purge old embeddings and vectors for this document
+            try:
+                await self._embedding_service.delete_embeddings(id)
+            except Exception as e:
+                logger.warning(
+                    f"Failed to clear old embeddings/vectors during replace for document {id}: {e}"
+                )
+
+            # 7. Save new file to storage
+            old_storage_key = document.filename
+            new_storage_key = await self._storage_provider.save(
+                filename=safe_original_name,
+                content=file_bytes,
+                user_id=user_id,
+                document_id=id,
+            )
+
+            # 8. Update document metadata and transition status to QUEUED
+            now = self._time_provider.get_now()
+            document.filename = new_storage_key
+            document.original_filename = safe_original_name
+            document.content_type = content_type
+            document.file_size = len(file_bytes)
+            document.checksum = checksum
+            document.status = DocumentStatus.QUEUED
+            document.failure_reason = None
+            document.processing_started_at = None
+            document.processing_completed_at = None
+            document.updated_at = now
+
+            saved_doc = await self._document_repo.save(document)
+            await self._uow.commit()
+        except Exception:
+            await self._uow.rollback()
+            raise
+
+        # 9. Cleanup old storage file if the key changed (e.g. extension changed)
+        if old_storage_key and old_storage_key != new_storage_key:
+            try:
+                await self._storage_provider.delete(old_storage_key)
+            except Exception as e:
+                logger.warning(
+                    f"Failed to delete old storage file {old_storage_key} during document replace {id}: {e}"
+                )
+
+        # 10. Trigger asynchronous processing task
         self._task_queue.enqueue(
             self._document_processing_service.process_document, saved_doc.id
         )

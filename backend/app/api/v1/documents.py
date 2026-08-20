@@ -100,6 +100,28 @@ async def get_document(
     return await document_service.get_document_by_id(id, user_id)
 
 
+@router.put("/{id}", response_model=DocumentResponse)
+async def replace_document(
+    id: UUID,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user_context),
+    document_service: DocumentService = Depends(get_document_service),
+):
+    """
+    Replaces an existing document's content with a new file.
+    Preserves document ID, user ownership, scope, and conversation associations.
+    """
+    user_id = UUID(current_user["user_id"])
+    file_bytes = await file.read()
+    return await document_service.replace_document_content(
+        id=id,
+        user_id=user_id,
+        file_bytes=file_bytes,
+        original_filename=file.filename or "unnamed",
+        content_type=file.content_type or "application/octet-stream",
+    )
+
+
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     id: UUID,

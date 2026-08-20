@@ -50,3 +50,9 @@ class InvalidStateTransitionException(DocumentException):
     """Raised when an invalid state transition is requested."""
 
     pass
+
+
+class DocumentProcessingInProgressException(DocumentException):
+    """Raised when an operation cannot proceed because the document is currently queued or processing."""
+
+    pass

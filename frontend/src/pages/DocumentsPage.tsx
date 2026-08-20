@@ -4,6 +4,7 @@ import {
   useDeleteDocument,
   useReprocessDocument,
   useRegenerateEmbeddings,
+  useReplaceDocument,
 } from "../hooks/useDocuments";
 import { useEmbeddingStatus } from "../hooks/useEmbeddingStatus";
 import { Document } from "../types";
@@ -38,6 +39,7 @@ const DocumentsPage: React.FC = () => {
   const deleteMutation       = useDeleteDocument();
   const reprocessMutation    = useReprocessDocument();
   const regenerateMutation   = useRegenerateEmbeddings();
+  const replaceMutation      = useReplaceDocument();
 
   const [viewMode, setViewMode]     = useState<"grid" | "list">("grid");
   const [search, setSearch]         = useState("");
@@ -319,6 +321,7 @@ const DocumentsPage: React.FC = () => {
           onDelete={async (id) => deleteMutation.mutateAsync(id)}
           onReprocess={async (id) => reprocessMutation.mutateAsync(id)}
           onRegenerateEmbeddings={async (id) => regenerateMutation.mutateAsync(id)}
+          onReplace={async (id, file) => replaceMutation.mutateAsync({ id, file })}
           folders={folders}
           folderMappings={folderMappings}
           setFolderMappings={setFolderMappings}

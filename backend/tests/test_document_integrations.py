@@ -882,3 +882,176 @@ async def test_document_processing_invalidates_index_cache(client, doc_test_db):
     finally:
         verify_db.close()
         sync_engine.dispose()
+
+
+# --- Document Replacement Integration Tests ---
+
+
+@patch("app.documents.infrastructure.extractors.PDFExtractor.extract")
+@patch("app.documents.infrastructure.extractors.DOCXExtractor.extract")
+def test_replace_document_e2e_lifecycle(
+    mock_docx_extract, mock_pdf_extract, client, doc_test_db
+):
+    mock_pdf_extract.return_value = ExtractionResult(
+        text="Original PDF text version one.", page_count=1
+    )
+    mock_docx_extract.return_value = ExtractionResult(
+        text="Replaced DOCX text version two with different contents.", page_count=2
+    )
+
+    token = get_user_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Initial Upload
+    upload_res = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("original.pdf", b"pdf content v1", "application/pdf")},
+        headers=headers,
+    )
+    assert upload_res.status_code == status.HTTP_201_CREATED
+    doc_data = upload_res.json()
+    doc_id = doc_data["id"]
+    assert doc_data["original_filename"] == "original.pdf"
+    assert doc_data["scope"] == "LIBRARY"
+    assert doc_data["conversation_id"] is None
+
+    # Wait / verify chunks created for original
+    db = doc_test_db()
+    try:
+        old_chunks = db.execute(
+            text("SELECT id, text FROM document_chunks WHERE document_id = :id"),
+            {"id": doc_id},
+        ).fetchall()
+        assert len(old_chunks) > 0
+        old_chunk_ids = {str(c[0]) for c in old_chunks}
+    finally:
+        db.close()
+
+    # 2. Replace Document Content via PUT /documents/{id}
+    replace_res = client.put(
+        f"/api/v1/documents/{doc_id}",
+        files={
+            "file": (
+                "updated.docx",
+                b"docx content v2 new bytes",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
+        headers=headers,
+    )
+    assert replace_res.status_code == status.HTTP_200_OK
+    updated_doc = replace_res.json()
+    assert updated_doc["id"] == doc_id
+    assert updated_doc["original_filename"] == "updated.docx"
+    assert updated_doc["scope"] == "LIBRARY"
+    assert updated_doc["conversation_id"] is None
+
+    # 3. Verify in DB that new chunks exist and old chunk IDs are gone
+    db = doc_test_db()
+    try:
+        new_chunks = db.execute(
+            text("SELECT id, text FROM document_chunks WHERE document_id = :id"),
+            {"id": doc_id},
+        ).fetchall()
+        assert len(new_chunks) > 0
+        new_chunk_ids = {str(c[0]) for c in new_chunks}
+        # Invariant: Old chunk IDs are replaced by new chunk IDs
+        assert not old_chunk_ids.intersection(new_chunk_ids)
+
+        # Verify document table metadata is synchronized
+        doc_row = db.execute(
+            text(
+                "SELECT original_filename, content_type, file_size FROM documents WHERE id = :id"
+            ),
+            {"id": doc_id},
+        ).first()
+        assert doc_row[0] == "updated.docx"
+        assert (
+            doc_row[1]
+            == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+        assert doc_row[2] == len(b"docx content v2 new bytes")
+    finally:
+        db.close()
+
+
+def test_replace_document_same_checksum_is_noop(client, doc_test_db):
+    token = get_user_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Upload document
+    file_bytes = b"plain text document identical"
+    upload_res = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("doc.txt", file_bytes, "text/plain")},
+        headers=headers,
+    )
+    assert upload_res.status_code == status.HTTP_201_CREATED
+    doc_id = upload_res.json()["id"]
+
+    # PUT with exact same file bytes
+    replace_res = client.put(
+        f"/api/v1/documents/{doc_id}",
+        files={"file": ("doc.txt", file_bytes, "text/plain")},
+        headers=headers,
+    )
+    assert replace_res.status_code == status.HTTP_200_OK
+    assert replace_res.json()["id"] == doc_id
+
+
+def test_replace_document_duplicate_other_doc_rejected(client, doc_test_db):
+    token = get_user_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Upload Doc 1
+    res1 = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("doc1.txt", b"content of doc 1", "text/plain")},
+        headers=headers,
+    )
+    assert res1.status_code == status.HTTP_201_CREATED
+
+    # Upload Doc 2
+    res2 = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("doc2.txt", b"content of doc 2", "text/plain")},
+        headers=headers,
+    )
+    assert res2.status_code == status.HTTP_201_CREATED
+    doc2_id = res2.json()["id"]
+
+    # Replace Doc 2 with Doc 1's content
+    replace_res = client.put(
+        f"/api/v1/documents/{doc2_id}",
+        files={"file": ("doc2.txt", b"content of doc 1", "text/plain")},
+        headers=headers,
+    )
+    assert replace_res.status_code in (
+        status.HTTP_400_BAD_REQUEST,
+        status.HTTP_409_CONFLICT,
+    )
+
+
+def test_replace_document_unauthorized_user_rejected(client, doc_test_db):
+    user1_token = get_user_token(client, email="owner@example.com")
+    user2_token = get_user_token(client, email="attacker@example.com")
+
+    # User 1 uploads document
+    upload_res = client.post(
+        "/api/v1/documents/upload",
+        files={"file": ("secret.txt", b"owner secrets", "text/plain")},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert upload_res.status_code == status.HTTP_201_CREATED
+    doc_id = upload_res.json()["id"]
+
+    # User 2 attempts to replace User 1's document
+    replace_res = client.put(
+        f"/api/v1/documents/{doc_id}",
+        files={"file": ("hacked.txt", b"hacked content", "text/plain")},
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
+    assert replace_res.status_code in (
+        status.HTTP_403_FORBIDDEN,
+        status.HTTP_404_NOT_FOUND,
+    )

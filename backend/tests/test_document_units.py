@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -309,3 +310,280 @@ def test_image_extractor_factory():
         factory.get_extractor("application/octet-stream", "screenshot.jpg"),
         ImageExtractor,
     )
+
+
+# --- DocumentService Replace Unit Tests ---
+
+
+@pytest.mark.asyncio
+async def test_replace_document_empty_file_rejected():
+    from app.documents.services.document_service import DocumentService
+
+    doc_service = DocumentService(
+        document_repo=AsyncMock(),
+        storage_provider=AsyncMock(),
+        extractor_factory=ExtractorFactory(),
+        checksum_generator=SHA256ChecksumGenerator(),
+        task_queue=AsyncMock(),
+        document_processing_service=AsyncMock(),
+        embedding_service=AsyncMock(),
+        uow=AsyncMock(),
+        uuid_generator=AsyncMock(),
+        time_provider=AsyncMock(),
+        max_upload_size=1024,
+    )
+
+    with pytest.raises(DocumentCorrupted, match="empty"):
+        await doc_service.replace_document_content(
+            id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            file_bytes=b"",
+            original_filename="test.txt",
+            content_type="text/plain",
+        )
+
+
+@pytest.mark.asyncio
+async def test_replace_document_file_too_large_rejected():
+    from app.documents.domain.exceptions import DocumentTooLarge
+    from app.documents.services.document_service import DocumentService
+
+    doc_service = DocumentService(
+        document_repo=AsyncMock(),
+        storage_provider=AsyncMock(),
+        extractor_factory=ExtractorFactory(),
+        checksum_generator=SHA256ChecksumGenerator(),
+        task_queue=AsyncMock(),
+        document_processing_service=AsyncMock(),
+        embedding_service=AsyncMock(),
+        uow=AsyncMock(),
+        uuid_generator=AsyncMock(),
+        time_provider=AsyncMock(),
+        max_upload_size=10,
+    )
+
+    with pytest.raises(DocumentTooLarge, match="exceeds maximum limit"):
+        await doc_service.replace_document_content(
+            id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            file_bytes=b"123456789012345",
+            original_filename="test.txt",
+            content_type="text/plain",
+        )
+
+
+@pytest.mark.asyncio
+async def test_replace_document_unsupported_type_rejected():
+    from app.documents.services.document_service import DocumentService
+
+    doc_service = DocumentService(
+        document_repo=AsyncMock(),
+        storage_provider=AsyncMock(),
+        extractor_factory=ExtractorFactory(),
+        checksum_generator=SHA256ChecksumGenerator(),
+        task_queue=AsyncMock(),
+        document_processing_service=AsyncMock(),
+        embedding_service=AsyncMock(),
+        uow=AsyncMock(),
+        uuid_generator=AsyncMock(),
+        time_provider=AsyncMock(),
+        max_upload_size=1024,
+    )
+
+    with pytest.raises(UnsupportedDocumentType):
+        await doc_service.replace_document_content(
+            id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            file_bytes=b"MZ executable header",
+            original_filename="malicious.exe",
+            content_type="application/x-msdownload",
+        )
+
+
+@pytest.mark.asyncio
+async def test_replace_document_concurrent_processing_rejected():
+    from datetime import datetime
+
+    from app.documents.domain.exceptions import DocumentProcessingInProgressException
+    from app.documents.domain.models import Document, DocumentScope
+    from app.documents.services.document_service import DocumentService
+
+    doc_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    mock_repo = AsyncMock()
+    mock_repo.get_by_id_for_update.return_value = Document(
+        id=doc_id,
+        user_id=user_id,
+        scope=DocumentScope.LIBRARY,
+        conversation_id=None,
+        filename=f"user_{user_id}/{doc_id}.txt",
+        original_filename="test.txt",
+        content_type="text/plain",
+        file_size=100,
+        checksum="old_hash",
+        status=DocumentStatus.PROCESSING,
+        extractor_version="v1",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+    doc_service = DocumentService(
+        document_repo=mock_repo,
+        storage_provider=AsyncMock(),
+        extractor_factory=ExtractorFactory(),
+        checksum_generator=SHA256ChecksumGenerator(),
+        task_queue=AsyncMock(),
+        document_processing_service=AsyncMock(),
+        embedding_service=AsyncMock(),
+        uow=AsyncMock(),
+        uuid_generator=AsyncMock(),
+        time_provider=AsyncMock(),
+        max_upload_size=1024,
+    )
+
+    with pytest.raises(DocumentProcessingInProgressException, match="processing"):
+        await doc_service.replace_document_content(
+            id=doc_id,
+            user_id=user_id,
+            file_bytes=b"new content",
+            original_filename="test.txt",
+            content_type="text/plain",
+        )
+
+
+@pytest.mark.asyncio
+async def test_replace_document_same_checksum_is_noop():
+    from datetime import datetime
+
+    from app.documents.domain.models import Document, DocumentScope
+    from app.documents.services.document_service import DocumentService
+
+    doc_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    file_bytes = b"identical content bytes"
+    checksum = SHA256ChecksumGenerator().generate(file_bytes)
+
+    existing_doc = Document(
+        id=doc_id,
+        user_id=user_id,
+        scope=DocumentScope.LIBRARY,
+        conversation_id=None,
+        filename=f"user_{user_id}/{doc_id}.txt",
+        original_filename="test.txt",
+        content_type="text/plain",
+        file_size=len(file_bytes),
+        checksum=checksum,
+        status=DocumentStatus.COMPLETED,
+        extractor_version="v1",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+    mock_repo = AsyncMock()
+    mock_repo.get_by_id_for_update.return_value = existing_doc
+    mock_storage = AsyncMock()
+    mock_task_queue = AsyncMock()
+    mock_uow = AsyncMock()
+
+    doc_service = DocumentService(
+        document_repo=mock_repo,
+        storage_provider=mock_storage,
+        extractor_factory=ExtractorFactory(),
+        checksum_generator=SHA256ChecksumGenerator(),
+        task_queue=mock_task_queue,
+        document_processing_service=AsyncMock(),
+        embedding_service=AsyncMock(),
+        uow=mock_uow,
+        uuid_generator=AsyncMock(),
+        time_provider=AsyncMock(),
+        max_upload_size=1024,
+    )
+
+    res = await doc_service.replace_document_content(
+        id=doc_id,
+        user_id=user_id,
+        file_bytes=file_bytes,
+        original_filename="test.txt",
+        content_type="text/plain",
+    )
+
+    assert res.id == doc_id
+    assert res.checksum == checksum
+    mock_storage.save.assert_not_called()
+    mock_task_queue.enqueue.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_replace_document_duplicate_other_doc_rejected():
+    from datetime import datetime
+
+    from app.documents.domain.exceptions import DuplicateDocumentException
+    from app.documents.domain.models import Document, DocumentScope
+    from app.documents.services.document_service import DocumentService
+
+    doc_id = uuid.uuid4()
+    other_doc_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    file_bytes = b"content already in library"
+    checksum = SHA256ChecksumGenerator().generate(file_bytes)
+
+    current_doc = Document(
+        id=doc_id,
+        user_id=user_id,
+        scope=DocumentScope.LIBRARY,
+        conversation_id=None,
+        filename=f"user_{user_id}/{doc_id}.txt",
+        original_filename="doc1.txt",
+        content_type="text/plain",
+        file_size=10,
+        checksum="old_different_hash",
+        status=DocumentStatus.COMPLETED,
+        extractor_version="v1",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+    other_doc = Document(
+        id=other_doc_id,
+        user_id=user_id,
+        scope=DocumentScope.LIBRARY,
+        conversation_id=None,
+        filename=f"user_{user_id}/{other_doc_id}.txt",
+        original_filename="doc2.txt",
+        content_type="text/plain",
+        file_size=len(file_bytes),
+        checksum=checksum,
+        status=DocumentStatus.COMPLETED,
+        extractor_version="v1",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+    mock_repo = AsyncMock()
+    mock_repo.get_by_id_for_update.return_value = current_doc
+    mock_repo.get_by_checksum_and_user.return_value = other_doc
+
+    doc_service = DocumentService(
+        document_repo=mock_repo,
+        storage_provider=AsyncMock(),
+        extractor_factory=ExtractorFactory(),
+        checksum_generator=SHA256ChecksumGenerator(),
+        task_queue=AsyncMock(),
+        document_processing_service=AsyncMock(),
+        embedding_service=AsyncMock(),
+        uow=AsyncMock(),
+        uuid_generator=AsyncMock(),
+        time_provider=AsyncMock(),
+        max_upload_size=1024,
+    )
+
+    with pytest.raises(
+        DuplicateDocumentException, match="already exists in your library"
+    ):
+        await doc_service.replace_document_content(
+            id=doc_id,
+            user_id=user_id,
+            file_bytes=file_bytes,
+            original_filename="doc1.txt",
+            content_type="text/plain",
+        )

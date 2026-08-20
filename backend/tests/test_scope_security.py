@@ -12,6 +12,7 @@ These tests verify that the scope model correctly enforces:
 """
 
 import uuid
+from datetime import UTC
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -290,3 +291,130 @@ async def test_retrieval_service_cross_user_access_denied():
     )
     with pytest.raises(UnauthorizedDocumentAccess):
         await svc.retrieve(query="test", user_id=user_a, top_k=5, retrieval_scope=scope)
+
+
+# ---------------------------------------------------------------------------
+# 8. Replacement Security & Scope Invariants
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_replace_document_cross_user_denied():
+    from datetime import datetime
+
+    from app.documents.domain.exceptions import UnauthorizedDocumentAccess
+    from app.documents.domain.models import Document, DocumentScope, DocumentStatus
+    from app.documents.infrastructure.checksum import SHA256ChecksumGenerator
+    from app.documents.infrastructure.extractors import ExtractorFactory
+    from app.documents.services.document_service import DocumentService
+
+    user_a = uuid.uuid4()
+    user_b = uuid.uuid4()
+    doc_id = uuid.uuid4()
+
+    doc_a = Document(
+        id=doc_id,
+        user_id=user_a,
+        scope=DocumentScope.LIBRARY,
+        conversation_id=None,
+        filename=f"user_{user_a}/{doc_id}.txt",
+        original_filename="user_a.txt",
+        content_type="text/plain",
+        file_size=50,
+        checksum="hash_a",
+        status=DocumentStatus.COMPLETED,
+        extractor_version="v1",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+    mock_repo = AsyncMock()
+    mock_repo.get_by_id_for_update.return_value = doc_a
+
+    doc_service = DocumentService(
+        document_repo=mock_repo,
+        storage_provider=AsyncMock(),
+        extractor_factory=ExtractorFactory(),
+        checksum_generator=SHA256ChecksumGenerator(),
+        task_queue=AsyncMock(),
+        document_processing_service=AsyncMock(),
+        embedding_service=AsyncMock(),
+        uow=AsyncMock(),
+        uuid_generator=AsyncMock(),
+        time_provider=AsyncMock(),
+        max_upload_size=1024,
+    )
+
+    with pytest.raises(UnauthorizedDocumentAccess):
+        await doc_service.replace_document_content(
+            id=doc_id,
+            user_id=user_b,
+            file_bytes=b"attempted takeover",
+            original_filename="user_b.txt",
+            content_type="text/plain",
+        )
+
+
+@pytest.mark.asyncio
+async def test_replace_document_preserves_conversation_scope():
+    from datetime import datetime
+
+    from app.documents.domain.models import Document, DocumentScope, DocumentStatus
+    from app.documents.infrastructure.checksum import SHA256ChecksumGenerator
+    from app.documents.infrastructure.extractors import ExtractorFactory
+    from app.documents.services.document_service import DocumentService
+
+    user_id = uuid.uuid4()
+    conv_id = uuid.uuid4()
+    doc_id = uuid.uuid4()
+
+    conv_doc = Document(
+        id=doc_id,
+        user_id=user_id,
+        scope=DocumentScope.CONVERSATION,
+        conversation_id=conv_id,
+        filename=f"user_{user_id}/{doc_id}.txt",
+        original_filename="chat_attachment.txt",
+        content_type="text/plain",
+        file_size=50,
+        checksum="hash_old",
+        status=DocumentStatus.COMPLETED,
+        extractor_version="v1",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+    mock_repo = AsyncMock()
+    mock_repo.get_by_id_for_update.return_value = conv_doc
+    mock_repo.get_by_checksum_and_user.return_value = None
+    mock_repo.save.side_effect = lambda d: d
+    mock_storage = AsyncMock()
+    mock_storage.save.return_value = f"user_{user_id}/{doc_id}.txt"
+    mock_time = AsyncMock()
+    mock_time.get_now.return_value = datetime.now(UTC)
+
+    doc_service = DocumentService(
+        document_repo=mock_repo,
+        storage_provider=mock_storage,
+        extractor_factory=ExtractorFactory(),
+        checksum_generator=SHA256ChecksumGenerator(),
+        task_queue=AsyncMock(),
+        document_processing_service=AsyncMock(),
+        embedding_service=AsyncMock(),
+        uow=AsyncMock(),
+        uuid_generator=AsyncMock(),
+        time_provider=mock_time,
+        max_upload_size=1024,
+    )
+
+    replaced = await doc_service.replace_document_content(
+        id=doc_id,
+        user_id=user_id,
+        file_bytes=b"new attachment content",
+        original_filename="chat_attachment_v2.txt",
+        content_type="text/plain",
+    )
+
+    assert replaced.scope == DocumentScope.CONVERSATION
+    assert replaced.conversation_id == conv_id
+    assert replaced.original_filename == "chat_attachment_v2.txt"
