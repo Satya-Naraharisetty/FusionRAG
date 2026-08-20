@@ -8,6 +8,56 @@ from app.chat.domain.models import Citation, Usage
 from app.documents.domain.models import DocumentRetrievalScope
 
 
+class CapabilityType(str, Enum):
+    RESEARCH = "RESEARCH"
+    DOCUMENT_INSPECTION = "DOCUMENT_INSPECTION"
+    ANALYSIS = "ANALYSIS"
+    SYNTHESIS = "SYNTHESIS"
+
+
+class CapabilityDescriptor(BaseModel):
+    capability_id: str
+    capability_type: CapabilityType
+    description: str
+    supported_operations: list[str] = Field(default_factory=list)
+    required_context: list[str] = Field(default_factory=list)
+    estimated_latency_ms: float = 0.0
+    estimated_cost_units: float = 0.0
+    max_concurrency: int | None = None
+    enabled: bool = True
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class CapabilityRequirement(BaseModel):
+    capability_type: CapabilityType | None = None
+    operation: str = ""
+    required_context: list[str] = Field(default_factory=list)
+    preferred: bool = False
+    priority: int = 0
+
+
+class RoutingDecision(BaseModel):
+    task_id: str
+    selected_capability_id: str | None = None
+    capability_type: CapabilityType | None = None
+    eligible_capabilities: list[str] = Field(default_factory=list)
+    rejected_capabilities: dict[str, str] = Field(default_factory=dict)
+    reason_code: str = "EXACT_CAPABILITY_MATCH"
+    confidence: float = 1.0
+    estimated_latency_ms: float = 0.0
+    estimated_cost_units: float = 0.0
+
+
+class RoutingDiagnostics(BaseModel):
+    routing_decisions: int = 0
+    capability_rejections: int = 0
+    fallback_routes: int = 0
+    unavailable_capabilities: int = 0
+    routing_latency_ms: float = 0.0
+    estimated_cost_units: float = 0.0
+    estimated_latency_ms: float = 0.0
+
+
 class AgentType(str, Enum):
     MASTER = "MASTER"
     RESEARCH = "RESEARCH"
@@ -32,6 +82,7 @@ class AgentFailureReason(str, Enum):
     EXECUTION_ERROR = "EXECUTION_ERROR"
     LIMIT_EXCEEDED = "LIMIT_EXCEEDED"
     UNAUTHORIZED = "UNAUTHORIZED"
+    CAPABILITY_UNAVAILABLE = "CAPABILITY_UNAVAILABLE"
 
 
 class EvaluationDecision(str, Enum):
@@ -62,6 +113,10 @@ class AgentTask(BaseModel):
     required_evidence: list[str] = Field(default_factory=list)
     is_required: bool = True
     retryable: bool = True
+    capability_requirements: list[CapabilityRequirement] = Field(default_factory=list)
+    preferred_capability: str | None = None
+    max_latency_ms: float | None = None
+    max_cost_units: float | None = None
 
 
 class AgentResult(BaseModel):
@@ -204,6 +259,14 @@ class MultiAgentDiagnostics(BaseModel):
     research_planning_latency_ms: float = 0.0
     research_retrieval_latency_ms: float = 0.0
     research_total_latency_ms: float = 0.0
+    # Routing Diagnostics (Prompt 3.4)
+    routing_decisions: int = 0
+    capability_rejections: int = 0
+    fallback_routes: int = 0
+    unavailable_capabilities: int = 0
+    routing_latency_ms: float = 0.0
+    estimated_cost_units: float = 0.0
+    estimated_latency_ms: float = 0.0
 
 
 class MultiAgentResponse(BaseModel):

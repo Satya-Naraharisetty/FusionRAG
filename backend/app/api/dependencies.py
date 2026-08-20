@@ -945,18 +945,53 @@ def get_analysis_agent() -> Any:
     return AnalysisAgent()
 
 
+_capability_registry_instance: Any = None
+
+
+def get_capability_registry() -> Any:
+    global _capability_registry_instance
+    if _capability_registry_instance is None:
+        from app.chat.services.multi_agent.capability_registry import (
+            create_default_capability_registry,
+        )
+
+        _capability_registry_instance = create_default_capability_registry()
+    return _capability_registry_instance
+
+
+def get_task_router(
+    registry=Depends(get_capability_registry),
+    llm_provider=Depends(get_llm_provider),
+) -> Any:
+    from app.chat.services.multi_agent.task_router import TaskRouter
+
+    return TaskRouter(
+        registry=registry,
+        llm_provider=llm_provider,
+        enable_llm_router=settings.ENABLE_LLM_CAPABILITY_ROUTER,
+        max_cost_units=settings.MAX_ESTIMATED_AGENT_COST_UNITS,
+        max_latency_ms=settings.MAX_ESTIMATED_LATENCY_MS,
+    )
+
+
 def get_agent_execution_engine(
     research_agent=Depends(get_research_agent),
     document_agent=Depends(get_document_agent),
     analysis_agent=Depends(get_analysis_agent),
+    task_router=Depends(get_task_router),
+    capability_registry=Depends(get_capability_registry),
 ) -> Any:
     from app.chat.services.multi_agent.execution_engine import AgentExecutionEngine
 
     return AgentExecutionEngine(
         specialist_agents=[research_agent, document_agent, analysis_agent],
+        task_router=task_router,
+        capability_registry=capability_registry,
         max_specialist_tasks=settings.MAX_SPECIALIST_TASKS,
         max_total_calls=settings.MAX_TOTAL_AGENT_CALLS,
         task_timeout=settings.MULTI_AGENT_TASK_TIMEOUT,
+        max_cost_units=settings.MAX_ESTIMATED_AGENT_COST_UNITS,
+        max_latency_ms=settings.MAX_ESTIMATED_LATENCY_MS,
     )
 
 

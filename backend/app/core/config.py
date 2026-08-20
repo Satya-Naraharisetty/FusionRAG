@@ -263,6 +263,12 @@ class Settings(BaseSettings):
     RESEARCH_DEDUP_SIMILARITY_THRESHOLD: float = 0.85
     RESEARCH_ENABLE_LLM_PLANNER: bool = True
 
+    # Capability-Aware Routing Configurations (Prompt 3.4)
+    CAPABILITY_ROUTING_ENABLED: bool = True
+    ENABLE_LLM_CAPABILITY_ROUTER: bool = False
+    MAX_ESTIMATED_AGENT_COST_UNITS: float = 100.0
+    MAX_ESTIMATED_LATENCY_MS: float = 30000.0
+
     # Evaluation & Benchmarking Configurations
     ENABLE_EVALUATION: bool = True
     ENABLE_RAGAS: bool = True

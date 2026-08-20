@@ -534,6 +534,14 @@ class MasterAgent:
                 plan=current_plan,
                 context=merged_context,
                 cumulative_calls=total_calls,
+                cumulative_cost_units=sum(
+                    r.metadata.get("estimated_cost_units", 0.0)
+                    for r in accumulated_results.values()
+                ),
+                cumulative_latency_ms=sum(
+                    r.metadata.get("estimated_latency_ms", 0.0)
+                    for r in accumulated_results.values()
+                ),
             )
             exec_latency_ms += (time.perf_counter() - x_start) * 1000
 
@@ -628,6 +636,37 @@ class MasterAgent:
         )
         research_total_latency_ms = sum(r.execution_time_ms for r in research_results)
 
+        # Routing Diagnostics (Prompt 3.4)
+        routing_decisions_count = len(all_results_list)
+        capability_rejections_count = sum(
+            1
+            for r in all_results_list
+            if r.metadata.get("routing_reason_code")
+            in (
+                "BUDGET_EXCEEDED",
+                "CONTEXT_MISSING",
+                "POLICY_REJECTED",
+                "CAPABILITY_MISMATCH",
+            )
+        )
+        fallback_routes_count = sum(
+            1
+            for r in all_results_list
+            if r.metadata.get("routing_reason_code") == "FALLBACK_CAPABILITY"
+        )
+        unavailable_capabilities_count = sum(
+            1
+            for r in all_results_list
+            if r.metadata.get("routing_reason_code")
+            in ("NO_CAPABILITY_AVAILABLE", "CAPABILITY_DISABLED")
+        )
+        total_est_cost = sum(
+            r.metadata.get("estimated_cost_units", 0.0) for r in all_results_list
+        )
+        total_est_latency = sum(
+            r.metadata.get("estimated_latency_ms", 0.0) for r in all_results_list
+        )
+
         diagnostics = MultiAgentDiagnostics(
             plan_iterations=iteration,
             total_specialist_calls=total_calls,
@@ -654,6 +693,13 @@ class MasterAgent:
             research_planning_latency_ms=round(research_planning_latency_ms, 2),
             research_retrieval_latency_ms=round(research_retrieval_latency_ms, 2),
             research_total_latency_ms=round(research_total_latency_ms, 2),
+            routing_decisions=routing_decisions_count,
+            capability_rejections=capability_rejections_count,
+            fallback_routes=fallback_routes_count,
+            unavailable_capabilities=unavailable_capabilities_count,
+            routing_latency_ms=round(plan_latency_ms, 2),
+            estimated_cost_units=round(total_est_cost, 4),
+            estimated_latency_ms=round(total_est_latency, 2),
         )
 
         return MultiAgentResponse(
@@ -759,6 +805,14 @@ class MasterAgent:
                 context=merged_context,
                 event_callback=_event_callback,
                 cumulative_calls=total_calls,
+                cumulative_cost_units=sum(
+                    r.metadata.get("estimated_cost_units", 0.0)
+                    for r in accumulated_results.values()
+                ),
+                cumulative_latency_ms=sum(
+                    r.metadata.get("estimated_latency_ms", 0.0)
+                    for r in accumulated_results.values()
+                ),
             )
 
             for ev in event_queue:
