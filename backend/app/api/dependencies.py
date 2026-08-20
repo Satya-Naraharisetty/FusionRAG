@@ -626,6 +626,58 @@ def get_retrieval_service(
     )
 
 
+def get_hyde_executor(
+    generator: EmbeddingGenerator = Depends(get_embedding_generator),
+    retrieval_service: Any = Depends(get_retrieval_service),
+) -> Any:
+    from app.documents.services.hyde import DeterministicHyDEGenerator, SafeHyDEExecutor
+
+    dense_retriever = getattr(retrieval_service, "_dense_retriever", None)
+    if dense_retriever is None:
+        return None
+
+    return SafeHyDEExecutor(
+        hyde_generator=DeterministicHyDEGenerator(),
+        embedding_generator=generator,
+        dense_retriever=dense_retriever,
+        timeout_ms=settings.HYDE_TIMEOUT_MS,
+    )
+
+
+def get_adaptive_rag_orchestrator(
+    retrieval_service: Any = Depends(get_retrieval_service),
+    hyde_executor: Any = Depends(get_hyde_executor),
+    chunk_repo: Any = Depends(get_chunk_repository),
+) -> Any:
+    from app.documents.services.query_classifier import DeterministicQueryClassifier
+    from app.documents.services.query_decomposer import DeterministicQueryDecomposer
+    from app.rag.orchestration.evidence_evaluator import EvidenceSufficiencyEvaluator
+    from app.rag.orchestration.master import AdaptiveRAGOrchestrator
+    from app.rag.orchestration.replanner import Replanner
+    from app.rag.orchestration.strategy_router import RetrievalStrategyRouter
+    from app.rag.orchestration.telemetry import OrchestrationTelemetry
+
+    query_classifier = DeterministicQueryClassifier()
+    return AdaptiveRAGOrchestrator(
+        retrieval_service=retrieval_service,
+        strategy_router=RetrievalStrategyRouter(query_classifier),
+        evidence_evaluator=EvidenceSufficiencyEvaluator(
+            min_relevance_threshold=settings.SIMILARITY_THRESHOLD,
+        ),
+        replanner=Replanner(),
+        query_classifier=query_classifier,
+        query_decomposer=DeterministicQueryDecomposer(),
+        hyde_executor=hyde_executor,
+        telemetry=OrchestrationTelemetry(),
+        chunk_repo=chunk_repo,
+        max_iterations=settings.MAX_AGENT_ITERATIONS,
+        max_tasks=settings.MAX_AGENT_TASKS,
+        max_retrieval_calls=settings.MAX_AGENT_RETRIEVAL_CALLS,
+        max_replans=settings.MAX_AGENT_REPLANS,
+        total_timeout_ms=settings.AGENT_TOTAL_TIMEOUT_MS,
+    )
+
+
 # --- Chat & LLM Orchestration Component Dependency Injection ---
 
 
@@ -1144,6 +1196,7 @@ def get_chat_orchestrator(
     conversation_context_builder=Depends(get_conversation_context_builder),
     agent_executor=Depends(get_agent_executor),
     master_agent=Depends(get_master_agent),
+    adaptive_rag_orchestrator=Depends(get_adaptive_rag_orchestrator),
 ) -> Any:
     from app.chat.services.chat_orchestrator import ChatOrchestrator
     from app.chat.services.llm_generation_service import LLMGenerationService
@@ -1169,6 +1222,8 @@ def get_chat_orchestrator(
         enable_conversation_memory=settings.ENABLE_CONVERSATION_MEMORY,
         enable_tool_calling=settings.ENABLE_TOOL_CALLING,
         enable_multi_agent=settings.ENABLE_MULTI_AGENT,
+        adaptive_rag_orchestrator=adaptive_rag_orchestrator,
+        enable_adaptive_rag=settings.ENABLE_ADAPTIVE_RAG,
     )
 
 

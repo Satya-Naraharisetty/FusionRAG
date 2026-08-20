@@ -125,6 +125,30 @@ class AdvancedRAGEvaluation(BaseModel):
     quality_gain_per_additional_latency: float = 0.0
 
 
+class AdaptiveRAGEvaluation(BaseModel):
+    strategy_selection_accuracy: float = 1.0
+    hyde_usage_rate: float = 0.0
+    hyde_success_rate: float = 1.0
+    hyde_quality_delta: float = 0.0
+    evidence_sufficiency_rate: float = 1.0
+    replan_trigger_rate: float = 0.0
+    replan_success_rate: float = 1.0
+    task_success_rate: float = 1.0
+    duplicate_task_avoidance: float = 1.0
+    agent_call_efficiency: float = 1.0
+    conflict_resolution_rate: float = 1.0
+    partial_completion_rate: float = 0.0
+    premature_stop_rate: float = 0.0
+    unnecessary_retrieval_rate: float = 0.0
+    quality_gain_per_additional_retrieval: float = 0.0
+    quality_gain_per_additional_latency: float = 0.0
+    average_iterations: float = 1.0
+    average_tasks_per_query: float = 1.0
+    average_retrieval_calls: float = 1.0
+    orchestration_latency_p50: float = 0.0
+    orchestration_latency_p95: float = 0.0
+
+
 class EvaluationResult(BaseModel):
     sample_id: str
     question: str

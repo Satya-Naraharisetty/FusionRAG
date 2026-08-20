@@ -962,3 +962,183 @@ class DuplicateContextRateMetric(Metric):
             passed=rate == 0.0,
             reason=f"Duplicate context rate: {rate * 100:.1f}% ({duplicate_count} duplicates).",
         )
+
+
+# --- PHASE 2.5 ADAPTIVE & AGENTIC RAG METRICS ---
+
+
+@MetricRegistry.register("strategy_selection_accuracy")
+class StrategySelectionAccuracyMetric(Metric):
+    """
+    Measures accuracy of adaptive strategy routing against expected strategy.
+    """
+
+    def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
+        expected_strat = sample.metadata.get("expected_strategy")
+        if not expected_strat:
+            return MetricResult(
+                name=self.name,
+                score=1.0,
+                passed=True,
+                reason="No expected strategy defined.",
+            )
+
+        actual_strat = (
+            actual_output.get("strategy")
+            if isinstance(actual_output, dict)
+            else str(actual_output)
+        )
+        passed = str(actual_strat).lower() == str(expected_strat).lower()
+        score = 1.0 if passed else 0.0
+        return MetricResult(
+            name=self.name,
+            score=score,
+            passed=passed,
+            reason=f"Strategy '{actual_strat}' {'matches' if passed else 'does not match'} expected '{expected_strat}'.",
+        )
+
+
+@MetricRegistry.register("hyde_usage_rate")
+class HyDEUsageRateMetric(Metric):
+    def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
+        metadata = actual_output if isinstance(actual_output, dict) else sample.metadata
+        used = metadata.get("hyde_used", False) or metadata.get("strategy") == "hyde"
+        expected = sample.metadata.get(
+            "expected_strategy"
+        ) == "hyde" or sample.metadata.get("hyde_expected", False)
+        passed = (used == expected) if "expected_strategy" in sample.metadata else True
+        return MetricResult(
+            name=self.name,
+            score=1.0 if used else 0.0,
+            passed=passed,
+            reason=f"HyDE {'was used' if used else 'was not used'}.",
+        )
+
+
+@MetricRegistry.register("hyde_success_rate")
+class HyDESuccessRateMetric(Metric):
+    def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
+        metadata = actual_output if isinstance(actual_output, dict) else sample.metadata
+        hyde_used = (
+            metadata.get("hyde_used", False) or metadata.get("strategy") == "hyde"
+        )
+        if not hyde_used:
+            return MetricResult(
+                name=self.name, score=1.0, passed=True, reason="HyDE was not activated."
+            )
+        failed = metadata.get("hyde_failed", False)
+        score = 0.0 if failed else 1.0
+        return MetricResult(
+            name=self.name,
+            score=score,
+            passed=score == 1.0,
+            reason=f"HyDE execution {'succeeded' if score == 1.0 else 'failed'}.",
+        )
+
+
+@MetricRegistry.register("replan_trigger_rate")
+class ReplanTriggerRateMetric(Metric):
+    def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
+        metadata = actual_output if isinstance(actual_output, dict) else sample.metadata
+        replan_count = metadata.get("replan_count", 0)
+        triggered = replan_count > 0
+        return MetricResult(
+            name=self.name,
+            score=1.0 if triggered else 0.0,
+            passed=True,
+            reason=f"Replanning triggered {replan_count} times.",
+        )
+
+
+@MetricRegistry.register("conflict_resolution_rate")
+class ConflictResolutionRateMetric(Metric):
+    def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
+        metadata = actual_output if isinstance(actual_output, dict) else sample.metadata
+        conflict_detected = metadata.get("conflict_detected", False)
+        if not conflict_detected:
+            return MetricResult(
+                name=self.name, score=1.0, passed=True, reason="No conflict detected."
+            )
+        resolved = metadata.get("conflict_resolved", True)
+        score = 1.0 if resolved else 0.0
+        return MetricResult(
+            name=self.name,
+            score=score,
+            passed=score == 1.0,
+            reason=f"Conflict {'resolved/flagged' if resolved else 'unresolved'}.",
+        )
+
+
+@MetricRegistry.register("partial_completion_rate")
+class PartialCompletionRateMetric(Metric):
+    def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
+        metadata = actual_output if isinstance(actual_output, dict) else sample.metadata
+        status = str(metadata.get("final_status", "success")).lower()
+        is_partial = status in ("partial", "budget_exceeded", "timeout")
+        return MetricResult(
+            name=self.name,
+            score=1.0 if is_partial else 0.0,
+            passed=True,
+            reason=f"Final status: {status}.",
+        )
+
+
+@MetricRegistry.register("premature_stop_rate")
+class PrematureStopRateMetric(Metric):
+    """
+    Measures if orchestration stopped claiming sufficiency when required evidence was actually missing.
+    """
+
+    def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
+        metadata = actual_output if isinstance(actual_output, dict) else sample.metadata
+        claimed_sufficient = metadata.get("evidence_sufficiency", True)
+        contexts = metadata.get("retrieved_chunks", [])
+        if not isinstance(contexts, list):
+            contexts = []
+
+        gts = sample.ground_truth_context or []
+        if claimed_sufficient and gts:
+            combined = " ".join(
+                getattr(c, "text", "") if hasattr(c, "text") else str(c.get("text", ""))
+                for c in contexts
+            ).lower()
+            missing = sum(1 for gt in gts if compute_word_overlap(gt, combined) < 0.20)
+            if missing > 0 and len(gts) > 0 and (missing / len(gts)) > 0.5:
+                return MetricResult(
+                    name=self.name,
+                    score=1.0,
+                    passed=False,
+                    reason="Premature stop: claimed sufficient but major ground truth context is missing.",
+                )
+
+        return MetricResult(
+            name=self.name,
+            score=0.0,
+            passed=True,
+            reason="No premature stop detected.",
+        )
+
+
+@MetricRegistry.register("unnecessary_retrieval_rate")
+class UnnecessaryRetrievalRateMetric(Metric):
+    """
+    Measures if additional retrieval calls were performed after sufficient evidence was already obtained.
+    """
+
+    def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
+        metadata = actual_output if isinstance(actual_output, dict) else sample.metadata
+        total_calls = metadata.get("total_retrieval_calls", 1)
+        replan_count = metadata.get("replan_count", 0)
+        unnecessary = 0
+        if not sample.retrieval_required and total_calls > 0:
+            unnecessary = total_calls
+        elif replan_count > 0 and metadata.get("first_iteration_sufficient", False):
+            unnecessary = replan_count
+
+        rate = unnecessary / total_calls if total_calls > 0 else 0.0
+        return MetricResult(
+            name=self.name,
+            score=round(rate, 3),
+            passed=rate <= 0.20,
+            reason=f"Unnecessary retrieval rate: {rate * 100:.1f}%.",
+        )

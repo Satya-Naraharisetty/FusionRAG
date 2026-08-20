@@ -185,7 +185,11 @@ class ChatOrchestrator:
         enable_conversation_memory: bool = True,
         enable_tool_calling: bool = True,
         enable_multi_agent: bool = True,
+        adaptive_rag_orchestrator: Any | None = None,
+        enable_adaptive_rag: bool | None = None,
     ) -> None:
+        from app.core.config import settings
+
         self.retrieval_service = retrieval_service
         self.prompt_builder = prompt_builder
         self.llm_generation_service = llm_generation_service
@@ -204,6 +208,12 @@ class ChatOrchestrator:
         self.enable_conversation_memory = enable_conversation_memory
         self.enable_tool_calling = enable_tool_calling
         self.enable_multi_agent = enable_multi_agent
+        self.adaptive_rag_orchestrator = adaptive_rag_orchestrator
+        self.enable_adaptive_rag = (
+            enable_adaptive_rag
+            if enable_adaptive_rag is not None
+            else getattr(settings, "ENABLE_ADAPTIVE_RAG", False)
+        )
 
     async def generate_answer(
         self,
@@ -302,13 +312,24 @@ class ChatOrchestrator:
                 include_library_documents=documents_priority,
                 document_ids=retrieval_doc_ids if retrieval_doc_ids else None,
             )
-            search_result = await self.retrieval_service.retrieve(
-                query=query_to_retrieve,
-                user_id=user_id,
-                top_k=top_k,
-                filter_metadata=filters,
-                retrieval_scope=retrieval_scope,
-            )
+            if self.enable_adaptive_rag and self.adaptive_rag_orchestrator is not None:
+                search_result = await self.adaptive_rag_orchestrator.orchestrate(
+                    query=query_to_retrieve,
+                    user_id=user_id,
+                    top_k=top_k,
+                    conversation_id=conversation_id,
+                    document_ids=retrieval_doc_ids if retrieval_doc_ids else None,
+                    filter_metadata=filters,
+                    retrieval_scope=retrieval_scope,
+                )
+            else:
+                search_result = await self.retrieval_service.retrieve(
+                    query=query_to_retrieve,
+                    user_id=user_id,
+                    top_k=top_k,
+                    filter_metadata=filters,
+                    retrieval_scope=retrieval_scope,
+                )
         retrieval_time_ms = (time.perf_counter() - retrieval_start) * 1000
 
         # Note: an empty retrieval does NOT abort the request. The prompt is
@@ -591,13 +612,24 @@ class ChatOrchestrator:
                 include_library_documents=documents_priority,
                 document_ids=retrieval_doc_ids if retrieval_doc_ids else None,
             )
-            search_result = await self.retrieval_service.retrieve(
-                query=query_to_retrieve,
-                user_id=user_id,
-                top_k=top_k,
-                filter_metadata=filters,
-                retrieval_scope=retrieval_scope,
-            )
+            if self.enable_adaptive_rag and self.adaptive_rag_orchestrator is not None:
+                search_result = await self.adaptive_rag_orchestrator.orchestrate(
+                    query=query_to_retrieve,
+                    user_id=user_id,
+                    top_k=top_k,
+                    conversation_id=conversation_id,
+                    document_ids=retrieval_doc_ids if retrieval_doc_ids else None,
+                    filter_metadata=filters,
+                    retrieval_scope=retrieval_scope,
+                )
+            else:
+                search_result = await self.retrieval_service.retrieve(
+                    query=query_to_retrieve,
+                    user_id=user_id,
+                    top_k=top_k,
+                    filter_metadata=filters,
+                    retrieval_scope=retrieval_scope,
+                )
         retrieval_time_ms = (time.perf_counter() - retrieval_start) * 1000
 
         # Note: an empty retrieval does NOT abort the request. The prompt is

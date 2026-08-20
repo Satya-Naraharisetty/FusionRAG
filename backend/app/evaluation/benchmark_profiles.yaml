@@ -35,3 +35,11 @@ nightly:
     - agent
     - conversation
   max_samples: 1000
+
+adaptive_rag:
+  pipelines:
+    - retrieval
+    - citation
+    - agent
+  max_samples: 100
+

@@ -273,6 +273,10 @@ class SQLAlchemyChunkRepository(ChunkRepository):
             )
 
         query = query.where(or_(*conditions))
-        result = await self._db.execute(query)
+        try:
+            result = await self._db.execute(query)
+        except TypeError:
+            sync_db: Any = self._db
+            result = sync_db.execute(query)
         db_doc_ids = result.all()
         return [row[0] for row in db_doc_ids]

@@ -236,6 +236,22 @@ class Settings(BaseSettings):
     NEIGHBOR_CHUNK_WINDOW: int = 1
     TOTAL_ADVANCED_RAG_TIMEOUT_MS: int = 3000
 
+    # Adaptive / Agentic RAG Orchestration Configurations (Phase 2.5)
+    ENABLE_ADAPTIVE_RAG: bool = False
+    ENABLE_HYDE: bool = False
+    HYDE_TIMEOUT_MS: int = 1000
+    HYDE_MAX_TOKENS: int = 512
+    HYDE_MAX_RETRIES: int = 1
+    HYDE_MIN_QUERY_CONFIDENCE: float = 0.70
+    HYDE_MAX_RETRIEVAL_CALLS: int = 1
+
+    MAX_AGENT_ITERATIONS: int = 3
+    MAX_AGENT_TASKS: int = 8
+    MAX_AGENT_RETRIEVAL_CALLS: int = 12
+    MAX_AGENT_REPLANS: int = 2
+    AGENT_TOTAL_TIMEOUT_MS: int = 5000
+    MAX_DUPLICATE_TASK_ATTEMPTS: int = 0
+
     # LLM Orchestration & Answer Generation Configurations
     LLM_PROVIDER: str = "gemini"
     GEMINI_CHAT_MODEL: str = "gemini-2.5-flash-lite"

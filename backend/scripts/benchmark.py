@@ -44,7 +44,14 @@ async def main() -> None:
     parser.add_argument(
         "--profile",
         default="fast_deterministic",
-        choices=["fast_deterministic", "quick", "standard", "full", "nightly"],
+        choices=[
+            "fast_deterministic",
+            "quick",
+            "standard",
+            "full",
+            "nightly",
+            "adaptive_rag",
+        ],
         help="Evaluation profile.",
     )
     parser.add_argument(
@@ -109,6 +116,16 @@ async def main() -> None:
         default=True,
         help="Enable Phase 2.4 context selection.",
     )
+    parser.add_argument(
+        "--enable-adaptive-rag",
+        action="store_true",
+        help="Enable Phase 2.5 Adaptive / Agentic RAG Orchestration.",
+    )
+    parser.add_argument(
+        "--enable-hyde",
+        action="store_true",
+        help="Enable Phase 2.5 HyDE (Hypothetical Document Embeddings).",
+    )
     args = parser.parse_args()
 
     # 1. Establish DB session (Postgres or SQLite in-memory fallback)
@@ -166,23 +183,75 @@ async def main() -> None:
             chunk_repo = get_chunk_repository(db)
             index_cache = get_index_cache()
 
-            retrieval_service = get_retrieval_service(
+            base_retrieval_service = get_retrieval_service(
                 generator=generator,
                 vector_store=vector_store,
                 chunk_repo=chunk_repo,
                 index_cache=index_cache,
             )
             # Apply CLI overrides for benchmark run
-            retrieval_service._enable_query_expansion = args.enable_query_expansion
-            retrieval_service._enable_query_decomposition = (
+            base_retrieval_service._enable_query_expansion = args.enable_query_expansion
+            base_retrieval_service._enable_query_decomposition = (
                 args.enable_query_decomposition
             )
-            retrieval_service._enable_weighted_rrf = args.enable_weighted_rrf
-            retrieval_service._dense_weight = args.dense_weight
-            retrieval_service._sparse_weight = args.sparse_weight
-        except Exception:
+            base_retrieval_service._enable_weighted_rrf = args.enable_weighted_rrf
+            base_retrieval_service._dense_weight = args.dense_weight
+            base_retrieval_service._sparse_weight = args.sparse_weight
+
+            if args.enable_adaptive_rag:
+                from app.documents.services.hyde import (
+                    DeterministicHyDEGenerator,
+                    SafeHyDEExecutor,
+                )
+                from app.documents.services.query_classifier import (
+                    DeterministicQueryClassifier,
+                )
+                from app.documents.services.query_decomposer import (
+                    DeterministicQueryDecomposer,
+                )
+                from app.rag.orchestration.evidence_evaluator import (
+                    EvidenceSufficiencyEvaluator,
+                )
+                from app.rag.orchestration.master import AdaptiveRAGOrchestrator
+                from app.rag.orchestration.replanner import Replanner
+                from app.rag.orchestration.strategy_router import (
+                    RetrievalStrategyRouter,
+                )
+                from app.rag.orchestration.telemetry import OrchestrationTelemetry
+
+                hyde_exec = None
+                if (
+                    args.enable_hyde
+                    and getattr(base_retrieval_service, "_dense_retriever", None)
+                    is not None
+                ):
+                    hyde_exec = SafeHyDEExecutor(
+                        hyde_generator=DeterministicHyDEGenerator(),
+                        embedding_generator=generator,
+                        dense_retriever=base_retrieval_service._dense_retriever,
+                        timeout_ms=settings.HYDE_TIMEOUT_MS,
+                    )
+
+                q_classifier = DeterministicQueryClassifier()
+                retrieval_service = AdaptiveRAGOrchestrator(
+                    retrieval_service=base_retrieval_service,
+                    strategy_router=RetrievalStrategyRouter(q_classifier),
+                    evidence_evaluator=EvidenceSufficiencyEvaluator(
+                        min_relevance_threshold=settings.SIMILARITY_THRESHOLD
+                    ),
+                    replanner=Replanner(),
+                    query_classifier=q_classifier,
+                    query_decomposer=DeterministicQueryDecomposer(),
+                    hyde_executor=hyde_exec,
+                    telemetry=OrchestrationTelemetry(),
+                    chunk_repo=chunk_repo,
+                )
+            else:
+                retrieval_service = base_retrieval_service
+        except Exception as e:
             from unittest.mock import MagicMock
 
+            print(f"Retrieval service resolution exception: {e}")
             retrieval_service = MagicMock()
 
         retrieval_eval = RetrievalEvaluator(retrieval_service)
