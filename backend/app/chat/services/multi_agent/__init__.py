@@ -1,3 +1,19 @@
+from app.chat.domain.agent_observability import (
+    AgentErrorRecord,
+    AgentEvidenceMetrics,
+    AgentPhase,
+    AgentQualityMetrics,
+    AgentSecurityEvent,
+    AgentTaskTrace,
+    AgentTrace,
+    AgentTraceEvent,
+    AgentTraceStatus,
+    BatchExecutionTrace,
+    FailureCategory,
+    ProviderUsageRecord,
+    hash_user_id,
+    sanitize_telemetry_data,
+)
 from app.chat.domain.multi_agent import (
     AgentExecutionContext,
     AgentFailureReason,
@@ -32,7 +48,13 @@ from app.chat.services.multi_agent.capability_registry import (
 )
 from app.chat.services.multi_agent.document_agent import DocumentAgent
 from app.chat.services.multi_agent.execution_engine import AgentExecutionEngine
+from app.chat.services.multi_agent.health_diagnostics import get_agent_readiness_report
 from app.chat.services.multi_agent.master_agent import MasterAgent
+from app.chat.services.multi_agent.observability import (
+    AgentObservabilityService,
+    AgentTelemetrySink,
+    InMemoryTelemetrySink,
+)
 from app.chat.services.multi_agent.research_agent import ResearchAgent
 from app.chat.services.multi_agent.research_planner import ResearchPlanner
 from app.chat.services.multi_agent.result_evaluator import ResultEvaluator
@@ -64,6 +86,20 @@ __all__ = [
     "ResearchPlan",
     "ResearchEvidenceSet",
     "ResearchQueryContext",
+    "AgentPhase",
+    "AgentTraceStatus",
+    "FailureCategory",
+    "AgentErrorRecord",
+    "AgentSecurityEvent",
+    "AgentTraceEvent",
+    "AgentTaskTrace",
+    "BatchExecutionTrace",
+    "AgentEvidenceMetrics",
+    "AgentQualityMetrics",
+    "AgentTrace",
+    "ProviderUsageRecord",
+    "hash_user_id",
+    "sanitize_telemetry_data",
     "BaseSpecialistAgent",
     "ResearchPlanner",
     "ResearchAgent",
@@ -76,4 +112,8 @@ __all__ = [
     "ResultEvaluator",
     "SynthesisAgent",
     "MasterAgent",
+    "AgentTelemetrySink",
+    "InMemoryTelemetrySink",
+    "AgentObservabilityService",
+    "get_agent_readiness_report",
 ]

@@ -5,6 +5,9 @@ import time
 from collections.abc import AsyncIterator
 from typing import Any
 
+from app.chat.domain.agent_observability import (
+    AgentQualityMetrics,
+)
 from app.chat.domain.interfaces import LLMProvider
 from app.chat.domain.models import ChatMessage, ChatRole
 from app.chat.domain.multi_agent import (
@@ -23,6 +26,7 @@ from app.chat.services.multi_agent.execution_engine import (
     ALLOWED_SPECIALIST_TYPES,
     AgentExecutionEngine,
 )
+from app.chat.services.multi_agent.observability import AgentObservabilityService
 from app.chat.services.multi_agent.result_evaluator import ResultEvaluator
 from app.chat.services.multi_agent.synthesis_agent import SynthesisAgent
 
@@ -75,6 +79,7 @@ class MasterAgent:
         execution_engine: AgentExecutionEngine,
         synthesis_agent: SynthesisAgent,
         result_evaluator: ResultEvaluator | None = None,
+        observability: AgentObservabilityService | None = None,
         max_plan_iterations: int = 2,
         max_total_calls: int = 8,
     ) -> None:
@@ -84,6 +89,7 @@ class MasterAgent:
         self.result_evaluator = result_evaluator or ResultEvaluator(
             llm_provider=llm_provider
         )
+        self.observability = observability
         self.max_plan_iterations = max_plan_iterations
         self.max_total_calls = max_total_calls
 
@@ -469,9 +475,18 @@ class MasterAgent:
         max_tokens: int = 1000,
     ) -> MultiAgentResponse:
         """
-        Executes a complete multi-agent request with adaptive result evaluation and bounded replanning.
+        Executes a complete multi-agent request with adaptive result evaluation, bounded replanning,
+        and end-to-end production observability.
         """
         start_time = time.perf_counter()
+        if self.observability:
+            self.observability.start_trace(
+                request_id=context.request_id,
+                conversation_id=context.conversation_id,
+                user_id=context.user_id,
+                metadata=context.metadata,
+            )
+
         total_calls = 0
         task_latencies: dict[str, float] = {}
         accumulated_results: dict[str, AgentResult] = {}
@@ -483,6 +498,7 @@ class MasterAgent:
         replan_count = 0
         avoided_dupes = 0
         retry_count = 0
+        planning_fallback_used = False
 
         eval_latency_ms = 0.0
         plan_latency_ms = 0.0
@@ -498,10 +514,36 @@ class MasterAgent:
                 current_plan = await self.create_plan(
                     request, context, iteration=iteration
                 )
+                if (
+                    current_plan.reasoning_summary
+                    and "heuristic" in current_plan.reasoning_summary.lower()
+                ):
+                    planning_fallback_used = True
+                if self.observability:
+                    self.observability.record_event(
+                        request_id=context.request_id,
+                        event_type="plan_created",
+                        duration_ms=(time.perf_counter() - p_start) * 1000,
+                        metadata={
+                            "task_count": len(current_plan.tasks),
+                            "iteration": iteration,
+                            "reasoning_summary": current_plan.reasoning_summary or "",
+                        },
+                    )
             else:
                 replan_count += 1
                 assert current_plan is not None
                 assert latest_evaluation is not None
+                if self.observability:
+                    self.observability.record_event(
+                        request_id=context.request_id,
+                        event_type="replan_started",
+                        metadata={
+                            "iteration": iteration,
+                            "reason": latest_evaluation.reason,
+                        },
+                    )
+                prev_task_count = len(current_plan.tasks)
                 current_plan, dupes = await self.create_refined_plan(
                     request=request,
                     previous_plan=current_plan,
@@ -511,6 +553,16 @@ class MasterAgent:
                     iteration=iteration,
                 )
                 avoided_dupes += dupes
+                replan_dur_ms = (time.perf_counter() - p_start) * 1000
+                if self.observability:
+                    self.observability.record_replan(
+                        request_id=context.request_id,
+                        iteration=iteration,
+                        new_tasks_count=len(current_plan.tasks),
+                        preserved_tasks_count=prev_task_count,
+                        avoided_dupes=dupes,
+                        duration_ms=replan_dur_ms,
+                    )
 
             plan_latency_ms += (time.perf_counter() - p_start) * 1000
 
@@ -562,14 +614,28 @@ class MasterAgent:
 
             # Evaluate execution outcome
             e_start = time.perf_counter()
+            if self.observability:
+                self.observability.record_event(
+                    request_id=context.request_id,
+                    event_type="evaluation_started",
+                    metadata={"iteration": iteration},
+                )
             latest_evaluation = await self.result_evaluator.evaluate(
                 original_request=request,
                 plan=current_plan,
                 outcome=outcome,
                 accumulated_results=accumulated_results,
             )
-            eval_latency_ms += (time.perf_counter() - e_start) * 1000
+            eval_dur_ms = (time.perf_counter() - e_start) * 1000
+            eval_latency_ms += eval_dur_ms
             eval_count += 1
+
+            if self.observability:
+                self.observability.record_evaluation(
+                    request_id=context.request_id,
+                    evaluation=latest_evaluation,
+                    duration_ms=eval_dur_ms,
+                )
 
             if latest_evaluation.decision == EvaluationDecision.RETRYABLE_FAILURE:
                 retry_count += 1
@@ -593,6 +659,12 @@ class MasterAgent:
         )
 
         s_start = time.perf_counter()
+        if self.observability:
+            self.observability.record_event(
+                request_id=context.request_id,
+                event_type="synthesis_started",
+                metadata={"specialist_results_count": len(all_results_list)},
+            )
         answer_text, citations, usage = await self.synthesis_agent.synthesize(
             request=synthesis_req,
             model=model,
@@ -600,6 +672,18 @@ class MasterAgent:
             max_tokens=max_tokens,
         )
         synth_latency_ms = (time.perf_counter() - s_start) * 1000
+        if self.observability:
+            self.observability.record_event(
+                request_id=context.request_id,
+                event_type="synthesis_completed",
+                duration_ms=synth_latency_ms,
+                metadata={
+                    "citations_count": len(citations),
+                    "prompt_tokens": usage.prompt_tokens,
+                    "completion_tokens": usage.completion_tokens,
+                    "total_tokens": usage.total_tokens,
+                },
+            )
 
         total_time_ms = (time.perf_counter() - start_time) * 1000
         failed_tasks = [r.task_id for r in all_results_list if not r.success]
@@ -702,6 +786,54 @@ class MasterAgent:
             estimated_latency_ms=round(total_est_latency, 2),
         )
 
+        grounding_status = "grounded"
+        total_ev_count = sum(len(r.evidence) for r in all_results_list)
+        if total_ev_count == 0:
+            grounding_status = "empty_evidence"
+        elif len(citations) == 0 and total_ev_count > 0:
+            grounding_status = "partial"
+
+        if self.observability:
+            self.observability.record_evidence_metrics(
+                request_id=context.request_id,
+                total_evidence=total_ev_count,
+                unique_evidence=total_ev_count,
+                duplicate_removed=research_duplicate_evidence_removed,
+                citation_count=len(citations),
+                conflicting_count=len(latest_evaluation.contradictions)
+                if latest_evaluation
+                else 0,
+                empty_retrieval_count=research_empty_queries,
+                research_subqueries=research_subqueries_generated,
+                successful_research_subqueries=research_subqueries_executed,
+                failed_research_subqueries=research_empty_queries,
+                citations_received=total_ev_count,
+                citations_returned=len(citations),
+                grounding_status=grounding_status,
+            )
+            quality_metrics = AgentQualityMetrics(
+                planning_success=True,
+                planning_fallback_used=planning_fallback_used,
+                number_of_specialists_used=len(
+                    {r.agent_type for r in all_results_list if r.success}
+                ),
+                number_of_replans=replan_count,
+                successful_task_count=len([r for r in all_results_list if r.success]),
+                failed_task_count=len(failed_tasks),
+                skipped_task_count=len(
+                    [r for r in all_results_list if r.status == "SKIPPED"]
+                ),
+                capability_fallback_count=fallback_routes_count,
+                evaluation_count=eval_count,
+                synthesis_success=True,
+                final_grounding_status=grounding_status,
+            )
+            self.observability.complete_trace(
+                request_id=context.request_id,
+                diagnostics=diagnostics,
+                quality_metrics=quality_metrics,
+            )
+
         return MultiAgentResponse(
             answer=answer_text,
             plan=current_plan
@@ -726,6 +858,14 @@ class MasterAgent:
         """
         Streams multi-agent lifecycle events (including evaluation & replan events) and synthesized text chunks.
         """
+        if self.observability:
+            self.observability.start_trace(
+                request_id=context.request_id,
+                conversation_id=context.conversation_id,
+                user_id=context.user_id,
+                metadata=context.metadata,
+            )
+
         event_queue: list[dict[str, Any]] = []
 
         async def _event_callback(event_name: str, event_data: dict[str, Any]) -> None:

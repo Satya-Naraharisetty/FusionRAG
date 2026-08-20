@@ -5,6 +5,10 @@ from collections import defaultdict, deque
 from collections.abc import Callable, Coroutine
 from typing import Any
 
+from app.chat.domain.agent_observability import (
+    FailureCategory,
+    ProviderUsageRecord,
+)
 from app.chat.domain.multi_agent import (
     AgentExecutionContext,
     AgentFailureReason,
@@ -21,6 +25,7 @@ from app.chat.services.multi_agent.capability_registry import (
     CapabilityRegistry,
     create_default_capability_registry,
 )
+from app.chat.services.multi_agent.observability import AgentObservabilityService
 from app.chat.services.multi_agent.task_router import (
     TaskRouter,
 )
@@ -41,7 +46,7 @@ class AgentExecutionEngine:
     Resolves dependency graphs (DAG), routes tasks through TaskRouter, executes independent
     tasks concurrently via asyncio.gather, propagates upstream dependency results into downstream
     task contexts, enforces execution limits and timeouts, isolates failures, and returns a
-    structured ExecutionOutcome.
+    structured ExecutionOutcome with complete observability and concurrency metrics.
     """
 
     def __init__(
@@ -49,6 +54,7 @@ class AgentExecutionEngine:
         specialist_agents: list[BaseSpecialistAgent],
         task_router: TaskRouter | None = None,
         capability_registry: CapabilityRegistry | None = None,
+        observability: AgentObservabilityService | None = None,
         max_specialist_tasks: int = 5,
         max_total_calls: int = 8,
         task_timeout: float = 20.0,
@@ -66,6 +72,7 @@ class AgentExecutionEngine:
             max_cost_units=max_cost_units,
             max_latency_ms=max_latency_ms,
         )
+        self.observability = observability
         self.max_specialist_tasks = max_specialist_tasks
         self.max_total_calls = max_total_calls
         self.task_timeout = task_timeout
@@ -154,17 +161,43 @@ class AgentExecutionEngine:
         event_callback: Callable[[str, dict[str, Any]], Coroutine[Any, Any, None]]
         | None = None,
     ) -> AgentResult:
-        """Executes a single specialist task with timeout enforcement and event emission."""
+        """Executes a single specialist task with timeout enforcement, failure classification, and observability recording."""
         specialist = self.specialists.get(task.agent_type)
         if not specialist:
+            err_msg = f"Unregistered specialist for {task.agent_type}"
+            if self.observability:
+                self.observability.fail_task(
+                    request_id=context.request_id,
+                    task_id=task.task_id,
+                    failure_category=FailureCategory.VALIDATION_ERROR,
+                    failure_reason="UNREGISTERED_SPECIALIST",
+                    safe_error_message=err_msg,
+                )
             return AgentResult(
                 task_id=task.task_id,
                 agent_type=task.agent_type,
                 status=AgentTaskStatus.FAILED,
                 success=False,
                 output="",
-                error=f"Unregistered specialist for {task.agent_type}",
+                error=err_msg,
                 failure_reason=AgentFailureReason.VALIDATION_ERROR,
+            )
+
+        if self.observability:
+            self.observability.start_task(
+                request_id=context.request_id,
+                task_id=task.task_id,
+                agent_type=task.agent_type.value,
+                dependencies=task.dependencies,
+                capability_id=routing_decision.selected_capability_id
+                if routing_decision
+                else None,
+                estimated_latency_ms=routing_decision.estimated_latency_ms
+                if routing_decision
+                else 0.0,
+                estimated_cost_units=routing_decision.estimated_cost_units
+                if routing_decision
+                else 0.0,
             )
 
         if event_callback:
@@ -181,26 +214,48 @@ class AgentExecutionEngine:
             )
         except TimeoutError:
             elapsed_ms = (time.perf_counter() - start_time) * 1000
+            err_msg = f"Task timed out after {self.task_timeout} seconds."
+            if self.observability:
+                self.observability.fail_task(
+                    request_id=context.request_id,
+                    task_id=task.task_id,
+                    failure_category=FailureCategory.TIMEOUT,
+                    failure_reason="TIMEOUT",
+                    safe_error_message=err_msg,
+                    retryable=task.retryable,
+                    actual_latency_ms=elapsed_ms,
+                )
             result = AgentResult(
                 task_id=task.task_id,
                 agent_type=task.agent_type,
                 status=AgentTaskStatus.FAILED,
                 success=False,
                 output="",
-                error=f"Task timed out after {self.task_timeout} seconds.",
+                error=err_msg,
                 failure_reason=AgentFailureReason.TIMEOUT,
                 execution_time_ms=elapsed_ms,
             )
         except Exception as e:
             elapsed_ms = (time.perf_counter() - start_time) * 1000
             logger.exception("Unexpected execution error in task %s", task.task_id)
+            err_msg = f"Execution error: {e}"
+            if self.observability:
+                self.observability.fail_task(
+                    request_id=context.request_id,
+                    task_id=task.task_id,
+                    failure_category=FailureCategory.EXECUTION_ERROR,
+                    failure_reason="EXECUTION_ERROR",
+                    safe_error_message=str(e),
+                    retryable=task.retryable,
+                    actual_latency_ms=elapsed_ms,
+                )
             result = AgentResult(
                 task_id=task.task_id,
                 agent_type=task.agent_type,
                 status=AgentTaskStatus.FAILED,
                 success=False,
                 output="",
-                error=f"Execution error: {e}",
+                error=err_msg,
                 failure_reason=AgentFailureReason.EXECUTION_ERROR,
                 execution_time_ms=elapsed_ms,
             )
@@ -215,6 +270,60 @@ class AgentExecutionEngine:
             )
             result.metadata["estimated_cost_units"] = (
                 routing_decision.estimated_cost_units
+            )
+
+        # Record completion/failure in observability
+        if self.observability and result.success:
+            p_usage: ProviderUsageRecord | None = None
+            if "provider_usage" in result.metadata and isinstance(
+                result.metadata["provider_usage"], dict
+            ):
+                u_dict = result.metadata["provider_usage"]
+                p_usage = ProviderUsageRecord(
+                    provider=str(u_dict.get("provider", "")),
+                    model=str(u_dict.get("model", "")),
+                    input_tokens=int(u_dict.get("input_tokens", 0)),
+                    output_tokens=int(u_dict.get("output_tokens", 0)),
+                    total_tokens=int(u_dict.get("total_tokens", 0)),
+                    provider_latency_ms=float(u_dict.get("provider_latency_ms", 0.0)),
+                    finish_reason=u_dict.get("finish_reason"),
+                )
+            self.observability.complete_task(
+                request_id=context.request_id,
+                task_id=result.task_id,
+                actual_latency_ms=result.execution_time_ms,
+                execution_ms=result.execution_time_ms,
+                evidence_count=len(result.evidence),
+                citations_count=len(result.citations),
+                provider_usage=p_usage,
+                metadata=result.metadata,
+            )
+        elif self.observability and not result.success:
+            cat = FailureCategory.UNKNOWN_ERROR
+            if result.failure_reason == AgentFailureReason.TIMEOUT:
+                cat = FailureCategory.TIMEOUT
+            elif result.failure_reason == AgentFailureReason.DEPENDENCY_FAILED:
+                cat = FailureCategory.DEPENDENCY_FAILED
+            elif result.failure_reason == AgentFailureReason.VALIDATION_ERROR:
+                cat = FailureCategory.VALIDATION_ERROR
+            elif result.failure_reason == AgentFailureReason.LIMIT_EXCEEDED:
+                cat = FailureCategory.BUDGET_EXCEEDED
+            elif result.failure_reason == AgentFailureReason.UNAUTHORIZED:
+                cat = FailureCategory.AUTHORIZATION_FAILURE
+            elif result.failure_reason == AgentFailureReason.CAPABILITY_UNAVAILABLE:
+                cat = FailureCategory.CAPABILITY_UNAVAILABLE
+
+            self.observability.fail_task(
+                request_id=context.request_id,
+                task_id=result.task_id,
+                failure_category=cat,
+                failure_reason=result.failure_reason.value
+                if result.failure_reason
+                else "FAILURE",
+                safe_error_message=result.error or "Task failed.",
+                retryable=task.retryable,
+                actual_latency_ms=result.execution_time_ms,
+                metadata=result.metadata,
             )
 
         if event_callback:
@@ -256,13 +365,15 @@ class AgentExecutionEngine:
         """
         Executes the provided ExecutionPlan using topological concurrency.
         Routes ready tasks through TaskRouter, runs independent tasks concurrently,
-        enforces latency and cost budgets, and passes completed dependency results downstream.
+        enforces latency and cost budgets, records batch concurrency metrics,
+        and passes completed dependency results downstream.
         """
         start_time = time.perf_counter()
         validation_errors = self.validate_plan(plan)
         if validation_errors:
-            failed_results = [
-                AgentResult(
+            failed_results = []
+            for t in plan.tasks:
+                res = AgentResult(
                     task_id=t.task_id,
                     agent_type=t.agent_type,
                     status=AgentTaskStatus.FAILED,
@@ -271,8 +382,16 @@ class AgentExecutionEngine:
                     error="; ".join(validation_errors),
                     failure_reason=AgentFailureReason.VALIDATION_ERROR,
                 )
-                for t in plan.tasks
-            ]
+                failed_results.append(res)
+                if self.observability:
+                    self.observability.fail_task(
+                        request_id=plan.request_id,
+                        task_id=t.task_id,
+                        failure_category=FailureCategory.PLAN_VALIDATION_FAILURE,
+                        failure_reason="PLAN_VALIDATION_FAILURE",
+                        safe_error_message="; ".join(validation_errors),
+                    )
+
             elapsed_ms = (time.perf_counter() - start_time) * 1000
             return ExecutionOutcome(
                 request_id=plan.request_id,
@@ -290,6 +409,7 @@ class AgentExecutionEngine:
         all_results: dict[str, AgentResult] = {}
         total_calls = 0
         limits_reached: list[str] = []
+        batch_counter = 0
 
         estimated_cost_used = cumulative_cost_units
         estimated_latency_used = cumulative_latency_ms
@@ -310,6 +430,14 @@ class AgentExecutionEngine:
                             error="Execution halted: MAX_TOTAL_AGENT_CALLS limit reached.",
                             failure_reason=AgentFailureReason.LIMIT_EXCEEDED,
                         )
+                        if self.observability:
+                            self.observability.skip_task(
+                                request_id=context.request_id,
+                                task_id=t_id,
+                                agent_type=t.agent_type.value,
+                                reason="MAX_TOTAL_AGENT_CALLS limit reached.",
+                                failure_category=FailureCategory.BUDGET_EXCEEDED,
+                            )
                 break
 
             # Find ready tasks (all dependencies resolved)
@@ -342,6 +470,14 @@ class AgentExecutionEngine:
                             error=f"Dependency '{failed_dep}' failed or was skipped.",
                             failure_reason=AgentFailureReason.DEPENDENCY_FAILED,
                         )
+                        if self.observability:
+                            self.observability.skip_task(
+                                request_id=context.request_id,
+                                task_id=t_id,
+                                agent_type=task_map[t_id].agent_type.value,
+                                reason=f"Dependency '{failed_dep}' failed or was skipped.",
+                                failure_category=FailureCategory.DEPENDENCY_FAILED,
+                            )
                         if event_callback:
                             await event_callback(
                                 "agent_failed",
@@ -366,6 +502,14 @@ class AgentExecutionEngine:
                             error="Task could not be scheduled due to unresolved dependencies.",
                             failure_reason=AgentFailureReason.DEPENDENCY_FAILED,
                         )
+                        if self.observability:
+                            self.observability.skip_task(
+                                request_id=context.request_id,
+                                task_id=t_id,
+                                agent_type=t.agent_type.value,
+                                reason="Unresolved dependencies.",
+                                failure_category=FailureCategory.DEPENDENCY_FAILED,
+                            )
                 break
 
             # Enforce remaining quota limit on batch execution
@@ -384,6 +528,14 @@ class AgentExecutionEngine:
                         error="Execution halted: MAX_TOTAL_AGENT_CALLS limit reached.",
                         failure_reason=AgentFailureReason.LIMIT_EXCEEDED,
                     )
+                    if self.observability:
+                        self.observability.skip_task(
+                            request_id=context.request_id,
+                            task_id=sk_t.task_id,
+                            agent_type=sk_t.agent_type.value,
+                            reason="MAX_TOTAL_AGENT_CALLS limit reached.",
+                            failure_category=FailureCategory.BUDGET_EXCEEDED,
+                        )
 
             if not ready_tasks:
                 break
@@ -391,6 +543,13 @@ class AgentExecutionEngine:
             # Route ready tasks through TaskRouter
             executable_batch: list[tuple[AgentTask, RoutingDecision]] = []
             for t in ready_tasks:
+                if self.observability:
+                    self.observability.record_event(
+                        request_id=context.request_id,
+                        event_type="routing_started",
+                        task_id=t.task_id,
+                        agent_type=t.agent_type.value,
+                    )
                 if event_callback:
                     await event_callback(
                         "capability_routing_started",
@@ -426,6 +585,13 @@ class AgentExecutionEngine:
                     remaining_cost_units=rem_cost,
                 )
 
+                if self.observability:
+                    self.observability.record_routing_decision(
+                        request_id=context.request_id,
+                        task_id=t.task_id,
+                        decision=decision,
+                    )
+
                 if not decision.selected_capability_id:
                     if event_callback:
                         await event_callback(
@@ -442,6 +608,19 @@ class AgentExecutionEngine:
                         if decision.reason_code == "BUDGET_EXCEEDED"
                         else AgentFailureReason.CAPABILITY_UNAVAILABLE
                     )
+                    cat = (
+                        FailureCategory.BUDGET_EXCEEDED
+                        if decision.reason_code == "BUDGET_EXCEEDED"
+                        else FailureCategory.CAPABILITY_UNAVAILABLE
+                    )
+                    if self.observability:
+                        self.observability.fail_task(
+                            request_id=context.request_id,
+                            task_id=t.task_id,
+                            failure_category=cat,
+                            failure_reason=decision.reason_code,
+                            safe_error_message=f"Capability routing failed: {decision.reason_code}",
+                        )
                     all_results[t.task_id] = AgentResult(
                         task_id=t.task_id,
                         agent_type=t.agent_type,
@@ -478,7 +657,12 @@ class AgentExecutionEngine:
             batch_max_latency = max(
                 (d.estimated_latency_ms for _, d in executable_batch), default=0.0
             )
+            batch_seq_latency = sum(d.estimated_latency_ms for _, d in executable_batch)
             estimated_latency_used += batch_max_latency
+
+            batch_counter += 1
+            batch_id = f"batch_{batch_counter}"
+            batch_wall_start = time.perf_counter()
 
             # Execute routed tasks concurrently via asyncio.gather
             async def _run_routed_task(
@@ -511,6 +695,19 @@ class AgentExecutionEngine:
                 *[_run_routed_task(t, d) for t, d in executable_batch]
             )
             total_calls += len(executable_batch)
+            batch_wall_clock_ms = (time.perf_counter() - batch_wall_start) * 1000.0
+            actual_seq_ms = sum(res.execution_time_ms for res in batch_results)
+
+            if self.observability:
+                self.observability.record_batch_execution(
+                    request_id=context.request_id,
+                    batch_id=batch_id,
+                    task_ids=[t.task_id for t, _ in executable_batch],
+                    estimated_sequential_latency_ms=batch_seq_latency,
+                    estimated_parallel_latency_ms=batch_max_latency,
+                    actual_sequential_equivalent_ms=actual_seq_ms,
+                    actual_parallel_wall_clock_ms=batch_wall_clock_ms,
+                )
 
             # Record batch results and remove resolved dependencies
             for res in batch_results:

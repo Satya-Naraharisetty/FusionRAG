@@ -14,6 +14,7 @@ from app.chat.domain.multi_agent import (
     RoutingDecision,
 )
 from app.chat.services.multi_agent.capability_registry import CapabilityRegistry
+from app.chat.services.multi_agent.observability import AgentObservabilityService
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ class TaskRouter:
         registry: CapabilityRegistry,
         llm_provider: LLMProvider | None = None,
         enable_llm_router: bool = False,
+        observability: AgentObservabilityService | None = None,
         max_cost_units: float = 100.0,
         max_latency_ms: float = 30000.0,
         llm_timeout: float = 5.0,
@@ -52,6 +54,7 @@ class TaskRouter:
         self.registry = registry
         self.llm_provider = llm_provider
         self.enable_llm_router = enable_llm_router
+        self.observability = observability
         self.max_cost_units = max_cost_units
         self.max_latency_ms = max_latency_ms
         self.llm_timeout = llm_timeout
@@ -155,6 +158,16 @@ class TaskRouter:
 
         # 1. Check for non-executable or disallowed AgentType
         if task.agent_type in NON_EXECUTABLE_AGENT_TYPES:
+            if self.observability:
+                self.observability.record_security_event(
+                    request_id=context.request_id,
+                    event_type="unauthorized_agent_type_routing",
+                    reason="POLICY_REJECTED",
+                    task_id=task.task_id,
+                    agent_type=task.agent_type.value,
+                    user_id=context.user_id,
+                    details={"attempted_agent_type": task.agent_type.value},
+                )
             return RoutingDecision(
                 task_id=task.task_id,
                 selected_capability_id=None,
@@ -167,6 +180,15 @@ class TaskRouter:
 
         target_cap_type = AGENT_TYPE_TO_CAPABILITY_TYPE.get(task.agent_type)
         if not target_cap_type:
+            if self.observability:
+                self.observability.record_security_event(
+                    request_id=context.request_id,
+                    event_type="unmapped_agent_type_routing",
+                    reason="POLICY_REJECTED",
+                    task_id=task.task_id,
+                    agent_type=task.agent_type.value,
+                    user_id=context.user_id,
+                )
             return RoutingDecision(
                 task_id=task.task_id,
                 selected_capability_id=None,
@@ -181,6 +203,19 @@ class TaskRouter:
         if task.capability_requirements:
             for req in task.capability_requirements:
                 if req.capability_type and req.capability_type != target_cap_type:
+                    if self.observability:
+                        self.observability.record_security_event(
+                            request_id=context.request_id,
+                            event_type="capability_mismatch",
+                            reason="CAPABILITY_MISMATCH",
+                            task_id=task.task_id,
+                            agent_type=task.agent_type.value,
+                            user_id=context.user_id,
+                            details={
+                                "expected_capability_type": target_cap_type.value,
+                                "requested_capability_type": req.capability_type.value,
+                            },
+                        )
                     return RoutingDecision(
                         task_id=task.task_id,
                         selected_capability_id=None,
@@ -200,6 +235,16 @@ class TaskRouter:
                 rejected[task.preferred_capability] = "UNKNOWN_CAPABILITY"
             elif registered_pref.capability_type != target_cap_type:
                 rejected[task.preferred_capability] = "CAPABILITY_MISMATCH"
+                if self.observability:
+                    self.observability.record_security_event(
+                        request_id=context.request_id,
+                        event_type="preferred_capability_mismatch",
+                        reason="CAPABILITY_MISMATCH",
+                        task_id=task.task_id,
+                        agent_type=task.agent_type.value,
+                        user_id=context.user_id,
+                        details={"preferred_capability": task.preferred_capability},
+                    )
 
         # 4. Fetch all descriptors for this capability type
         candidates = self.registry.list_by_type(target_cap_type)

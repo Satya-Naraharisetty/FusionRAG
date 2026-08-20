@@ -959,9 +959,38 @@ def get_capability_registry() -> Any:
     return _capability_registry_instance
 
 
+# Global singleton telemetry sink instance
+_telemetry_sink_instance: Any | None = None
+
+
+def get_telemetry_sink() -> Any:
+    global _telemetry_sink_instance
+    if _telemetry_sink_instance is None:
+        from app.chat.services.multi_agent.observability import InMemoryTelemetrySink
+
+        _telemetry_sink_instance = InMemoryTelemetrySink()
+    return _telemetry_sink_instance
+
+
+def get_agent_observability_service(
+    sink=Depends(get_telemetry_sink),
+) -> Any:
+    from app.chat.services.multi_agent.observability import AgentObservabilityService
+
+    return AgentObservabilityService(
+        sink=sink,
+        enabled=settings.AGENT_OBSERVABILITY_ENABLED,
+        max_events=settings.AGENT_TRACE_MAX_EVENTS,
+        max_tasks=settings.AGENT_TRACE_MAX_TASKS,
+        max_str_len=settings.AGENT_MAX_TELEMETRY_STRING_LEN,
+        max_keys=settings.AGENT_MAX_TELEMETRY_METADATA_KEYS,
+    )
+
+
 def get_task_router(
     registry=Depends(get_capability_registry),
     llm_provider=Depends(get_llm_provider),
+    observability=Depends(get_agent_observability_service),
 ) -> Any:
     from app.chat.services.multi_agent.task_router import TaskRouter
 
@@ -969,6 +998,7 @@ def get_task_router(
         registry=registry,
         llm_provider=llm_provider,
         enable_llm_router=settings.ENABLE_LLM_CAPABILITY_ROUTER,
+        observability=observability,
         max_cost_units=settings.MAX_ESTIMATED_AGENT_COST_UNITS,
         max_latency_ms=settings.MAX_ESTIMATED_LATENCY_MS,
     )
@@ -980,6 +1010,7 @@ def get_agent_execution_engine(
     analysis_agent=Depends(get_analysis_agent),
     task_router=Depends(get_task_router),
     capability_registry=Depends(get_capability_registry),
+    observability=Depends(get_agent_observability_service),
 ) -> Any:
     from app.chat.services.multi_agent.execution_engine import AgentExecutionEngine
 
@@ -987,6 +1018,7 @@ def get_agent_execution_engine(
         specialist_agents=[research_agent, document_agent, analysis_agent],
         task_router=task_router,
         capability_registry=capability_registry,
+        observability=observability,
         max_specialist_tasks=settings.MAX_SPECIALIST_TASKS,
         max_total_calls=settings.MAX_TOTAL_AGENT_CALLS,
         task_timeout=settings.MULTI_AGENT_TASK_TIMEOUT,
@@ -1007,6 +1039,7 @@ def get_master_agent(
     llm_provider=Depends(get_llm_provider),
     execution_engine=Depends(get_agent_execution_engine),
     synthesis_agent=Depends(get_synthesis_agent),
+    observability=Depends(get_agent_observability_service),
 ) -> Any:
     from app.chat.services.multi_agent.master_agent import MasterAgent
 
@@ -1014,6 +1047,7 @@ def get_master_agent(
         llm_provider=llm_provider,
         execution_engine=execution_engine,
         synthesis_agent=synthesis_agent,
+        observability=observability,
         max_plan_iterations=settings.MAX_PLAN_ITERATIONS,
         max_total_calls=settings.MAX_TOTAL_AGENT_CALLS,
     )

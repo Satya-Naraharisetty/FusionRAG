@@ -269,6 +269,19 @@ class Settings(BaseSettings):
     MAX_ESTIMATED_AGENT_COST_UNITS: float = 100.0
     MAX_ESTIMATED_LATENCY_MS: float = 30000.0
 
+    # Production Observability & Resilience Configurations (Prompt 3.5)
+    AGENT_OBSERVABILITY_ENABLED: bool = True
+    AGENT_TRACE_PERSISTENCE_ENABLED: bool = False
+    AGENT_TRACE_MAX_EVENTS: int = 500
+    AGENT_TRACE_MAX_TASKS: int = 50
+    AGENT_TRACE_RETENTION_DAYS: int = 7
+    AGENT_METRICS_ENABLED: bool = True
+    AGENT_DETAILED_ERRORS: bool = False
+    AGENT_RETRY_BACKOFF_BASE_MS: int = 100
+    AGENT_RETRY_BACKOFF_MAX_MS: int = 2000
+    AGENT_MAX_TELEMETRY_STRING_LEN: int = 500
+    AGENT_MAX_TELEMETRY_METADATA_KEYS: int = 50
+
     # Evaluation & Benchmarking Configurations
     ENABLE_EVALUATION: bool = True
     ENABLE_RAGAS: bool = True
