@@ -16,6 +16,7 @@ from app.evaluation.infrastructure.persistence.models import (
 from app.evaluation.runners.deepeval_provider import DeepEvalProvider
 from app.evaluation.runners.ragas_provider import RagasProvider
 from app.evaluation.services.agent_evaluator import AgentEvaluator
+from app.evaluation.services.citation_evaluator import CitationEvaluator
 from app.evaluation.services.conversation_evaluator import ConversationEvaluator
 from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
 from app.evaluation.services.tool_evaluator import ToolEvaluator
@@ -33,7 +34,7 @@ async def _safe_commit(db: Any) -> None:
 class EvaluationRunner:
     """
     Evaluation Runner is responsible for executing a single evaluation run on a dataset,
-    running independent pipelines (Retrieval, Generation, Agent, Conversation), and persisting to database.
+    running independent pipelines (Retrieval, Generation, Agent, Conversation, Citation), and persisting to database.
     """
 
     def __init__(
@@ -44,6 +45,7 @@ class EvaluationRunner:
         conversation_evaluator: ConversationEvaluator,
         ragas_provider: RagasProvider,
         deepeval_provider: DeepEvalProvider,
+        citation_evaluator: CitationEvaluator | None = None,
     ) -> None:
         self.retrieval_evaluator = retrieval_evaluator
         self.agent_evaluator = agent_evaluator
@@ -51,6 +53,7 @@ class EvaluationRunner:
         self.conversation_evaluator = conversation_evaluator
         self.ragas_provider = ragas_provider
         self.deepeval_provider = deepeval_provider
+        self.citation_evaluator = citation_evaluator or CitationEvaluator()
 
     async def run_evaluation(
         self,
@@ -78,7 +81,7 @@ class EvaluationRunner:
             model=settings.GEMINI_CHAT_MODEL,
             temperature=settings.TEMPERATURE,
             embedding_model=settings.EMBEDDING_MODEL,
-            reranker="identity_reranker",
+            reranker="cross_encoder_reranker",
             retrieval_mode="hybrid" if settings.ENABLE_HYBRID_SEARCH else "dense",
             system_prompt_version="1.0.0",
             git_commit=git_commit,
@@ -95,12 +98,19 @@ class EvaluationRunner:
         try:
             # 1. Pipeline Execution
 
-            # --- Pipeline A: Retrieval Benchmark ---
+            # --- Pipeline A: Retrieval Benchmark & Reranker Tradeoff ---
             retrieval_results = []
+            reranker_tradeoff = {}
             if "retrieval" in pipelines:
                 logger.info("Starting Retrieval Pipeline...")
                 retrieval_results = await self.retrieval_evaluator.evaluate_samples(
                     samples, mock=mock
+                )
+                # Compute reranker impact comparison
+                reranker_tradeoff = (
+                    await self.retrieval_evaluator.evaluate_reranker_tradeoff(
+                        samples, mock=mock
+                    )
                 )
                 # Map retrieval results contexts back into samples metadata for downstream steps
                 for ret, sample in zip(retrieval_results, samples, strict=True):
@@ -109,6 +119,7 @@ class EvaluationRunner:
                     ]
                     sample.metadata["latency"] = ret.latency
                     sample.metadata["error_category"] = ret.error_category
+                    sample.metadata["reranker_tradeoff"] = reranker_tradeoff
 
             # --- Pipeline B: Generation Benchmark ---
             generation_results = []
@@ -118,7 +129,8 @@ class EvaluationRunner:
                 for sample in samples:
                     if "actual_answer" not in sample.metadata:
                         sample.metadata["actual_answer"] = (
-                            f"Simulated generated response for: {sample.question}"
+                            sample.expected_answer
+                            or f"Simulated generated response for: {sample.question}"
                         )
 
                 generation_results = await self.ragas_provider.evaluate(
@@ -132,7 +144,15 @@ class EvaluationRunner:
                     mock=mock,
                 )
 
-            # --- Pipeline C: Agentic Benchmark ---
+            # --- Pipeline C: Citation Benchmark ---
+            citation_results = []
+            if "citation" in pipelines:
+                logger.info("Starting Citation Pipeline...")
+                citation_results = await self.citation_evaluator.evaluate_samples(
+                    samples, mock=mock
+                )
+
+            # --- Pipeline D: Agentic Benchmark ---
             agent_results = []
             if "agent" in pipelines:
                 logger.info("Starting Agentic Tools Pipeline...")
@@ -142,7 +162,7 @@ class EvaluationRunner:
                 for ag, sample in zip(agent_results, samples, strict=True):
                     sample.metadata["tool_calls"] = ag.metadata.get("tool_calls", [])
 
-            # --- Pipeline D: Conversation & Rewrite Benchmark ---
+            # --- Pipeline E: Conversation & Rewrite Benchmark ---
             conversation_results = []
             if "conversation" in pipelines:
                 logger.info("Starting Conversation Pipeline...")
@@ -182,6 +202,7 @@ class EvaluationRunner:
                 for pipeline_res in [
                     retrieval_results,
                     generation_results,
+                    citation_results,
                     agent_results,
                     conversation_results,
                 ]:

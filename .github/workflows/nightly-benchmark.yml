@@ -1,4 +1,4 @@
-name: Nightly Evaluation Benchmark
+name: Nightly Evaluation Benchmark & Regression Gate
 
 on:
   schedule:
@@ -54,27 +54,28 @@ jobs:
           uv pip install --system -e ".[dev]"
           uv pip install --system ragas deepeval langchain-google-vertexai langchain-community
 
-      - name: Run Standard Benchmark Suite
+      - name: Run Full Golden Benchmark Suite
         working-directory: ./backend
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           alembic upgrade head
-          # Run standard profile; fall back to mock if no secrets are present
           if [ -z "$GEMINI_API_KEY" ] && [ -z "$OPENAI_API_KEY" ]; then
-            echo "No API keys found. Executing in MOCK mode."
-            python scripts/benchmark.py --dataset tests/evaluation/simple_rag_dataset.json --profile standard --mock
+            echo "No external API keys found. Executing full profile in MOCK mode."
+            python scripts/benchmark.py --dataset app/evaluation/datasets/golden/golden_v1.yaml --profile full --mock
           else
-            echo "API keys found. Executing standard benchmark."
-            python scripts/benchmark.py --dataset tests/evaluation/simple_rag_dataset.json --profile standard
+            echo "API keys found. Executing full benchmark suite."
+            python scripts/benchmark.py --dataset app/evaluation/datasets/golden/golden_v1.yaml --profile full
           fi
 
-      - name: Run Regression Analysis
+      - name: Run Regression Analysis Against Approved Baseline
         working-directory: ./backend
-        run: python scripts/regression.py
+        run: |
+          python scripts/regression.py --baseline-file app/evaluation/baselines/baseline_v1.json --max-score-drop 0.03
 
       - name: Upload Benchmark Reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: nightly-benchmark-reports

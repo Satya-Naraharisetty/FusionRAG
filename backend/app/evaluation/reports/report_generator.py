@@ -205,6 +205,30 @@ class ReportGenerator:
             md.append(f"| {metric} | {avg:.3f} |")
         md.append("")
 
+        # Extract reranker tradeoff if present
+        sample_meta = run.results[0].metadata_json if run.results else {}
+        reranker_tradeoff = sample_meta.get("reranker_tradeoff")
+        if reranker_tradeoff:
+            md.append("## Cross-Encoder Reranker Impact & Latency Tradeoff")
+            md.append("| Metric | Without Reranker | With Reranker | Delta |")
+            md.append("| --- | ---:| ---:| ---:|")
+            md.append(
+                f"| MRR | {reranker_tradeoff.get('without_reranker_mrr', 0.0):.3f} | {reranker_tradeoff.get('with_reranker_mrr', 0.0):.3f} | {reranker_tradeoff.get('mrr_delta', 0.0):+.3f} |"
+            )
+            md.append(
+                f"| nDCG | {reranker_tradeoff.get('without_reranker_ndcg', 0.0):.3f} | {reranker_tradeoff.get('with_reranker_ndcg', 0.0):.3f} | {reranker_tradeoff.get('ndcg_delta', 0.0):+.3f} |"
+            )
+            md.append(
+                f"| Precision@K | {reranker_tradeoff.get('without_reranker_precision', 0.0):.3f} | {reranker_tradeoff.get('with_reranker_precision', 0.0):.3f} | {reranker_tradeoff.get('precision_delta', 0.0):+.3f} |"
+            )
+            md.append("")
+            md.append(
+                f"- **Reranker Latency:** Avg {reranker_tradeoff.get('reranker_latency_avg_ms', 0.0)}ms (p50: {reranker_tradeoff.get('reranker_latency_p50_ms', 0.0)}ms, p95: {reranker_tradeoff.get('reranker_latency_p95_ms', 0.0)}ms)"
+            )
+            md.append(
+                f"- **Relative Latency Impact:** +{reranker_tradeoff.get('relative_latency_increase_percent', 0.0)}%\n"
+            )
+
         if regression:
             md.append("## Regression Check Status")
             status_text = (
@@ -220,9 +244,27 @@ class ReportGenerator:
             md.append("| --- | --- | --- |")
             for metric, delta in regression.metric_deltas.items():
                 icon = "🔺" if delta > 0.01 else ("🔻" if delta < -0.01 else "➖")
-                status = "Warning" if delta < -0.02 else "Stable/Improved"
+                status = (
+                    "Regression"
+                    if delta < -0.03
+                    else ("Improved" if delta > 0.01 else "Stable")
+                )
                 md.append(f"| {metric} | {delta:+.3f} {icon} | {status} |")
             md.append("")
+
+            reg_list = regression.details.get("regressions", [])
+            if reg_list:
+                md.append("### ⚠️ Detected Regressions")
+                for r in reg_list:
+                    if r.get("metric") == "latency":
+                        md.append(
+                            f"- **Latency Regression:** Baseline {r.get('baseline')}s -> Current {r.get('candidate')}s (+{r.get('latency_increase_percent')}% vs threshold +{r.get('threshold')}%)"
+                        )
+                    else:
+                        md.append(
+                            f"- **{r.get('metric')}:** Baseline {r.get('baseline')} -> Current {r.get('candidate')} (Drop: {r.get('delta')} vs allowed {r.get('threshold')})"
+                        )
+                md.append("")
 
         md.append("## Error Category Analysis")
         categories: dict[str, int] = {}

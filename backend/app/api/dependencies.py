@@ -1171,6 +1171,12 @@ def get_tool_evaluator():
     return ToolEvaluator()
 
 
+def get_citation_evaluator() -> Any:
+    from app.evaluation.services.citation_evaluator import CitationEvaluator
+
+    return CitationEvaluator()
+
+
 def get_conversation_evaluator():
     from app.evaluation.services.conversation_evaluator import ConversationEvaluator
 
@@ -1182,6 +1188,7 @@ def get_evaluation_runner(
     agent_evaluator=Depends(get_agent_evaluator),
     tool_evaluator=Depends(get_tool_evaluator),
     conversation_evaluator=Depends(get_conversation_evaluator),
+    citation_evaluator=Depends(get_citation_evaluator),
     ragas_provider=Depends(get_ragas_provider),
     deepeval_provider=Depends(get_deepeval_provider),
 ):
@@ -1192,6 +1199,7 @@ def get_evaluation_runner(
         agent_evaluator=agent_evaluator,
         tool_evaluator=tool_evaluator,
         conversation_evaluator=conversation_evaluator,
+        citation_evaluator=citation_evaluator,
         ragas_provider=ragas_provider,
         deepeval_provider=deepeval_provider,
     )

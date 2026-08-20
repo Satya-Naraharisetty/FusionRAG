@@ -1,11 +1,11 @@
-name: PR Quick Evaluation Check
+name: PR Evaluation & Regression Gate
 
 on:
   pull_request:
     branches: [ main ]
 
 jobs:
-  quick-evaluation:
+  fast-evaluation:
     runs-on: ubuntu-latest
     env:
       POSTGRES_USER: postgres
@@ -51,13 +51,19 @@ jobs:
           uv pip install --system -e ".[dev]"
           uv pip install --system ragas deepeval langchain-google-vertexai langchain-community
 
-      - name: Run Quick Mock Benchmark
+      - name: Run Fast Deterministic Golden Benchmark
         working-directory: ./backend
         run: |
           alembic upgrade head
-          python scripts/benchmark.py --dataset tests/evaluation/simple_rag_dataset.json --profile quick --mock
+          python scripts/benchmark.py --dataset app/evaluation/datasets/golden/golden_v1.yaml --profile fast_deterministic --mock
+
+      - name: Enforce Regression Gate Against Approved Baseline
+        working-directory: ./backend
+        run: |
+          python scripts/regression.py --baseline-file app/evaluation/baselines/baseline_v1.json --max-score-drop 0.03 --max-latency-increase 20.0
 
       - name: Upload Evaluation Reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pr-evaluation-reports

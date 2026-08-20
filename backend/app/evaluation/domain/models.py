@@ -12,16 +12,25 @@ class RetrievedContext(BaseModel):
     document_id: str | None = None
 
 
+class RelevantChunk(BaseModel):
+    document: str
+    section: str | None = None
+    relevance: int = 1  # Graded relevance, e.g. 1 to 3
+
+
 class EvaluationSample(BaseModel):
     id: str
     question: str
+    category: str | None = None
     expected_answer: str | None = None
     ground_truth_context: list[str] | None = None
+    relevant_chunks: list[RelevantChunk] | list[dict[str, Any]] | None = None
     conversation_history: list[dict[str, Any]] | None = None
     expected_tools: list[str] | None = None
     expected_citations: list[str] | None = None
     difficulty: str | None = "medium"  # easy, medium, hard
     topic: str | None = None
+    tags: list[str] | None = None
     retrieval_required: bool = True
     tools_required: bool = False
     conversation_required: bool = False
@@ -44,6 +53,47 @@ class MetricResult(BaseModel):
     score: float
     passed: bool | None = None
     reason: str | None = None
+
+
+class CitationEvaluation(BaseModel):
+    citation_validity: float = 1.0
+    citation_precision: float = 1.0
+    citation_grounding: float = 1.0
+    citation_coverage: float = 1.0
+    unauthorized_citations_count: int = 0
+    nonexistent_citations_count: int = 0
+    passed: bool = True
+    reason: str | None = None
+
+
+class RerankerEvaluation(BaseModel):
+    without_reranker_mrr: float = 0.0
+    with_reranker_mrr: float = 0.0
+    mrr_delta: float = 0.0
+    without_reranker_ndcg: float = 0.0
+    with_reranker_ndcg: float = 0.0
+    ndcg_delta: float = 0.0
+    without_reranker_precision: float = 0.0
+    with_reranker_precision: float = 0.0
+    precision_delta: float = 0.0
+    reranker_latency_avg_ms: float = 0.0
+    reranker_latency_p50_ms: float = 0.0
+    reranker_latency_p95_ms: float = 0.0
+    total_retrieval_latency_delta_ms: float = 0.0
+    relative_latency_increase_percent: float = 0.0
+
+
+class BaselineData(BaseModel):
+    baseline_version: str = "v1"
+    dataset_version: str = "1.0.0"
+    evaluator_version: str = "v1"
+    profile: str = "fast_deterministic"
+    generated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    sample_count: int = 0
+    metric_averages: dict[str, float] = Field(default_factory=dict)
+    latency_metrics: dict[str, float] = Field(default_factory=dict)
+    reranker_tradeoff: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class EvaluationResult(BaseModel):

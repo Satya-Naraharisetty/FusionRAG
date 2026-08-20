@@ -1,0 +1,1215 @@
+dataset_id: golden_rag_dataset
+version: 1.0.0
+description: "Production-Grade Golden Evaluation Dataset for Hybrid RAG, Cross-Encoder Reranking, and Multi-Agent Orchestration"
+samples:
+  # ==========================================
+  # Category 1: Direct Factual Retrieval
+  # ==========================================
+  - id: golden-01
+    category: direct_factual
+    difficulty: easy
+    question: "What is the standard availability SLO for enterprise tier tenants?"
+    expected_answer: "The platform commits to a standard availability Service Level Objective (SLO) of 99.99% (four nines) for enterprise tier tenants on a rolling 30-day window."
+    expected_documents:
+      - engineering_policies.md
+    ground_truth_context:
+      - "availability Service Level Objective (SLO) of 99.95% uptime for standard tier tenants and 99.99% (four nines) for enterprise tier tenants"
+    relevant_chunks:
+      - document: engineering_policies.md
+        section: "Section 1: Service Level Agreements (SLAs) and SLOs"
+        relevance: 3
+    expected_citations:
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [sla, enterprise, availability]
+    metadata: {}
+
+  - id: golden-02
+    category: direct_factual
+    difficulty: easy
+    question: "What encryption standard and key rotation schedule is enforced for data at rest?"
+    expected_answer: "Data at rest is encrypted using AWS KMS Customer Managed Keys (CMK) with AES-256-GCM, with automated key rotation scheduled every 365 days."
+    expected_documents:
+      - cloud_architecture.md
+    ground_truth_context:
+      - "encrypted using AWS KMS Customer Managed Keys (CMK) with AES-256-GCM. KMS key rotation is automatically scheduled every 365 days."
+    relevant_chunks:
+      - document: cloud_architecture.md
+        section: "Section 3: Data Encryption Standards"
+        relevance: 3
+    expected_citations:
+      - cloud_architecture.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [security, encryption, kms]
+    metadata: {}
+
+  - id: golden-03
+    category: direct_factual
+    difficulty: easy
+    question: "What was the total consolidated GAAP revenue for FY2025?"
+    expected_answer: "Total consolidated GAAP revenue for FY2025 reached $142.5 million, representing a 38.5% year-over-year increase."
+    expected_documents:
+      - financial_report_2025.md
+    ground_truth_context:
+      - "total consolidated GAAP revenue reached $142.5 million, representing a 38.5% year-over-year increase compared to $102.9 million in FY2024."
+    relevant_chunks:
+      - document: financial_report_2025.md
+        section: "Section 1: Executive Financial Summary"
+        relevance: 3
+    expected_citations:
+      - financial_report_2025.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [finance, revenue, gaap]
+    metadata: {}
+
+  - id: golden-04
+    category: direct_factual
+    difficulty: easy
+    question: "What is the token lifetime for JWT access tokens and refresh tokens?"
+    expected_answer: "JWT access tokens have a lifetime of 15 minutes, while refresh tokens have a lifetime of 7 days."
+    expected_documents:
+      - api_specifications.md
+    ground_truth_context:
+      - "short-lived JSON Web Token (JWT) access token (lifetime: 15 minutes) and a refresh token (lifetime: 7 days)."
+    relevant_chunks:
+      - document: api_specifications.md
+        section: "Section 1: Authentication & Authorization Protocol"
+        relevance: 3
+    expected_citations:
+      - api_specifications.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [api, auth, jwt]
+    metadata: {}
+
+  - id: golden-05
+    category: direct_factual
+    difficulty: easy
+    question: "What is the initial response time SLA for SEV-1 critical outages?"
+    expected_answer: "For SEV-1 critical outages, the initial response time is within 15 minutes or less."
+    expected_documents:
+      - engineering_policies.md
+    ground_truth_context:
+      - "SEV-1 (Critical Outage): Total service degradation or data loss impacting >10% of active users. Initial response time: ≤ 15 minutes."
+    relevant_chunks:
+      - document: engineering_policies.md
+        section: "Section 2: Incident Classification & Severity Levels"
+        relevance: 3
+    expected_citations:
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [sla, incident_response, sev1]
+    metadata: {}
+
+  # ==========================================
+  # Category 2: Multi-Hop Retrieval
+  # ==========================================
+  - id: golden-06
+    category: multi_hop
+    difficulty: medium
+    question: "Where are database clusters deployed and what mechanism protects external access?"
+    expected_answer: "Database clusters are deployed in the isolated Data VPC with direct internet ingress and egress strictly disabled, communicating exclusively over AWS Transit Gateway and VPC Peering."
+    expected_documents:
+      - cloud_architecture.md
+    ground_truth_context:
+      - "Data VPC: Isolated database tier containing Amazon Aurora PostgreSQL multi-AZ clusters and Qdrant vector database clusters. Direct internet ingress and egress are strictly disabled; communication with the Application VPC occurs exclusively over AWS Transit Gateway and VPC Peering"
+    relevant_chunks:
+      - document: cloud_architecture.md
+        section: "Section 1: Network Topology & VPC Isolation"
+        relevance: 3
+    expected_citations:
+      - cloud_architecture.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [vpc, security, network]
+    metadata: {}
+
+  - id: golden-07
+    category: multi_hop
+    difficulty: medium
+    question: "How does emergency administrator access work and who must approve it?"
+    expected_answer: "Emergency administrator access requires dual approvals from the Head of Infrastructure and CISO, and automatically triggers audit alerts to Slack and PagerDuty."
+    expected_documents:
+      - cloud_architecture.md
+    ground_truth_context:
+      - "Break-glass emergency administrator access requires dual approvals from the Head of Infrastructure and CISO, triggering automated Slack and PagerDuty audit alerts."
+    relevant_chunks:
+      - document: cloud_architecture.md
+        section: "Section 2: Identity & Access Management (IAM) and Authentication"
+        relevance: 3
+    expected_citations:
+      - cloud_architecture.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [iam, security, break_glass]
+    metadata: {}
+
+  - id: golden-08
+    category: multi_hop
+    difficulty: medium
+    question: "Which geographic region exhibited the highest percentage revenue growth in FY2025?"
+    expected_answer: "Asia-Pacific (APAC) exhibited the highest YoY revenue growth at 52%, generating $15.67 million."
+    expected_documents:
+      - financial_report_2025.md
+    ground_truth_context:
+      - "Asia-Pacific (APAC): $15.67 million (11.0% of revenue), YoY growth of 52%."
+    relevant_chunks:
+      - document: financial_report_2025.md
+        section: "Section 4: Geographic Segment Performance"
+        relevance: 3
+    expected_citations:
+      - financial_report_2025.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [finance, growth, geo]
+    metadata: {}
+
+  - id: golden-09
+    category: multi_hop
+    difficulty: medium
+    question: "What happens when a pull request introduces an MRR drop of 0.04 in retrieval evaluation?"
+    expected_answer: "The pull request is automatically blocked by the CI evaluation gate because MRR drops greater than 0.03 are prohibited regressions."
+    expected_documents:
+      - engineering_policies.md
+    ground_truth_context:
+      - "Pull requests that introduce quality regressions in RAG retrieval (e.g., MRR drop > 0.03 or precision drop > 0.02) are automatically blocked by the CI evaluation gate."
+    relevant_chunks:
+      - document: engineering_policies.md
+        section: "Section 3: Code Quality, Review & Testing Standards"
+        relevance: 3
+    expected_citations:
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [ci_cd, regression, gate]
+    metadata: {}
+
+  - id: golden-10
+    category: multi_hop
+    difficulty: medium
+    question: "What is the maximum file size accepted when uploading documents to the platform?"
+    expected_answer: "The upload API accepts files up to 50 megabytes in size for supported formats including PDF, DOCX, TXT, and MD."
+    expected_documents:
+      - api_specifications.md
+    ground_truth_context:
+      - "Document Upload: POST /api/v1/documents/upload accepts multipart file uploads (PDF, DOCX, TXT, MD) up to 50 megabytes per file."
+    relevant_chunks:
+      - document: api_specifications.md
+        section: "Section 3: Document Management & Ingestion API"
+        relevance: 3
+    expected_citations:
+      - api_specifications.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [api, ingestion, limits]
+    metadata: {}
+
+  # ==========================================
+  # Category 3: Multi-Document Questions
+  # ==========================================
+  - id: golden-11
+    category: multi_document
+    difficulty: hard
+    question: "How do the platform's role-based access requirements for admin users connect to emergency infrastructure access?"
+    expected_answer: "In the API specification, only admin roles can trigger benchmarks and configure rerankers, while infrastructure break-glass admin access requires dual approval from the Head of Infrastructure and CISO."
+    expected_documents:
+      - api_specifications.md
+      - cloud_architecture.md
+    ground_truth_context:
+      - "Only admin accounts can execute benchmark evaluations or configure system-level reranker models."
+      - "Break-glass emergency administrator access requires dual approvals from the Head of Infrastructure and CISO"
+    relevant_chunks:
+      - document: api_specifications.md
+        section: "Section 1: Authentication & Authorization Protocol"
+        relevance: 3
+      - document: cloud_architecture.md
+        section: "Section 2: Identity & Access Management (IAM) and Authentication"
+        relevance: 3
+    expected_citations:
+      - api_specifications.md
+      - cloud_architecture.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [multi_doc, security, admin]
+    metadata: {}
+
+  - id: golden-12
+    category: multi_document
+    difficulty: hard
+    question: "Compare the P95 retrieval latency target in engineering policies with the rate limiting threshold in API specifications."
+    expected_answer: "Engineering policies target P95 retrieval latency under 250 milliseconds, while API specifications limit standard tenants to 100 req/min and enterprise tenants to 1000 req/min."
+    expected_documents:
+      - engineering_policies.md
+      - api_specifications.md
+    ground_truth_context:
+      - "P95 Latency Target: Hybrid RAG query processing and candidate retrieval must return within 250 milliseconds."
+      - "Standard Tier Tenants: Limited to 100 requests per minute per IP... Enterprise Tier Tenants: Limited to 1000 requests per minute"
+    relevant_chunks:
+      - document: engineering_policies.md
+        section: "Section 1: Service Level Agreements (SLAs) and SLOs"
+        relevance: 3
+      - document: api_specifications.md
+        section: "Section 2: Rate Limiting & Throttling"
+        relevance: 3
+    expected_citations:
+      - engineering_policies.md
+      - api_specifications.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [multi_doc, latency, rate_limit]
+    metadata: {}
+
+  - id: golden-13
+    category: multi_document
+    difficulty: hard
+    question: "How do R&D investments in semantic reranking tie into the CI quality regression policies?"
+    expected_answer: "R&D invested $45.6M focusing on multi-agent reasoning and semantic reranking models, while engineering policies block CI builds if reranking quality regresses by MRR > 0.03."
+    expected_documents:
+      - financial_report_2025.md
+      - engineering_policies.md
+    ground_truth_context:
+      - "Research & Development (R&D): $45.6 million (32.0% of revenue), focused on multi-agent reasoning, semantic reranking models"
+      - "regressions in RAG retrieval (e.g., MRR drop > 0.03 or precision drop > 0.02) are automatically blocked by the CI evaluation gate."
+    relevant_chunks:
+      - document: financial_report_2025.md
+        section: "Section 3: Operating Expenses & R&D Investment"
+        relevance: 3
+      - document: engineering_policies.md
+        section: "Section 3: Code Quality, Review & Testing Standards"
+        relevance: 3
+    expected_citations:
+      - financial_report_2025.md
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [multi_doc, rd, reranker, ci]
+    metadata: {}
+
+  - id: golden-14
+    category: multi_document
+    difficulty: hard
+    question: "What disaster recovery objectives exist for PostgreSQL and vector store data relative to SEV-1 incident response times?"
+    expected_answer: "Disaster recovery sets an RPO of 5 minutes and RTO of 30 minutes with Aurora replication latency <200ms and vector snapshots synced hourly to S3, while SEV-1 response time is ≤15 minutes."
+    expected_documents:
+      - cloud_architecture.md
+      - engineering_policies.md
+    ground_truth_context:
+      - "Recovery Point Objective (RPO) is established at 5 minutes; Recovery Time Objective (RTO) is established at 30 minutes"
+      - "SEV-1 (Critical Outage)... Initial response time: ≤ 15 minutes."
+    relevant_chunks:
+      - document: cloud_architecture.md
+        section: "Section 4: Disaster Recovery & Replication"
+        relevance: 3
+      - document: engineering_policies.md
+        section: "Section 2: Incident Classification & Severity Levels"
+        relevance: 3
+    expected_citations:
+      - cloud_architecture.md
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [multi_doc, dr, incident]
+    metadata: {}
+
+  - id: golden-15
+    category: multi_document
+    difficulty: hard
+    question: "How do document ingestion APIs enforce document replacement while complying with code freeze policies?"
+    expected_answer: "Document replacement is supported via POST /api/v1/documents/{document_id}/replace preserving UUIDs, while code freezes (Dec 15 - Jan 5) only block pipeline deployments, not runtime user document ingestion."
+    expected_documents:
+      - api_specifications.md
+      - engineering_policies.md
+    ground_truth_context:
+      - "Document Replace: POST /api/v1/documents/{document_id}/replace performs atomic replacement of an existing document while preserving document UUID"
+      - "Annual end-of-year change freeze is enforced from December 15 through January 5, permitting only critical security patches"
+    relevant_chunks:
+      - document: api_specifications.md
+        section: "Section 3: Document Management & Ingestion API"
+        relevance: 3
+      - document: engineering_policies.md
+        section: "Section 4: Release Management & Change Freezes"
+        relevance: 3
+    expected_citations:
+      - api_specifications.md
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [multi_doc, ingestion, freeze]
+    metadata: {}
+
+  # ==========================================
+  # Category 4: Comparison Questions
+  # ==========================================
+  - id: golden-16
+    category: comparison
+    difficulty: medium
+    question: "Compare the initial response time requirements between SEV-1 and SEV-2 incidents."
+    expected_answer: "SEV-1 requires response within 15 minutes with updates every 30 minutes, whereas SEV-2 requires response within 30 minutes with updates every 60 minutes."
+    expected_documents:
+      - engineering_policies.md
+    ground_truth_context:
+      - "SEV-1 (Critical Outage)... Initial response time: ≤ 15 minutes. Incident commander assigned, status page updated every 30 minutes."
+      - "SEV-2 (Major Incident)... Initial response time: ≤ 30 minutes. Status updates every 60 minutes."
+    relevant_chunks:
+      - document: engineering_policies.md
+        section: "Section 2: Incident Classification & Severity Levels"
+        relevance: 3
+    expected_citations:
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [comparison, incident, sev]
+    metadata: {}
+
+  - id: golden-17
+    category: comparison
+    difficulty: medium
+    question: "Compare the rate limiting allowances for Standard Tier versus Enterprise Tier tenants."
+    expected_answer: "Standard Tier tenants are limited to 100 requests per minute per IP (with a 20-request burst), while Enterprise Tier tenants receive 1000 requests per minute per tenant API key."
+    expected_documents:
+      - api_specifications.md
+    ground_truth_context:
+      - "Standard Tier Tenants: Limited to 100 requests per minute per IP with a burst allowance of 20 requests."
+      - "Enterprise Tier Tenants: Limited to 1000 requests per minute per tenant API key"
+    relevant_chunks:
+      - document: api_specifications.md
+        section: "Section 2: Rate Limiting & Throttling"
+        relevance: 3
+    expected_citations:
+      - api_specifications.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [comparison, api, rate_limit]
+    metadata: {}
+
+  - id: golden-18
+    category: comparison
+    difficulty: medium
+    question: "Compare revenue and gross margin between Q1 2025 and Q4 2025."
+    expected_answer: "Q1 2025 revenue was $31.2 million with a 76.5% gross margin, while Q4 2025 revenue rose to $39.5 million with a 79.2% gross margin."
+    expected_documents:
+      - financial_report_2025.md
+    ground_truth_context:
+      - "Q1 2025: Revenue of $31.2 million (Gross Margin: 76.5%"
+      - "Q4 2025: Revenue of $39.5 million (Gross Margin: 79.2%"
+    relevant_chunks:
+      - document: financial_report_2025.md
+        section: "Section 2: Quarterly Revenue Breakdown"
+        relevance: 3
+    expected_citations:
+      - financial_report_2025.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [comparison, finance, quarterly]
+    metadata: {}
+
+  - id: golden-19
+    category: comparison
+    difficulty: medium
+    question: "Compare the rotation period of KMS Customer Managed Keys with TLS private CA certificates."
+    expected_answer: "KMS Customer Managed Keys rotate every 365 days, whereas internal mTLS certificates from AWS Private CA rotate every 30 days."
+    expected_documents:
+      - cloud_architecture.md
+    ground_truth_context:
+      - "KMS key rotation is automatically scheduled every 365 days."
+      - "certificates issued by AWS Private Certificate Authority (PCA) and rotated every 30 days."
+    relevant_chunks:
+      - document: cloud_architecture.md
+        section: "Section 3: Data Encryption Standards"
+        relevance: 3
+    expected_citations:
+      - cloud_architecture.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [comparison, security, rotation]
+    metadata: {}
+
+  - id: golden-20
+    category: comparison
+    difficulty: medium
+    question: "Compare the availability SLO between standard and enterprise tier tenants."
+    expected_answer: "Standard tier tenants have an SLO of 99.95% uptime, whereas enterprise tier tenants have an SLO of 99.99% uptime."
+    expected_documents:
+      - engineering_policies.md
+    ground_truth_context:
+      - "availability Service Level Objective (SLO) of 99.95% uptime for standard tier tenants and 99.99% (four nines) for enterprise tier tenants"
+    relevant_chunks:
+      - document: engineering_policies.md
+        section: "Section 1: Service Level Agreements (SLAs) and SLOs"
+        relevance: 3
+    expected_citations:
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [comparison, slo, availability]
+    metadata: {}
+
+  # ==========================================
+  # Category 5: Explanation Questions
+  # ==========================================
+  - id: golden-21
+    category: explanation
+    difficulty: medium
+    question: "Explain the network separation between Edge, Application, and Data VPCs."
+    expected_answer: "Edge VPC handles public ALBs with AWS WAF; Application VPC runs EKS compute nodes in private subnets with NAT egress; Data VPC isolates databases with zero direct internet access, connecting only via Transit Gateway and VPC Peering."
+    expected_documents:
+      - cloud_architecture.md
+    ground_truth_context:
+      - "Edge VPC: Houses Internet-facing Application Load Balancers (ALB) with AWS WAF v2... Application VPC: Houses containerized services orchestrated via Amazon Elastic Kubernetes Service (EKS)... Data VPC: Isolated database tier"
+    relevant_chunks:
+      - document: cloud_architecture.md
+        section: "Section 1: Network Topology & VPC Isolation"
+        relevance: 3
+    expected_citations:
+      - cloud_architecture.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [explanation, vpc, architecture]
+    metadata: {}
+
+  - id: golden-22
+    category: explanation
+    difficulty: medium
+    question: "Explain the release management and change freeze policy enforced during the holidays."
+    expected_answer: "Releases use automated blue-green deployments with canary rollbacks for error rates >0.05%. An annual change freeze runs from Dec 15 to Jan 5, permitting only critical security patches and SEV-1 emergency fixes."
+    expected_documents:
+      - engineering_policies.md
+    ground_truth_context:
+      - "Deployments occur automatically via CI/CD pipelines utilizing blue-green deployment strategies with automatic canary rollback if error rates exceed 0.05%."
+      - "Annual end-of-year change freeze is enforced from December 15 through January 5"
+    relevant_chunks:
+      - document: engineering_policies.md
+        section: "Section 4: Release Management & Change Freezes"
+        relevance: 3
+    expected_citations:
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [explanation, release, freeze]
+    metadata: {}
+
+  - id: golden-23
+    category: explanation
+    difficulty: medium
+    question: "Explain how document replace functions and what HTTP status is returned when checking status."
+    expected_answer: "POST /api/v1/documents/{document_id}/replace executes atomic replacement while preserving document UUID and lineage. GET /api/v1/documents/{document_id}/status returns states like PENDING, PARSING, INDEXED, or FAILED."
+    expected_documents:
+      - api_specifications.md
+    ground_truth_context:
+      - "Document Replace: POST /api/v1/documents/{document_id}/replace performs atomic replacement of an existing document while preserving document UUID and lineage."
+      - "Document Status: GET /api/v1/documents/{document_id}/status returns current processing state (PENDING, PARSING, INDEXED, FAILED)."
+    relevant_chunks:
+      - document: api_specifications.md
+        section: "Section 3: Document Management & Ingestion API"
+        relevance: 3
+    expected_citations:
+      - api_specifications.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [explanation, api, document_lifecycle]
+    metadata: {}
+
+  - id: golden-24
+    category: explanation
+    difficulty: medium
+    question: "Explain the main drivers of the FY2025 operating expense breakdown."
+    expected_answer: "Operating expenses totaled $112.3M, driven by S&M at $48.2M (33.8%) for enterprise sales expansion, R&D at $45.6M (32.0%) for AI reasoning and rerankers, and G&A at $18.5M (13.0%)."
+    expected_documents:
+      - financial_report_2025.md
+    ground_truth_context:
+      - "Research & Development (R&D): $45.6 million (32.0% of revenue)... Sales & Marketing (S&M): $48.2 million (33.8% of revenue)... General & Administrative (G&A): $18.5 million (13.0% of revenue)... Total operating expenses for FY2025 amounted to $112.3 million."
+    relevant_chunks:
+      - document: financial_report_2025.md
+        section: "Section 3: Operating Expenses & R&D Investment"
+        relevance: 3
+    expected_citations:
+      - financial_report_2025.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [explanation, finance, opex]
+    metadata: {}
+
+  - id: golden-25
+    category: explanation
+    difficulty: medium
+    question: "Explain the code review and branch protection policies required for merging code."
+    expected_answer: "All pull requests require at least two peer approvals including a Code Owner, test coverage ≥85%, no RAG quality regressions (MRR drop >0.03 blocked), and no direct commits to main."
+    expected_documents:
+      - engineering_policies.md
+    ground_truth_context:
+      - "All production pull requests require a minimum of two peer review approvals, including at least one designated Code Owner"
+      - "Automated test coverage must remain at or above 85% line coverage"
+      - "Direct commits to main branch are strictly prohibited via GitHub branch protection rules."
+    relevant_chunks:
+      - document: engineering_policies.md
+        section: "Section 3: Code Quality, Review & Testing Standards"
+        relevance: 3
+    expected_citations:
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [explanation, code_quality, git]
+    metadata: {}
+
+  # ==========================================
+  # Category 6: Numerical / Calculation Questions
+  # ==========================================
+  - id: golden-26
+    category: numerical_calculation
+    difficulty: medium
+    question: "What is the sum of Q1 and Q2 revenue in FY2025?"
+    expected_answer: "The sum of Q1 ($31.2M) and Q2 ($34.8M) revenue in FY2025 is $66.0 million."
+    expected_documents:
+      - financial_report_2025.md
+    ground_truth_context:
+      - "Q1 2025: Revenue of $31.2 million"
+      - "Q2 2025: Revenue of $34.8 million"
+    relevant_chunks:
+      - document: financial_report_2025.md
+        section: "Section 2: Quarterly Revenue Breakdown"
+        relevance: 3
+    expected_citations:
+      - financial_report_2025.md
+    expected_tools:
+      - calculator
+    retrieval_required: true
+    tools_required: true
+    conversation_required: false
+    tags: [numerical, calculation, finance]
+    metadata: {}
+
+  - id: golden-27
+    category: numerical_calculation
+    difficulty: medium
+    question: "Calculate the total revenue generated from EMEA and APAC combined in FY2025."
+    expected_answer: "EMEA ($38.48M) and APAC ($15.67M) combined generated $54.15 million in FY2025."
+    expected_documents:
+      - financial_report_2025.md
+    ground_truth_context:
+      - "Europe, Middle East, and Africa (EMEA): $38.48 million (27.0% of revenue)"
+      - "Asia-Pacific (APAC): $15.67 million (11.0% of revenue)"
+    relevant_chunks:
+      - document: financial_report_2025.md
+        section: "Section 4: Geographic Segment Performance"
+        relevance: 3
+    expected_citations:
+      - financial_report_2025.md
+    expected_tools:
+      - calculator
+    retrieval_required: true
+    tools_required: true
+    conversation_required: false
+    tags: [numerical, geo, calculation]
+    metadata: {}
+
+  - id: golden-28
+    category: numerical_calculation
+    difficulty: medium
+    question: "What is the difference between cash reserves at the end of FY2025 and FY2024?"
+    expected_answer: "Cash reserves increased by $23.2 million, from $61.0 million at the end of FY2024 to $84.2 million at the end of FY2025."
+    expected_documents:
+      - financial_report_2025.md
+    ground_truth_context:
+      - "totaled $84.2 million, compared to $61.0 million at the end of FY2024."
+    relevant_chunks:
+      - document: financial_report_2025.md
+        section: "Section 5: Balance Sheet & Liquidity"
+        relevance: 3
+    expected_citations:
+      - financial_report_2025.md
+    expected_tools:
+      - calculator
+    retrieval_required: true
+    tools_required: true
+    conversation_required: false
+    tags: [numerical, cash, calculation]
+    metadata: {}
+
+  - id: golden-29
+    category: numerical_calculation
+    difficulty: medium
+    question: "What is the combined percentage of total revenue spent on R&D and S&M in FY2025?"
+    expected_answer: "R&D (32.0%) and S&M (33.8%) combined accounted for 65.8% of total revenue."
+    expected_documents:
+      - financial_report_2025.md
+    ground_truth_context:
+      - "Research & Development (R&D): $45.6 million (32.0% of revenue)"
+      - "Sales & Marketing (S&M): $48.2 million (33.8% of revenue)"
+    relevant_chunks:
+      - document: financial_report_2025.md
+        section: "Section 3: Operating Expenses & R&D Investment"
+        relevance: 3
+    expected_citations:
+      - financial_report_2025.md
+    expected_tools:
+      - calculator
+    retrieval_required: true
+    tools_required: true
+    conversation_required: false
+    tags: [numerical, percentage, calculation]
+    metadata: {}
+
+  - id: golden-30
+    category: numerical_calculation
+    difficulty: medium
+    question: "If an enterprise tenant makes 800 requests in a minute, what percentage of their rate limit quota is consumed?"
+    expected_answer: "With an enterprise rate limit of 1000 requests per minute, 800 requests consumes 80% of the quota."
+    expected_documents:
+      - api_specifications.md
+    ground_truth_context:
+      - "Enterprise Tier Tenants: Limited to 1000 requests per minute per tenant API key"
+    relevant_chunks:
+      - document: api_specifications.md
+        section: "Section 2: Rate Limiting & Throttling"
+        relevance: 3
+    expected_citations:
+      - api_specifications.md
+    expected_tools:
+      - calculator
+    retrieval_required: true
+    tools_required: true
+    conversation_required: false
+    tags: [numerical, api, quota]
+    metadata: {}
+
+  # ==========================================
+  # Category 7: Citation / Source Questions
+  # ==========================================
+  - id: golden-31
+    category: citation_source
+    difficulty: easy
+    question: "Cite the document and section specifying the RPO and RTO for regional failovers."
+    expected_answer: "Cloud Security & Infrastructure Architecture Specification, Section 4: Disaster Recovery & Replication specifies an RPO of 5 minutes and RTO of 30 minutes."
+    expected_documents:
+      - cloud_architecture.md
+    ground_truth_context:
+      - "Recovery Point Objective (RPO) is established at 5 minutes; Recovery Time Objective (RTO) is established at 30 minutes for complete regional failover."
+    relevant_chunks:
+      - document: cloud_architecture.md
+        section: "Section 4: Disaster Recovery & Replication"
+        relevance: 3
+    expected_citations:
+      - cloud_architecture.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [citation, rpo, rto]
+    metadata: {}
+
+  - id: golden-32
+    category: citation_source
+    difficulty: easy
+    question: "Which official policy document sets the 85% test coverage requirement?"
+    expected_answer: "Engineering Operating Procedures & Reliability Policies, Section 3: Code Quality, Review & Testing Standards mandates test coverage ≥85%."
+    expected_documents:
+      - engineering_policies.md
+    ground_truth_context:
+      - "Automated test coverage must remain at or above 85% line coverage across backend services."
+    relevant_chunks:
+      - document: engineering_policies.md
+        section: "Section 3: Code Quality, Review & Testing Standards"
+        relevance: 3
+    expected_citations:
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [citation, testing, policy]
+    metadata: {}
+
+  - id: golden-33
+    category: citation_source
+    difficulty: easy
+    question: "Cite the document detailing the Net Revenue Retention rate for FY2025."
+    expected_answer: "Annual Financial & Operating Performance Report 2025, Section 1: Executive Financial Summary states NRR was 124%."
+    expected_documents:
+      - financial_report_2025.md
+    ground_truth_context:
+      - "Annual Recurring Revenue (ARR) grew to $158.0 million with a Net Revenue Retention (NRR) rate of 124%."
+    relevant_chunks:
+      - document: financial_report_2025.md
+        section: "Section 1: Executive Financial Summary"
+        relevance: 3
+    expected_citations:
+      - financial_report_2025.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [citation, nrr, finance]
+    metadata: {}
+
+  - id: golden-34
+    category: citation_source
+    difficulty: easy
+    question: "Cite the API endpoint for streaming interactive chat completions."
+    expected_answer: "Platform API Specifications & Developer Integration Guide, Section 4: Chat & Multi-Agent Query API specifies POST /api/v1/chat/completions."
+    expected_documents:
+      - api_specifications.md
+    ground_truth_context:
+      - "Interactive Chat: POST /api/v1/chat/completions accepts structured user prompts and optional conversation IDs, returning streaming server-sent events"
+    relevant_chunks:
+      - document: api_specifications.md
+        section: "Section 4: Chat & Multi-Agent Query API"
+        relevance: 3
+    expected_citations:
+      - api_specifications.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [citation, api, chat]
+    metadata: {}
+
+  - id: golden-35
+    category: citation_source
+    difficulty: easy
+    question: "Cite the document specifying the maximum duration for IRSA service account tokens."
+    expected_answer: "Cloud Security & Infrastructure Architecture Specification, Section 2 specifies a maximum IRSA token lifetime of 1 hour."
+    expected_documents:
+      - cloud_architecture.md
+    ground_truth_context:
+      - "All service-to-service communications utilize short-lived IAM roles via AWS IRSA (IAM Roles for Service Accounts) with maximum token lifetime of 1 hour."
+    relevant_chunks:
+      - document: cloud_architecture.md
+        section: "Section 2: Identity & Access Management (IAM) and Authentication"
+        relevance: 3
+    expected_citations:
+      - cloud_architecture.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [citation, iam, irsa]
+    metadata: {}
+
+  # ==========================================
+  # Category 8: Conversation-Context Questions
+  # ==========================================
+  - id: golden-36
+    category: conversation_context
+    difficulty: medium
+    question: "What is the response time for that severity level?"
+    expected_answer: "For SEV-1 critical outages, the initial response time is ≤ 15 minutes."
+    conversation_history:
+      - role: user
+        content: "What is a SEV-1 incident in engineering policies?"
+      - role: assistant
+        content: "A SEV-1 is a critical outage causing total service degradation or data loss impacting >10% of active users."
+    expected_documents:
+      - engineering_policies.md
+    ground_truth_context:
+      - "SEV-1 (Critical Outage)... Initial response time: ≤ 15 minutes."
+    relevant_chunks:
+      - document: engineering_policies.md
+        section: "Section 2: Incident Classification & Severity Levels"
+        relevance: 3
+    expected_citations:
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: true
+    tags: [conversation, rewrite, sev1]
+    metadata: {}
+
+  - id: golden-37
+    category: conversation_context
+    difficulty: medium
+    question: "How does it compare to the refresh token lifetime?"
+    expected_answer: "The access token lasts 15 minutes, whereas the refresh token lasts 7 days."
+    conversation_history:
+      - role: user
+        content: "How long does a JWT access token last?"
+      - role: assistant
+        content: "A JWT access token has a lifetime of 15 minutes."
+    expected_documents:
+      - api_specifications.md
+    ground_truth_context:
+      - "JSON Web Token (JWT) access token (lifetime: 15 minutes) and a refresh token (lifetime: 7 days)."
+    relevant_chunks:
+      - document: api_specifications.md
+        section: "Section 1: Authentication & Authorization Protocol"
+        relevance: 3
+    expected_citations:
+      - api_specifications.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: true
+    tags: [conversation, auth, jwt]
+    metadata: {}
+
+  - id: golden-38
+    category: conversation_context
+    difficulty: medium
+    question: "What was the growth rate for that region?"
+    expected_answer: "The Americas region achieved a YoY revenue growth rate of 34%."
+    conversation_history:
+      - role: user
+        content: "Which region generated the most revenue in FY2025?"
+      - role: assistant
+        content: "The Americas (North America) generated the highest revenue with $88.35 million (62.0% of total revenue)."
+    expected_documents:
+      - financial_report_2025.md
+    ground_truth_context:
+      - "North America (Americas): $88.35 million (62.0% of revenue), YoY growth of 34%."
+    relevant_chunks:
+      - document: financial_report_2025.md
+        section: "Section 4: Geographic Segment Performance"
+        relevance: 3
+    expected_citations:
+      - financial_report_2025.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: true
+    tags: [conversation, geo, finance]
+    metadata: {}
+
+  - id: golden-39
+    category: conversation_context
+    difficulty: medium
+    question: "What is the secondary region used for it?"
+    expected_answer: "The secondary region used for disaster recovery is us-west-2."
+    conversation_history:
+      - role: user
+        content: "Where is our primary AWS cloud deployment located?"
+      - role: assistant
+        content: "The primary AWS cloud deployment is in us-east-1."
+    expected_documents:
+      - cloud_architecture.md
+    ground_truth_context:
+      - "primary deployment in us-east-1 and disaster recovery in us-west-2."
+    relevant_chunks:
+      - document: cloud_architecture.md
+        section: "Section 1: Network Topology & VPC Isolation"
+        relevance: 3
+    expected_citations:
+      - cloud_architecture.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: true
+    tags: [conversation, aws, dr]
+    metadata: {}
+
+  - id: golden-40
+    category: conversation_context
+    difficulty: medium
+    question: "What error status code does the server return when that limit is exceeded?"
+    expected_answer: "The server returns HTTP status code 429 Too Many Requests with Retry-After headers."
+    conversation_history:
+      - role: user
+        content: "What is the rate limit for standard tier tenants?"
+      - role: assistant
+        content: "Standard tier tenants are throttled at 100 requests per minute per IP."
+    expected_documents:
+      - api_specifications.md
+    ground_truth_context:
+      - "Throttled requests return HTTP status code 429 Too Many Requests accompanied by standard Retry-After headers in seconds."
+    relevant_chunks:
+      - document: api_specifications.md
+        section: "Section 2: Rate Limiting & Throttling"
+        relevance: 3
+    expected_citations:
+      - api_specifications.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: true
+    tags: [conversation, api, rate_limit]
+    metadata: {}
+
+  # ==========================================
+  # Category 9: Scope-Restricted Document Questions
+  # ==========================================
+  - id: golden-41
+    category: scope_restricted
+    difficulty: medium
+    question: "According to financial_report_2025.md only, what was full-year adjusted EBITDA?"
+    expected_answer: "Full-year Adjusted EBITDA reached $23.4 million (16.4% of total revenue)."
+    expected_documents:
+      - financial_report_2025.md
+    ground_truth_context:
+      - "Total Full Year Adjusted EBITDA reached $23.4 million (16.4% of total revenue)"
+    relevant_chunks:
+      - document: financial_report_2025.md
+        section: "Section 2: Quarterly Revenue Breakdown"
+        relevance: 3
+    expected_citations:
+      - financial_report_2025.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [scope, finance, ebitda]
+    metadata:
+      document_ids: ["financial_report_2025.md"]
+
+  - id: golden-42
+    category: scope_restricted
+    difficulty: medium
+    question: "According to cloud_architecture.md only, what is the certificate rotation interval?"
+    expected_answer: "Internal mTLS certificates from AWS Private CA are rotated every 30 days."
+    expected_documents:
+      - cloud_architecture.md
+    ground_truth_context:
+      - "certificates issued by AWS Private Certificate Authority (PCA) and rotated every 30 days."
+    relevant_chunks:
+      - document: cloud_architecture.md
+        section: "Section 3: Data Encryption Standards"
+        relevance: 3
+    expected_citations:
+      - cloud_architecture.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [scope, security, certificates]
+    metadata:
+      document_ids: ["cloud_architecture.md"]
+
+  - id: golden-43
+    category: scope_restricted
+    difficulty: medium
+    question: "According to engineering_policies.md only, what is the canary rollback threshold?"
+    expected_answer: "Canary rollbacks trigger automatically if error rates exceed 0.05%."
+    expected_documents:
+      - engineering_policies.md
+    ground_truth_context:
+      - "automatic canary rollback if error rates exceed 0.05%."
+    relevant_chunks:
+      - document: engineering_policies.md
+        section: "Section 4: Release Management & Change Freezes"
+        relevance: 3
+    expected_citations:
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [scope, canary, release]
+    metadata:
+      document_ids: ["engineering_policies.md"]
+
+  - id: golden-44
+    category: scope_restricted
+    difficulty: medium
+    question: "According to api_specifications.md only, what HTTP method is used for atomic document replacement?"
+    expected_answer: "POST method is used: POST /api/v1/documents/{document_id}/replace."
+    expected_documents:
+      - api_specifications.md
+    ground_truth_context:
+      - "Document Replace: POST /api/v1/documents/{document_id}/replace performs atomic replacement"
+    relevant_chunks:
+      - document: api_specifications.md
+        section: "Section 3: Document Management & Ingestion API"
+        relevance: 3
+    expected_citations:
+      - api_specifications.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [scope, api, replace]
+    metadata:
+      document_ids: ["api_specifications.md"]
+
+  # ==========================================
+  # Category 10: Dense vs Sparse Distinction Cases
+  # ==========================================
+  - id: golden-45
+    category: dense_vs_sparse
+    difficulty: hard
+    question: "Find the exact error threshold 0.05% for canary rollback."
+    expected_answer: "Automatic canary rollback triggers if error rates exceed 0.05% during blue-green deployments."
+    expected_documents:
+      - engineering_policies.md
+    ground_truth_context:
+      - "automatic canary rollback if error rates exceed 0.05%."
+    relevant_chunks:
+      - document: engineering_policies.md
+        section: "Section 4: Release Management & Change Freezes"
+        relevance: 3
+    expected_citations:
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [sparse_keyword, exact_term, canary]
+    metadata:
+      preferred_mode: sparse
+
+  - id: golden-46
+    category: dense_vs_sparse
+    difficulty: hard
+    question: "How do we make sure our cloud servers stay protected against web traffic attacks?"
+    expected_answer: "Edge VPC houses Internet-facing Application Load Balancers with AWS WAF v2 enabled for DDoS mitigation and SQL injection filtering."
+    expected_documents:
+      - cloud_architecture.md
+    ground_truth_context:
+      - "Edge VPC: Houses Internet-facing Application Load Balancers (ALB) with AWS WAF v2 enabled for DDoS mitigation and SQL injection filtering."
+    relevant_chunks:
+      - document: cloud_architecture.md
+        section: "Section 1: Network Topology & VPC Isolation"
+        relevance: 3
+    expected_citations:
+      - cloud_architecture.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [dense_semantic, paraphrase, waf]
+    metadata:
+      preferred_mode: dense
+
+  - id: golden-47
+    category: dense_vs_sparse
+    difficulty: hard
+    question: "What is the exact endpoint string for uploading new files to the platform?"
+    expected_answer: "POST /api/v1/documents/upload"
+    expected_documents:
+      - api_specifications.md
+    ground_truth_context:
+      - "Document Upload: POST /api/v1/documents/upload accepts multipart file uploads"
+    relevant_chunks:
+      - document: api_specifications.md
+        section: "Section 3: Document Management & Ingestion API"
+        relevance: 3
+    expected_citations:
+      - api_specifications.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [sparse_keyword, exact_url, upload]
+    metadata:
+      preferred_mode: sparse
+
+  # ==========================================
+  # Category 11: Reranker Improvement Cases
+  # ==========================================
+  - id: golden-48
+    category: reranker_improvement
+    difficulty: hard
+    question: "How are internal services authenticated when communicating with each other across clusters?"
+    expected_answer: "Service-to-service communication uses short-lived IAM roles via AWS IRSA with 1-hour tokens and mTLS encryption via Private CA certificates rotated every 30 days."
+    expected_documents:
+      - cloud_architecture.md
+    ground_truth_context:
+      - "All service-to-service communications utilize short-lived IAM roles via AWS IRSA (IAM Roles for Service Accounts) with maximum token lifetime of 1 hour."
+      - "internal microservice communication is encrypted using mTLS with certificates issued by AWS Private Certificate Authority (PCA) and rotated every 30 days."
+    relevant_chunks:
+      - document: cloud_architecture.md
+        section: "Section 2: Identity & Access Management (IAM) and Authentication"
+        relevance: 3
+      - document: cloud_architecture.md
+        section: "Section 3: Data Encryption Standards"
+        relevance: 2
+    expected_citations:
+      - cloud_architecture.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [reranker, cross_encoder, service_auth]
+    metadata:
+      benefit_from_reranking: true
+
+  - id: golden-49
+    category: reranker_improvement
+    difficulty: hard
+    question: "What criteria prevent developers from deploying code directly to production without testing?"
+    expected_answer: "Direct commits to main are blocked, PRs require 2 approvals including a Code Owner, test coverage must be ≥85%, and RAG retrieval quality drops are blocked by CI gates."
+    expected_documents:
+      - engineering_policies.md
+    ground_truth_context:
+      - "All production pull requests require a minimum of two peer review approvals, including at least one designated Code Owner"
+      - "Automated test coverage must remain at or above 85% line coverage"
+      - "Direct commits to main branch are strictly prohibited via GitHub branch protection rules."
+    relevant_chunks:
+      - document: engineering_policies.md
+        section: "Section 3: Code Quality, Review & Testing Standards"
+        relevance: 3
+    expected_citations:
+      - engineering_policies.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [reranker, cross_encoder, branch_protection]
+    metadata:
+      benefit_from_reranking: true
+
+  - id: golden-50
+    category: reranker_improvement
+    difficulty: hard
+    question: "How do our financial investments support advancements in artificial intelligence and search speed?"
+    expected_answer: "R&D invested $45.6M (32% of revenue) specifically targeting multi-agent reasoning, semantic reranking models, and low-latency vector index caching."
+    expected_documents:
+      - financial_report_2025.md
+    ground_truth_context:
+      - "Research & Development (R&D): $45.6 million (32.0% of revenue), focused on multi-agent reasoning, semantic reranking models, and low-latency vector index caching."
+    relevant_chunks:
+      - document: financial_report_2025.md
+        section: "Section 3: Operating Expenses & R&D Investment"
+        relevance: 3
+    expected_citations:
+      - financial_report_2025.md
+    retrieval_required: true
+    tools_required: false
+    conversation_required: false
+    tags: [reranker, cross_encoder, ai_investment]
+    metadata:
+      benefit_from_reranking: true
+
+  # ==========================================
+  # Category 12: Negative Control & Edge Cases
+  # ==========================================
+  - id: golden-51
+    category: negative_control
+    difficulty: hard
+    question: "What is the corporate policy on flying first class for commercial airline business travel?"
+    expected_answer: "The provided knowledge base does not contain any policies or information regarding corporate business travel or commercial airline classes."
+    expected_documents: []
+    ground_truth_context: []
+    relevant_chunks: []
+    expected_citations: []
+    retrieval_required: false
+    tools_required: false
+    conversation_required: false
+    tags: [negative_control, out_of_domain, unanswerable]
+    metadata:
+      is_negative_control: true
+      expected_retrieval_count: 0
+
+  - id: golden-52
+    category: negative_control
+    difficulty: hard
+    question: "What were the quarterly dividend payouts per share distributed to shareholders in FY2023?"
+    expected_answer: "The provided knowledge base does not contain information regarding FY2023 dividend distributions or per-share dividends."
+    expected_documents: []
+    ground_truth_context: []
+    relevant_chunks: []
+    expected_citations: []
+    retrieval_required: false
+    tools_required: false
+    conversation_required: false
+    tags: [negative_control, missing_data, unanswerable]
+    metadata:
+      is_negative_control: true
+      expected_retrieval_count: 0

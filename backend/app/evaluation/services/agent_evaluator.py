@@ -29,7 +29,7 @@ class AgentEvaluator:
 
             metric_results = []
 
-            # 1. Run reasoning metrics from registry
+            # 1. Run reasoning and observable agent metrics from registry
             m_steps = MetricRegistry.get_metric("reasoning_steps").evaluate(
                 sample, steps
             )
@@ -42,13 +42,42 @@ class AgentEvaluator:
             m_efficiency = MetricRegistry.get_metric("reasoning_efficiency").evaluate(
                 sample, steps
             )
+            m_task_success = MetricRegistry.get_metric("task_success_rate").evaluate(
+                sample, sample.metadata
+            )
+            m_evidence_suff = MetricRegistry.get_metric(
+                "evidence_sufficiency_rate"
+            ).evaluate(sample, sample.metadata)
+            m_replan_success = MetricRegistry.get_metric(
+                "replan_success_rate"
+            ).evaluate(sample, sample.metadata)
+            m_dup_avoidance = MetricRegistry.get_metric(
+                "duplicate_task_avoidance"
+            ).evaluate(sample, sample.metadata)
+            m_call_eff = MetricRegistry.get_metric("agent_call_efficiency").evaluate(
+                sample, sample.metadata
+            )
 
-            metric_results.extend([m_steps, m_necessity, m_ordering, m_efficiency])
+            metric_results.extend(
+                [
+                    m_steps,
+                    m_necessity,
+                    m_ordering,
+                    m_efficiency,
+                    m_task_success,
+                    m_evidence_suff,
+                    m_replan_success,
+                    m_dup_avoidance,
+                    m_call_eff,
+                ]
+            )
 
             if not m_steps.passed:
                 error_category = "Context Overflow"
             elif not m_necessity.passed:
                 error_category = "Wrong Tool"
+            elif not m_task_success.passed:
+                error_category = "Task Execution Failure"
 
             agent_details = AgentEvaluation(
                 reasoning_steps=steps,

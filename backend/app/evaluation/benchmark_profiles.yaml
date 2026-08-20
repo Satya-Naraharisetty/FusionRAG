@@ -1,19 +1,28 @@
 # Benchmark Profiles Configuration
+fast_deterministic:
+  pipelines:
+    - retrieval
+    - citation
+  max_samples: 100
+
 quick:
   pipelines:
     - retrieval
+    - citation
   max_samples: 5
 
 standard:
   pipelines:
     - retrieval
     - generation
+    - citation
   max_samples: 50
 
 full:
   pipelines:
     - retrieval
     - generation
+    - citation
     - agent
     - conversation
   max_samples: 200
@@ -22,6 +31,7 @@ nightly:
   pipelines:
     - retrieval
     - generation
+    - citation
     - agent
     - conversation
   max_samples: 1000

@@ -126,15 +126,28 @@ class DatasetLoader:
                 f"Unsupported file format: {ext}. Supported formats: JSON, JSONL, YAML, CSV"
             )
 
+        if not raw_samples:
+            raise ValueError(
+                f"Dataset at '{file_path}' contains no evaluation samples."
+            )
+
         # Parse and validate samples
         samples = []
+        seen_ids: set[str] = set()
         for i, raw in enumerate(raw_samples):
             # Guarantee ID
             if "id" not in raw or not raw["id"]:
                 raw["id"] = f"{dataset_id}-{version}-{i}"
 
+            sample_id = str(raw["id"]).strip()
+            if sample_id in seen_ids:
+                raise ValueError(
+                    f"Duplicate sample ID detected: '{sample_id}' at index {i}."
+                )
+            seen_ids.add(sample_id)
+
             # Basic validation
-            if "question" not in raw or not raw["question"]:
+            if "question" not in raw or not str(raw["question"]).strip():
                 raise ValueError(
                     f"Sample at index {i} is missing required 'question' field."
                 )
@@ -164,17 +177,37 @@ class DatasetLoader:
             hasher.update(sample_str.encode("utf-8"))
         return hasher.hexdigest()
 
-    def validate_dataset(self, dataset: EvaluationDataset) -> bool:
+    def validate_dataset(
+        self, dataset: EvaluationDataset, strict: bool = False
+    ) -> bool:
         """
         Run schema and content consistency checks on the dataset.
+        If strict=True, raises ValueError on validation failures.
         """
         if not dataset.dataset_id or not dataset.version:
+            if strict:
+                raise ValueError("dataset_id and version are required.")
+            return False
+        if not dataset.samples or dataset.sample_count <= 0:
+            if strict:
+                raise ValueError("Dataset samples cannot be empty.")
             return False
         if len(dataset.samples) != dataset.sample_count:
+            if strict:
+                raise ValueError("Sample count mismatch with samples list length.")
             return False
+
+        seen_ids: set[str] = set()
         for s in dataset.samples:
-            if not s.id or not s.question:
+            if not s.id or not s.question or not s.question.strip():
+                if strict:
+                    raise ValueError(f"Sample '{s.id}' is missing required fields.")
                 return False
+            if s.id in seen_ids:
+                if strict:
+                    raise ValueError(f"Duplicate sample ID '{s.id}' found in dataset.")
+                return False
+            seen_ids.add(s.id)
         return True
 
     def split_train_test(
