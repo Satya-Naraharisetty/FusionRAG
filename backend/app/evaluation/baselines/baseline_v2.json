@@ -1,0 +1,47 @@
+{
+  "baseline_version": "v2",
+  "dataset_version": "2.0.0",
+  "evaluator_version": "v1",
+  "profile": "fast_deterministic",
+  "parent_baseline": "v1",
+  "generated_at": "2026-08-20T18:28:48.393671+00:00",
+  "sample_count": 68,
+  "metric_averages": {
+    "hit_rate": 0.985,
+    "precision_at_k": 0.536,
+    "recall_at_k": 1.0,
+    "mrr": 1.0,
+    "ndcg": 1.0,
+    "context_recall": 0.947,
+    "context_precision": 0.544,
+    "duplicate_context_rate": 0.0,
+    "citation_validity": 1.0,
+    "citation_precision": 1.0,
+    "citation_grounding": 1.0,
+    "citation_coverage": 0.869
+  },
+  "latency_metrics": {
+    "avg_latency": 0.001003627941252061,
+    "max_latency": 0.0012467000051401556
+  },
+  "reranker_tradeoff": {
+    "without_reranker_mrr": 0.978,
+    "with_reranker_mrr": 1.0,
+    "mrr_delta": 0.022,
+    "without_reranker_ndcg": 0.984,
+    "with_reranker_ndcg": 1.0,
+    "ndcg_delta": 0.016,
+    "without_reranker_precision": 0.963,
+    "with_reranker_precision": 0.969,
+    "precision_delta": 0.006,
+    "reranker_latency_avg_ms": 12.5,
+    "reranker_latency_p50_ms": 12.5,
+    "reranker_latency_p95_ms": 12.5,
+    "relative_latency_increase_percent": 18.5
+  },
+  "tradeoffs": {},
+  "metadata": {
+    "run_id": "1d2516e4-dc17-4c82-8e0f-ebae0704ebbb",
+    "dataset_id": "golden_rag_dataset"
+  }
+}

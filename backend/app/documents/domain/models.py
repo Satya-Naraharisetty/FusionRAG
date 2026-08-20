@@ -254,6 +254,10 @@ class SearchResult(BaseModel):
     sparse_matches: list[RetrievedChunk] | None = None
     fusion_method: FusionMethod | None = None
     reranker: RerankerName | None = None
+    query_type: str | None = None
+    expanded_queries: list[str] | None = None
+    subtask_queries: list[str] | None = None
+    diagnostics: dict[str, Any] | None = None
 
 
 class CleanupJob(BaseModel):

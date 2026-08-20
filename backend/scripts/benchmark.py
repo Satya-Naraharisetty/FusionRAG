@@ -62,9 +62,52 @@ async def main() -> None:
         help="Path to save the generated baseline JSON artifact (e.g. app/evaluation/baselines/baseline_v1.json).",
     )
     parser.add_argument(
+        "--parent-baseline",
+        default=None,
+        help="Parent baseline version identifier (e.g. v1).",
+    )
+    parser.add_argument(
         "--use-sqlite",
         action="store_true",
         help="Use an in-memory SQLite database for standalone benchmarking without Postgres.",
+    )
+    parser.add_argument(
+        "--enable-query-expansion",
+        action="store_true",
+        help="Enable Phase 2.4 query expansion during benchmark.",
+    )
+    parser.add_argument(
+        "--enable-query-decomposition",
+        action="store_true",
+        help="Enable Phase 2.4 query decomposition during benchmark.",
+    )
+    parser.add_argument(
+        "--enable-weighted-rrf",
+        action="store_true",
+        help="Enable Phase 2.4 weighted RRF during benchmark.",
+    )
+    parser.add_argument(
+        "--dense-weight",
+        type=float,
+        default=1.0,
+        help="Weight for dense retrieval in weighted RRF.",
+    )
+    parser.add_argument(
+        "--sparse-weight",
+        type=float,
+        default=1.0,
+        help="Weight for sparse retrieval in weighted RRF.",
+    )
+    parser.add_argument(
+        "--enable-neighbor-chunks",
+        action="store_true",
+        help="Enable Phase 2.4 neighbor chunk expansion.",
+    )
+    parser.add_argument(
+        "--enable-context-selection",
+        action="store_true",
+        default=True,
+        help="Enable Phase 2.4 context selection.",
     )
     args = parser.parse_args()
 
@@ -129,6 +172,14 @@ async def main() -> None:
                 chunk_repo=chunk_repo,
                 index_cache=index_cache,
             )
+            # Apply CLI overrides for benchmark run
+            retrieval_service._enable_query_expansion = args.enable_query_expansion
+            retrieval_service._enable_query_decomposition = (
+                args.enable_query_decomposition
+            )
+            retrieval_service._enable_weighted_rrf = args.enable_weighted_rrf
+            retrieval_service._dense_weight = args.dense_weight
+            retrieval_service._sparse_weight = args.sparse_weight
         except Exception:
             from unittest.mock import MagicMock
 
@@ -226,11 +277,13 @@ async def main() -> None:
 
         # 6. Save baseline if requested
         if args.generate_baseline:
+            baseline_ver = "v2" if args.parent_baseline else "v1"
             baseline_obj = BaselineData(
-                baseline_version="v1",
+                baseline_version=baseline_ver,
                 dataset_version=dataset.version,
                 evaluator_version="v1",
                 profile=args.profile,
+                parent_baseline=args.parent_baseline,
                 generated_at=datetime.now(UTC).isoformat(),
                 sample_count=run_record.total_samples,
                 metric_averages=metric_averages,

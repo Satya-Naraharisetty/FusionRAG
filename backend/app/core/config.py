@@ -208,6 +208,33 @@ class Settings(BaseSettings):
     VECTOR_TOP_K: int = 20
     RRF_K: int = 60
     MMR_LAMBDA: float = 0.5
+    # Advanced RAG Configurations (Phase 2.4)
+    ENABLE_QUERY_CLASSIFICATION: bool = True
+    ENABLE_QUERY_EXPANSION: bool = False
+    QUERY_EXPANSION_MAX_QUERIES: int = 3
+    QUERY_EXPANSION_TIMEOUT_MS: int = 500
+    ENABLE_QUERY_DECOMPOSITION: bool = False
+    MAX_QUERY_SUBTASKS: int = 3
+    QUERY_DECOMPOSITION_TIMEOUT_MS: int = 500
+    MAX_TOTAL_RETRIEVAL_QUERIES: int = 6
+    DEFAULT_RETRIEVAL_TOP_K: int = 10
+    EXPANDED_QUERY_TOP_K: int = 15
+    MULTI_HOP_TOP_K: int = 20
+    MAX_RETRIEVAL_CANDIDATES: int = 100
+    ENABLE_WEIGHTED_RRF: bool = False
+    DENSE_WEIGHT: float = 1.0
+    SPARSE_WEIGHT: float = 1.0
+    ENABLE_CONTEXT_SELECTION: bool = False
+    CONTEXT_SCORE_SOURCE: Literal["rerank_score", "rrf_score", "similarity_score"] = (
+        "rerank_score"
+    )
+    CONTEXT_MAX_TOKENS: int = 6000
+    CONTEXT_MIN_CHUNK_SCORE: float = 0.0
+    CONTEXT_MAX_CHUNKS: int = 12
+    CONTEXT_ORDERING_STRATEGY: str = "rerank_score_desc"
+    ENABLE_NEIGHBOR_CHUNKS: bool = False
+    NEIGHBOR_CHUNK_WINDOW: int = 1
+    TOTAL_ADVANCED_RAG_TIMEOUT_MS: int = 3000
 
     # LLM Orchestration & Answer Generation Configurations
     LLM_PROVIDER: str = "gemini"

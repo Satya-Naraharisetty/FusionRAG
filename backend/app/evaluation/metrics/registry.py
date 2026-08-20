@@ -871,3 +871,94 @@ class ContextBudgetMetric(Metric):
             passed=ratio <= 1.0,
             reason=f"Used {tokens_used} tokens out of max {max_tokens} limit ({ratio * 100:.1f}%).",
         )
+
+
+@MetricRegistry.register("context_recall")
+class ContextRecallMetric(Metric):
+    def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
+        contexts: list[RetrievedContext] = (
+            actual_output if isinstance(actual_output, list) else []
+        )
+        gts = sample.ground_truth_context or []
+        if not gts:
+            return MetricResult(
+                name=self.name,
+                score=1.0,
+                passed=True,
+                reason="No ground truth context specified.",
+            )
+
+        combined_text = " ".join(
+            [c.text for c in contexts if hasattr(c, "text") and c.text]
+        )
+        if not combined_text:
+            return MetricResult(
+                name=self.name, score=0.0, passed=False, reason="No context retrieved."
+            )
+
+        hits = 0
+        for gt in gts:
+            overlap = compute_word_overlap(gt, combined_text)
+            if overlap >= 0.25:
+                hits += 1
+
+        score = hits / len(gts)
+        return MetricResult(
+            name=self.name,
+            score=round(score, 3),
+            passed=score >= 0.70,
+            reason=f"Context recall: {hits}/{len(gts)} ground truth statements covered ({score * 100:.1f}%).",
+        )
+
+
+@MetricRegistry.register("context_precision")
+class ContextPrecisionMetric(Metric):
+    def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
+        contexts: list[RetrievedContext] = (
+            actual_output if isinstance(actual_output, list) else []
+        )
+        if not contexts:
+            return MetricResult(
+                name=self.name,
+                score=1.0,
+                passed=True,
+                reason="No contexts to evaluate.",
+            )
+
+        relevances = calculate_relevance(contexts, sample)
+        relevant_count = sum(1 for r in relevances if r > 0.0)
+        score = relevant_count / len(contexts)
+        return MetricResult(
+            name=self.name,
+            score=round(score, 3),
+            passed=score >= 0.50,
+            reason=f"Context precision: {relevant_count}/{len(contexts)} chunks relevant ({score * 100:.1f}%).",
+        )
+
+
+@MetricRegistry.register("duplicate_context_rate")
+class DuplicateContextRateMetric(Metric):
+    def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
+        contexts: list[RetrievedContext] = (
+            actual_output if isinstance(actual_output, list) else []
+        )
+        if not contexts:
+            return MetricResult(
+                name=self.name, score=0.0, passed=True, reason="No duplicate context."
+            )
+
+        chunk_ids = [c.chunk_id for c in contexts if c.chunk_id]
+        if not chunk_ids:
+            return MetricResult(
+                name=self.name, score=0.0, passed=True, reason="Zero duplicates found."
+            )
+
+        unique_count = len(set(chunk_ids))
+        duplicate_count = len(chunk_ids) - unique_count
+        rate = duplicate_count / len(chunk_ids)
+        return MetricResult(
+            name=self.name,
+            score=round(rate, 3),
+            passed=rate == 0.0,
+            reason=f"Duplicate context rate: {rate * 100:.1f}% ({duplicate_count} duplicates).",
+        )

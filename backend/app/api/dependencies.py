@@ -560,6 +560,9 @@ def get_retrieval_service(
     from app.documents.services.dense_retriever import QdrantDenseRetriever
     from app.documents.services.fusion import ReciprocalRankFusionEngine
     from app.documents.services.mmr import DefaultMMRSelector
+    from app.documents.services.query_classifier import DeterministicQueryClassifier
+    from app.documents.services.query_decomposer import SafeQueryDecomposer
+    from app.documents.services.query_expansion import SafeQueryExpander
     from app.documents.services.query_processor import DefaultQueryProcessor
     from app.documents.services.retrieval_service import RetrievalService
     from app.documents.services.sparse_index import InMemoryBM25Index
@@ -603,6 +606,23 @@ def get_retrieval_service(
         bm25_top_k=settings.BM25_TOP_K,
         mmr_lambda=settings.MMR_LAMBDA,
         rerank_top_k=settings.RERANK_TOP_K,
+        enable_query_classification=settings.ENABLE_QUERY_CLASSIFICATION,
+        enable_query_expansion=settings.ENABLE_QUERY_EXPANSION,
+        enable_query_decomposition=settings.ENABLE_QUERY_DECOMPOSITION,
+        enable_weighted_rrf=settings.ENABLE_WEIGHTED_RRF,
+        dense_weight=settings.DENSE_WEIGHT,
+        sparse_weight=settings.SPARSE_WEIGHT,
+        max_total_retrieval_queries=settings.MAX_TOTAL_RETRIEVAL_QUERIES,
+        max_retrieval_candidates=settings.MAX_RETRIEVAL_CANDIDATES,
+        query_classifier=DeterministicQueryClassifier(),
+        query_expander=SafeQueryExpander(
+            timeout_ms=settings.QUERY_EXPANSION_TIMEOUT_MS,
+            max_queries=settings.QUERY_EXPANSION_MAX_QUERIES,
+        ),
+        query_decomposer=SafeQueryDecomposer(
+            timeout_ms=settings.QUERY_DECOMPOSITION_TIMEOUT_MS,
+            max_subtasks=settings.MAX_QUERY_SUBTASKS,
+        ),
     )
 
 
@@ -636,14 +656,36 @@ def get_prompt_builder():
     return _prompt_builder_instance
 
 
+def get_context_selector(
+    token_estimator=Depends(get_token_estimator),
+    chunk_repo: ChunkRepository = Depends(get_chunk_repository),
+) -> Any:
+    from app.documents.services.context_selector import ContextSelector
+
+    return ContextSelector(
+        token_estimator=token_estimator,
+        max_context_tokens=settings.CONTEXT_MAX_TOKENS,
+        max_chunks=settings.CONTEXT_MAX_CHUNKS,
+        min_chunk_score=settings.CONTEXT_MIN_CHUNK_SCORE,
+        score_source=settings.CONTEXT_SCORE_SOURCE,
+        ordering_strategy=settings.CONTEXT_ORDERING_STRATEGY,
+        enable_neighbor_chunks=settings.ENABLE_NEIGHBOR_CHUNKS,
+        neighbor_window=settings.NEIGHBOR_CHUNK_WINDOW,
+        chunk_repo=chunk_repo,
+    )
+
+
 def get_context_builder(
     token_estimator=Depends(get_token_estimator),
+    context_selector=Depends(get_context_selector),
 ) -> Any:
     from app.chat.services.context_builder import ContextBuilder
 
     return ContextBuilder(
         token_estimator=token_estimator,
         max_context_tokens=settings.MAX_CONTEXT_TOKENS,
+        context_selector=context_selector,
+        enable_context_selection=settings.ENABLE_CONTEXT_SELECTION,
     )
 
 

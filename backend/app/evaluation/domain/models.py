@@ -88,12 +88,41 @@ class BaselineData(BaseModel):
     dataset_version: str = "1.0.0"
     evaluator_version: str = "v1"
     profile: str = "fast_deterministic"
+    parent_baseline: str | None = None
     generated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     sample_count: int = 0
     metric_averages: dict[str, float] = Field(default_factory=dict)
     latency_metrics: dict[str, float] = Field(default_factory=dict)
     reranker_tradeoff: dict[str, Any] = Field(default_factory=dict)
+    tradeoffs: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ContextEvaluation(BaseModel):
+    context_recall: float = 1.0
+    context_precision: float = 1.0
+    context_utilization: float = 1.0
+    duplicate_context_rate: float = 0.0
+    token_budget_utilization: float = 1.0
+    passed: bool = True
+    reason: str | None = None
+
+
+class AdvancedRAGEvaluation(BaseModel):
+    query_classification_accuracy: float = 1.0
+    expansion_trigger_rate: float = 0.0
+    decomposition_trigger_rate: float = 0.0
+    unnecessary_expansion_rate: float = 0.0
+    unnecessary_decomposition_rate: float = 0.0
+    fallback_rate: float = 0.0
+    retrieval_call_count: int = 1
+    expanded_query_count: int = 0
+    decomposition_call_count: int = 0
+    dense_retrieval_calls: int = 1
+    sparse_retrieval_calls: int = 1
+    reranker_candidate_count: int = 5
+    retrieval_compute_overhead_ms: float = 0.0
+    quality_gain_per_additional_latency: float = 0.0
 
 
 class EvaluationResult(BaseModel):

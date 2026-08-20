@@ -418,3 +418,88 @@ async def test_replace_document_preserves_conversation_scope():
     assert replaced.scope == DocumentScope.CONVERSATION
     assert replaced.conversation_id == conv_id
     assert replaced.original_filename == "chat_attachment_v2.txt"
+
+
+# ---------------------------------------------------------------------------
+# 7. Multi-Query Expansion Scope Security (Phase 2.4)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_expanded_queries_cannot_escape_retrieval_scope():
+    """
+    CRITICAL SECURITY TEST:
+    Verifies that every original, expanded, and decomposed query executed by
+    RetrievalService strictly inherits and enforces the exact user_id,
+    DocumentRetrievalScope, and allowed_document_ids of the original request.
+    """
+    from app.documents.services.fusion import ReciprocalRankFusionEngine
+    from app.documents.services.mmr import DefaultMMRSelector
+    from app.documents.services.query_classifier import DeterministicQueryClassifier
+    from app.documents.services.query_decomposer import DeterministicQueryDecomposer
+    from app.documents.services.query_expansion import LexicalQueryExpander
+    from app.documents.services.query_processor import DefaultQueryProcessor
+    from app.documents.services.reranker import IdentityReranker
+    from app.documents.services.retrieval_service import RetrievalService
+
+    user_a = uuid.uuid4()
+    conv_a = uuid.uuid4()
+    doc_a = uuid.uuid4()
+
+    mock_chunk_repo = AsyncMock()
+    mock_chunk_repo.get_allowed_document_ids.return_value = [doc_a]
+    mock_chunk_repo.get_chunks_metadata_stats.return_value = {"count": 10}
+
+    mock_dense = AsyncMock()
+    mock_dense.retrieve.return_value = []
+    mock_sparse = AsyncMock()
+    mock_sparse.retrieve.return_value = []
+
+    service = RetrievalService(
+        query_processor=DefaultQueryProcessor(),
+        dense_retriever=mock_dense,
+        sparse_retriever=mock_sparse,
+        fusion_engine=ReciprocalRankFusionEngine(rrf_k=60),
+        mmr_selector=DefaultMMRSelector(),
+        reranker=IdentityReranker(),
+        chunk_repo=mock_chunk_repo,
+        query_classifier=DeterministicQueryClassifier(),
+        query_expander=LexicalQueryExpander(),
+        query_decomposer=DeterministicQueryDecomposer(),
+        enable_hybrid_search=True,
+        enable_query_expansion=True,
+        enable_query_decomposition=True,
+    )
+
+    scope = DocumentRetrievalScope(
+        user_id=user_a,
+        conversation_id=conv_a,
+        include_conversation_documents=True,
+        include_library_documents=False,
+    )
+
+    await service.retrieve(
+        query="What was 2025 revenue and also the engineering SLA target?",
+        user_id=user_a,
+        top_k=5,
+        retrieval_scope=scope,
+    )
+
+    # Verify every call to dense retriever preserved user_id and allowed_doc_ids
+    assert mock_dense.retrieve.call_count >= 1
+    for call in mock_dense.retrieve.call_args_list:
+        _, kwargs = call
+        assert kwargs["user_id"] == user_a
+        assert kwargs["document_ids"] == [doc_a]
+        assert kwargs["retrieval_scope"].user_id == user_a
+        assert kwargs["retrieval_scope"].conversation_id == conv_a
+        assert kwargs["retrieval_scope"].include_library_documents is False
+
+    # Verify every call to sparse retriever preserved user_id and allowed_doc_ids
+    assert mock_sparse.retrieve.call_count >= 1
+    for call in mock_sparse.retrieve.call_args_list:
+        _, kwargs = call
+        assert kwargs["user_id"] == user_a
+        assert kwargs["document_ids"] == [doc_a]
+        assert kwargs["retrieval_scope"].user_id == user_a
+        assert kwargs["retrieval_scope"].conversation_id == conv_a
