@@ -160,7 +160,9 @@ class ResultEvaluator:
                 missing_reqs.append(
                     MissingRequirement(
                         requirement=f"Output for '{task.request}'",
-                        reason=res.error if (res and res.error) else "Task was not executed",
+                        reason=res.error
+                        if (res and res.error)
+                        else "Task was not executed",
                         suggested_agent_type=task.agent_type,
                         priority=2,
                     )

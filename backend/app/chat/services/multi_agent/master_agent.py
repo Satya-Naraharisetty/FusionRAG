@@ -596,6 +596,38 @@ class MasterAgent:
         total_time_ms = (time.perf_counter() - start_time) * 1000
         failed_tasks = [r.task_id for r in all_results_list if not r.success]
 
+        research_results = [
+            r
+            for r in all_results_list
+            if r.agent_type == AgentType.RESEARCH and r.metadata
+        ]
+        research_plans_created = len(research_results)
+        research_subqueries_generated = sum(
+            len(r.metadata.get("research_plan", {}).get("subqueries", []))
+            for r in research_results
+        )
+        research_subqueries_executed = sum(
+            r.metadata.get("queries_executed", 0) for r in research_results
+        )
+        research_empty_queries = sum(
+            len(r.metadata.get("empty_queries", [])) for r in research_results
+        )
+        research_duplicate_evidence_removed = sum(
+            r.metadata.get("duplicate_evidence_removed", 0) for r in research_results
+        )
+        research_evidence_count = sum(
+            len(r.evidence) for r in research_results if r.success
+        )
+        research_planning_latency_ms = sum(
+            r.metadata.get("research_planning_latency_ms", 0.0)
+            for r in research_results
+        )
+        research_retrieval_latency_ms = sum(
+            r.metadata.get("research_retrieval_latency_ms", 0.0)
+            for r in research_results
+        )
+        research_total_latency_ms = sum(r.execution_time_ms for r in research_results)
+
         diagnostics = MultiAgentDiagnostics(
             plan_iterations=iteration,
             total_specialist_calls=total_calls,
@@ -612,6 +644,16 @@ class MasterAgent:
             planning_latency_ms=round(plan_latency_ms, 2),
             execution_latency_ms=round(exec_latency_ms, 2),
             synthesis_latency_ms=round(synth_latency_ms, 2),
+            research_plans_created=research_plans_created,
+            research_subqueries_generated=research_subqueries_generated,
+            research_subqueries_executed=research_subqueries_executed,
+            research_retrieval_calls=research_subqueries_executed,
+            research_empty_queries=research_empty_queries,
+            research_duplicate_evidence_removed=research_duplicate_evidence_removed,
+            research_evidence_count=research_evidence_count,
+            research_planning_latency_ms=round(research_planning_latency_ms, 2),
+            research_retrieval_latency_ms=round(research_retrieval_latency_ms, 2),
+            research_total_latency_ms=round(research_total_latency_ms, 2),
         )
 
         return MultiAgentResponse(

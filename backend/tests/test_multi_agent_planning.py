@@ -809,7 +809,15 @@ async def test_adaptive_q2_q3_revenue_scenario():
         nonlocal call_count
         call_count += 1
         query_lower = query.lower()
-        if "q2" in query_lower:
+        # In iteration 1 (calls 1 and 2 of decomposed research), Q2 is missing/empty
+        if "q2" in query_lower and call_count <= 2:
+            return SearchResult(
+                original_query=query,
+                retrieval_time=1.0,
+                total_matches=0,
+                retrieved_chunks=[],
+            )
+        elif "q2" in query_lower and call_count > 2:
             return SearchResult(
                 original_query=query,
                 retrieval_time=1.0,

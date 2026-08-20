@@ -923,10 +923,11 @@ def get_agent_executor(
 
 def get_research_agent(
     retrieval_service=Depends(get_retrieval_service),
+    llm_provider=Depends(get_llm_provider),
 ) -> Any:
     from app.chat.services.multi_agent.research_agent import ResearchAgent
 
-    return ResearchAgent(retrieval_service)
+    return ResearchAgent(retrieval_service=retrieval_service, llm_provider=llm_provider)
 
 
 def get_document_agent(

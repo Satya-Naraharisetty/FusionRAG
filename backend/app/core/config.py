@@ -256,6 +256,13 @@ class Settings(BaseSettings):
     MAX_TOTAL_AGENT_CALLS: int = 8
     MULTI_AGENT_TASK_TIMEOUT: float = 20.0
 
+    # Research Planner Configurations (Prompt 3.3)
+    RESEARCH_MAX_SUBQUERIES: int = 4
+    RESEARCH_MAX_RETRIEVAL_CALLS: int = 6
+    RESEARCH_QUERY_TIMEOUT: float = 10.0
+    RESEARCH_DEDUP_SIMILARITY_THRESHOLD: float = 0.85
+    RESEARCH_ENABLE_LLM_PLANNER: bool = True
+
     # Evaluation & Benchmarking Configurations
     ENABLE_EVALUATION: bool = True
     ENABLE_RAGAS: bool = True
