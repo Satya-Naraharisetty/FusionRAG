@@ -413,15 +413,16 @@ class RetrievalService:
         if self._enable_reranker:
             t0 = time.perf_counter()
             # If a custom legacy ranker was supplied in constructor, use it for backwards compatibility,
-            # otherwise use Reranker
+            # otherwise use async Reranker
             if self._ranker:
                 reranked_results = self._ranker.rank(
                     processed_query_obj.cleaned_query, final_results
                 )
             else:
-                reranked_results = self._reranker.rerank(
+                reranked_results = await self._reranker.rerank(
                     processed_query_obj.cleaned_query, final_results
                 )
+            # RetrievalService owns final result truncation
             reranked_results = reranked_results[: self._rerank_top_k]
             rerank_latency = time.perf_counter() - t0
 

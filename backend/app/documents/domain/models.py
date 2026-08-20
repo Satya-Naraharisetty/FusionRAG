@@ -199,6 +199,7 @@ class RetrievedChunk(BaseModel):
     text: str
     similarity_score: float
     normalized_score: float | None = None
+    rerank_score: float | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     chunk_index: int
 
@@ -219,6 +220,7 @@ class FusionMethod(str, Enum):
 class RerankerName(str, Enum):
     IDENTITY = "IdentityReranker"
     SEMANTIC = "SemanticSearchRanker"
+    CROSS_ENCODER = "CrossEncoderReranker"
     MOCK = "MagicMock"
 
 

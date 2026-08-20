@@ -363,6 +363,23 @@ async def lifespan(app: FastAPI):
 
         run_durable_cleanup_recovery()
 
+        # Warm up cross-encoder reranker if enabled (non-fatal graceful degradation on warmup error)
+        if getattr(settings, "ENABLE_RERANKER", False) and settings.ENV != "testing":
+            try:
+                from app.api.dependencies import get_reranker
+
+                reranker = get_reranker()
+                if hasattr(reranker, "ensure_model_loaded"):
+                    logger.info(
+                        "Pre-warming CrossEncoder reranker model during application startup..."
+                    )
+                    reranker.ensure_model_loaded()
+            except Exception as re_err:
+                logger.warning(
+                    f"Reranker model warmup encountered error during startup: {re_err}. "
+                    "Application startup will proceed with graceful fallback to MMR order."
+                )
+
         logger.info(
             "Application lifespan initialization completed. Web service online."
         )

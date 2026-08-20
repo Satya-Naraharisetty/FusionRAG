@@ -485,13 +485,13 @@ class MMRSelector(ABC):
 
 class Reranker(ABC):
     @abstractmethod
-    def rerank(
+    async def rerank(
         self,
         query: str,
         chunks: list[RetrievedChunk],
     ) -> list[RetrievedChunk]:
         """
-        Reranks retrieved chunks for the given query.
+        Reranks retrieved chunks for the given query asynchronously.
         """
         pass
 

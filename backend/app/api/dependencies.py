@@ -509,17 +509,58 @@ def get_search_ranker() -> SearchRanker:
     return SemanticSearchRanker()
 
 
+_reranker_instance: Any = None
+
+
+def get_reranker() -> Any:
+    """
+    Returns the process-wide Reranker instance.
+    Constructs CrossEncoderReranker cheaply without loading weights during construction,
+    or IdentityReranker when reranker is disabled or initialization fails.
+    """
+    global _reranker_instance
+
+    from app.core.config import settings
+
+    if not settings.ENABLE_RERANKER:
+        from app.documents.services.reranker import IdentityReranker
+
+        return IdentityReranker()
+
+    if _reranker_instance is None:
+        from app.documents.services.reranker import (
+            CrossEncoderReranker,
+            IdentityReranker,
+        )
+
+        try:
+            _reranker_instance = CrossEncoderReranker(
+                model_name=settings.RERANKER_MODEL,
+                device=settings.RERANKER_DEVICE,
+                batch_size=settings.RERANKER_BATCH_SIZE,
+                max_length=settings.RERANKER_MAX_LENGTH,
+                concurrency_limit=settings.RERANKER_CONCURRENCY_LIMIT,
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to instantiate CrossEncoderReranker: {e}. Falling back to IdentityReranker."
+            )
+            return IdentityReranker()
+
+    return _reranker_instance
+
+
 def get_retrieval_service(
     generator: EmbeddingGenerator = Depends(get_embedding_generator),
     vector_store: VectorStore = Depends(get_vector_store),
     chunk_repo: ChunkRepository = Depends(get_chunk_repository),
     index_cache=Depends(get_index_cache),
+    reranker=Depends(get_reranker),
 ) -> Any:
     from app.documents.services.dense_retriever import QdrantDenseRetriever
     from app.documents.services.fusion import ReciprocalRankFusionEngine
     from app.documents.services.mmr import DefaultMMRSelector
     from app.documents.services.query_processor import DefaultQueryProcessor
-    from app.documents.services.reranker import IdentityReranker
     from app.documents.services.retrieval_service import RetrievalService
     from app.documents.services.sparse_index import InMemoryBM25Index
     from app.documents.services.sparse_retriever import BM25Retriever
@@ -545,7 +586,6 @@ def get_retrieval_service(
 
     fusion_engine = ReciprocalRankFusionEngine(rrf_k=settings.RRF_K)
     mmr_selector = DefaultMMRSelector()
-    reranker = IdentityReranker()
 
     return RetrievalService(
         query_processor=query_processor,

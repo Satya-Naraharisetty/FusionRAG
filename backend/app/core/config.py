@@ -197,11 +197,17 @@ class Settings(BaseSettings):
     EMPTY_KB_CACHE_TTL_SECONDS: float = 60.0
     ENABLE_MMR: bool = True
     ENABLE_RERANKER: bool = True
+    RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    RERANKER_PROVIDER: str = "sentence_transformers"
+    RERANKER_DEVICE: str = "cpu"
+    RERANK_TOP_K: int = 5
+    RERANKER_BATCH_SIZE: int = 16
+    RERANKER_MAX_LENGTH: int = 512
+    RERANKER_CONCURRENCY_LIMIT: int = 4
     BM25_TOP_K: int = 20
     VECTOR_TOP_K: int = 20
     RRF_K: int = 60
     MMR_LAMBDA: float = 0.5
-    RERANK_TOP_K: int = 5
 
     # LLM Orchestration & Answer Generation Configurations
     LLM_PROVIDER: str = "gemini"

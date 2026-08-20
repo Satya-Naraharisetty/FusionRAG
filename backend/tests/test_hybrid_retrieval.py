@@ -393,7 +393,8 @@ def test_mmr_selector_pluggable_similarity():
 
 
 # --- 6. IdentityReranker Tests ---
-def test_identity_reranker():
+@pytest.mark.asyncio
+async def test_identity_reranker():
     reranker = IdentityReranker()
     doc_id = uuid4()
     chunks = [
@@ -415,7 +416,7 @@ def test_identity_reranker():
         ),
     ]
 
-    reranked = reranker.rerank("query", chunks)
+    reranked = await reranker.rerank("query", chunks)
     assert reranked == chunks  # No changes
 
 
@@ -472,7 +473,7 @@ async def test_retrieval_orchestrator_integration(mocker):
     mmr_selector.select.side_effect = lambda chunks, top_k, **kwargs: chunks[:top_k]  # noqa: ARG005
 
     reranker = MagicMock()
-    reranker.rerank.side_effect = lambda _query, chunks: chunks
+    reranker.rerank = AsyncMock(side_effect=lambda _query, chunks: chunks)
 
     chunk_repo = MagicMock()
     chunk_repo.verify_document_ownership = AsyncMock(return_value=True)
