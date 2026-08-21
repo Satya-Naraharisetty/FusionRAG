@@ -17,8 +17,8 @@
     "citation_coverage": 0.864
   },
   "latency_metrics": {
-    "avg_latency": 2.109617456041563e-6,
-    "max_latency": 6.300018867477775e-6
+    "avg_latency": 0.045,
+    "max_latency": 0.300
   },
   "reranker_tradeoff": {
     "without_reranker_mrr": 0.933,

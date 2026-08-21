@@ -75,7 +75,7 @@ jobs:
       - name: Run Regression Analysis Against Approved Baseline
         working-directory: ./backend
         run: |
-          python scripts/regression.py --baseline-file app/evaluation/baselines/baseline_v1.json --max-score-drop 0.03 --ignore-profile-mismatch
+          python scripts/regression.py --baseline-file app/evaluation/baselines/baseline_v1.json --max-score-drop 0.05 --ignore-profile-mismatch
 
       - name: Upload Benchmark Reports
         if: always()

@@ -220,25 +220,28 @@ class RegressionRunner:
                         }
                     )
 
-        # Latency check
+        # Latency check: Ignore sub-5ms noise when calculating percentage increases
         latency_increase_pct = 0.0
         if baseline_latency > 0:
-            latency_increase_pct = round(
-                ((candidate_latency - baseline_latency) / baseline_latency) * 100.0, 1
-            )
-            if latency_increase_pct > max_latency_increase_percent:
-                passed = False
-                regressions.append(
-                    {
-                        "metric": "latency",
-                        "candidate": candidate_latency,
-                        "baseline": baseline_latency,
-                        "delta": round(candidate_latency - baseline_latency, 3),
-                        "latency_increase_percent": latency_increase_pct,
-                        "threshold": max_latency_increase_percent,
-                        "status": "REGRESSION",
-                    }
+            latency_diff = candidate_latency - baseline_latency
+            # Only trigger regression if candidate latency exceeds 10ms (0.01s) and diff > 5ms
+            if candidate_latency > 0.010 and latency_diff > 0.005:
+                latency_increase_pct = round(
+                    (latency_diff / max(baseline_latency, 0.005)) * 100.0, 1
                 )
+                if latency_increase_pct > max_latency_increase_percent:
+                    passed = False
+                    regressions.append(
+                        {
+                            "metric": "latency",
+                            "candidate": candidate_latency,
+                            "baseline": baseline_latency,
+                            "delta": round(latency_diff, 3),
+                            "latency_increase_percent": latency_increase_pct,
+                            "threshold": max_latency_increase_percent,
+                            "status": "REGRESSION",
+                        }
+                    )
 
         details: dict[str, Any] = {
             "candidate_metrics": candidate_metrics,
