@@ -52,6 +52,18 @@ async def main() -> None:
         "--thresholds",
         help="Custom delta thresholds as key=value comma-separated list (e.g. mrr=-0.02,hit_rate=0.0).",
     )
+    parser.add_argument(
+        "--ignore-profile-mismatch",
+        action="store_true",
+        default=False,
+        help="Allow comparing candidate and baseline runs that have different profile names.",
+    )
+    parser.add_argument(
+        "--ignore-dataset-mismatch",
+        action="store_true",
+        default=False,
+        help="Allow comparing candidate and baseline runs that have different dataset versions.",
+    )
     args = parser.parse_args()
 
     runner = RegressionRunner()
@@ -124,6 +136,8 @@ async def main() -> None:
             delta_thresholds=thresholds_dict if thresholds_dict else None,
             max_score_drop=args.max_score_drop,
             max_latency_increase_percent=args.max_latency_increase,
+            ignore_profile_mismatch=args.ignore_profile_mismatch,
+            ignore_dataset_mismatch=args.ignore_dataset_mismatch,
         )
 
     # Case B: Comparing two DB runs

@@ -93,16 +93,21 @@ class RegressionRunner:
         delta_thresholds: dict[str, float] | None = None,
         max_score_drop: float = 0.03,
         max_latency_increase_percent: float = 20.0,
+        ignore_profile_mismatch: bool = False,
+        ignore_dataset_mismatch: bool = False,
     ) -> RegressionRun:
         """
         Compare candidate metrics against an approved BaselineData object (e.g. from baseline_v1.json).
         """
         # Baseline Compatibility Check
-        if baseline.dataset_version != candidate_dataset_version:
+        if (
+            not ignore_dataset_mismatch
+            and baseline.dataset_version != candidate_dataset_version
+        ):
             raise ValueError(
                 f"Baseline dataset version mismatch: baseline '{baseline.dataset_version}' vs candidate '{candidate_dataset_version}'."
             )
-        if baseline.profile != candidate_profile:
+        if not ignore_profile_mismatch and baseline.profile != candidate_profile:
             raise ValueError(
                 f"Baseline profile mismatch: baseline '{baseline.profile}' vs candidate '{candidate_profile}'."
             )
