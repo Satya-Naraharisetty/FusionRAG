@@ -311,9 +311,9 @@ def get_embedding_generator() -> EmbeddingGenerator:
             GeminiEmbeddingGenerator,
         )
 
-        logger.info("Using GeminiEmbeddingGenerator")
+        logger.info("Using GeminiEmbeddingGenerator with dedicated embedding key")
         _embedding_generator_instance = GeminiEmbeddingGenerator(
-            api_key=settings.GEMINI_API_KEY,
+            api_key=settings.get_gemini_embedding_api_key(),
             model=settings.EMBEDDING_MODEL,
             dimension=settings.EMBEDDING_DIMENSION,
         )
@@ -515,7 +515,7 @@ _reranker_instance: Any = None
 def get_reranker() -> Any:
     """
     Returns the process-wide Reranker instance.
-    Constructs CrossEncoderReranker cheaply without loading weights during construction,
+    Constructs JinaReranker when provider is 'jina' or JINA_API_KEY is configured,
     or IdentityReranker when reranker is disabled or initialization fails.
     """
     global _reranker_instance
@@ -529,22 +529,25 @@ def get_reranker() -> Any:
 
     if _reranker_instance is None:
         from app.documents.services.reranker import (
-            CrossEncoderReranker,
             IdentityReranker,
+            JinaCrossEncoderReranker,
         )
 
-        try:
-            _reranker_instance = CrossEncoderReranker(
-                model_name=settings.RERANKER_MODEL,
-                device=settings.RERANKER_DEVICE,
-                batch_size=settings.RERANKER_BATCH_SIZE,
-                max_length=settings.RERANKER_MAX_LENGTH,
-                concurrency_limit=settings.RERANKER_CONCURRENCY_LIMIT,
-            )
-        except Exception as e:
-            logger.error(
-                f"Failed to instantiate CrossEncoderReranker: {e}. Falling back to IdentityReranker."
-            )
+        provider = (settings.RERANKER_PROVIDER or "").lower().strip()
+        if provider == "jina" or settings.JINA_API_KEY:
+            try:
+                _reranker_instance = JinaCrossEncoderReranker(
+                    api_key=settings.JINA_API_KEY,
+                    model_name=settings.RERANKER_MODEL
+                    or "jina-reranker-v2-base-multilingual",
+                    concurrency_limit=settings.RERANKER_CONCURRENCY_LIMIT,
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to instantiate JinaCrossEncoderReranker: {e}. Falling back to IdentityReranker."
+                )
+                return IdentityReranker()
+        else:
             return IdentityReranker()
 
     return _reranker_instance
@@ -690,7 +693,7 @@ def get_token_estimator():
 def get_llm_provider():
     from app.chat.infrastructure.gemini_provider import GeminiProvider
 
-    return GeminiProvider(api_key=settings.GEMINI_API_KEY)
+    return GeminiProvider(api_key=settings.get_gemini_llm_api_key())
 
 
 # Global PromptBuilder instance cached system prompt at startup

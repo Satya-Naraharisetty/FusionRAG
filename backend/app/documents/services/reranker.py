@@ -1,7 +1,7 @@
 import asyncio
 import logging
-import threading
-from typing import Any
+
+import httpx
 
 from app.documents.domain.interfaces import Reranker
 from app.documents.domain.models import RetrievedChunk
@@ -23,139 +23,128 @@ class IdentityReranker(Reranker):
         return chunks
 
 
-class CrossEncoderReranker(Reranker):
+class JinaCrossEncoderReranker(Reranker):
     """
-    Production-grade Cross-Encoder Reranker using sentence-transformers.
-    Performs full cross-attention query-document relevance scoring on candidate chunks.
+    Production-grade API-based Cross-Encoder Reranker using Jina AI Rerank API.
+    Performs full cross-attention query-document relevance scoring via Jina AI.
+
+    Endpoint: https://api.jina.ai/v1/rerank
+    Default model: jina-reranker-v2-base-multilingual
 
     Architecture & Safety:
-    - Thread-safe singleton model lifecycle.
-    - Synchronous PyTorch inference offloaded via asyncio.to_thread to avoid blocking event loop.
-    - Request-level concurrency bounded via asyncio.Semaphore.
-    - Graceful fallback to incoming MMR candidate order on initialization or inference errors.
+    - Bounded timeouts & exponential retries on transient network/rate limit errors.
+    - Zero local PyTorch/CUDA runtime dependency.
+    - Concurrency bounding via asyncio.Semaphore.
+    - Graceful fallback to incoming candidate order on missing API key, rate limits, or network errors.
     """
 
     def __init__(
         self,
-        model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
-        device: str = "cpu",
-        batch_size: int = 16,
-        max_length: int = 512,
-        concurrency_limit: int = 4,
+        api_key: str,
+        model_name: str = "jina-reranker-v2-base-multilingual",
+        timeout: float = 5.0,
+        max_retries: int = 2,
+        concurrency_limit: int = 8,
     ) -> None:
+        self._api_key = api_key
         self._model_name = model_name
-        self._device = device
-        self._batch_size = batch_size
-        self._max_length = max_length
+        self._timeout = timeout
+        self._max_retries = max_retries
         self._concurrency_limit = concurrency_limit
-
-        self._model: Any = None
-        self._init_lock = threading.Lock()
-        self._init_failed: bool = False
-        self._init_error: str | None = None
         self._semaphore: asyncio.Semaphore | None = None
 
     def _get_semaphore(self) -> asyncio.Semaphore:
-        """
-        Lifecycle-safe lazy semaphore initialization tied to the running event loop.
-        Avoids binding to loop at arbitrary module import time.
-        """
         if self._semaphore is None:
             self._semaphore = asyncio.Semaphore(self._concurrency_limit)
         return self._semaphore
-
-    def ensure_model_loaded(self) -> None:
-        """
-        Thread-safe model initialization. Can be called at application startup
-        to pre-warm the model, or on-demand on first request.
-        """
-        if self._model is not None:
-            return
-        if self._init_failed:
-            raise RuntimeError(
-                f"Cross-encoder model initialization previously failed: {self._init_error}"
-            )
-
-        with self._init_lock:
-            if self._model is not None:
-                return
-            if self._init_failed:
-                raise RuntimeError(
-                    f"Cross-encoder model initialization previously failed: {self._init_error}"
-                )
-            try:
-                from sentence_transformers import CrossEncoder
-
-                logger.info(
-                    f"Initializing CrossEncoder model '{self._model_name}' on device '{self._device}'..."
-                )
-                self._model = CrossEncoder(
-                    self._model_name,
-                    device=self._device,
-                    max_length=self._max_length,
-                )
-                logger.info("CrossEncoder model successfully loaded and ready.")
-            except Exception as e:
-                self._init_failed = True
-                self._init_error = str(e)
-                logger.critical(
-                    f"Failed to load CrossEncoder model '{self._model_name}': {e}",
-                    exc_info=True,
-                )
-                raise
-
-    def _predict_scores(self, query: str, texts: list[str]) -> list[float]:
-        self.ensure_model_loaded()
-        pairs = [(query, text) for text in texts]
-        raw_scores = self._model.predict(
-            pairs,
-            batch_size=self._batch_size,
-            show_progress_bar=False,
-        )
-        return [float(s) for s in raw_scores]
 
     async def rerank(
         self,
         query: str,
         chunks: list[RetrievedChunk],
     ) -> list[RetrievedChunk]:
-        # 1. 0 candidates -> return empty list
         if not chunks:
             return []
 
-        # 2. Check model readiness / handle initialization failure
-        try:
-            self.ensure_model_loaded()
-        except Exception as init_err:
+        if not self._api_key or not self._api_key.strip():
             logger.warning(
-                f"Cross-encoder reranker unavailable ({init_err}); falling back to incoming MMR candidate order."
+                "JINA_API_KEY is not configured; falling back to incoming candidate order."
             )
             return chunks
 
-        # 3. Score candidates with bounded async concurrency
-        try:
-            semaphore = self._get_semaphore()
-            async with semaphore:
-                texts = [c.text for c in chunks]
-                scores = await asyncio.to_thread(self._predict_scores, query, texts)
+        url = "https://api.jina.ai/v1/rerank"
+        headers = {
+            "Authorization": f"Bearer {self._api_key.strip()}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self._model_name,
+            "query": query,
+            "documents": [c.text for c in chunks],
+            "top_n": len(chunks),
+        }
 
-            # 4. Handle 1 candidate -> assign score, no reordering necessary
-            if len(chunks) == 1:
-                return [chunks[0].model_copy(update={"rerank_score": scores[0]})]
+        semaphore = self._get_semaphore()
+        for attempt in range(self._max_retries + 1):
+            try:
+                async with semaphore:
+                    async with httpx.AsyncClient() as client:
+                        response = await client.post(
+                            url,
+                            json=payload,
+                            headers=headers,
+                            timeout=self._timeout,
+                        )
+                        response.raise_for_status()
+                        data = response.json()
 
-            # 5. Handle N candidates -> assign score, sort descending
-            scored_chunks: list[tuple[float, RetrievedChunk]] = []
-            for score, chunk in zip(scores, chunks, strict=True):
-                updated_chunk = chunk.model_copy(update={"rerank_score": score})
-                scored_chunks.append((score, updated_chunk))
+                results = data.get("results", [])
+                if not results:
+                    return chunks
 
-            # Stable sort descending (preserves incoming MMR order for identical scores)
-            scored_chunks.sort(key=lambda item: item[0], reverse=True)
-            return [chunk for _, chunk in scored_chunks]
+                scored_chunks: list[RetrievedChunk] = []
+                for item in results:
+                    idx = int(item["index"])
+                    score = float(item["relevance_score"])
+                    if 0 <= idx < len(chunks):
+                        updated = chunks[idx].model_copy(update={"rerank_score": score})
+                        scored_chunks.append(updated)
 
-        except Exception as inf_err:
-            logger.error(
-                f"Cross-encoder inference failed during reranking: {inf_err}. Falling back to MMR order.",
-                exc_info=True,
-            )
-            return chunks
+                if len(scored_chunks) < len(chunks):
+                    seen_indices = {
+                        int(item["index"])
+                        for item in results
+                        if 0 <= int(item["index"]) < len(chunks)
+                    }
+                    for i, chunk in enumerate(chunks):
+                        if i not in seen_indices:
+                            scored_chunks.append(chunk)
+
+                return scored_chunks
+
+            except httpx.HTTPStatusError as e:
+                status_code = e.response.status_code
+                if (
+                    status_code in (429, 500, 502, 503, 504)
+                    and attempt < self._max_retries
+                ):
+                    await asyncio.sleep(2.0**attempt)
+                    continue
+                logger.warning(
+                    f"Jina AI rerank HTTP {status_code} error: {e}. Falling back to incoming candidate order."
+                )
+                return chunks
+            except Exception as e:
+                if attempt < self._max_retries:
+                    await asyncio.sleep(2.0**attempt)
+                    continue
+                logger.warning(
+                    f"Jina AI rerank request failed ({e}); falling back to incoming candidate order."
+                )
+                return chunks
+
+        return chunks
+
+
+# Alias for backward compatibility
+JinaReranker = JinaCrossEncoderReranker

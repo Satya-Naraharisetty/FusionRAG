@@ -122,9 +122,10 @@ class ImageExtractor(DocumentExtractor):
         if not file_bytes:
             raise DocumentCorrupted("Image file is empty.")
 
-        if not settings.GEMINI_API_KEY:
+        api_key = settings.get_gemini_llm_api_key()
+        if not api_key:
             raise UnsupportedDocumentType(
-                "GEMINI_API_KEY is required for image vision processing."
+                "GEMINI_LLM_API_KEY (or GEMINI_API_KEY) is required for image vision processing."
             )
 
         prompt = (
@@ -134,14 +135,16 @@ class ImageExtractor(DocumentExtractor):
         )
 
         try:
-            extracted_text = await self._extract_via_gemini(file_bytes, prompt)
+            extracted_text = await self._extract_via_gemini(file_bytes, prompt, api_key)
         except Exception as e:
             logger.error(f"Failed to extract image content via Gemini: {e}")
             raise DocumentCorrupted(f"Gemini image extraction failed: {e}") from e
 
         return ExtractionResult(text=extracted_text, page_count=1)
 
-    async def _extract_via_gemini(self, file_bytes: bytes, prompt: str) -> str:
+    async def _extract_via_gemini(
+        self, file_bytes: bytes, prompt: str, api_key: str
+    ) -> str:
         base64_data = base64.b64encode(file_bytes).decode("utf-8")
         payload = {
             "contents": [
@@ -160,7 +163,7 @@ class ImageExtractor(DocumentExtractor):
             "generationConfig": {"temperature": 0.0, "maxOutputTokens": 2048},
         }
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(url, json=payload)

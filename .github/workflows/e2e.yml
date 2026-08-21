@@ -29,12 +29,7 @@ jobs:
       # (env_file). The login/API smoke tests need no LLM key — they only need
       # a JWT_SECRET (required at startup) and COOKIE_SECURE=False so the
       # refresh cookie is stored over plain http://localhost — otherwise the
-      # session-persistence check in the e2e script fails. GEMINI_API_KEY is
-      # injected here (before compose boots) so the two-tier document-model
-      # E2E can run against real chat answers; it resolves to an empty string
-      # when the secret isn't configured, which is harmless for the other
-      # tests. Embeddings need no key: the dockerized backend runs
-      # ENV=development, which uses the local all-MiniLM-L6-v2 model.
+      # session-persistence check in the e2e script fails.
       - name: Create backend .env for CI
         run: |
           JWT_SECRET="ci_$(openssl rand -hex 32)"
@@ -42,11 +37,12 @@ jobs:
           JWT_SECRET=$JWT_SECRET
           COOKIE_SECURE=False
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          GEMINI_FALLBACK_API_KEY=${{ secrets.GEMINI_FALLBACK_API_KEY || secrets.GEMINI_API_KEY }}
+          GEMINI_EMBEDDING_API_KEY=${{ secrets.GEMINI_EMBEDDING_API_KEY || secrets.GEMINI_API_KEY }}
+          GEMINI_LLM_API_KEY=${{ secrets.GEMINI_LLM_API_KEY || secrets.GEMINI_API_KEY }}
+          JINA_API_KEY=${{ secrets.JINA_API_KEY }}
           EOF
 
-      # The backend image is heavy (multi-stage CPU PyTorch, ~2 GB), so build it
-      # once with a GitHub Actions build cache — subsequent runs on the same
-      # branch are warm and skip most of the build.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 

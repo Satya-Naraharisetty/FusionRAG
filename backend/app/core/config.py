@@ -197,13 +197,14 @@ class Settings(BaseSettings):
     EMPTY_KB_CACHE_TTL_SECONDS: float = 60.0
     ENABLE_MMR: bool = True
     ENABLE_RERANKER: bool = True
-    RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-    RERANKER_PROVIDER: str = "sentence_transformers"
+    RERANKER_MODEL: str = "jina-reranker-v2-base-multilingual"
+    RERANKER_PROVIDER: str = "jina"
     RERANKER_DEVICE: str = "cpu"
     RERANK_TOP_K: int = 5
     RERANKER_BATCH_SIZE: int = 16
     RERANKER_MAX_LENGTH: int = 512
     RERANKER_CONCURRENCY_LIMIT: int = 4
+    JINA_API_KEY: str = ""
     BM25_TOP_K: int = 20
     VECTOR_TOP_K: int = 20
     RRF_K: int = 60
@@ -263,6 +264,29 @@ class Settings(BaseSettings):
     RESERVED_COMPLETION_TOKENS: int = 500
     ENABLE_STREAMING: bool = True
     GEMINI_API_KEY: str = ""
+    GEMINI_FALLBACK_API_KEY: str = ""
+    GEMINI_EMBEDDING_API_KEY: str = ""
+    GEMINI_LLM_API_KEY: str = ""
+
+    def get_gemini_fallback_api_key(self) -> str:
+        """Returns the fallback Gemini API key."""
+        return (self.GEMINI_FALLBACK_API_KEY or self.GEMINI_API_KEY).strip()
+
+    def get_gemini_embedding_api_key(self) -> str:
+        """Returns the dedicated embedding Gemini API key, falling back to fallback key."""
+        return (
+            self.GEMINI_EMBEDDING_API_KEY
+            or self.GEMINI_FALLBACK_API_KEY
+            or self.GEMINI_API_KEY
+        ).strip()
+
+    def get_gemini_llm_api_key(self) -> str:
+        """Returns the dedicated LLM Gemini API key, falling back to fallback key."""
+        return (
+            self.GEMINI_LLM_API_KEY
+            or self.GEMINI_FALLBACK_API_KEY
+            or self.GEMINI_API_KEY
+        ).strip()
 
     # OAuth (Google)
     GOOGLE_CLIENT_ID: str = ""
@@ -451,13 +475,17 @@ class Settings(BaseSettings):
 
             # 2. LLM Provider keys
             # Gemini key check
-            gemini_key = getattr(self, "GEMINI_API_KEY", "")
+            gemini_key = (
+                getattr(self, "GEMINI_FALLBACK_API_KEY", "")
+                or getattr(self, "GEMINI_API_KEY", "")
+                or getattr(self, "GEMINI_LLM_API_KEY", "")
+            )
             if not gemini_key or gemini_key.strip() in (
                 "",
                 "your_gemini_api_key_here",
             ):
                 raise ConfigurationError(
-                    "GEMINI_API_KEY is required in production when Gemini is enabled."
+                    "GEMINI_FALLBACK_API_KEY (or GEMINI_API_KEY / GEMINI_LLM_API_KEY) is required in production when Gemini is enabled."
                 )
 
             # 3. OAuth checks

@@ -100,8 +100,9 @@ def test_production_fails_when_secrets_missing():
     Verify that in production mode (ENV=production), required secrets cannot be missing.
     """
     # 1. Missing Gemini key when gemini is active LLM provider
-    with pytest.raises(ConfigurationError, match="GEMINI_API_KEY is required"):
+    with pytest.raises(ConfigurationError, match="GEMINI_FALLBACK_API_KEY"):
         Settings(
+            _env_file=None,
             ENV="production",
             POSTGRES_SERVER="localhost",
             POSTGRES_USER="test_user",
@@ -112,6 +113,9 @@ def test_production_fails_when_secrets_missing():
             JWT_SECRET="a_very_long_secure_secret_signing_key_32_bytes_long",
             LLM_PROVIDER="gemini",
             GEMINI_API_KEY="",
+            GEMINI_FALLBACK_API_KEY="",
+            GEMINI_LLM_API_KEY="",
+            GEMINI_EMBEDDING_API_KEY="",
         )
 
     # 2. Missing JWT secret

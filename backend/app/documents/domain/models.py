@@ -220,7 +220,8 @@ class FusionMethod(str, Enum):
 class RerankerName(str, Enum):
     IDENTITY = "IdentityReranker"
     SEMANTIC = "SemanticSearchRanker"
-    CROSS_ENCODER = "CrossEncoderReranker"
+    JINA = "JinaReranker"
+    JINA_CROSS_ENCODER = "JinaCrossEncoderReranker"
     MOCK = "MagicMock"
 
 

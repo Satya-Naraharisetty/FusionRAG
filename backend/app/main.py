@@ -121,7 +121,10 @@ def run_startup_validations() -> None:
         )
 
     # Validate API keys based on configured providers
-    key_vars: dict[str, str | None] = {"GEMINI_API_KEY": settings.GEMINI_API_KEY}
+    key_vars: dict[str, str | None] = {
+        "GEMINI_FALLBACK_API_KEY": settings.get_gemini_fallback_api_key()
+        or settings.GEMINI_LLM_API_KEY
+    }
 
     empty_keys = [k for k, v in key_vars.items() if not v or not str(v).strip()]
     if empty_keys:
