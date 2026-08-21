@@ -80,11 +80,16 @@ async def main() -> None:
             cand_profile = cand_data.get("profile", "fast_deterministic")
         else:
             # Look up latest completed run from DB
-            engine = create_async_engine(
-                "sqlite+aiosqlite:///:memory:"
-                if not settings.DATABASE_URL
-                else settings.DATABASE_URL
-            )
+            from app.db.session import init_postgres_engine
+
+            try:
+                engine = init_postgres_engine(settings.DATABASE_URL or "")
+            except Exception:
+                engine = create_async_engine(
+                    "sqlite+aiosqlite:///:memory:",
+                    connect_args={"check_same_thread": False},
+                )
+
             session_local = async_sessionmaker(
                 bind=engine, class_=AsyncSession, expire_on_commit=False
             )
@@ -123,9 +128,9 @@ async def main() -> None:
 
     # Case B: Comparing two DB runs
     else:
-        try:
-            from app.db.session import init_postgres_engine
+        from app.db.session import init_postgres_engine
 
+        try:
             engine = init_postgres_engine(settings.DATABASE_URL or "")
         except Exception:
             engine = create_async_engine(
