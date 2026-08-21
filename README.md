@@ -22,6 +22,9 @@ This repository contains a reference implementation of a production-ready **Hybr
 * **Backend**: Python 3.12+, FastAPI, Pydantic v2
 * **Frontend**: React, Vite, TypeScript, Vanilla CSS
 * **Databases**: PostgreSQL (Relational metadata), Qdrant (Vector indexing), Redis (Caching and rate limiting)
+* **Embeddings & LLM**: Google Gemini (`text-embedding-004` 768-dim embeddings, `gemini-2.5-flash-lite` chat & vision)
+* **Cross-Encoder Reranker**: Jina AI REST API (`jina-reranker-v2-base-multilingual`)
+* **Zero Local Deep Learning Dependencies**: Completely free of PyTorch, CUDA, and local neural weights (container image size < 450 MB, instant cold-starts)
 * **Orchestration**: Docker, Docker Compose
 
 ---

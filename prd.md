@@ -142,8 +142,9 @@ To handle ambiguous or conversational queries, the system must preprocess incomi
 *   **Multi-Query Retrieval:** Generates 3-4 different variations of the user's question from different perspectives, executes them in parallel, retrieves the union of results, and applies deduplication.
 
 ### 8.9. Cross-Encoder Reranking
-*   **Reranking Pipeline:** Support for an optional reranking step (using a pass-through `IdentityReranker` by default). Heavyweight local cross-encoder models are not run by default to maintain a light memory footprint.
-*   **Reranked Top-K Selection:** Select the top-$K$ (e.g., $K=5$) high-relevance chunks to pass to context compression.
+*   **Jina AI Cross-Encoder Reranker:** Integration with Jina AI REST API (`jina-reranker-v2-base-multilingual`), performing full joint cross-attention relevance scoring over candidate query-document pairs without local PyTorch runtime overhead.
+*   **Zero-Dependency Fallback:** Built with pass-through `IdentityReranker` fallback for offline development or missing credentials.
+*   **Reranked Top-K Selection:** Select the top-$K$ (e.g., $K=5$) high-relevance chunks from the candidate pool to pass to context compression and answer generation.
 
 ### 8.10. Context Compression
 *   **Token Optimization:** Compress the final chunk contexts before passing them to the generator. Use systems like `LLMLingua` or semantic sentence-level filtering to prune redundant, non-informative filler text from chunks.
