@@ -48,8 +48,7 @@ jobs:
         working-directory: ./backend
         run: |
           uv pip install --system .
-          uv pip install --system -e ".[dev]"
-          uv pip install --system ragas deepeval langchain-google-vertexai langchain-community
+          uv pip install --system -e ".[dev,eval]"
 
       - name: Run Fast Deterministic Golden Benchmark
         working-directory: ./backend

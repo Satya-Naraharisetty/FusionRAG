@@ -51,17 +51,20 @@ jobs:
         working-directory: ./backend
         run: |
           uv pip install --system .
-          uv pip install --system -e ".[dev]"
-          uv pip install --system ragas deepeval langchain-google-vertexai langchain-community
+          uv pip install --system -e ".[dev,eval]"
 
       - name: Run Full Golden Benchmark Suite
         working-directory: ./backend
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_FALLBACK_API_KEY: ${{ secrets.GEMINI_FALLBACK_API_KEY || secrets.GEMINI_API_KEY }}
+          GEMINI_EMBEDDING_API_KEY: ${{ secrets.GEMINI_EMBEDDING_API_KEY || secrets.GEMINI_API_KEY }}
+          GEMINI_LLM_API_KEY: ${{ secrets.GEMINI_LLM_API_KEY || secrets.GEMINI_API_KEY }}
+          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           alembic upgrade head
-          if [ -z "$GEMINI_API_KEY" ] && [ -z "$OPENAI_API_KEY" ]; then
+          if [ -z "$GEMINI_API_KEY" ] && [ -z "$GEMINI_FALLBACK_API_KEY" ] && [ -z "$GEMINI_LLM_API_KEY" ] && [ -z "$OPENAI_API_KEY" ]; then
             echo "No external API keys found. Executing full profile in MOCK mode."
             python scripts/benchmark.py --dataset app/evaluation/datasets/golden/golden_v1.yaml --profile full --mock
           else
