@@ -2,7 +2,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: hybrid_rag_postgres
-    restart: always
+    restart: "no"
     environment:
       POSTGRES_DB: hybrid_rag
       POSTGRES_USER: postgres
@@ -25,7 +25,7 @@ services:
   postgres-test:
     image: postgres:16-alpine
     container_name: hybrid_rag_postgres_test
-    restart: always
+    restart: "no"
     environment:
       POSTGRES_DB: hybrid_rag_test
       POSTGRES_USER: postgres
@@ -43,7 +43,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: hybrid_rag_redis
-    restart: always
+    restart: "no"
     ports:
       - "6379:6379"
     volumes:
@@ -53,7 +53,7 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.19.0
     container_name: hybrid_rag_qdrant
-    restart: always
+    restart: "no"
     ports:
       - "6333:6333"
       - "6334:6334"
@@ -65,7 +65,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: hybrid_rag_backend
-    restart: always
+    restart: "no"
     ports:
       - "8000:8000"
     depends_on:
@@ -77,39 +77,22 @@ services:
         condition: service_started
     env_file:
       - ./backend/.env
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/hybrid_rag
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_URL=redis://redis:6379/0
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - QDRANT_URL=http://qdrant:6333
-      - ENV=development
-      - SKIP_DB_MIGRATION_CHECK=false
-      - HF_HOME=/cache/huggingface
-      # CORS origins: single source of truth is backend/app/core/config.py.
-      # Do not set BACKEND_CORS_ORIGINS here; override only for a genuinely
-      # different deployment (e.g. a production domain).
-    volumes:
-      - hf_cache:/cache/huggingface
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
     container_name: hybrid_rag_frontend
-    restart: always
+    restart: "no"
     ports:
       - "80:80"
     depends_on:
       - backend
+    env_file:
+      - ./frontend/.env
 
 volumes:
   postgres_data:
   postgres_test_data:
   redis_data:
   qdrant_data:
-  hf_cache:

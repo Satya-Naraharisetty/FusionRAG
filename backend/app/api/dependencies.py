@@ -898,7 +898,7 @@ def get_event_dispatcher(
             # Resolve task queue
             task_queue: Any
             if (
-                settings.ENV != "testing"
+                not settings.is_testing
                 and request
                 and hasattr(request, "background_tasks")
             ):

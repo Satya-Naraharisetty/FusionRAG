@@ -379,8 +379,16 @@ class Settings(BaseSettings):
     THRESHOLD_CONTEXT_PRECISION: float = 0.85
     THRESHOLD_CONTEXT_RECALL: float = 0.85
 
-    # Environment Profile configuration
-    ENV: str = os.getenv("ENV", "development").lower()
+    # Environment Profile configuration (defaults to 'development')
+    ENV: str = "development"
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENV == "production" or os.getenv("VERCEL") == "1"
+
+    @property
+    def is_testing(self) -> bool:
+        return self.ENV == "testing" or "PYTEST_CURRENT_TEST" in os.environ
 
     # Redis Cache Settings
     REDIS_CACHE_URL: str = "redis://localhost:6379/0"
@@ -446,7 +454,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
-        if self.ENV == "production":
+        if self.is_production:
             # 1. JWT_SECRET checks
             if not getattr(self, "JWT_SECRET", None):
                 raise ConfigurationError("JWT_SECRET is required in production.")

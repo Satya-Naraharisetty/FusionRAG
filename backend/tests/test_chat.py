@@ -266,6 +266,23 @@ class MockMessageRepository:
     async def fail_message(self, message_id, error_message=None):
         pass
 
+    async def append_stream_chunk(self, message_id, text_delta):
+        pass
+
+    async def interrupt_message(self, message_id, reason="client_disconnected"):
+        pass
+
+    async def complete_message(
+        self,
+        message_id,
+        prompt_tokens,
+        completion_tokens,
+        citations=None,
+        content=None,
+        metadata=None,
+    ):
+        pass
+
 
 def _stub_doc(doc_id):
     """Minimal document stand-in — the orchestrator only reads ``.id``."""
@@ -283,6 +300,20 @@ class MockDocumentService:
         return self._global
 
     def list_documents_by_conversation(self, conversation_id, user_id):
+        return self._scoped
+
+
+class AsyncMockDocumentService:
+    """Stands in for async DocumentService (real runtime behavior)."""
+
+    def __init__(self, global_docs=None, scoped_docs=None):
+        self._global = global_docs or []
+        self._scoped = scoped_docs or []
+
+    async def list_documents(self, user_id):
+        return self._global
+
+    async def list_documents_by_conversation(self, conversation_id, user_id):
         return self._scoped
 
 
@@ -976,3 +1007,78 @@ def test_api_chat_exceptions(client):
     response = client.post("/api/v1/chat", json=payload)
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert response.json()["error"]["code"] == "NO_RELEVANT_CONTEXT"
+
+
+@pytest.mark.asyncio
+async def test_chat_orchestrator_with_async_document_service():
+    """
+    Verifies that ChatOrchestrator correctly awaits async DocumentService methods
+    in both synchronous and streaming generation paths.
+    """
+    from app.chat.services.chat_orchestrator import ChatOrchestrator
+    from app.chat.services.conversation_context_builder import (
+        ConversationContextBuilder,
+    )
+    from app.chat.services.llm_generation_service import LLMGenerationService
+
+    doc_id = uuid4()
+    chunks = [
+        RetrievedChunk(
+            chunk_id=uuid4(),
+            document_id=doc_id,
+            document_name="doc.txt",
+            text="Python was created in 1991.",
+            similarity_score=0.9,
+            normalized_score=0.95,
+            chunk_index=0,
+        )
+    ]
+    retrieval_service = MockRetrievalService(chunks)
+    estimator = CharacterTokenEstimator()
+    context_builder = ConversationContextBuilder()
+    prompt_builder = PromptBuilder("")
+    llm_provider = MockLLMProvider()
+    llm_gen = LLMGenerationService(llm_provider)
+
+    async_doc_service = AsyncMockDocumentService(
+        global_docs=[_stub_doc(doc_id)],
+        scoped_docs=[_stub_doc(doc_id)],
+    )
+    conv_manager = MockConversationManager(document_service=async_doc_service)
+
+    orchestrator = ChatOrchestrator(
+        retrieval_service=retrieval_service,
+        prompt_builder=prompt_builder,
+        llm_generation_service=llm_gen,
+        token_estimator=estimator,
+        conversation_manager=conv_manager,
+        context_builder=context_builder,
+        agent_executor=None,
+        master_agent=None,
+        model="gemini-2.5-flash-lite",
+        enable_conversation_memory=False,
+        enable_tool_calling=False,
+        enable_multi_agent=False,
+    )
+
+    # 1. Test synchronous generation
+    resp = await orchestrator.generate_answer(
+        question="hi",
+        user_id=uuid4(),
+        top_k=5,
+    )
+    assert resp.answer == "Mocked Answer"
+
+    # 2. Test streaming generation
+    events = []
+    async for event in orchestrator.generate_answer_stream(
+        question="hi",
+        user_id=uuid4(),
+        top_k=5,
+    ):
+        events.append(event)
+
+    assert len(events) >= 2
+    event_names = [e["event"] for e in events]
+    assert "metadata" in event_names
+    assert "done" in event_names

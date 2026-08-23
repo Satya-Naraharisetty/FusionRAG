@@ -132,11 +132,11 @@ def run_startup_validations() -> None:
         # On Vercel the app must boot so CORS preflight responses are served;
         # missing keys are downgraded to a warning and calls will fail at
         # request time rather than silently blocking all cross-origin requests.
-        if settings.ENV == "production" and _os.getenv("VERCEL") != "1":
+        if settings.is_production and _os.getenv("VERCEL") != "1":
             raise ConfigurationError(f"Startup aborted due to: {msg}")
         else:
             logger.warning(
-                f"{msg}. This is allowed in {settings.ENV} mode, but LLM or cloud embedding calls will fail."
+                f"{msg}. This is allowed in development mode, but LLM or cloud embedding calls will fail."
             )
 
 
@@ -147,8 +147,7 @@ async def verify_postgres_connectivity(engine) -> None:
     import os
 
     if (
-        "PYTEST_CURRENT_TEST" in os.environ
-        or settings.ENV == "testing"
+        settings.is_testing
         or os.getenv("VERCEL") == "1"
         or type(engine).__name__ in ("MagicMock", "Mock")
     ):
@@ -181,8 +180,7 @@ async def verify_alembic_migrations(engine) -> None:
     import os
 
     if (
-        "PYTEST_CURRENT_TEST" in os.environ
-        or settings.ENV == "testing"
+        settings.is_testing
         or os.getenv("VERCEL") == "1"
         or os.getenv("SKIP_DB_MIGRATION_CHECK", "false").lower() in ("true", "1", "yes")
         or type(engine).__name__ in ("MagicMock", "Mock")
@@ -276,11 +274,7 @@ async def lifespan(app: FastAPI):
         )
 
         # Seed and enforce single default admin user from environment settings if configured
-        if (
-            settings.ENV != "testing"
-            and settings.ADMIN_EMAIL
-            and settings.ADMIN_PASSWORD
-        ):
+        if not settings.is_testing and settings.ADMIN_EMAIL and settings.ADMIN_PASSWORD:
             logger.info("Enforcing single default admin account seeding...")
             async with app.state.db_session_factory() as db_session:
                 try:
@@ -368,7 +362,7 @@ async def lifespan(app: FastAPI):
         run_durable_cleanup_recovery()
 
         # Warm up cross-encoder reranker if enabled (non-fatal graceful degradation on warmup error)
-        if getattr(settings, "ENABLE_RERANKER", False) and settings.ENV != "testing":
+        if getattr(settings, "ENABLE_RERANKER", False) and not settings.is_testing:
             try:
                 from app.api.dependencies import get_reranker
 

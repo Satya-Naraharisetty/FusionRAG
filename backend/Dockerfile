@@ -33,9 +33,9 @@ ENV PATH="/usr/local/bin:$PATH"
 RUN groupadd -g 999 appuser && \
     useradd -r -u 999 -g appuser appuser
 
-# Set up huggingface cache and application data folder, and set permissions
-RUN mkdir -p /cache/huggingface /app/data && \
-    chown -R appuser:appuser /cache/huggingface /app/data
+# Set up application data folder and set permissions
+RUN mkdir -p /app/data && \
+    chown -R appuser:appuser /app/data
 
 # Copy backend application code with correct ownership
 COPY --chown=appuser:appuser . .

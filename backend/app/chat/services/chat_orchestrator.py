@@ -1,3 +1,4 @@
+import inspect
 import logging
 import re
 import time
@@ -141,13 +142,15 @@ class ChatOrchestrator:
             return []
         try:
             docs = doc_service.list_documents_by_conversation(conversation_id, user_id)
+            if inspect.isawaitable(docs):
+                docs = await docs
+            return [doc.id for doc in docs]
         except Exception:
             logger.exception(
                 "Failed to load conversation-scoped documents for %s",
                 conversation_id,
             )
             return []
-        return [doc.id for doc in docs]
 
     async def _load_global_documents(self, user_id: UUID) -> list[UUID]:
         """
@@ -160,10 +163,12 @@ class ChatOrchestrator:
             return []
         try:
             docs = doc_service.list_documents(user_id)
+            if inspect.isawaitable(docs):
+                docs = await docs
+            return [doc.id for doc in docs]
         except Exception:
             logger.exception("Failed to load global documents for %s", user_id)
             return []
-        return [doc.id for doc in docs]
 
     def __init__(
         self,
