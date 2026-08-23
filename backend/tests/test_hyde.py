@@ -159,7 +159,7 @@ async def test_llm_hyde_generator_live_and_fallback():
 
     llm_hyde_gen = LLMHyDEGenerator(
         llm_generation_service=mock_llm,
-        model="gemini-2.5-flash-lite",
+        model="gemini-3.5-flash-lite",
         timeout_ms=500,
         max_retries=1,
     )

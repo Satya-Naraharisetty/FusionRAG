@@ -568,7 +568,7 @@ async def test_conversation_summarizer(chat_test_db, test_users):
             llm_provider=llm_provider,
             summary_repo=sum_repo,
             message_repo=msg_repo,
-            model="gemini-2.5-flash-lite",
+            model="gemini-3.5-flash-lite",
         )
 
         # Generate initial summary up to message index 2
@@ -592,7 +592,7 @@ async def test_conversation_summarizer(chat_test_db, test_users):
 async def test_query_rewriter_heuristics_and_caching():
     llm = MockLLMProvider("Standalone rewritten question")
     # Using local memory cache in rewriter
-    rewriter = LLMHistoryRewriter(llm, "gemini-2.5-flash-lite", MemoryRewriteCache())
+    rewriter = LLMHistoryRewriter(llm, "gemini-3.5-flash-lite", MemoryRewriteCache())
 
     history = [
         ConversationMessage(
@@ -799,7 +799,7 @@ async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
         access_service = ConversationAccessService(conv_repo)
         memory = RollingConversationMemory(msg_repo, sum_repo, max_messages=12)
         rewriter = LLMHistoryRewriter(
-            llm, "gemini-2.5-flash-lite", MemoryRewriteCache()
+            llm, "gemini-3.5-flash-lite", MemoryRewriteCache()
         )
 
         manager = ConversationManager(
@@ -821,7 +821,7 @@ async def test_answer_generation_service_end_to_end(chat_test_db, test_users):
             token_estimator=estimator,
             conversation_manager=manager,
             context_builder=context_builder,
-            model="gemini-2.5-flash-lite",
+            model="gemini-3.5-flash-lite",
             temperature=0.0,
             max_response_tokens=100,
             system_prompt_tokens_limit=500,
@@ -948,14 +948,14 @@ async def test_conversations_api_flow(client, patch_client_db):
         headers=headers,
         json={
             "title": "Renamed Chat Session",
-            "settings": {"temperature": 0.7, "model": "gemini-2.5-flash-lite"},
+            "settings": {"temperature": 0.7, "model": "gemini-3.5-flash-lite"},
         },
     )
     assert patch_resp.status_code == status.HTTP_200_OK
     patched_data = patch_resp.json()
     assert patched_data["title"] == "Renamed Chat Session"
     assert patched_data["settings"]["temperature"] == 0.7
-    assert patched_data["settings"]["model"] == "gemini-2.5-flash-lite"
+    assert patched_data["settings"]["model"] == "gemini-3.5-flash-lite"
 
     # 5. Get specific conversation details
     detail_resp = client.get(f"/api/v1/conversations/{conv_id}", headers=headers)
@@ -1183,7 +1183,7 @@ def _build_answer_service(db):
     dispatcher = SimpleEventDispatcher()
     access_service = ConversationAccessService(conv_repo)
     memory = RollingConversationMemory(msg_repo, sum_repo, max_messages=12)
-    rewriter = LLMHistoryRewriter(llm, "gemini-2.5-flash-lite", MemoryRewriteCache())
+    rewriter = LLMHistoryRewriter(llm, "gemini-3.5-flash-lite", MemoryRewriteCache())
 
     manager = ConversationManager(
         conversation_repo=conv_repo,
@@ -1203,7 +1203,7 @@ def _build_answer_service(db):
         token_estimator=estimator,
         conversation_manager=manager,
         context_builder=context_builder,
-        model="gemini-2.5-flash-lite",
+        model="gemini-3.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
@@ -1448,7 +1448,7 @@ async def test_answer_generation_skips_rewrite_and_retrieval_without_documents(
             token_estimator=estimator,
             conversation_manager=manager,
             context_builder=context_builder,
-            model="gemini-2.5-flash-lite",
+            model="gemini-3.5-flash-lite",
             temperature=0.0,
             max_response_tokens=100,
             system_prompt_tokens_limit=500,

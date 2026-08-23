@@ -255,7 +255,7 @@ class Settings(BaseSettings):
 
     # LLM Orchestration & Answer Generation Configurations
     LLM_PROVIDER: str = "gemini"
-    GEMINI_CHAT_MODEL: str = "gemini-2.5-flash-lite"
+    GEMINI_CHAT_MODEL: str = "gemini-3.5-flash-lite"
     TEMPERATURE: float = 0.0
     MAX_CONTEXT_TOKENS: int = 4000
     MAX_RESPONSE_TOKENS: int = 1000

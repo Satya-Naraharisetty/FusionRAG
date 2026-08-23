@@ -58,27 +58,36 @@ export const authApi = {
     });
   },
 
-  /**
-   * Redirect the full browser window to the backend Google OAuth initiation
-   * endpoint. The backend will redirect to Google, which redirects back to
-   * /api/v1/auth/oauth/google/callback, which then sends the user to
-   * /oauth/callback on the frontend with the access token in the URL.
-   */
-  loginWithGoogle(): void {
+  openOAuthPopup(provider: "google" | "github"): Window | null {
     const apiBase =
       import.meta.env.VITE_API_URL || "http://localhost:8000";
-    window.location.href = `${apiBase}/api/v1/auth/oauth/google`;
+    const width = 500;
+    const height = 620;
+    const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
+    const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
+    return window.open(
+      `${apiBase}/api/v1/auth/oauth/${provider}`,
+      `oauth_${provider}_popup`,
+      `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
+    );
   },
 
-  /**
-   * Redirect the full browser window to the backend GitHub OAuth initiation
-   * endpoint. The backend will redirect to GitHub, which redirects back to
-   * /api/v1/auth/oauth/github/callback, which then sends the user to
-   * /oauth/callback on the frontend with the access token in the URL.
-   */
+  loginWithGoogle(): void {
+    const popup = this.openOAuthPopup("google");
+    if (!popup || popup.closed || typeof popup.closed === "undefined") {
+      const apiBase =
+        import.meta.env.VITE_API_URL || "http://localhost:8000";
+      window.location.href = `${apiBase}/api/v1/auth/oauth/google`;
+    }
+  },
+
   loginWithGithub(): void {
-    const apiBase =
-      import.meta.env.VITE_API_URL || "http://localhost:8000";
-    window.location.href = `${apiBase}/api/v1/auth/oauth/github`;
+    const popup = this.openOAuthPopup("github");
+    if (!popup || popup.closed || typeof popup.closed === "undefined") {
+      const apiBase =
+        import.meta.env.VITE_API_URL || "http://localhost:8000";
+      window.location.href = `${apiBase}/api/v1/auth/oauth/github`;
+    }
   },
 };
+

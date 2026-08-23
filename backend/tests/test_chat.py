@@ -1055,7 +1055,7 @@ async def test_chat_orchestrator_with_async_document_service():
         context_builder=context_builder,
         agent_executor=None,
         master_agent=None,
-        model="gemini-2.5-flash-lite",
+        model="gemini-3.5-flash-lite",
         enable_conversation_memory=False,
         enable_tool_calling=False,
         enable_multi_agent=False,

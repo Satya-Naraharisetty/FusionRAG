@@ -11,13 +11,16 @@ class ProviderFailoverProxy(LLMProviderRouter):
     def __init__(
         self,
         primary: LLMProvider,
-        backup: LLMProvider,
+        backup: LLMProvider | None = None,
         failure_threshold: int = 5,
         recovery_timeout: float = 30.0,
     ) -> None:
-        providers = {"gemini": primary, "openai": backup}
+        providers = {"gemini": primary}
+        if backup is not None:
+            providers["backup"] = backup
         policy = SettingsRoutingPolicy(
-            primary_provider_key="gemini", backup_provider_key="openai"
+            primary_provider_key="gemini",
+            backup_provider_key="backup" if backup is not None else None,
         )
         super().__init__(
             providers=providers,

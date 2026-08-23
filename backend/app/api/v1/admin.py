@@ -77,8 +77,9 @@ async def get_operational_status(
 
     # Inspect circuit breakers if LLMProvider is wrapped in router
     if isinstance(llm_provider, LLMProviderRouter):
-        for provider_key in ["gemini", "openai"]:
+        for provider_key in getattr(llm_provider, "_breakers", {}).keys():
             breaker = llm_provider.get_circuit_breaker(provider_key)
+
             if breaker:
                 status_report["circuit_breakers"][provider_key] = {
                     "state": breaker.state,

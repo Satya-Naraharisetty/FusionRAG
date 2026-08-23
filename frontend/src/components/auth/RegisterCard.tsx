@@ -43,15 +43,15 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
 }) => {
   return (
     <div
-      className="relative z-10 flex w-full max-w-[408px] flex-col rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-8 shadow-none animate-in fade-in zoom-in-95 duration-300"
+      className="relative z-10 flex w-full max-w-[420px] flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-8 sm:p-10 shadow-2xl animate-in fade-in zoom-in-95 duration-300"
       aria-label="Register form"
     >
       {/* Brand mark */}
-      <div className="flex flex-col items-center mb-6">
-        <div className="mb-4 flex h-10 w-10 select-none items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-base font-semibold text-[var(--text-primary)]">
+      <div className="flex flex-col items-center mb-8">
+        <div className="mb-4 flex h-12 w-12 select-none items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-lg font-bold text-[var(--text-primary)] shadow-sm">
           H
         </div>
-        <h1 className="mb-1 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+        <h1 className="mb-1.5 text-2xl font-bold tracking-tight text-[var(--text-primary)]">
           Create account
         </h1>
         <p className="text-sm text-[var(--text-secondary)] text-center">
@@ -63,15 +63,15 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
       {error && (
         <div
           role="alert"
-          className="mb-5 flex items-center gap-2 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3 text-xs font-medium text-[var(--text-secondary)] animate-in slide-in-from-top duration-200"
+          className="mb-6 flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3.5 text-xs font-medium text-[var(--text-secondary)] animate-in slide-in-from-top duration-200"
         >
-          <ShieldAlert size={14} className="flex-shrink-0 text-[var(--accent-error)]" />
+          <ShieldAlert size={16} className="flex-shrink-0 text-[var(--accent-error)]" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Form */}
-      <form onSubmit={onSubmit} className="flex flex-col gap-3.5" noValidate>
+      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <Input
           id="register-email"
           type="email"
@@ -87,7 +87,7 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
         {!isMagicLink && setPassword && setConfirmPassword && (
           <>
             {/* Password field + strength meter */}
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Input
                 id="register-password"
                 type={showPassword ? "text" : "password"}
@@ -106,7 +106,7 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
                     tabIndex={-1}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 }
                 className="h-11"
@@ -148,7 +148,7 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
             </div>
 
             {/* Confirm password */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Input
                 id="register-confirm-password"
                 type={showPassword ? "text" : "password"}
@@ -174,7 +174,7 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
         )}
 
         {/* Magic link toggle */}
-        <div className="flex justify-end text-xs text-[var(--text-secondary)] select-none">
+        <div className="flex justify-end text-xs text-[var(--text-secondary)] select-none pt-0.5">
           <button
             type="button"
             onClick={() => setIsMagicLink(!isMagicLink)}
@@ -189,7 +189,7 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
           variant="default"
           size="lg"
           fullWidth
-          className="mt-1 font-medium"
+          className="mt-2 font-medium h-11"
           disabled={
             isSubmitting ||
             (!isMagicLink &&
@@ -200,30 +200,30 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
           loading={isSubmitting}
         >
           {!isSubmitting && (
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-2">
               Create account
-              <ArrowRight size={15} />
+              <ArrowRight size={16} />
             </span>
           )}
         </Button>
       </form>
 
       {/* Divider */}
-      <div className="relative my-5 flex items-center">
+      <div className="relative my-6 flex items-center">
         <div className="flex-1 border-t border-[var(--border-subtle)]" />
-        <span className="px-3 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-widest select-none">
+        <span className="px-3 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider select-none">
           or
         </span>
         <div className="flex-1 border-t border-[var(--border-subtle)]" />
       </div>
 
       {/* OAuth buttons */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2.5">
         <Button
           variant="secondary"
           size="default"
           onClick={() => onSocialAuth("Google")}
-          className="gap-2 text-xs font-medium w-full"
+          className="gap-2.5 text-xs font-medium w-full h-10"
           aria-label="Sign up with Google"
         >
           <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -238,7 +238,7 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
           variant="secondary"
           size="default"
           onClick={() => onSocialAuth("GitHub")}
-          className="gap-2 text-xs font-medium w-full"
+          className="gap-2.5 text-xs font-medium w-full h-10"
           aria-label="Sign up with GitHub"
         >
           <svg className="h-4 w-4 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -249,11 +249,11 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
       </div>
 
       {/* Footer link */}
-      <p className="text-center mt-6 text-xs text-[var(--text-secondary)] select-none">
+      <p className="text-center mt-7 text-xs text-[var(--text-secondary)] select-none">
         Already have an account?{" "}
         <Link
           to="/login"
-          className="text-[var(--text-primary)] font-semibold hover:underline underline-offset-2 transition-colors"
+          className="text-[var(--text-primary)] font-semibold hover:underline underline-offset-2 transition-colors ml-1"
         >
           Sign in
         </Link>

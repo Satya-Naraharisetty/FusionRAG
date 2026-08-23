@@ -180,7 +180,7 @@ class ChatOrchestrator:
         context_builder: ConversationContextBuilder,
         agent_executor: AgentExecutor,
         master_agent: Any | None = None,
-        model: str = "gemini-2.5-flash-lite",
+        model: str = "gemini-3.5-flash-lite",
         temperature: float = 0.0,
         max_response_tokens: int = 1000,
         system_prompt_tokens_limit: int = 1000,

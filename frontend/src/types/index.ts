@@ -16,7 +16,8 @@ export interface Conversation {
 
 export interface ConversationSettings {
   temperature: number;
-  provider: "gemini" | "openai" | string;
+  provider: "gemini" | string;
+
   model: string;
   retrieval_mode: RetrievalMode;
   stream: boolean;

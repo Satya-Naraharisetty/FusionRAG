@@ -226,16 +226,7 @@
   --font-sans:  var(--font-sans);
   --font-title: var(--font-title);
 
-  --spacing-1:  var(--space-1);
-  --spacing-2:  var(--space-2);
-  --spacing-3:  var(--space-3);
-  --spacing-4:  var(--space-4);
-  --spacing-5:  var(--space-5);
-  --spacing-6:  var(--space-6);
-  --spacing-8:  var(--space-8);
-  --spacing-10: var(--space-10);
-  --spacing-12: var(--space-12);
-  --spacing-16: var(--space-16);
+  --spacing: 0.25rem;
 
   --shadow-elevation-1:    var(--elevation-1);
   --shadow-elevation-2:    var(--elevation-2);

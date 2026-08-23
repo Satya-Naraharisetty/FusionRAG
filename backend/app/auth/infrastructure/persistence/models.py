@@ -1,7 +1,16 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -43,6 +52,12 @@ class SQLAlchemyUser(Base):
     sessions: Mapped[list["SQLAlchemySession"]] = relationship(
         "SQLAlchemySession", back_populates="user", cascade="all, delete-orphan"
     )
+    encryption_key: Mapped[Optional["SQLAlchemyUserEncryptionKey"]] = relationship(
+        "SQLAlchemyUserEncryptionKey",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
 
 class SQLAlchemySession(Base):
@@ -77,4 +92,28 @@ class SQLAlchemySession(Base):
     # Relationships
     user: Mapped["SQLAlchemyUser"] = relationship(
         "SQLAlchemyUser", back_populates="sessions"
+    )
+
+
+class SQLAlchemyUserEncryptionKey(Base):
+    __tablename__ = "user_encryption_keys"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    wrapped_dek: Mapped[str] = mapped_column(Text, nullable=False)
+    key_version: Mapped[int] = mapped_column(default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # Relationships
+    user: Mapped["SQLAlchemyUser"] = relationship(
+        "SQLAlchemyUser", back_populates="encryption_key"
     )

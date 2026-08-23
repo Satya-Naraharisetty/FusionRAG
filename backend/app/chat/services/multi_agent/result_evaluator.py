@@ -336,7 +336,7 @@ class ResultEvaluator:
         try:
             response = await self.llm_provider.generate(
                 messages=messages,
-                model="gemini-2.5-flash-lite",
+                model="gemini-3.5-flash-lite",
                 temperature=0.0,
                 max_tokens=600,
             )

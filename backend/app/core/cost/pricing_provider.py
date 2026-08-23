@@ -44,14 +44,11 @@ class YAMLPricingProvider(BasePricingProvider):
 
     def _set_fallbacks(self) -> None:
         self._pricing_cache = {
-            "gemini-2.5-flash-lite": ModelPricing(
+            "gemini-3.5-flash-lite": ModelPricing(
                 input_cost_per_million=0.075, output_cost_per_million=0.30
             ),
-            "gpt-4o-mini": ModelPricing(
-                input_cost_per_million=0.15, output_cost_per_million=0.60
-            ),
-            "text-embedding-3-small": ModelPricing(
-                input_cost_per_million=0.02, output_cost_per_million=0.02
+            "gemini-3.5-flash": ModelPricing(
+                input_cost_per_million=0.075, output_cost_per_million=0.30
             ),
         }
 

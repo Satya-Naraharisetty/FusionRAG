@@ -190,11 +190,9 @@ async def deep_check(
 
         if isinstance(llm_provider, LLMProviderRouter):
             gemini_breaker = llm_provider.get_circuit_breaker("gemini")
-            openai_breaker = llm_provider.get_circuit_breaker("openai")
             if gemini_breaker and gemini_breaker.state == "OPEN":
-                llm_status = "degraded: Gemini offline (failed over to OpenAI)"
-            elif openai_breaker and openai_breaker.state == "OPEN":
-                llm_status = "degraded: OpenAI offline"
+                llm_status = "degraded: Gemini circuit is OPEN"
+
     except Exception as e:
         logger.error(f"Deep health LLM check failed: {e}")
         llm_status = f"degraded: {str(e)}"

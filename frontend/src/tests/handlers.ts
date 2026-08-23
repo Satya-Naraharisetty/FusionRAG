@@ -57,7 +57,7 @@ const handlers = [
           settings: {
             temperature: 0.0,
             provider: "gemini",
-            model: "gemini-2.5-flash-lite",
+            model: "gemini-3.5-flash-lite",
             retrieval_mode: "hybrid",
             stream: false,
             hybrid_enabled: true,
@@ -66,7 +66,7 @@ const handlers = [
           version: 1,
           metadata: {
             message_count: 2,
-            last_model: "gemini-2.5-flash-lite",
+            last_model: "gemini-3.5-flash-lite",
             last_provider: "gemini",
             last_tokens: 150,
           },

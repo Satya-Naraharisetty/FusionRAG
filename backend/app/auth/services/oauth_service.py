@@ -72,8 +72,8 @@ class OAuthService:
             "scope": _GOOGLE_SCOPES,
             "state": state,
             "access_type": "offline",
-            "prompt": "select_account",
         }
+
         url = f"{_GOOGLE_AUTH_URL}?{urllib.parse.urlencode(params)}"
         return url, state
 

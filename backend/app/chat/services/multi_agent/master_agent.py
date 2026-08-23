@@ -130,7 +130,7 @@ class MasterAgent:
         try:
             response = await self.llm_provider.generate(
                 messages=messages,
-                model="gemini-2.5-flash-lite",
+                model="gemini-3.5-flash-lite",
                 temperature=0.0,
                 max_tokens=600,
             )
@@ -355,7 +355,7 @@ class MasterAgent:
                 ]
                 await self.llm_provider.generate(
                     messages=prompt_msgs,
-                    model="gemini-2.5-flash-lite",
+                    model="gemini-3.5-flash-lite",
                     temperature=0.0,
                     max_tokens=1000,
                 )
@@ -470,7 +470,7 @@ class MasterAgent:
         self,
         request: str,
         context: AgentExecutionContext,
-        model: str = "gemini-2.5-flash-lite",
+        model: str = "gemini-3.5-flash-lite",
         temperature: float = 0.0,
         max_tokens: int = 1000,
     ) -> MultiAgentResponse:
@@ -851,7 +851,7 @@ class MasterAgent:
         self,
         request: str,
         context: AgentExecutionContext,
-        model: str = "gemini-2.5-flash-lite",
+        model: str = "gemini-3.5-flash-lite",
         temperature: float = 0.0,
         max_tokens: int = 1000,
     ) -> AsyncIterator[dict[str, Any]]:

@@ -122,7 +122,7 @@ class LLMHyDEGenerator:
     def __init__(
         self,
         llm_generation_service: Any,
-        model: str = "gemini-2.5-flash-lite",
+        model: str = "gemini-3.5-flash-lite",
         temperature: float = 0.0,
         max_tokens: int = 512,
         timeout_ms: int = 1000,

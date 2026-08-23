@@ -163,7 +163,7 @@ class ImageExtractor(DocumentExtractor):
             "generationConfig": {"temperature": 0.0, "maxOutputTokens": 2048},
         }
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(url, json=payload)

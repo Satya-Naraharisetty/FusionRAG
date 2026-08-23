@@ -36,6 +36,14 @@ jobs:
           cat > backend/.env <<EOF
           JWT_SECRET=$JWT_SECRET
           COOKIE_SECURE=False
+          DATABASE_URL=postgresql://postgres:postgres@postgres:5432/hybrid_rag
+          POSTGRES_SERVER=postgres
+          POSTGRES_PORT=5432
+          POSTGRES_DB=hybrid_rag
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=postgres
+          REDIS_HOST=redis
+          QDRANT_HOST=qdrant
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           GEMINI_FALLBACK_API_KEY=${{ secrets.GEMINI_FALLBACK_API_KEY || secrets.GEMINI_API_KEY }}
           GEMINI_EMBEDDING_API_KEY=${{ secrets.GEMINI_EMBEDDING_API_KEY || secrets.GEMINI_API_KEY }}

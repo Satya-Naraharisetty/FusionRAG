@@ -33,7 +33,7 @@ async def test_gemini_provider_generate_success():
 
         content, usage = await provider.generate(
             messages=messages,
-            model="gemini-2.5-flash-lite",
+            model="gemini-3.5-flash-lite",
             temperature=0.0,
             max_tokens=100,
         )
@@ -46,7 +46,7 @@ async def test_gemini_provider_generate_success():
         mock_post.assert_called_once()
         args, kwargs = mock_post.call_args
         # Verify Gemini URL format
-        assert "gemini-2.5-flash-lite:generateContent" in args[0]
+        assert "gemini-3.5-flash-lite:generateContent" in args[0]
         assert "key=test-key" in args[0]
 
         # Verify payload mapping
@@ -78,7 +78,7 @@ async def test_gemini_provider_generate_api_error():
         )
 
         with pytest.raises(LLMProviderError, match="Gemini API returned status 400"):
-            await provider.generate(messages, "gemini-2.5-flash-lite", 0.0, 100)
+            await provider.generate(messages, "gemini-3.5-flash-lite", 0.0, 100)
 
 
 @pytest.mark.asyncio
@@ -128,7 +128,7 @@ async def test_gemini_provider_stream_success():
         results = []
         async for chunk, usage in provider.stream(
             messages=messages,
-            model="gemini-2.5-flash-lite",
+            model="gemini-3.5-flash-lite",
             temperature=0.0,
             max_tokens=100,
         ):

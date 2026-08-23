@@ -312,15 +312,12 @@ async def google_oauth_callback(
             status_code=302,
         )
 
-    # ── Redirect to frontend with access token ─────────────────────────────────
+    # ── Redirect to frontend cleanly (token retrieved via HttpOnly cookie silent refresh) ───
     redirect = RedirectResponse(
-        url=(
-            f"{frontend_base}/oauth/callback"
-            f"?access_token={access_token}"
-            f"&expires_in={settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60}"
-        ),
+        url=f"{frontend_base}/oauth/callback",
         status_code=302,
     )
+
     # Set the long-lived refresh cookie
     redirect.set_cookie(
         key=settings.COOKIE_NAME,
@@ -433,15 +430,12 @@ async def github_oauth_callback(
             status_code=302,
         )
 
-    # ── Redirect to frontend with access token ─────────────────────────────────
+    # ── Redirect to frontend cleanly (token retrieved via HttpOnly cookie silent refresh) ───
     redirect = RedirectResponse(
-        url=(
-            f"{frontend_base}/oauth/callback"
-            f"?access_token={access_token}"
-            f"&expires_in={settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60}"
-        ),
+        url=f"{frontend_base}/oauth/callback",
         status_code=302,
     )
+
     # Set the long-lived refresh cookie
     redirect.set_cookie(
         key=settings.COOKIE_NAME,

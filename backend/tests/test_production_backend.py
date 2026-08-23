@@ -384,7 +384,7 @@ async def test_llm_provider_router_failover():
     # Calling generate using "gemini" should fail on primary, trigger failover, and return backup response
     messages = [ChatMessage(role="user", content="Hi")]
     response = await router.generate(
-        messages, model="gemini-2.5-flash-lite", temperature=0.0, max_tokens=100
+        messages, model="gemini-3.5-flash-lite", temperature=0.0, max_tokens=100
     )
 
     assert response.content == "Hello from OpenAI"

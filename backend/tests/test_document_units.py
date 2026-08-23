@@ -290,7 +290,8 @@ async def test_image_extractor_gemini(mock_client_class):
 
         mock_client.post.assert_called_once()
         args, kwargs = mock_client.post.call_args
-        assert "gemini-2.5-flash" in args[0]
+        assert "gemini-3.5-flash" in args[0]
+
         assert "mock-gemini-key" in args[0]
 
 

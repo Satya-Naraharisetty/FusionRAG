@@ -29,7 +29,11 @@ class RoutingPolicy(ABC):
 
 
 class SettingsRoutingPolicy(RoutingPolicy):
-    def __init__(self, primary_provider_key: str, backup_provider_key: str) -> None:
+    def __init__(
+        self,
+        primary_provider_key: str = "gemini",
+        backup_provider_key: str | None = None,
+    ) -> None:
         self.primary = primary_provider_key
         self.backup = backup_provider_key
 
@@ -39,25 +43,21 @@ class SettingsRoutingPolicy(RoutingPolicy):
         providers: dict[str, LLMProvider],
         breakers: dict[str, CircuitBreaker],
     ) -> str:
-        # Determine based on model name prefix first
-        model_lower = model_name.lower()
         target = self.primary
-        if "gpt" in model_lower or "openai" in model_lower:
-            target = "openai"
-        elif "gemini" in model_lower:
-            target = "gemini"
-
-        # Check circuit breaker for target
-        breaker = breakers.get(target)
-        if breaker and breaker.state == "OPEN":
-            # Fallback to backup
-            fallback = self.backup if target == self.primary else self.primary
-            logger.warning(
-                f"Primary provider '{target}' circuit is OPEN. Failing over to '{fallback}'."
-            )
-            return fallback
-
-        return target
+        if target in providers:
+            breaker = breakers.get(target)
+            if (
+                breaker
+                and breaker.state == "OPEN"
+                and self.backup
+                and self.backup in providers
+            ):
+                logger.warning(
+                    f"Primary provider '{target}' circuit is OPEN. Failing over to '{self.backup}'."
+                )
+                return self.backup
+            return target
+        return next(iter(providers.keys())) if providers else self.primary
 
 
 class LLMProviderRouter(LLMProvider):
@@ -100,7 +100,7 @@ class LLMProviderRouter(LLMProvider):
         if provider_key == "openai" and "gemini" in model:
             actual_model = "gpt-4o-mini"  # Default backup model
         elif provider_key == "gemini" and "gpt" in model:
-            actual_model = "gemini-2.5-flash-lite"  # Default backup model
+            actual_model = "gemini-3.5-flash-lite"  # Default backup model
 
         logger.info(
             f"Routing generate request to provider: {provider_key} (Model: {actual_model})"
@@ -163,7 +163,7 @@ class LLMProviderRouter(LLMProvider):
         if provider_key == "openai" and "gemini" in model:
             actual_model = "gpt-4o-mini"
         elif provider_key == "gemini" and "gpt" in model:
-            actual_model = "gemini-2.5-flash-lite"
+            actual_model = "gemini-3.5-flash-lite"
 
         logger.info(
             f"Routing stream request to provider: {provider_key} (Model: {actual_model})"

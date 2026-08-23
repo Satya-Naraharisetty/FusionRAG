@@ -179,11 +179,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     });
 
+    // Listen for OAuth completion messages from popup windows
+
+    const handleOAuthMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === "OAUTH_SUCCESS") {
+        try {
+          setIsLoading(true);
+          const response = await authApi.refresh();
+          setAccessTokenState(response.access_token);
+          const userProfile = await authApi.getMe();
+          setUser(userProfile);
+          scheduleRefresh(response.expires_in);
+        } catch (err) {
+          console.error("Failed to complete OAuth popup session:", err);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    window.addEventListener("message", handleOAuthMessage);
+
     return () => {
       active = false;
+      window.removeEventListener("message", handleOAuthMessage);
       clearRefreshTimer();
     };
   }, [scheduleRefresh, clearRefreshTimer]);
+
 
   const loginWithGoogle = () => {
     authApi.loginWithGoogle();
