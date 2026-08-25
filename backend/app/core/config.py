@@ -81,10 +81,10 @@ class Settings(BaseSettings):
     QDRANT_URL: str | None = None
 
     # Embedding Configurations
-    # Gemini text-embedding-004 is used in all environments (local + production).
-    # sentence-transformers / torch are no longer required.
-    EMBEDDING_PROVIDER: str = "gemini"
-    EMBEDDING_MODEL: str = "text-embedding-004"
+    # Default is Jina AI (jina-embeddings-v3) with 768 dimensions (Matryoshka representation).
+    # Gemini (text-embedding-004) is also supported as an alternate provider.
+    EMBEDDING_PROVIDER: str = "jina"
+    EMBEDDING_MODEL: str = "jina-embeddings-v3"
     EMBEDDING_DIMENSION: int = 768
     EMBEDDING_BATCH_SIZE: int = 32
     EMBEDDING_VERSION: str = "v1"
@@ -287,6 +287,10 @@ class Settings(BaseSettings):
             or self.GEMINI_FALLBACK_API_KEY
             or self.GEMINI_API_KEY
         ).strip()
+
+    def get_jina_api_key(self) -> str:
+        """Returns the configured Jina API key."""
+        return (self.JINA_API_KEY or "").strip()
 
     # OAuth (Google)
     GOOGLE_CLIENT_ID: str = ""

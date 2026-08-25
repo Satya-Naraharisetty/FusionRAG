@@ -291,3 +291,45 @@ async def test_jina_embedding_generator_success():
     assert len(embeddings) == 2
     assert embeddings[0] == [0.1, 0.2, 0.3, 0.4]
     assert embeddings[1] == [0.5, 0.6, 0.7, 0.8]
+
+
+@pytest.mark.asyncio
+async def test_jina_embedding_generator_single_generate():
+    from app.documents.infrastructure.embedding_generator import JinaEmbeddingGenerator
+
+    generator = JinaEmbeddingGenerator(
+        api_key="mock-key",
+        model="jina-embeddings-v3",
+        dimension=4,
+    )
+
+    mock_response = httpx.Response(
+        status_code=200,
+        json={"data": [{"embedding": [0.9, 0.8, 0.7, 0.6]}]},
+        request=httpx.Request("POST", "https://api.jina.ai/v1/embeddings"),
+    )
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_response
+        embedding = await generator.generate("query text")
+
+    assert embedding == [0.9, 0.8, 0.7, 0.6]
+    called_payload = mock_post.call_args[1]["json"]
+    assert called_payload["task"] == "retrieval.query"
+    assert called_payload["dimensions"] == 4
+
+
+def test_get_embedding_generator_jina_provider(monkeypatch):
+    import app.api.dependencies as deps
+    from app.documents.infrastructure.embedding_generator import JinaEmbeddingGenerator
+
+    deps._embedding_generator_instance = None
+    monkeypatch.setattr(deps.settings, "EMBEDDING_PROVIDER", "jina")
+    monkeypatch.setattr(deps.settings, "EMBEDDING_MODEL", "jina-embeddings-v3")
+    monkeypatch.setattr(deps.settings, "EMBEDDING_DIMENSION", 768)
+    monkeypatch.setattr(deps.settings, "JINA_API_KEY", "test-jina-key")
+
+    gen = deps.get_embedding_generator()
+    assert isinstance(gen, JinaEmbeddingGenerator)
+    assert gen.dimension == 768
+    deps._embedding_generator_instance = None

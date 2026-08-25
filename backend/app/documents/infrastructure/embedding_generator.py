@@ -153,23 +153,27 @@ class JinaEmbeddingGenerator(EmbeddingGenerator):
         self,
         api_key: str,
         model: str = "jina-embeddings-v3",
-        dimension: int = 1024,
+        dimension: int = 768,
+        task: str | None = None,
     ) -> None:
         self._api_key = api_key
         self._model = model
         self._dimension = dimension
+        self._task = task
 
     @property
     def dimension(self) -> int:
         return self._dimension
 
-    async def generate(self, text: str) -> list[float]:
-        results = await self.batch_generate([text])
+    async def generate(self, text: str, task: str | None = None) -> list[float]:
+        results = await self.batch_generate([text], task=task or self._task or "retrieval.query")
         if not results:
             raise RuntimeError("Jina API failed to return embeddings.")
         return results[0]
 
-    async def batch_generate(self, texts: list[str]) -> list[list[float]]:
+    async def batch_generate(
+        self, texts: list[str], task: str | None = None
+    ) -> list[list[float]]:
         if not texts:
             return []
 
@@ -178,11 +182,14 @@ class JinaEmbeddingGenerator(EmbeddingGenerator):
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
-        payload = {
+        payload: dict[str, Any] = {
             "model": self._model,
             "dimensions": self._dimension,
             "input": texts,
         }
+        effective_task = task or self._task
+        if effective_task and "v3" in self._model:
+            payload["task"] = effective_task
 
         max_retries = 3
         backoff_factor = 2.0

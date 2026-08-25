@@ -307,16 +307,30 @@ def get_embedding_generator() -> EmbeddingGenerator:
 
     # Singleton: construct once per process (both API and background workers).
     if _embedding_generator_instance is None:
-        from app.documents.infrastructure.embedding_generator import (
-            GeminiEmbeddingGenerator,
-        )
+        provider = (settings.EMBEDDING_PROVIDER or "jina").lower()
 
-        logger.info("Using GeminiEmbeddingGenerator with dedicated embedding key")
-        _embedding_generator_instance = GeminiEmbeddingGenerator(
-            api_key=settings.get_gemini_embedding_api_key(),
-            model=settings.EMBEDDING_MODEL,
-            dimension=settings.EMBEDDING_DIMENSION,
-        )
+        if provider == "jina":
+            from app.documents.infrastructure.embedding_generator import (
+                JinaEmbeddingGenerator,
+            )
+
+            logger.info("Using JinaEmbeddingGenerator for dense embeddings")
+            _embedding_generator_instance = JinaEmbeddingGenerator(
+                api_key=settings.get_jina_api_key(),
+                model=settings.effective_embedding_model,
+                dimension=settings.effective_embedding_dimension,
+            )
+        else:
+            from app.documents.infrastructure.embedding_generator import (
+                GeminiEmbeddingGenerator,
+            )
+
+            logger.info("Using GeminiEmbeddingGenerator with dedicated embedding key")
+            _embedding_generator_instance = GeminiEmbeddingGenerator(
+                api_key=settings.get_gemini_embedding_api_key(),
+                model=settings.effective_embedding_model,
+                dimension=settings.effective_embedding_dimension,
+            )
 
     return _embedding_generator_instance
 
