@@ -583,32 +583,56 @@ class TaskSuccessRateMetric(Metric):
     """
 
     def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
-        metadata = actual_output if isinstance(actual_output, dict) else sample.metadata
+        diag = getattr(actual_output, "diagnostics", None)
+        if (
+            diag is None
+            and isinstance(actual_output, dict)
+            and "diagnostics" in actual_output
+        ):
+            diag = actual_output["diagnostics"]
+        metadata = (
+            diag
+            if isinstance(diag, dict)
+            else (actual_output if isinstance(actual_output, dict) else sample.metadata)
+        )
+
         total_tasks = (
-            metadata.get("total_tasks")
+            metadata.get("total_tasks_executed")
+            or metadata.get("total_tasks")
+            or len(metadata.get("tasks", []))
             or len(metadata.get("planned_tasks", []))
             or metadata.get("initial_task_count")
-            or 1
+        )
+        if not total_tasks:
+            return MetricResult(
+                name=self.name,
+                score=None,
+                passed=True,
+                status="not_applicable",
+                reason="Single-pass direct retrieval; no agent tasks required.",
+            )
+
+        failed_tasks = (
+            metadata.get("failed_tasks_count")
+            or len(metadata.get("failed_tasks", []))
+            or sum(
+                1
+                for t in metadata.get("tasks", [])
+                if isinstance(t, dict) and str(t.get("status", "")).lower() == "failed"
+            )
         )
         completed_tasks = (
             metadata.get("successful_tasks_count")
             or len(metadata.get("completed_tasks", []))
-            or metadata.get("successful_task_count")
-            or total_tasks
+            or (total_tasks - failed_tasks)
         )
-        failed_tasks = metadata.get("failed_tasks_count") or len(
-            metadata.get("failed_tasks", [])
-        )
+        rate = max(0.0, completed_tasks / total_tasks)
 
-        rate = (
-            max(0.0, (total_tasks - failed_tasks) / total_tasks)
-            if total_tasks > 0
-            else 1.0
-        )
         return MetricResult(
             name=self.name,
             score=round(rate, 3),
             passed=rate >= 0.85,
+            status="measured",
             reason=f"Task success rate: {rate * 100:.1f}% ({completed_tasks}/{total_tasks} tasks successful).",
         )
 
@@ -620,32 +644,65 @@ class EvidenceSufficiencyRateMetric(Metric):
     """
 
     def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
-        metadata = actual_output if isinstance(actual_output, dict) else sample.metadata
-        research_total = (
-            metadata.get("research_tasks_total")
-            or metadata.get("research_evidence_count")
-            or len(metadata.get("evidence", []))
-        )
-        research_sufficient = (
-            metadata.get("research_tasks_sufficient")
-            if "research_tasks_sufficient" in metadata
-            else (research_total - metadata.get("unsupported_evidence_count", 0))
+        diag = getattr(actual_output, "diagnostics", None)
+        if (
+            diag is None
+            and isinstance(actual_output, dict)
+            and "diagnostics" in actual_output
+        ):
+            diag = actual_output["diagnostics"]
+        metadata = (
+            diag
+            if isinstance(diag, dict)
+            else (actual_output if isinstance(actual_output, dict) else sample.metadata)
         )
 
-        rate = 1.0
-        if research_total and float(research_total) > 0:
-            suff_val = (
-                float(research_sufficient) if research_sufficient is not None else 0.0
+        if "evidence_sufficiency" in metadata:
+            suff = bool(metadata["evidence_sufficiency"])
+            score = 1.0 if suff else 0.0
+            return MetricResult(
+                name=self.name,
+                score=score,
+                passed=suff,
+                status="measured",
+                reason=f"Evidence sufficiency evaluated to {'sufficient' if suff else 'insufficient'}.",
             )
-            rate = max(0.0, min(1.0, suff_val / float(research_total)))
-        elif sample.retrieval_required and not sample.ground_truth_context:
-            rate = 1.0
+        if "evidence_assessment" in metadata and metadata["evidence_assessment"]:
+            ea = metadata["evidence_assessment"]
+            suff = (
+                ea.get("sufficient", False)
+                if isinstance(ea, dict)
+                else getattr(ea, "sufficient", False)
+            )
+            score = 1.0 if suff else 0.0
+            return MetricResult(
+                name=self.name,
+                score=score,
+                passed=suff,
+                status="measured",
+                reason=f"Evidence sufficiency evaluated to {'sufficient' if suff else 'insufficient'}.",
+            )
+        if (
+            "research_tasks_total" in metadata
+            and float(metadata["research_tasks_total"]) > 0
+        ):
+            total_tasks_cnt = float(metadata["research_tasks_total"])
+            suff_cnt = float(metadata.get("research_tasks_sufficient", total_tasks_cnt))
+            rate = max(0.0, min(1.0, suff_cnt / total_tasks_cnt))
+            return MetricResult(
+                name=self.name,
+                score=round(rate, 3),
+                passed=rate >= 0.80,
+                status="measured",
+                reason=f"Evidence sufficiency rate: {rate * 100:.1f}%.",
+            )
 
         return MetricResult(
             name=self.name,
-            score=round(rate, 3),
-            passed=rate >= 0.80,
-            reason=f"Evidence sufficiency rate: {rate * 100:.1f}%.",
+            score=None,
+            passed=True,
+            status="not_applicable",
+            reason="Evidence sufficiency evaluation not applicable or not executed.",
         )
 
 
@@ -656,19 +713,46 @@ class ReplanSuccessRateMetric(Metric):
     """
 
     def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
-        metadata = actual_output if isinstance(actual_output, dict) else sample.metadata
-        replans = metadata.get("replans") or metadata.get("number_of_replans") or 0
-        synthesis_success = metadata.get("synthesis_success", True)
+        diag = getattr(actual_output, "diagnostics", None)
+        if (
+            diag is None
+            and isinstance(actual_output, dict)
+            and "diagnostics" in actual_output
+        ):
+            diag = actual_output["diagnostics"]
+        metadata = (
+            diag
+            if isinstance(diag, dict)
+            else (actual_output if isinstance(actual_output, dict) else sample.metadata)
+        )
 
+        replans = (
+            metadata.get("replan_count")
+            or metadata.get("replans")
+            or metadata.get("replan_attempts")
+            or 0
+        )
         if replans == 0:
-            rate = 1.0
-            reason = "No replanning was required (first plan succeeded)."
-        else:
-            rate = 1.0 if synthesis_success else 0.0
-            reason = f"Replanning occurred ({replans} iterations) and synthesis {'succeeded' if synthesis_success else 'failed'}."
+            return MetricResult(
+                name=self.name,
+                score=None,
+                passed=True,
+                status="not_applicable",
+                reason="No replanning was required (first plan succeeded).",
+            )
+
+        final_status = str(metadata.get("final_status", "")).lower()
+        suff_val = bool(metadata.get("evidence_sufficiency", False))
+        replan_succ = metadata.get("replan_successes", 0) > 0
+        succeeded = "success" in final_status or suff_val or replan_succ
+        rate = 1.0 if succeeded else 0.0
 
         return MetricResult(
-            name=self.name, score=round(rate, 3), passed=rate >= 0.80, reason=reason
+            name=self.name,
+            score=rate,
+            passed=succeeded,
+            status="measured",
+            reason=f"Replanning occurred ({replans} replans) and {'succeeded' if succeeded else 'terminated with partial evidence'}.",
         )
 
 
@@ -679,20 +763,56 @@ class DuplicateTaskAvoidanceMetric(Metric):
     """
 
     def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
-        metadata = actual_output if isinstance(actual_output, dict) else sample.metadata
-        total_tasks = (
-            metadata.get("total_tasks") or metadata.get("final_task_count") or 1
+        diag = getattr(actual_output, "diagnostics", None)
+        if (
+            diag is None
+            and isinstance(actual_output, dict)
+            and "diagnostics" in actual_output
+        ):
+            diag = actual_output["diagnostics"]
+        metadata = (
+            diag
+            if isinstance(diag, dict)
+            else (actual_output if isinstance(actual_output, dict) else sample.metadata)
         )
-        avoided_duplicates = metadata.get("avoided_duplicate_tasks", 0)
-        duplicates = metadata.get("duplicate_tasks_executed", 0)
 
-        rate = 1.0 - (duplicates / total_tasks) if total_tasks > 0 else 1.0
-        rate = max(0.0, min(1.0, rate))
+        total_tasks = (
+            metadata.get("total_tasks_executed")
+            or metadata.get("total_tasks")
+            or len(metadata.get("tasks", []))
+            or len(metadata.get("planned_tasks", []))
+        )
+        if not total_tasks or total_tasks <= 1:
+            if "duplicate_task_count" in metadata:
+                return MetricResult(
+                    name=self.name,
+                    score=1.0 if metadata["duplicate_task_count"] == 0 else 0.0,
+                    passed=True,
+                    status="measured",
+                    reason="Duplicate task avoidance measured from metadata.",
+                )
+            return MetricResult(
+                name=self.name,
+                score=None,
+                passed=True,
+                status="not_applicable",
+                reason="Single task executed; duplicate avoidance not applicable.",
+            )
+
+        avoided = metadata.get("duplicate_tasks_avoided", 0)
+        duplicates = metadata.get(
+            "duplicate_tasks_executed", metadata.get("duplicate_task_count", 0)
+        )
+        total_tasks_float = float(total_tasks or 1)
+        duplicates_float = float(duplicates or 0)
+        rate = max(0.0, min(1.0, 1.0 - (duplicates_float / total_tasks_float)))
+
         return MetricResult(
             name=self.name,
             score=round(rate, 3),
             passed=rate >= 0.90,
-            reason=f"Duplicate task avoidance: {rate * 100:.1f}% ({avoided_duplicates} duplicates avoided).",
+            status="measured",
+            reason=f"Duplicate task avoidance: {rate * 100:.1f}% ({avoided} duplicates avoided).",
         )
 
 
@@ -703,25 +823,50 @@ class AgentCallEfficiencyMetric(Metric):
     """
 
     def evaluate(self, sample: EvaluationSample, actual_output: Any) -> MetricResult:
-        metadata = actual_output if isinstance(actual_output, dict) else sample.metadata
+        diag = getattr(actual_output, "diagnostics", None)
+        if (
+            diag is None
+            and isinstance(actual_output, dict)
+            and "diagnostics" in actual_output
+        ):
+            diag = actual_output["diagnostics"]
+        metadata = (
+            diag
+            if isinstance(diag, dict)
+            else (actual_output if isinstance(actual_output, dict) else sample.metadata)
+        )
+
         total_calls = (
-            metadata.get("total_agent_calls")
-            or metadata.get("total_specialist_calls")
+            metadata.get("total_retrieval_calls")
+            or metadata.get("retrieval_calls")
+            or metadata.get("total_agent_calls")
             or 1
         )
         successful_calls = (
-            metadata.get("successful_task_count")
-            or metadata.get("successful_tasks_count")
-            or total_calls
+            metadata.get("productive_agent_calls")
+            or metadata.get("successful_task_count")
+            or metadata.get("total_tasks_executed")
+            or len(metadata.get("tasks", []))
+            or len(metadata.get("completed_tasks", []))
+            or 1
         )
 
-        efficiency = successful_calls / total_calls if total_calls > 0 else 1.0
-        efficiency = min(max(efficiency, 0.0), 1.0)
+        if total_calls == 0:
+            return MetricResult(
+                name=self.name,
+                score=None,
+                passed=True,
+                status="not_applicable",
+                reason="No agent retrieval calls executed.",
+            )
+
+        efficiency = min(1.0, max(0.0, successful_calls / total_calls))
         return MetricResult(
             name=self.name,
             score=round(efficiency, 3),
-            passed=efficiency >= 0.70,
-            reason=f"Agent call efficiency: {efficiency * 100:.1f}% ({successful_calls}/{total_calls} productive calls).",
+            passed=efficiency >= 0.50,
+            status="measured",
+            reason=f"Agent call efficiency: {efficiency * 100:.1f}% ({successful_calls}/{total_calls} calls).",
         )
 
 

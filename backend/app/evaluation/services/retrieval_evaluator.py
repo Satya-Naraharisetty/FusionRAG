@@ -244,31 +244,37 @@ class RetrievalEvaluator:
         m_ndcg = MetricRegistry.get_metric("ndcg")
         m_prec = MetricRegistry.get_metric("precision_at_k")
 
-        mrr_without = [
-            m_mrr.evaluate(s, c).score
+        mrr_without: list[float] = [
+            val
             for s, c in zip(samples, without_reranker_results, strict=False)
+            if (val := m_mrr.evaluate(s, c).score) is not None
         ]
-        mrr_with = [
-            m_mrr.evaluate(s, c).score
+        mrr_with: list[float] = [
+            val
             for s, c in zip(samples, with_reranker_results, strict=False)
+            if (val := m_mrr.evaluate(s, c).score) is not None
         ]
 
-        ndcg_without = [
-            m_ndcg.evaluate(s, c).score
+        ndcg_without: list[float] = [
+            val
             for s, c in zip(samples, without_reranker_results, strict=False)
+            if (val := m_ndcg.evaluate(s, c).score) is not None
         ]
-        ndcg_with = [
-            m_ndcg.evaluate(s, c).score
+        ndcg_with: list[float] = [
+            val
             for s, c in zip(samples, with_reranker_results, strict=False)
+            if (val := m_ndcg.evaluate(s, c).score) is not None
         ]
 
-        prec_without = [
-            m_prec.evaluate(s, c).score
+        prec_without: list[float] = [
+            val
             for s, c in zip(samples, without_reranker_results, strict=False)
+            if (val := m_prec.evaluate(s, c).score) is not None
         ]
-        prec_with = [
-            m_prec.evaluate(s, c).score
+        prec_with: list[float] = [
+            val
             for s, c in zip(samples, with_reranker_results, strict=False)
+            if (val := m_prec.evaluate(s, c).score) is not None
         ]
 
         avg_mrr_wo = float(np.mean(mrr_without)) if mrr_without else 0.0

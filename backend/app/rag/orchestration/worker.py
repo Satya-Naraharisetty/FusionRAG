@@ -65,15 +65,15 @@ class RetrievalWorker:
                     retrieval_scope=scope,
                 )
 
-                # Execute hybrid retrieval with the real query, replacing dense results
-                search_res = await self._retrieval_service.retrieve(
+                # Delegate to canonical pipeline for fusion with BM25 original query, MMR, and cross-encoder
+                search_res = await self._retrieval_service.retrieve_with_hyde_dense(
                     query=query,
                     user_id=scope.user_id,
+                    hyde_dense_chunks=dense_chunks,
                     top_k=top_k,
                     document_ids=scope.document_ids,
                     tags=scope.tags,
                     filter_metadata=scope.filter_metadata,
-                    retrieval_mode=RetrievalMode.HYBRID,
                     retrieval_scope=scope,
                 )
                 evidence_chunks = search_res.retrieved_chunks

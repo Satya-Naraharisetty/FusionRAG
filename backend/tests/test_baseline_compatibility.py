@@ -153,3 +153,71 @@ async def test_disabled_advanced_path_preserves_exact_phase_2_3_behavior():
     assert cited_chunks[0].chunk_id == chunk_id_2
     assert cited_chunks[1].chunk_id == chunk_id_3
     assert cited_chunks[2].chunk_id == chunk_id_1
+
+
+@pytest.mark.asyncio
+async def test_context_builder_enable_flag_exact_equivalence():
+    """
+    CRITICAL INVARIANT:
+    When ENABLE_CONTEXT_SELECTION=False, ContextBuilder must produce 100% exact identical
+    chunk IDs, ordering, formatted context string, citations, and token count as the Phase 2.3 baseline.
+    """
+    from app.chat.services.context_builder import ContextBuilder
+    from app.chat.services.token_estimator import CharacterTokenEstimator
+    from app.documents.services.context_selector import ContextSelector
+
+    estimator = CharacterTokenEstimator()
+    doc_id = uuid.uuid4()
+    chunks = [
+        RetrievedChunk(
+            chunk_id=uuid.uuid4(),
+            document_id=doc_id,
+            document_name="spec.md",
+            text=f"Specification requirement paragraph text block {i}",
+            similarity_score=0.9 - (i * 0.05),
+            rerank_score=0.5 + (i * 0.1),  # Inverted rerank score
+            chunk_index=i,
+        )
+        for i in range(5)
+    ]
+
+    # Baseline builder (selector = None)
+    baseline_builder = ContextBuilder(
+        token_estimator=estimator,
+        max_context_tokens=2000,
+        enable_context_selection=False,
+        context_selector=None,
+    )
+    baseline_grounded = baseline_builder.build_context(chunks)
+
+    # Context selector present, but explicitly disabled via flag
+    mock_selector = ContextSelector(
+        token_estimator=estimator,
+        max_context_tokens=2000,
+        min_chunk_score=0.7,
+        score_source="rerank_score",
+    )
+    disabled_flag_builder = ContextBuilder(
+        token_estimator=estimator,
+        max_context_tokens=2000,
+        enable_context_selection=False,
+        context_selector=mock_selector,
+    )
+    disabled_grounded = disabled_flag_builder.build_context(chunks)
+
+    # Exact equality checks
+    assert (
+        disabled_grounded.concatenated_context == baseline_grounded.concatenated_context
+    )
+    assert disabled_grounded.token_estimate == baseline_grounded.token_estimate
+    assert len(disabled_grounded.chunk_references) == len(
+        baseline_grounded.chunk_references
+    )
+    for c_dis, c_base in zip(
+        disabled_grounded.chunk_references,
+        baseline_grounded.chunk_references,
+        strict=True,
+    ):
+        assert c_dis.chunk_id == c_base.chunk_id
+        assert c_dis.document_name == c_base.document_name
+        assert c_dis.text == c_base.text

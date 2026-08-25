@@ -50,16 +50,17 @@ class EvaluationDataset(BaseModel):
 
 class MetricResult(BaseModel):
     name: str
-    score: float
+    score: float | None = None
     passed: bool | None = None
     reason: str | None = None
+    status: str = "measured"  # "measured" | "not_applicable" | "missing_telemetry"
 
 
 class CitationEvaluation(BaseModel):
-    citation_validity: float = 1.0
-    citation_precision: float = 1.0
-    citation_grounding: float = 1.0
-    citation_coverage: float = 1.0
+    citation_validity: float | None = 1.0
+    citation_precision: float | None = 1.0
+    citation_grounding: float | None = 1.0
+    citation_coverage: float | None = 1.0
     unauthorized_citations_count: int = 0
     nonexistent_citations_count: int = 0
     passed: bool = True
@@ -99,11 +100,11 @@ class BaselineData(BaseModel):
 
 
 class ContextEvaluation(BaseModel):
-    context_recall: float = 1.0
-    context_precision: float = 1.0
-    context_utilization: float = 1.0
-    duplicate_context_rate: float = 0.0
-    token_budget_utilization: float = 1.0
+    context_recall: float | None = 1.0
+    context_precision: float | None = 1.0
+    context_utilization: float | None = 1.0
+    duplicate_context_rate: float | None = 0.0
+    token_budget_utilization: float | None = 1.0
     passed: bool = True
     reason: str | None = None
 
@@ -183,26 +184,26 @@ class RegressionRun(BaseModel):
 
 
 class ConversationEvaluation(BaseModel):
-    history_rewrite_score: float = 0.0
-    memory_retention_score: float = 0.0
-    summary_quality_score: float = 0.0
-    context_budget_utilization: float = 0.0
+    history_rewrite_score: float | None = 0.0
+    memory_retention_score: float | None = 0.0
+    summary_quality_score: float | None = 0.0
+    context_budget_utilization: float | None = 0.0
     passed: bool = True
     reason: str | None = None
 
 
 class AgentEvaluation(BaseModel):
     reasoning_steps: int = 0
-    reasoning_efficiency: float = 0.0  # e.g., steps vs correct output ratio
-    tool_necessity_score: float = 1.0
-    tool_ordering_correctness: float = 1.0
+    reasoning_efficiency: float | None = 0.0  # e.g., steps vs correct output ratio
+    tool_necessity_score: float | None = 1.0
+    tool_ordering_correctness: float | None = 1.0
     iteration_count: int = 0
     passed: bool = True
     reason: str | None = None
 
 
 class ToolEvaluation(BaseModel):
-    tool_success_rate: float = 1.0
+    tool_success_rate: float | None = 1.0
     validation_failures: int = 0
     timeouts: int = 0
     retries: int = 0

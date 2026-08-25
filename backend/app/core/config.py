@@ -240,6 +240,7 @@ class Settings(BaseSettings):
     # Adaptive / Agentic RAG Orchestration Configurations (Phase 2.5)
     ENABLE_ADAPTIVE_RAG: bool = False
     ENABLE_HYDE: bool = False
+    HYDE_GENERATOR_TYPE: Literal["deterministic", "llm"] = "deterministic"
     HYDE_TIMEOUT_MS: int = 1000
     HYDE_MAX_TOKENS: int = 512
     HYDE_MAX_RETRIES: int = 1

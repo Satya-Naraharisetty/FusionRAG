@@ -797,3 +797,202 @@ class RetrievalService:
             subtask_queries=subtask_queries_list,
             diagnostics=diagnostics_data,
         )
+
+    async def retrieve_with_hyde_dense(
+        self,
+        query: str,
+        user_id: UUID,
+        hyde_dense_chunks: list[RetrievedChunk],
+        top_k: int = 10,
+        document_ids: list[UUID] | None = None,
+        tags: list[str] | None = None,
+        filter_metadata: dict[str, Any] | None = None,
+        retrieval_scope: DocumentRetrievalScope | None = None,
+    ) -> SearchResult:
+        """
+        Canonical HyDE Hybrid Retrieval Pipeline:
+        1. Validates and enforces document authorization and scope on all candidates before fusion.
+        2. Tags hypothetical dense chunks with provenance: metadata["retrieval_source"] = "hyde_dense".
+        3. Executes BM25 sparse retrieval using the ORIGINAL user query.
+        4. Fuses HyDE dense chunks and BM25 sparse chunks using the canonical Weighted/Standard RRF engine.
+        5. Applies MMR diversity selection (if enabled).
+        6. Reranks candidates using the ORIGINAL user query via Cross-Encoder.
+        7. Returns final SearchResult preserving provenance and metadata.
+        """
+        start_time = time.perf_counter()
+
+        if self._chunk_repo is None:
+            raise RuntimeError(
+                "Chunk repository is not configured; cannot verify document ownership."
+            )
+
+        if retrieval_scope is None:
+            retrieval_scope = DocumentRetrievalScope(
+                user_id=user_id,
+                conversation_id=None,
+                include_conversation_documents=True,
+                include_library_documents=True,
+                document_ids=document_ids,
+                tags=tags,
+                filter_metadata=filter_metadata,
+            )
+
+        # 1. Resolve and verify allowed document IDs from repository
+        allowed_doc_ids = await self._chunk_repo.get_allowed_document_ids(
+            retrieval_scope
+        )
+
+        if retrieval_scope.document_ids:
+            unauthorized = set(retrieval_scope.document_ids) - set(allowed_doc_ids)
+            if unauthorized:
+                raise UnauthorizedDocumentAccess(
+                    "Unauthorized document access: one or more specified document IDs do not belong to you or are not in scope."
+                )
+            allowed_doc_ids = [
+                doc_id
+                for doc_id in allowed_doc_ids
+                if doc_id in retrieval_scope.document_ids
+            ]
+
+        if not allowed_doc_ids:
+            logger.info(
+                "HyDE retrieval skipped: no documents match the requested scope."
+            )
+            return SearchResult(
+                original_query=query,
+                retrieval_time=time.perf_counter() - start_time,
+                total_matches=0,
+                retrieved_chunks=[],
+                search_strategy="hyde",
+                retrieval_strategy=RetrievalMode.HYBRID,
+                dense_matches=[],
+                sparse_matches=[],
+            )
+
+        # 2. Filter & Tag HyDE dense chunks with provenance BEFORE fusion
+        allowed_doc_id_set = set(allowed_doc_ids)
+        authorized_hyde_dense: list[RetrievedChunk] = []
+        for c in hyde_dense_chunks:
+            if c.document_id in allowed_doc_id_set:
+                merged_meta = dict(c.metadata) if c.metadata else {}
+                merged_meta["retrieval_source"] = "hyde_dense"
+                authorized_hyde_dense.append(
+                    RetrievedChunk(
+                        chunk_id=c.chunk_id,
+                        document_id=c.document_id,
+                        document_name=c.document_name,
+                        text=c.text,
+                        similarity_score=c.similarity_score,
+                        normalized_score=c.normalized_score,
+                        rerank_score=c.rerank_score,
+                        metadata=merged_meta,
+                        chunk_index=c.chunk_index,
+                    )
+                )
+
+        # 3. Sparse retrieval using original query
+        processed_query_obj = self._query_processor.process(query)
+        s_top_k = self._bm25_top_k or top_k
+        sparse_results: list[RetrievedChunk] = []
+        sparse_latency = 0.0
+
+        if self._sparse_retriever:
+            t0 = time.perf_counter()
+            raw_sparse = await self._sparse_retriever.retrieve(
+                query=processed_query_obj.expanded_query,
+                user_id=user_id,
+                top_k=s_top_k,
+                document_ids=allowed_doc_ids,
+                tags=tags,
+                filter_metadata=filter_metadata,
+                retrieval_scope=retrieval_scope,
+            )
+            sparse_latency = time.perf_counter() - t0
+            for c in raw_sparse:
+                if c.document_id in allowed_doc_id_set:
+                    merged_meta = dict(c.metadata) if c.metadata else {}
+                    merged_meta["retrieval_source"] = "bm25"
+                    sparse_results.append(
+                        RetrievedChunk(
+                            chunk_id=c.chunk_id,
+                            document_id=c.document_id,
+                            document_name=c.document_name,
+                            text=c.text,
+                            similarity_score=c.similarity_score,
+                            normalized_score=c.normalized_score,
+                            rerank_score=c.rerank_score,
+                            metadata=merged_meta,
+                            chunk_index=c.chunk_index,
+                        )
+                    )
+
+        # 4. Fusion Engine
+        fusion_start = time.perf_counter()
+        if self._enable_weighted_rrf:
+            fused_results = self._weighted_fusion_engine.fuse_weighted(
+                [
+                    (authorized_hyde_dense, self._dense_weight),
+                    (sparse_results, self._sparse_weight),
+                ]
+            )
+        else:
+            fused_results = self._fusion_engine.fuse(
+                authorized_hyde_dense, sparse_results
+            )
+        fusion_latency = time.perf_counter() - fusion_start
+
+        # 5. MMR Diversity Selection
+        if self._enable_mmr:
+            mmr_results = self._mmr_selector.select(
+                chunks=fused_results,
+                top_k=top_k,
+                mmr_lambda=self._mmr_lambda,
+            )
+        else:
+            mmr_results = fused_results[:top_k]
+
+        # 6. Reranking (Using original user query!)
+        reranked_results = mmr_results
+        rerank_latency = 0.0
+        if self._enable_reranker:
+            t0 = time.perf_counter()
+            if self._ranker:
+                reranked_results = self._ranker.rank(
+                    processed_query_obj.cleaned_query, mmr_results
+                )
+            else:
+                reranked_results = await self._reranker.rerank(
+                    processed_query_obj.cleaned_query, mmr_results
+                )
+            reranked_results = reranked_results[: self._rerank_top_k]
+            rerank_latency = time.perf_counter() - t0
+
+        total_latency = time.perf_counter() - start_time
+
+        return SearchResult(
+            original_query=query,
+            retrieval_time=total_latency,
+            total_matches=len(reranked_results),
+            retrieved_chunks=reranked_results,
+            search_strategy="hyde",
+            retrieval_strategy=RetrievalMode.HYBRID,
+            dense_matches=authorized_hyde_dense,
+            sparse_matches=sparse_results,
+            fusion_method=FusionMethod.RRF,
+            reranker=(
+                RerankerName(type(self._reranker).__name__)
+                if self._enable_reranker
+                and type(self._reranker).__name__ in RerankerName._value2member_map_
+                else None
+            ),
+            diagnostics={
+                "hyde_dense_count": len(authorized_hyde_dense),
+                "sparse_count": len(sparse_results),
+                "fused_count": len(fused_results),
+                "final_count": len(reranked_results),
+                "sparse_latency_ms": sparse_latency * 1000.0,
+                "fusion_latency_ms": fusion_latency * 1000.0,
+                "rerank_latency_ms": rerank_latency * 1000.0,
+                "total_latency_ms": total_latency * 1000.0,
+            },
+        )

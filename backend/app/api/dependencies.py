@@ -643,18 +643,45 @@ def get_retrieval_service(
     )
 
 
+def get_llm_provider():
+    from app.chat.infrastructure.gemini_provider import GeminiProvider
+
+    return GeminiProvider(api_key=settings.get_gemini_llm_api_key())
+
+
 def get_hyde_executor(
     generator: EmbeddingGenerator = Depends(get_embedding_generator),
     retrieval_service: Any = Depends(get_retrieval_service),
+    llm_provider: Any = Depends(get_llm_provider),
 ) -> Any:
-    from app.documents.services.hyde import DeterministicHyDEGenerator, SafeHyDEExecutor
+    from app.chat.services.llm_generation_service import LLMGenerationService
+    from app.documents.services.hyde import (
+        DeterministicHyDEGenerator,
+        LLMHyDEGenerator,
+        SafeHyDEExecutor,
+    )
 
     dense_retriever = getattr(retrieval_service, "_dense_retriever", None)
     if dense_retriever is None:
         return None
 
+    hyde_gen: Any
+    if getattr(settings, "HYDE_GENERATOR_TYPE", "deterministic") == "llm":
+        llm_gen = LLMGenerationService(llm_provider)
+        hyde_gen = LLMHyDEGenerator(
+            llm_generation_service=llm_gen,
+            model=settings.GEMINI_CHAT_MODEL,
+            temperature=settings.TEMPERATURE,
+            max_tokens=settings.HYDE_MAX_TOKENS,
+            timeout_ms=settings.HYDE_TIMEOUT_MS,
+            max_retries=settings.HYDE_MAX_RETRIES,
+            fallback_generator=DeterministicHyDEGenerator(),
+        )
+    else:
+        hyde_gen = DeterministicHyDEGenerator()
+
     return SafeHyDEExecutor(
-        hyde_generator=DeterministicHyDEGenerator(),
+        hyde_generator=hyde_gen,
         embedding_generator=generator,
         dense_retriever=dense_retriever,
         timeout_ms=settings.HYDE_TIMEOUT_MS,
@@ -702,12 +729,6 @@ def get_token_estimator():
     from app.chat.services.token_estimator import CharacterTokenEstimator
 
     return CharacterTokenEstimator()
-
-
-def get_llm_provider():
-    from app.chat.infrastructure.gemini_provider import GeminiProvider
-
-    return GeminiProvider(api_key=settings.get_gemini_llm_api_key())
 
 
 # Global PromptBuilder instance cached system prompt at startup

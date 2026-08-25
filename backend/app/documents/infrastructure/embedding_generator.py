@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Any
 
 import httpx
 
@@ -166,7 +167,9 @@ class JinaEmbeddingGenerator(EmbeddingGenerator):
         return self._dimension
 
     async def generate(self, text: str, task: str | None = None) -> list[float]:
-        results = await self.batch_generate([text], task=task or self._task or "retrieval.query")
+        results = await self.batch_generate(
+            [text], task=task or self._task or "retrieval.query"
+        )
         if not results:
             raise RuntimeError("Jina API failed to return embeddings.")
         return results[0]

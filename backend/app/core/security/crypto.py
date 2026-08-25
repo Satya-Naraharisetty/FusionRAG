@@ -42,8 +42,10 @@ class EnvelopeEncryptionService:
         # Ensure 32-byte 256-bit master key
         if isinstance(raw_key, str):
             raw_bytes = raw_key.encode("utf-8")
-        else:
+        elif isinstance(raw_key, (bytes, bytearray)):
             raw_bytes = bytes(raw_key)
+        else:
+            raw_bytes = str(raw_key).encode("utf-8")
 
         if len(raw_bytes) == 32:
             self._master_key_bytes = raw_bytes
@@ -56,7 +58,7 @@ class EnvelopeEncryptionService:
 
     def generate_user_dek(self) -> bytes:
         """Generate a cryptographically secure 256-bit DEK."""
-        return AESGCM.generate_key(bit_length=256)
+        return AESGCM.generate_key(256)
 
     def wrap_dek(self, dek: bytes, user_id: uuid.UUID) -> str:
         """

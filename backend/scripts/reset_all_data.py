@@ -7,28 +7,43 @@ from pathlib import Path
 backend_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from sqlalchemy import delete, inspect, select, text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy import text  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker  # noqa: E402
 
-from app.core.config import settings
-from app.db.session import init_postgres_engine, init_qdrant_client, init_redis_client
+from app.core.config import settings  # noqa: E402
+from app.db.session import (  # noqa: E402
+    init_postgres_engine,
+    init_qdrant_client,
+    init_redis_client,
+)
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger("reset_all_data")
 
 
 async def reset_postgres():
-    logger.info("Connecting to PostgreSQL: %s", settings.POSTGRES_SERVER or settings.DATABASE_URL[:25] + "...")
+    logger.info(
+        "Connecting to PostgreSQL: %s",
+        settings.POSTGRES_SERVER or settings.DATABASE_URL[:25] + "...",
+    )
     engine = init_postgres_engine(settings.DATABASE_URL)
-    session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+    session_factory = async_sessionmaker(
+        bind=engine, class_=AsyncSession, expire_on_commit=False
+    )
 
     async with session_factory() as session:
         # Check existing tables in public schema
         result = await session.execute(
-            text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+            text(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+            )
         )
         existing_tables = {row[0] for row in result.fetchall()}
-        logger.info("Existing database tables in public schema: %s", sorted(existing_tables))
+        logger.info(
+            "Existing database tables in public schema: %s", sorted(existing_tables)
+        )
 
         admin_email = (settings.ADMIN_EMAIL or "").strip().lower()
 
@@ -67,7 +82,9 @@ async def reset_postgres():
             if table in existing_tables:
                 try:
                     res = await session.execute(text(f"DELETE FROM {table}"))
-                    logger.info("Cleared table '%s' (rows deleted: %s)", table, res.rowcount)
+                    logger.info(
+                        "Cleared table '%s' (rows deleted: %s)", table, res.rowcount
+                    )
                 except Exception as e:
                     logger.warning("Could not clear table '%s': %s", table, e)
 
@@ -76,21 +93,31 @@ async def reset_postgres():
             if admin_ids:
                 formatted_ids = "'" + "','".join(admin_ids) + "'"
                 res = await session.execute(
-                    text(f"DELETE FROM refresh_sessions WHERE user_id::text NOT IN ({formatted_ids})")
+                    text(
+                        f"DELETE FROM refresh_sessions WHERE user_id::text NOT IN ({formatted_ids})"
+                    )
                 )
             else:
                 res = await session.execute(text("DELETE FROM refresh_sessions"))
-            logger.info("Cleared non-admin sessions from 'refresh_sessions' (rows deleted: %s)", res.rowcount)
+            logger.info(
+                "Cleared non-admin sessions from 'refresh_sessions' (rows deleted: %s)",
+                res.rowcount,
+            )
 
         if "user_encryption_keys" in existing_tables:
             if admin_ids:
                 formatted_ids = "'" + "','".join(admin_ids) + "'"
                 res = await session.execute(
-                    text(f"DELETE FROM user_encryption_keys WHERE user_id::text NOT IN ({formatted_ids})")
+                    text(
+                        f"DELETE FROM user_encryption_keys WHERE user_id::text NOT IN ({formatted_ids})"
+                    )
                 )
             else:
                 res = await session.execute(text("DELETE FROM user_encryption_keys"))
-            logger.info("Cleared non-admin keys from 'user_encryption_keys' (rows deleted: %s)", res.rowcount)
+            logger.info(
+                "Cleared non-admin keys from 'user_encryption_keys' (rows deleted: %s)",
+                res.rowcount,
+            )
 
         if "users" in existing_tables:
             if admin_ids:
@@ -100,7 +127,9 @@ async def reset_postgres():
                 )
             else:
                 res = await session.execute(text("DELETE FROM users"))
-            logger.info("Cleared non-admin users from 'users' (rows deleted: %s)", res.rowcount)
+            logger.info(
+                "Cleared non-admin users from 'users' (rows deleted: %s)", res.rowcount
+            )
 
         await session.commit()
         logger.info("PostgreSQL database cleanup committed successfully.")
@@ -109,7 +138,10 @@ async def reset_postgres():
 
 
 async def reset_qdrant():
-    logger.info("Connecting to Qdrant: %s", settings.QDRANT_URL or f"{settings.QDRANT_HOST}:{settings.QDRANT_PORT}")
+    logger.info(
+        "Connecting to Qdrant: %s",
+        settings.QDRANT_URL or f"{settings.QDRANT_HOST}:{settings.QDRANT_PORT}",
+    )
     try:
         qdrant_client = init_qdrant_client(
             host=settings.QDRANT_HOST,

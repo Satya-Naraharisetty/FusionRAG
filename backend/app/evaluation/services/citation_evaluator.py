@@ -108,7 +108,9 @@ class CitationEvaluator:
                 citation_grounding=grounding_score,
                 citation_coverage=coverage_score,
                 unauthorized_citations_count=unauth_count,
-                nonexistent_citations_count=0 if validity_score > 0 else 1,
+                nonexistent_citations_count=(
+                    0 if (validity_score is not None and validity_score > 0) else 1
+                ),
                 passed=all_passed,
                 reason="All citation checks passed."
                 if all_passed

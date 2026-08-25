@@ -89,11 +89,11 @@ class Replanner:
             if not targeted_query:
                 continue
 
-            # Determine strategy for missing target
+            # Formalized runtime transition strategy for iterative follow-up retrieval
             strategy = (
                 RetrievalStrategy.QUERY_EXPANSION
-                if len(targeted_query.split()) <= 3
-                else RetrievalStrategy.STANDARD_HYBRID
+                if len(targeted_query.split()) <= 2 and " " not in targeted_query
+                else RetrievalStrategy.ITERATIVE
             )
 
             fp = compute_task_fingerprint(targeted_query, strategy, scope)
