@@ -71,6 +71,27 @@ async function getButtonState(page, text) {
   }, text);
 }
 
+async function getDialogSubmitState(page) {
+  return page.evaluate(() => {
+    const dialog = document.querySelector('[role="dialog"]');
+    if (!dialog) return null;
+    const btn = dialog.querySelector('button[type="submit"]');
+    if (!btn) return null;
+    return { disabled: btn.disabled };
+  });
+}
+
+async function clickDialogSubmitButton(page) {
+  return page.evaluate(() => {
+    const dialog = document.querySelector('[role="dialog"]');
+    if (!dialog) return false;
+    const btn = dialog.querySelector('button[type="submit"]');
+    if (!btn) return false;
+    btn.click();
+    return true;
+  });
+}
+
 async function dismissOnboardingTour(page) {
   await page.evaluate(() => {
     localStorage.setItem('onboarding-completed', 'true');
@@ -107,7 +128,10 @@ async function deleteAccount() {
 
   const del = await fetch(`${API_URL}/api/v1/auth/account`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${access_token}` },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${access_token}`,
+    },
     body: JSON.stringify({ password: PASSWORD }),
   });
   if (!del.ok) {
@@ -243,24 +267,24 @@ async function main() {
       await uiPage.waitForSelector('#delete-account-confirm-email', { timeout: 10000 }).catch(() => {});
       check('dialog email input present', !!(await uiPage.$('#delete-account-confirm-email')));
 
-      let confirmState = await getButtonState(uiPage, 'Delete Account');
+      let confirmState = await getDialogSubmitState(uiPage);
       check('confirm disabled initially', !!confirmState && confirmState.disabled === true);
 
       await uiPage.type('#delete-account-confirm-email', 'wrong@example.com');
-      confirmState = await getButtonState(uiPage, 'Delete Account');
+      confirmState = await getDialogSubmitState(uiPage);
       check('confirm stays disabled with wrong email', !!confirmState && confirmState.disabled === true);
 
       // Select-all + replace with the exact account email
       await uiPage.click('#delete-account-confirm-email', { clickCount: 3 });
       await uiPage.type('#delete-account-confirm-email', EMAIL);
-      confirmState = await getButtonState(uiPage, 'Delete Account');
+      confirmState = await getDialogSubmitState(uiPage);
       check('confirm stays disabled until password entered', !!confirmState && confirmState.disabled === true);
 
       await uiPage.type('#delete-account-confirm-password', PASSWORD);
-      confirmState = await getButtonState(uiPage, 'Delete Account');
+      confirmState = await getDialogSubmitState(uiPage);
       check('confirm enabled with matching email + password', !!confirmState && confirmState.disabled === false);
 
-      check('delete confirmed', await clickButtonByExactText(uiPage, 'Delete Account'));
+      check('delete confirmed', await clickDialogSubmitButton(uiPage));
       let redirectedToLogin = false;
       for (let i = 0; i < 30; i++) {
         if (uiPage.url().includes('/login')) { redirectedToLogin = true; break; }

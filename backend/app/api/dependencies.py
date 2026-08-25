@@ -158,13 +158,23 @@ async def get_current_user_context(
 # --- Security & Rate Limiting ---
 
 
-def _build_rate_limiter(request: Request, requests_per_minute: int, burst: int) -> Any:
+def _build_rate_limiter(
+    request: Request,
+    requests_per_minute: int,
+    burst: int,
+    window_seconds: float = 60.0,
+) -> Any:
     """Create a Redis-backed RateLimiter (falling back to in-memory), honoring ENABLE_RATE_LIMITER."""
     from app.core.security.rate_limiter import RateLimiter
     from app.db.session import get_redis
 
     if not settings.ENABLE_RATE_LIMITER:
-        return RateLimiter(redis_client=None, requests_per_minute=999999, burst=999999)
+        return RateLimiter(
+            redis_client=None,
+            requests_per_minute=999999,
+            burst=999999,
+            window_seconds=window_seconds,
+        )
 
     try:
         redis_client = get_redis(request)
@@ -175,6 +185,7 @@ def _build_rate_limiter(request: Request, requests_per_minute: int, burst: int) 
         redis_client=redis_client,
         requests_per_minute=requests_per_minute,
         burst=burst,
+        window_seconds=window_seconds,
     )
 
 
@@ -251,6 +262,31 @@ async def check_account_delete_rate_limit(
         )
 
 
+def get_login_rate_limiter(request: Request) -> Any:
+    """
+    Strict brute-force limiter for /auth/login: 5 attempts per 5-minute (300s) window.
+    """
+    return _build_rate_limiter(
+        request,
+        settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
+        burst=0,
+        window_seconds=float(settings.LOGIN_RATE_LIMIT_WINDOW_SECONDS),
+    )
+
+
+async def check_login_rate_limit(
+    request: Request,
+    rate_limiter: Any = Depends(get_login_rate_limiter),
+) -> None:
+    ip = request.client.host if request.client else "unknown"
+    identifier = f"login:ip:{ip}"
+    if await rate_limiter.is_rate_limited(identifier):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please wait 5 minutes before trying again.",
+        )
+
+
 # --- Document Component Dependency Injection ---
 
 
@@ -307,30 +343,16 @@ def get_embedding_generator() -> EmbeddingGenerator:
 
     # Singleton: construct once per process (both API and background workers).
     if _embedding_generator_instance is None:
-        provider = (settings.EMBEDDING_PROVIDER or "jina").lower()
+        from app.documents.infrastructure.embedding_generator import (
+            JinaEmbeddingGenerator,
+        )
 
-        if provider == "jina":
-            from app.documents.infrastructure.embedding_generator import (
-                JinaEmbeddingGenerator,
-            )
-
-            logger.info("Using JinaEmbeddingGenerator for dense embeddings")
-            _embedding_generator_instance = JinaEmbeddingGenerator(
-                api_key=settings.get_jina_api_key(),
-                model=settings.effective_embedding_model,
-                dimension=settings.effective_embedding_dimension,
-            )
-        else:
-            from app.documents.infrastructure.embedding_generator import (
-                GeminiEmbeddingGenerator,
-            )
-
-            logger.info("Using GeminiEmbeddingGenerator with dedicated embedding key")
-            _embedding_generator_instance = GeminiEmbeddingGenerator(
-                api_key=settings.get_gemini_embedding_api_key(),
-                model=settings.effective_embedding_model,
-                dimension=settings.effective_embedding_dimension,
-            )
+        logger.info("Using JinaEmbeddingGenerator for dense embeddings")
+        _embedding_generator_instance = JinaEmbeddingGenerator(
+            api_key=settings.get_jina_api_key(),
+            model=settings.effective_embedding_model,
+            dimension=settings.effective_embedding_dimension,
+        )
 
     return _embedding_generator_instance
 

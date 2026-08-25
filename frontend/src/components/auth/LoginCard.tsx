@@ -59,10 +59,10 @@ export const LoginCard: React.FC<LoginCardProps> = ({
       {error && (
         <div
           role="alert"
-          className="mb-6 flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3.5 text-xs font-medium text-[var(--text-secondary)] animate-in slide-in-from-top duration-200"
+          className="mb-6 flex items-start gap-2.5 rounded-xl border border-[var(--accent-error)]/30 bg-[var(--accent-error)]/10 p-3.5 text-xs font-medium text-[var(--accent-error)] animate-in slide-in-from-top duration-200"
         >
-          <ShieldAlert size={16} className="flex-shrink-0 text-[var(--accent-error)]" />
-          <span>{error}</span>
+          <ShieldAlert size={16} className="flex-shrink-0 mt-0.5" />
+          <span className="leading-relaxed">{error}</span>
         </div>
       )}
 

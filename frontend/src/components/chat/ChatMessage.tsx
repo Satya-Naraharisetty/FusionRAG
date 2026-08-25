@@ -61,10 +61,10 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onRetry, on
           role="article"
           aria-label="User message"
         >
-          <div className="w-full max-w-[780px] flex justify-end px-6">
-            <div className="flex flex-col items-end gap-1.5 max-w-[72%]">
+          <div className="w-full max-w-[780px] flex justify-end px-3 sm:px-6">
+            <div className="flex flex-col items-end gap-1.5 max-w-[90%] sm:max-w-[75%]">
               {/* Bubble */}
-              <div className="px-4 py-3 rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] text-[15px] leading-relaxed select-text">
+              <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] text-[14px] sm:text-[15px] leading-relaxed select-text">
                 {message.content && (
                   <Suspense fallback={<MarkdownFallback />}>
                     <MarkdownRenderer content={message.content} />
@@ -74,7 +74,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onRetry, on
               {/* Timestamp */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="text-[11px] text-[var(--text-muted)] mr-1.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-default">
+                  <span className="text-[11px] text-[var(--text-muted)] mr-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-default">
                     {formattedTime}
                   </span>
                 </TooltipTrigger>
@@ -92,13 +92,13 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onRetry, on
     <TooltipProvider>
       <div
         ref={contentRef}
-        className="flex w-full py-[calc(var(--space-factor,1)*24px)] group bg-transparent justify-center transition-colors select-none"
+        className="flex w-full py-[calc(var(--space-factor,1)*16px)] sm:py-[calc(var(--space-factor,1)*24px)] group bg-transparent justify-center transition-colors select-none"
         role="article"
         aria-label="Assistant response"
         onMouseEnter={() => setShowActions(true)}
         onMouseLeave={() => setShowActions(false)}
       >
-        <div className="w-full max-w-[780px] flex gap-4 px-6 items-start">
+        <div className="w-full max-w-[780px] flex gap-2.5 sm:gap-4 px-3 sm:px-6 items-start">
           {/* Avatar */}
           <Avatar className="w-8 h-8 flex-shrink-0 bg-[var(--bg-tertiary)] border border-[var(--border-default)]">
             <AvatarFallback className="bg-transparent">
@@ -181,7 +181,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onRetry, on
             <div
               className={cn(
                 "flex items-center justify-between gap-2 mt-2 pt-1 border-t border-transparent transition-opacity duration-200",
-                showActions ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                showActions ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
               )}
             >
               {/* Left: timestamp + reactions */}

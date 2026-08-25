@@ -260,7 +260,7 @@ const SettingsPage: React.FC = () => {
 
   return (
     <div className="flex-1 overflow-y-auto bg-(--bg-primary) text-(--text-primary)">
-      <div className="max-w-3xl mx-auto px-4 py-[calc(var(--space-factor,1)*32px)] md:px-8">
+      <div className="max-w-3xl mx-auto px-4 py-6 pt-14 md:py-[calc(var(--space-factor,1)*32px)] md:px-8">
 
         {/* ── Page header ── */}
         <div className="mb-8">

@@ -206,7 +206,7 @@ const DocumentsPage: React.FC = () => {
 
   return (
     <div className="flex-1 overflow-y-auto bg-(--bg-primary) text-(--text-primary)">
-      <div className="max-w-4xl mx-auto px-4 py-8 md:px-8 space-y-6 relative pb-20">
+      <div className="max-w-4xl mx-auto px-4 py-6 pt-14 md:py-8 md:px-8 space-y-6 relative pb-20">
 
         {/* ── Page header ── */}
         <div className="flex items-start justify-between gap-4">

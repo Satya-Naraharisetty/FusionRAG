@@ -5,7 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 
-from app.api.dependencies import get_account_delete_rate_limiter
+from app.api.dependencies import (
+    get_account_delete_rate_limiter,
+    get_login_rate_limiter,
+)
 from app.core.config import settings
 from app.core.security.rate_limiter import RateLimiter
 from app.db.models import Base
@@ -492,3 +495,47 @@ async def test_refresh_concurrency_fails(client, test_db):
     status_codes = [r.status_code for r in results if not isinstance(r, Exception)]
     assert 200 in status_codes
     assert 401 in status_codes
+
+
+def test_login_rate_limiting_lockout(client, test_db):
+    """
+    Test that entering wrong credentials more than 5 times locks the user/IP
+    out with HTTP 429 and a 5-minute lockout window.
+    """
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "lockout@example.com", "password": "SecurePassword123!"},
+    )
+
+    shared_limiter = RateLimiter(
+        redis_client=None,
+        requests_per_minute=settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
+        burst=0,
+        window_seconds=float(settings.LOGIN_RATE_LIMIT_WINDOW_SECONDS),
+    )
+    client.app.dependency_overrides[get_login_rate_limiter] = lambda: shared_limiter
+
+    try:
+        # 5 attempts with wrong password
+        statuses = []
+        for _ in range(5):
+            res = client.post(
+                "/api/v1/auth/login",
+                json={"email": "lockout@example.com", "password": "WrongPassword1!"},
+            )
+            statuses.append(res.status_code)
+
+        # First 5 attempts return 401 Unauthorized
+        assert statuses == [status.HTTP_401_UNAUTHORIZED] * 5
+
+        # 6th attempt (exceeding 5 attempts) is blocked with HTTP 429 Too Many Requests
+        blocked_res = client.post(
+            "/api/v1/auth/login",
+            json={"email": "lockout@example.com", "password": "WrongPassword1!"},
+        )
+        assert blocked_res.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+        body = blocked_res.json()
+        error_msg = body.get("detail") or body.get("error", {}).get("message", "")
+        assert "5 minutes" in error_msg
+    finally:
+        client.app.dependency_overrides.pop(get_login_rate_limiter, None)

@@ -415,6 +415,9 @@ class Settings(BaseSettings):
     # Stricter per-user limit for the password-gated DELETE /auth/account so a
     # compromised access token cannot be used to brute-force the re-entry field.
     ACCOUNT_DELETE_RATE_LIMIT_PER_MINUTE: int = 10
+    # Strict brute-force guard for /auth/login: max 5 attempts per 5 minutes (300s window)
+    LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 5
+    LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 300  # 5 minutes (300 seconds)
 
     # Reliability settings
     CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5

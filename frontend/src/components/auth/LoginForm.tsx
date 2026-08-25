@@ -69,8 +69,20 @@ export const LoginForm: React.FC = () => {
       else            localStorage.removeItem("login-remember-email");
       toast.success("Welcome back!");
     } catch (err: unknown) {
-      const e = err as { data?: { message?: string } };
-      setError(e.data?.message || "Invalid email or password.");
+      const e = err as {
+        status?: number;
+        message?: string;
+        data?: { message?: string; detail?: string; error?: { message?: string } };
+      };
+      const errorMessage =
+        e.status === 429
+          ? (typeof e.data?.detail === "string" ? e.data.detail : "Too many login attempts. Please wait 5 minutes and try again.")
+          : e.data?.error?.message ||
+            (typeof e.data?.detail === "string" ? e.data.detail : undefined) ||
+            e.data?.message ||
+            e.message ||
+            "Invalid email or password.";
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

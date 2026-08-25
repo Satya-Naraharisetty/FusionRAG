@@ -16,7 +16,7 @@ export const ChatToolbar: React.FC<ChatToolbarProps> = ({
   const { collapsed, setCollapsed } = useSidebarState();
 
   return (
-    <header className="h-[52px] flex items-center justify-between px-5 bg-[var(--bg-primary)] flex-shrink-0 z-10">
+    <header className="h-[52px] flex items-center justify-between px-4 pl-12 md:pl-5 bg-[var(--bg-primary)] flex-shrink-0 z-10 border-b border-[var(--border-subtle)]/50 md:border-b-0">
       {/* Left */}
       <div className="flex items-center gap-2.5 min-w-0">
         {collapsed && (

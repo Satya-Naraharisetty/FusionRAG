@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse
 
 from app.api.dependencies import (
     check_account_delete_rate_limit,
+    check_login_rate_limit,
     check_rate_limit,
     get_auth_service,
     get_current_user_context,
@@ -47,7 +48,7 @@ async def register(
 @router.post(
     "/login",
     response_model=TokenResponseSchema,
-    dependencies=[Depends(check_rate_limit)],
+    dependencies=[Depends(check_login_rate_limit)],
 )
 async def login(
     response: Response,

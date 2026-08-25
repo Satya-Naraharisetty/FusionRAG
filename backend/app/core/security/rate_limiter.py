@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # always reachable. Sharing is per process: multi-worker deployments still
 # need Redis for cross-process enforcement. Growth is bounded — see
 # _MEMORY_PRUNE_INTERVAL and _MEMORY_MAX_IDENTIFIERS below.
-_MEMORY_STORES: dict[tuple[int, int], dict[str, list[float]]] = {}
+_MEMORY_STORES: dict[tuple[int, int, int], dict[str, list[float]]] = {}
 _MEMORY_STORE_LOCK = threading.Lock()
 
 # Bounds for the in-memory fallback stores. Without them, identifiers only
@@ -43,14 +43,14 @@ _MEMORY_PRUNE_INTERVAL = 60.0
 _MEMORY_MAX_IDENTIFIERS = 5000
 # Per-config deadline for the next sweep (time.time(), matching the sliding
 # window), so each store is swept at most once per _MEMORY_PRUNE_INTERVAL.
-_MEMORY_PRUNE_AT: dict[tuple[int, int], float] = {}
+_MEMORY_PRUNE_AT: dict[tuple[int, int, int], float] = {}
 
 # Redis-health circuit breaker. The Redis path in is_rate_limited() is a sync
 # call with no await, so when Redis is down every rate-limited request used to
 # stall for the full socket/DNS timeout (~4s on the dockerized stack) and
 # block the async event loop — and because dependencies.py builds a fresh
 # limiter per request, a 70-request burst spread over minutes can never fill
-# the 60s sliding window (entries keep expiring before the budget is reached).
+# the sliding window (entries keep expiring before the budget is reached).
 # After a failed Redis attempt we trip the breaker: for _REDIS_UNHEALTHY_TTL
 # seconds the limiter skips Redis entirely and uses the shared in-memory
 # fallback directly (microseconds instead of seconds), then the next request
@@ -72,13 +72,16 @@ class RateLimiter:
         redis_client: async_redis.Redis | None = None,
         requests_per_minute: int = 60,
         burst: int = 10,
+        window_seconds: float = 60.0,
     ) -> None:
         self._redis = redis_client
         self.requests_per_minute = requests_per_minute
         self.burst = burst
+        self.window_seconds = window_seconds
         # Share the fallback counters with every other limiter using the same
-        # (requests_per_minute, burst) config in this process.
-        self._memory_db = _MEMORY_STORES.setdefault((requests_per_minute, burst), {})
+        # (requests_per_minute, burst, window_seconds) config in this process.
+        config_key = (requests_per_minute, burst, int(window_seconds))
+        self._memory_db = _MEMORY_STORES.setdefault(config_key, {})
         self._lock = _MEMORY_STORE_LOCK
 
     def _sweep_stale_identifiers(self, now: float, window_start: float) -> None:
@@ -87,7 +90,7 @@ class RateLimiter:
         insert): at most once per _MEMORY_PRUNE_INTERVAL per store, drop every
         identifier whose newest timestamp has aged out of the sliding window.
         """
-        config_key = (self.requests_per_minute, self.burst)
+        config_key = (self.requests_per_minute, self.burst, int(self.window_seconds))
         if now < _MEMORY_PRUNE_AT.get(config_key, 0.0):
             return
         _MEMORY_PRUNE_AT[config_key] = now + _MEMORY_PRUNE_INTERVAL
@@ -134,7 +137,7 @@ class RateLimiter:
         if self._redis and time.monotonic() >= _redis_unhealthy_until:
             try:
                 now = time.time()
-                window_start = now - 60.0
+                window_start = now - self.window_seconds
                 key = f"rate:limit:{identifier}"
 
                 async with self._redis.pipeline() as pipe:
@@ -145,7 +148,7 @@ class RateLimiter:
                     # 3. Add current timestamp
                     pipe.zadd(key, {str(now): now})
                     # 4. Refresh key TTL
-                    pipe.expire(key, 60)
+                    pipe.expire(key, max(1, int(self.window_seconds)))
                     results = await pipe.execute()
 
                 _, count, _, _ = results
@@ -165,7 +168,7 @@ class RateLimiter:
 
         # Memory Fallback
         now = time.time()
-        window_start = now - 60.0
+        window_start = now - self.window_seconds
         with self._lock:
             if identifier not in self._memory_db:
                 # Sweep stale identifiers BEFORE inserting so the new entry can
@@ -174,7 +177,7 @@ class RateLimiter:
                 self._memory_db[identifier] = []
                 self._evict_over_cap()
 
-            # Evict timestamps older than 60s
+            # Evict timestamps older than window_seconds
             self._memory_db[identifier] = [
                 t for t in self._memory_db[identifier] if t > window_start
             ]

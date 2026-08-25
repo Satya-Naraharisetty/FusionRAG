@@ -286,7 +286,7 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 bg-[var(--bg-primary)] p-6 overflow-y-auto text-[var(--text-primary)]">
+    <div className="flex-1 bg-[var(--bg-primary)] p-4 pt-14 md:p-6 overflow-y-auto text-[var(--text-primary)]">
       {/* Header section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--border-default)] pb-5 mb-6">
         <div>
