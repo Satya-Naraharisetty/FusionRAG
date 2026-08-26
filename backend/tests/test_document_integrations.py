@@ -104,6 +104,17 @@ def _insert_conversation(db, user_id):
     return conversation_id
 
 
+def _make_dummy_docx_bytes() -> bytes:
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", b"<?xml version='1.0'?><Types></Types>")
+        zf.writestr("word/document.xml", b"<?xml version='1.0'?><document></document>")
+    return buf.getvalue()
+
+
 # --- Document Upload & Processing Pipeline Integration Tests ---
 
 
@@ -116,7 +127,7 @@ def test_upload_pdf_success(mock_pdf_extract, client, doc_test_db):
     token = get_user_token(client)
 
     # Upload PDF file
-    file_payload = {"file": ("test.pdf", b"dummy pdf bytes", "application/pdf")}
+    file_payload = {"file": ("test.pdf", b"%PDF-1.4 dummy pdf bytes", "application/pdf")}
     response = client.post(
         "/api/v1/documents/upload",
         files=file_payload,
@@ -157,7 +168,7 @@ def test_upload_docx_success(mock_docx_extract, client, doc_test_db):
     file_payload = {
         "file": (
             "test.docx",
-            b"dummy docx bytes",
+            _make_dummy_docx_bytes(),
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
     }
@@ -296,7 +307,7 @@ def test_duplicate_upload_same_user_rejected(mock_pdf_extract, client, doc_test_
     token = get_user_token(client)
 
     # Upload first time
-    file_payload = {"file": ("file1.pdf", b"pdf content", "application/pdf")}
+    file_payload = {"file": ("file1.pdf", b"%PDF-1.4 pdf content", "application/pdf")}
     client.post(
         "/api/v1/documents/upload",
         files=file_payload,
@@ -323,7 +334,7 @@ def test_duplicate_upload_different_users_allowed(
     token1 = get_user_token(client, email="user1@example.com")
     token2 = get_user_token(client, email="user2@example.com")
 
-    file_payload = {"file": ("file1.pdf", b"pdf content", "application/pdf")}
+    file_payload = {"file": ("file1.pdf", b"%PDF-1.4 pdf content", "application/pdf")}
 
     # User 1 uploads
     res1 = client.post(
@@ -355,7 +366,7 @@ def test_access_and_reprocess_unauthorized_rejected(
     token2 = get_user_token(client, email="user2@example.com")
 
     # User 1 uploads a file
-    file_payload = {"file": ("private.pdf", b"pdf content", "application/pdf")}
+    file_payload = {"file": ("private.pdf", b"%PDF-1.4 pdf content", "application/pdf")}
     res = client.post(
         "/api/v1/documents/upload",
         files=file_payload,
@@ -905,7 +916,7 @@ def test_replace_document_e2e_lifecycle(
     # 1. Initial Upload
     upload_res = client.post(
         "/api/v1/documents/upload",
-        files={"file": ("original.pdf", b"pdf content v1", "application/pdf")},
+        files={"file": ("original.pdf", b"%PDF-1.4 pdf content v1", "application/pdf")},
         headers=headers,
     )
     assert upload_res.status_code == status.HTTP_201_CREATED
@@ -933,7 +944,7 @@ def test_replace_document_e2e_lifecycle(
         files={
             "file": (
                 "updated.docx",
-                b"docx content v2 new bytes",
+                _make_dummy_docx_bytes(),
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             )
         },
@@ -970,7 +981,7 @@ def test_replace_document_e2e_lifecycle(
             doc_row[1]
             == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
-        assert doc_row[2] == len(b"docx content v2 new bytes")
+        assert doc_row[2] == len(_make_dummy_docx_bytes())
     finally:
         db.close()
 

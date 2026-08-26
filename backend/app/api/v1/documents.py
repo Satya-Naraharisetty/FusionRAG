@@ -3,7 +3,6 @@ from uuid import UUID
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     File,
     UploadFile,
@@ -14,10 +13,11 @@ from pydantic import BaseModel, ConfigDict
 from app.api.dependencies import (
     get_current_user_context,
     get_document_service,
+    get_durable_task_queue,
     get_embedding_service,
 )
+from app.core.queue.interfaces import DurableTaskQueue
 from app.documents.domain.models import DocumentScope, EmbeddingStatus
-from app.documents.infrastructure.tasks import FastAPIBackgroundTasksQueue
 from app.documents.services.document_service import DocumentService
 from app.documents.services.embedding_service import EmbeddingService
 
@@ -161,10 +161,9 @@ class EmbeddingStatusResponse(BaseModel):
 @router.post("/{id}/embeddings/regenerate", status_code=status.HTTP_202_ACCEPTED)
 async def regenerate_embeddings(
     id: UUID,
-    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user_context),
     document_service: DocumentService = Depends(get_document_service),
-    embedding_service: EmbeddingService = Depends(get_embedding_service),
+    task_queue: DurableTaskQueue = Depends(get_durable_task_queue),
 ):
     """
     Manually triggers complete regeneration of embeddings for a document.
@@ -172,8 +171,15 @@ async def regenerate_embeddings(
     user_id = UUID(current_user["user_id"])
     document = await document_service.get_document_by_id(id, user_id)
 
-    task_queue = FastAPIBackgroundTasksQueue(background_tasks)
-    task_queue.enqueue(embedding_service.generate_embeddings, document.id, force=True)
+    await task_queue.enqueue(
+        task_type="GENERATE_EMBEDDINGS",
+        payload={
+            "document_id": str(document.id),
+            "user_id": str(user_id),
+            "force": True,
+        },
+        max_attempts=3,
+    )
 
     return {"message": "Embedding regeneration task queued successfully."}
 

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import pathlib
 import re
@@ -5,6 +6,7 @@ from typing import Any
 from uuid import UUID
 
 from app.auth.domain.interfaces import TimeProvider, UnitOfWork, UUIDGenerator
+from app.core.queue.interfaces import DurableTaskQueue
 from app.documents.domain.exceptions import (
     DocumentCorrupted,
     DocumentNotFound,
@@ -25,6 +27,7 @@ from app.documents.domain.models import Document, DocumentScope, DocumentStatus
 from app.documents.infrastructure.extractors import ExtractorFactory
 from app.documents.services.document_processing_service import DocumentProcessingService
 from app.documents.services.embedding_service import EmbeddingService
+from app.documents.services.validator import MagicByteValidator
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +39,7 @@ class DocumentService:
         storage_provider: StorageProvider,
         extractor_factory: ExtractorFactory,
         checksum_generator: ChecksumGenerator,
-        task_queue: TaskQueue,
+        task_queue: TaskQueue | DurableTaskQueue | Any,
         document_processing_service: DocumentProcessingService,
         embedding_service: EmbeddingService,
         uow: UnitOfWork,
@@ -59,6 +62,29 @@ class DocumentService:
         self._max_upload_size = max_upload_size
         self._index_cache = index_cache
         self._malware_scanner = malware_scanner
+
+    async def _enqueue_processing_job(self, document: Document) -> None:
+        """
+        Triggers asynchronous document processing.
+        Uses durable queue when available, falling back to legacy task queue.
+        """
+        if isinstance(self._task_queue, DurableTaskQueue):
+            await self._task_queue.enqueue(
+                task_type="PROCESS_DOCUMENT",
+                payload={
+                    "document_id": str(document.id),
+                    "user_id": str(document.user_id),
+                    "scope": document.scope.value if hasattr(document.scope, "value") else str(document.scope),
+                    "checksum": document.checksum,
+                },
+                max_attempts=3,
+            )
+        elif hasattr(self._task_queue, "enqueue"):
+            res = self._task_queue.enqueue(
+                self._document_processing_service.process_document, document.id
+            )
+            if asyncio.iscoroutine(res):
+                await res
 
     async def upload_document(
         self,
@@ -102,6 +128,9 @@ class DocumentService:
             raise
         except Exception as e:
             raise UnsupportedDocumentType(f"Validation failed: {e}") from e
+
+        # 4a. Validate binary magic bytes and file signature
+        MagicByteValidator.validate(file_bytes, safe_original_name, content_type)
 
         # 4b. Scan for malware if scanner is present
         if self._malware_scanner:
@@ -175,9 +204,7 @@ class DocumentService:
             raise
 
         # 8. Trigger asynchronous processing task
-        self._task_queue.enqueue(
-            self._document_processing_service.process_document, saved_doc.id
-        )
+        await self._enqueue_processing_job(saved_doc)
 
         return saved_doc
 
@@ -303,9 +330,7 @@ class DocumentService:
             raise
 
         # Enqueue processing task
-        self._task_queue.enqueue(
-            self._document_processing_service.process_document, saved_doc.id
-        )
+        await self._enqueue_processing_job(saved_doc)
 
         return saved_doc
 
@@ -341,6 +366,9 @@ class DocumentService:
             raise
         except Exception as e:
             raise UnsupportedDocumentType(f"Validation failed: {e}") from e
+
+        # 4a. Validate binary magic bytes and file signature
+        MagicByteValidator.validate(file_bytes, safe_original_name, content_type)
 
         # 4b. Scan for malware if scanner is present
         if self._malware_scanner:
@@ -445,9 +473,7 @@ class DocumentService:
                 )
 
         # 10. Trigger asynchronous processing task
-        self._task_queue.enqueue(
-            self._document_processing_service.process_document, saved_doc.id
-        )
+        await self._enqueue_processing_job(saved_doc)
 
         return saved_doc
 

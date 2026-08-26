@@ -378,6 +378,96 @@ async def lifespan(app: FastAPI):
                     "Application startup will proceed with graceful fallback to MMR order."
                 )
 
+        # Initialize DurableTaskQueue, JobDispatcher, and registered handlers
+        from app.api.dependencies import (
+            get_embedding_generator,
+            get_extractor_factory,
+            get_index_cache,
+            get_llm_provider,
+            get_storage_provider,
+            get_vector_store,
+        )
+        from app.core.queue import (
+            GenerateEmbeddingsJobHandler,
+            InMemoryDurableTaskQueue,
+            JobDispatcher,
+            ProcessDocumentJobHandler,
+            QueueWorker,
+            RedisStreamTaskQueue,
+            SummarizeConversationJobHandler,
+        )
+
+        dispatcher = JobDispatcher()
+        storage_provider = (
+            get_storage_provider(db=None)
+            if settings.STORAGE_PROVIDER.lower() != "database"
+            else None
+        )
+        extractor_factory = get_extractor_factory()
+        index_cache = get_index_cache()
+
+        if settings.is_testing or settings.QUEUE_TYPE == "in_memory":
+            durable_queue: Any = InMemoryDurableTaskQueue(
+                dispatcher=dispatcher, auto_dispatch=True
+            )
+        else:
+            durable_queue = RedisStreamTaskQueue(
+                redis_client=app.state.redis,
+                stream_name=settings.QUEUE_STREAM_NAME,
+                consumer_group=settings.QUEUE_CONSUMER_GROUP,
+            )
+
+        dispatcher.register(
+            "PROCESS_DOCUMENT",
+            ProcessDocumentJobHandler(
+                db_session_factory=lambda: app.state.db_session_factory,
+                storage_provider=storage_provider,
+                extractor_factory=extractor_factory,
+                task_queue=durable_queue,
+                index_cache=index_cache,
+            ),
+        )
+        dispatcher.register(
+            "GENERATE_EMBEDDINGS",
+            GenerateEmbeddingsJobHandler(
+                db_session_factory=lambda: app.state.db_session_factory,
+                embedding_generator=get_embedding_generator,
+                vector_store=get_vector_store,
+                batch_size=settings.EMBEDDING_BATCH_SIZE,
+                provider_name=settings.EMBEDDING_PROVIDER,
+                model_name=settings.effective_embedding_model,
+                dimension=settings.effective_embedding_dimension,
+                embedding_version=settings.EMBEDDING_VERSION,
+            ),
+        )
+        dispatcher.register(
+            "SUMMARIZE_CONVERSATION",
+            SummarizeConversationJobHandler(
+                db_session_factory=lambda: app.state.db_session_factory,
+                llm_provider=get_llm_provider,
+                model=settings.GEMINI_CHAT_MODEL,
+                summary_trigger_messages=settings.SUMMARY_TRIGGER_MESSAGES,
+                max_messages_per_context=settings.MAX_MESSAGES_PER_CONTEXT,
+                summary_max_tokens=settings.SUMMARY_MAX_TOKENS,
+            ),
+        )
+
+        app.state.durable_task_queue = durable_queue
+        app.state.job_dispatcher = dispatcher
+
+        if not settings.is_testing and isinstance(durable_queue, RedisStreamTaskQueue):
+            worker = QueueWorker(
+                task_queue=durable_queue,
+                dispatcher=dispatcher,
+                concurrency=settings.QUEUE_WORKER_CONCURRENCY,
+                block_ms=settings.QUEUE_WORKER_BLOCK_MS,
+                visibility_timeout_s=settings.QUEUE_VISIBILITY_TIMEOUT_SECONDS,
+                retry_base_delay=settings.QUEUE_BASE_BACKOFF_SECONDS,
+                retry_max_delay=settings.QUEUE_MAX_BACKOFF_SECONDS,
+            )
+            await worker.start()
+            app.state.queue_worker = worker
+
         logger.info(
             "Application lifespan initialization completed. Web service online."
         )
@@ -394,6 +484,11 @@ async def lifespan(app: FastAPI):
     logger.info("Initiating shutdown cleanup...")
     try:
         app.state.is_draining = True
+        # Gracefully stop QueueWorker if running
+        if hasattr(app.state, "queue_worker"):
+            await app.state.queue_worker.stop(timeout_seconds=5.0)
+            logger.info("QueueWorker gracefully stopped.")
+
         # Wait up to 10 seconds to drain active requests
         for _ in range(10):
             active = app.state.active_requests_count

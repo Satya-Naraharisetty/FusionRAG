@@ -110,6 +110,7 @@ class DocumentProcessingService:
                 self._chunking_service.chunk_document,
                 cleaned_text,
                 document.id,
+                document.checksum,
             )
 
             # 3. Batch commit results (idempotent: delete previous chunks first)

@@ -1,9 +1,11 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     JSON,
     DateTime,
+    FetchedValue,
     ForeignKey,
     Integer,
     LargeBinary,
@@ -12,6 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -82,6 +85,11 @@ class SQLAlchemyChunk(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    search_vector: Mapped[Any] = mapped_column(
+        TSVECTOR().with_variant(Text(), "sqlite"),
+        server_default=FetchedValue(),
+        nullable=True,
     )
 
     # Relationships

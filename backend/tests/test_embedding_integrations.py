@@ -99,7 +99,7 @@ def test_full_pipeline_ingestion_generates_embeddings(
 
     token = get_user_token(client)
 
-    file_payload = {"file": ("test_emb.pdf", b"dummy pdf bytes", "application/pdf")}
+    file_payload = {"file": ("test_emb.pdf", b"%PDF-1.4 dummy pdf bytes", "application/pdf")}
     response = client.post(
         "/api/v1/documents/upload",
         files=file_payload,
@@ -143,7 +143,7 @@ def test_embeddings_regenerate(mock_pdf_extract, client, emb_test_db):
 
     token = get_user_token(client)
 
-    file_payload = {"file": ("test_regen.pdf", b"dummy pdf bytes", "application/pdf")}
+    file_payload = {"file": ("test_regen.pdf", b"%PDF-1.4 dummy pdf bytes", "application/pdf")}
     response = client.post(
         "/api/v1/documents/upload",
         files=file_payload,
@@ -182,7 +182,7 @@ def test_embeddings_delete(mock_pdf_extract, client, emb_test_db):
     )
 
     token = get_user_token(client)
-    file_payload = {"file": ("test_del.pdf", b"dummy pdf bytes", "application/pdf")}
+    file_payload = {"file": ("test_del.pdf", b"%PDF-1.4 dummy pdf bytes", "application/pdf")}
     response = client.post(
         "/api/v1/documents/upload",
         files=file_payload,
@@ -232,7 +232,7 @@ def test_document_deletion_cascade_clears_vectors_and_metadata(
     token = get_user_token(client)
     response = client.post(
         "/api/v1/documents/upload",
-        files={"file": ("test_cascade.pdf", b"dummy pdf bytes", "application/pdf")},
+        files={"file": ("test_cascade.pdf", b"%PDF-1.4 dummy pdf bytes", "application/pdf")},
         headers={"Authorization": f"Bearer {token}"},
     )
     doc_id = response.json()["id"]

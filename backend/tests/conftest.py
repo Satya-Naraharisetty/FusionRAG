@@ -97,6 +97,7 @@ def _reset_process_global_state():
     import app.api.dependencies as dependencies_module
 
     dependencies_module._index_cache_instance = None
+    dependencies_module._in_memory_task_queue_instance = None
     yield
     app.main.app.dependency_overrides.clear()
 

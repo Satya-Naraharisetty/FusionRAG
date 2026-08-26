@@ -23,6 +23,7 @@ from app.auth.infrastructure.providers import (
 from app.auth.services.auth_service import AuthService
 from app.auth.services.oauth_service import OAuthService
 from app.core.config import settings
+from app.core.queue.interfaces import DurableTaskQueue
 from app.db.session import get_db
 from app.documents.domain.events import DocumentProcessingCompleted
 from app.documents.domain.interfaces import (
@@ -31,6 +32,7 @@ from app.documents.domain.interfaces import (
     EmbeddingRepository,
     IndexCache,
     SearchRanker,
+    SparseIndex,
     VectorStore,
 )
 from app.documents.infrastructure.checksum import SHA256ChecksumGenerator
@@ -44,9 +46,6 @@ from app.documents.infrastructure.persistence.repositories.document_repository i
 )
 from app.documents.infrastructure.persistence.repositories.embedding_repository import (
     SQLAlchemyEmbeddingRepository,
-)
-from app.documents.infrastructure.tasks import (
-    FastAPIBackgroundTasksQueue,
 )
 from app.documents.services.chunking import ChunkingService
 from app.documents.services.document_processing_service import DocumentProcessingService
@@ -337,7 +336,18 @@ def get_chunking_service() -> ChunkingService:
 _embedding_generator_instance: EmbeddingGenerator | None = None
 
 
-def get_embedding_generator() -> EmbeddingGenerator:
+def get_embedding_generator(request: Request = None) -> EmbeddingGenerator:  # type: ignore[assignment]
+    import sys
+
+    main_mod = sys.modules.get("app.main")
+    if (
+        main_mod
+        and hasattr(main_mod, "app")
+        and hasattr(main_mod.app, "dependency_overrides")
+        and get_embedding_generator in main_mod.app.dependency_overrides
+    ):
+        return main_mod.app.dependency_overrides[get_embedding_generator]()
+
     global _embedding_generator_instance
 
     from app.core.config import settings
@@ -359,6 +369,17 @@ def get_embedding_generator() -> EmbeddingGenerator:
 
 
 def get_vector_store(request: Request = None) -> VectorStore:  # type: ignore[assignment]  # FastAPI injects Request
+    import sys
+
+    main_mod = sys.modules.get("app.main")
+    if (
+        main_mod
+        and hasattr(main_mod, "app")
+        and hasattr(main_mod.app, "dependency_overrides")
+        and get_vector_store in main_mod.app.dependency_overrides
+    ):
+        return main_mod.app.dependency_overrides[get_vector_store]()
+
     from app.documents.infrastructure.persistence.vector_store import QdrantVectorStore
 
     if (
@@ -430,6 +451,8 @@ def get_document_processing_service(
 
     task_queue: Any
     if request and hasattr(request, "background_tasks"):
+        from app.documents.infrastructure.tasks import FastAPIBackgroundTasksQueue
+
         task_queue = FastAPIBackgroundTasksQueue(request.background_tasks)
     else:
         from app.documents.infrastructure.tasks import SyncTaskQueue
@@ -483,30 +506,66 @@ def get_index_cache():
     return _index_cache_instance
 
 
+_in_memory_task_queue_instance: Any = None
+
+
+def get_durable_task_queue(
+    request: Request = None,  # type: ignore[assignment]
+) -> DurableTaskQueue:
+    """
+    Returns the configured DurableTaskQueue instance.
+    In testing or when QUEUE_TYPE is in_memory, returns InMemoryDurableTaskQueue.
+    In production/dev, returns RedisStreamTaskQueue.
+    """
+    global _in_memory_task_queue_instance
+    if settings.is_testing or settings.QUEUE_TYPE == "in_memory":
+        if _in_memory_task_queue_instance is None:
+            from app.core.queue.in_memory import InMemoryDurableTaskQueue
+
+            dispatcher = (
+                getattr(request.app.state, "job_dispatcher", None)
+                if request and hasattr(request, "app") and hasattr(request.app, "state")
+                else None
+            )
+            _in_memory_task_queue_instance = InMemoryDurableTaskQueue(
+                dispatcher=dispatcher,
+                auto_dispatch=True,
+            )
+        return _in_memory_task_queue_instance
+
+    if request and hasattr(request.app.state, "durable_task_queue"):
+        return request.app.state.durable_task_queue
+
+    from app.core.queue.redis_queue import RedisStreamTaskQueue
+
+    redis_client = getattr(request.app.state, "redis", None) if request else None
+    if redis_client is None:
+        from app.db.session import init_redis_client
+
+        redis_client = init_redis_client(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            password=settings.REDIS_PASSWORD,
+            ssl=settings.REDIS_SSL,
+            url=settings.REDIS_URL,
+        )
+    return RedisStreamTaskQueue(
+        redis_client=redis_client,
+        stream_name=settings.QUEUE_STREAM_NAME,
+        consumer_group=settings.QUEUE_CONSUMER_GROUP,
+    )
+
+
 def get_document_service(
-    background_tasks: BackgroundTasks,
-    request: Request,
+    request: Request = None,  # type: ignore[assignment]
     db: AsyncSession = Depends(get_db),
     processing_service: DocumentProcessingService = Depends(
         get_document_processing_service
     ),
     embedding_service: EmbeddingService = Depends(get_embedding_service),
     index_cache: IndexCache = Depends(get_index_cache),
+    task_queue: DurableTaskQueue = Depends(get_durable_task_queue),
 ) -> DocumentService:
-    task_queue = FastAPIBackgroundTasksQueue(background_tasks)
-    # Re-wire the request task queue into the dynamically resolved processing service
-    if hasattr(processing_service, "_event_dispatcher"):
-
-        def handle_document_completed(event: DocumentProcessingCompleted) -> None:
-            task_queue.enqueue(embedding_service.generate_embeddings, event.document_id)
-
-        # Clear and re-register to use the correct request background tasks queue
-        event_dispatcher = processing_service._event_dispatcher
-        if event_dispatcher is not None:
-            event_dispatcher._handlers[  # type: ignore[attr-defined]
-                DocumentProcessingCompleted
-            ] = [handle_document_completed]
-
     return DocumentService(
         document_repo=SQLAlchemyDocumentRepository(db),
         storage_provider=get_storage_provider(db),
@@ -594,6 +653,7 @@ def get_retrieval_service(
     generator: EmbeddingGenerator = Depends(get_embedding_generator),
     vector_store: VectorStore = Depends(get_vector_store),
     chunk_repo: ChunkRepository = Depends(get_chunk_repository),
+    db: AsyncSession = Depends(get_db),
     index_cache=Depends(get_index_cache),
     reranker=Depends(get_reranker),
 ) -> Any:
@@ -621,10 +681,18 @@ def get_retrieval_service(
         search_timeout=settings.SEARCH_TIMEOUT,
     )
 
-    sparse_index = InMemoryBM25Index(
-        chunk_repo=chunk_repo,
-        index_cache=index_cache,
-    )
+    sparse_index: SparseIndex
+    if settings.SPARSE_RETRIEVER_TYPE == "postgres_fts":
+        from app.documents.services.postgres_sparse_retriever import (
+            PostgresSparseRetriever,
+        )
+
+        sparse_index = PostgresSparseRetriever(db=db, chunk_repo=chunk_repo)
+    else:
+        sparse_index = InMemoryBM25Index(
+            chunk_repo=chunk_repo,
+            index_cache=index_cache,
+        )
     sparse_retriever = BM25Retriever(sparse_index=sparse_index)
 
     fusion_engine = ReciprocalRankFusionEngine(rrf_k=settings.RRF_K)
@@ -666,7 +734,18 @@ def get_retrieval_service(
     )
 
 
-def get_llm_provider():
+def get_llm_provider(request: Request = None):  # type: ignore[assignment]
+    import sys
+
+    main_mod = sys.modules.get("app.main")
+    if (
+        main_mod
+        and hasattr(main_mod, "app")
+        and hasattr(main_mod.app, "dependency_overrides")
+        and get_llm_provider in main_mod.app.dependency_overrides
+    ):
+        return main_mod.app.dependency_overrides[get_llm_provider]()
+
     from app.chat.infrastructure.gemini_provider import GeminiProvider
 
     return GeminiProvider(api_key=settings.get_gemini_llm_api_key())
@@ -946,51 +1025,36 @@ def get_event_dispatcher(
 ) -> Any:
     global _dispatcher_instance
     if _dispatcher_instance is None:
+        import asyncio
+
         from app.chat.domain.events import ConversationMessageCreated
         from app.documents.infrastructure.event_dispatcher import SimpleEventDispatcher
-        from app.documents.infrastructure.tasks import FastAPIBackgroundTasksQueue
 
         _dispatcher_instance = SimpleEventDispatcher()
 
         def handle_message_added(event: ConversationMessageCreated) -> None:
-            # Resolve task queue
-            task_queue: Any
-            if (
-                not settings.is_testing
-                and request
-                and hasattr(request, "background_tasks")
-            ):
-                task_queue = FastAPIBackgroundTasksQueue(request.background_tasks)
-            else:
-                from app.documents.infrastructure.tasks import SyncTaskQueue
+            durable_queue = get_durable_task_queue(request)
 
-                task_queue = SyncTaskQueue()
+            async def _enqueue_summary() -> None:
+                try:
+                    await durable_queue.enqueue(
+                        task_type="SUMMARIZE_CONVERSATION",
+                        payload={
+                            "conversation_id": str(event.conversation_id),
+                            "message_id": str(event.message_id),
+                        },
+                        max_attempts=3,
+                    )
+                except Exception as ex:
+                    logger.error(
+                        f"Failed to enqueue SUMMARIZE_CONVERSATION: {ex}"
+                    )
 
-            session_factory = (
-                getattr(request.app.state, "db_session_factory", None)
-                if request
-                else None
-            )
-            if not session_factory:
-                from sqlalchemy.ext.asyncio import async_sessionmaker
-
-                from app.db.session import init_postgres_engine
-
-                database_url = settings.DATABASE_URL or ""
-                engine = init_postgres_engine(database_url)
-                session_factory = async_sessionmaker(
-                    bind=engine,
-                    class_=AsyncSession,
-                    expire_on_commit=False,
-                )
-
-            task_queue.enqueue(
-                run_background_summarization,
-                event.conversation_id,
-                event.message_id,
-                session_factory,
-                llm_provider,
-            )
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(_enqueue_summary())
+            except RuntimeError:
+                asyncio.run(_enqueue_summary())
 
         _dispatcher_instance.register(ConversationMessageCreated, handle_message_added)
 

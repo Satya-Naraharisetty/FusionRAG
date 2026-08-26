@@ -18,10 +18,13 @@ class ChunkingService:
         self.strategy = strategy
         self.separators = ["\n\n", "\n", " ", ""]
 
-    def chunk_document(self, text: str, document_id: uuid.UUID) -> ChunkResult:
+    def chunk_document(
+        self, text: str, document_id: uuid.UUID, checksum: str | None = None
+    ) -> ChunkResult:
         """
         Splits a cleaned document text into logical chunks.
         Applies a recursive character splitting algorithm with standard separators.
+        Generates deterministic, version-aware chunk UUIDs if checksum is provided.
         """
         if not text.strip():
             return ChunkResult(chunks=[])
@@ -87,12 +90,19 @@ class ChunkingService:
 
             # Heuristic: approx_tokens = characters / 4
             token_est = max(1, len(chunk_text) // 4)
+            chunk_idx = len(filtered_chunks)
+
+            # Deterministic, version-aware chunk UUID
+            if checksum:
+                chunk_uuid = uuid.uuid5(document_id, f"{checksum}:{chunk_idx}")
+            else:
+                chunk_uuid = uuid.uuid5(document_id, f"chunk_{chunk_idx}")
 
             filtered_chunks.append(
                 Chunk(
-                    id=uuid.uuid4(),
+                    id=chunk_uuid,
                     document_id=document_id,
-                    chunk_index=len(filtered_chunks),
+                    chunk_index=chunk_idx,
                     text=chunk_text,
                     character_start=start,
                     character_end=end,
