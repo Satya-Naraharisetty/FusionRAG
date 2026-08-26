@@ -6,10 +6,10 @@ from fastapi.responses import RedirectResponse
 
 from app.api.dependencies import (
     check_account_delete_rate_limit,
-    check_login_rate_limit,
     check_rate_limit,
     get_auth_service,
     get_current_user_context,
+    get_login_failed_attempts_tracker,
     get_oauth_service,
 )
 from app.auth.domain.schemas import (
@@ -48,22 +48,41 @@ async def register(
 @router.post(
     "/login",
     response_model=TokenResponseSchema,
-    dependencies=[Depends(check_login_rate_limit)],
+    dependencies=[Depends(check_rate_limit)],
 )
 async def login(
     response: Response,
     request: Request,
     payload: UserLoginSchema,
     auth_service: AuthService = Depends(get_auth_service),
+    failed_tracker: Any = Depends(get_login_failed_attempts_tracker),
 ):
     """
     Authenticate user credentials and configure secure HTTP-only refresh cookies.
+    Enforces a 5-attempt brute-force lockout on consecutive failed login attempts.
     """
     user_agent = request.headers.get("User-Agent")
     ip_address = request.client.host if request.client else None
 
-    # Authenticate credentials
-    user = await auth_service.authenticate_user(payload.email, payload.password)
+    # Check brute-force lockout for failed credentials
+    ip = ip_address or "unknown"
+    email_norm = payload.email.strip().lower()
+    lockout_key = f"ip:{ip}:email:{email_norm}"
+
+    if await failed_tracker.is_locked_out(lockout_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please wait 5 minutes before trying again.",
+        )
+
+    # Authenticate credentials (recording failed attempts on failure, clearing on success)
+    try:
+        user = await auth_service.authenticate_user(payload.email, payload.password)
+    except Exception:
+        await failed_tracker.record_failed_attempt(lockout_key)
+        raise
+
+    await failed_tracker.reset(lockout_key)
 
     # Establish session
     access_token, refresh_token = await auth_service.create_session(

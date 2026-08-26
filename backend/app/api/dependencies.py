@@ -262,29 +262,30 @@ async def check_account_delete_rate_limit(
         )
 
 
-def get_login_rate_limiter(request: Request) -> Any:
+def get_login_failed_attempts_tracker(request: Request) -> Any:
     """
-    Strict brute-force limiter for /auth/login: 5 attempts per 5-minute (300s) window.
+    Tracker for consecutive failed login attempts (5 wrong attempts -> 5-minute lockout).
     """
-    return _build_rate_limiter(
-        request,
-        settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
-        burst=0,
+    from app.core.security.rate_limiter import LoginAttemptTracker
+    from app.db.session import get_redis
+
+    if not settings.ENABLE_RATE_LIMITER:
+        return LoginAttemptTracker(
+            redis_client=None,
+            max_attempts=999999,
+            window_seconds=float(settings.LOGIN_RATE_LIMIT_WINDOW_SECONDS),
+        )
+
+    try:
+        redis_client = get_redis(request)
+    except Exception:
+        redis_client = None
+
+    return LoginAttemptTracker(
+        redis_client=redis_client,
+        max_attempts=settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
         window_seconds=float(settings.LOGIN_RATE_LIMIT_WINDOW_SECONDS),
     )
-
-
-async def check_login_rate_limit(
-    request: Request,
-    rate_limiter: Any = Depends(get_login_rate_limiter),
-) -> None:
-    ip = request.client.host if request.client else "unknown"
-    identifier = f"login:ip:{ip}"
-    if await rate_limiter.is_rate_limited(identifier):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many login attempts. Please wait 5 minutes before trying again.",
-        )
 
 
 # --- Document Component Dependency Injection ---

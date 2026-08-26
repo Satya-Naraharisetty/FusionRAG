@@ -189,3 +189,122 @@ class RateLimiter:
 
             self._memory_db[identifier].append(now)
             return False
+
+
+_FAILED_LOGIN_STORES: dict[tuple[int, int], dict[str, list[float]]] = {}
+_FAILED_LOGIN_PRUNE_AT: dict[tuple[int, int], float] = {}
+
+
+class LoginAttemptTracker:
+    """
+    Tracks consecutive failed login attempts per account/IP.
+    Allows up to max_attempts failures before locking out for window_seconds (default: 5 attempts per 5 minutes = 300s).
+    """
+
+    def __init__(
+        self,
+        redis_client: async_redis.Redis | None = None,
+        max_attempts: int = 5,
+        window_seconds: float = 300.0,
+    ) -> None:
+        self._redis = redis_client
+        self.max_attempts = max_attempts
+        self.window_seconds = window_seconds
+        config_key = (max_attempts, int(window_seconds))
+        self._memory_db = _FAILED_LOGIN_STORES.setdefault(config_key, {})
+        self._lock = _MEMORY_STORE_LOCK
+
+    def _sweep_stale_identifiers(self, now: float, window_start: float) -> None:
+        config_key = (self.max_attempts, int(self.window_seconds))
+        if now < _FAILED_LOGIN_PRUNE_AT.get(config_key, 0.0):
+            return
+        _FAILED_LOGIN_PRUNE_AT[config_key] = now + _MEMORY_PRUNE_INTERVAL
+        stale = [
+            ident
+            for ident, stamps in self._memory_db.items()
+            if not stamps or stamps[-1] <= window_start
+        ]
+        for ident in stale:
+            del self._memory_db[ident]
+
+    def _evict_over_cap(self) -> None:
+        while len(self._memory_db) > _MEMORY_MAX_IDENTIFIERS:
+            oldest = min(
+                self._memory_db,
+                key=lambda ident: (
+                    self._memory_db[ident][-1]
+                    if self._memory_db[ident]
+                    else float("inf")
+                ),
+            )
+            del self._memory_db[oldest]
+
+    async def is_locked_out(self, identifier: str) -> bool:
+        """Return True if identifier has exceeded allowed failed attempts within window."""
+        if self._redis and time.monotonic() >= _redis_unhealthy_until:
+            try:
+                now = time.time()
+                window_start = now - self.window_seconds
+                key = f"failed_login:{identifier}"
+                async with self._redis.pipeline() as pipe:
+                    pipe.zremrangebyscore(key, 0, window_start)
+                    pipe.zcard(key)
+                    results = await pipe.execute()
+                _, count = results
+                return count >= self.max_attempts
+            except Exception as e:
+                _trip_redis_breaker()
+                logger.error(
+                    f"Redis failed login check failed, using memory fallback: {e}"
+                )
+
+        now = time.time()
+        window_start = now - self.window_seconds
+        with self._lock:
+            if identifier not in self._memory_db:
+                return False
+            self._memory_db[identifier] = [
+                t for t in self._memory_db[identifier] if t > window_start
+            ]
+            return len(self._memory_db[identifier]) >= self.max_attempts
+
+    async def record_failed_attempt(self, identifier: str) -> None:
+        """Record a failed login attempt."""
+        if self._redis and time.monotonic() >= _redis_unhealthy_until:
+            try:
+                now = time.time()
+                key = f"failed_login:{identifier}"
+                async with self._redis.pipeline() as pipe:
+                    pipe.zadd(key, {str(now): now})
+                    pipe.expire(key, max(1, int(self.window_seconds)))
+                    await pipe.execute()
+                return
+            except Exception as e:
+                _trip_redis_breaker()
+                logger.error(
+                    f"Redis record failed login failed, using memory fallback: {e}"
+                )
+
+        now = time.time()
+        window_start = now - self.window_seconds
+        with self._lock:
+            if identifier not in self._memory_db:
+                self._sweep_stale_identifiers(now, window_start)
+                self._memory_db[identifier] = []
+                self._evict_over_cap()
+            self._memory_db[identifier] = [
+                t for t in self._memory_db[identifier] if t > window_start
+            ]
+            self._memory_db[identifier].append(now)
+
+    async def reset(self, identifier: str) -> None:
+        """Reset failed attempt counters upon successful authentication."""
+        if self._redis and time.monotonic() >= _redis_unhealthy_until:
+            try:
+                key = f"failed_login:{identifier}"
+                await self._redis.delete(key)
+            except Exception:
+                pass
+
+        with self._lock:
+            self._memory_db.pop(identifier, None)

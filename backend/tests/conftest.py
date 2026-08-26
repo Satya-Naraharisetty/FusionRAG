@@ -90,6 +90,8 @@ def _reset_process_global_state():
 
     rate_limiter_module._MEMORY_STORES.clear()
     rate_limiter_module._MEMORY_PRUNE_AT.clear()
+    rate_limiter_module._FAILED_LOGIN_STORES.clear()
+    rate_limiter_module._FAILED_LOGIN_PRUNE_AT.clear()
     rate_limiter_module._redis_unhealthy_until = 0.0
 
     import app.api.dependencies as dependencies_module

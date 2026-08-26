@@ -7,10 +7,10 @@ from sqlalchemy.pool import NullPool
 
 from app.api.dependencies import (
     get_account_delete_rate_limiter,
-    get_login_rate_limiter,
+    get_login_failed_attempts_tracker,
 )
 from app.core.config import settings
-from app.core.security.rate_limiter import RateLimiter
+from app.core.security.rate_limiter import LoginAttemptTracker, RateLimiter
 from app.db.models import Base
 from tests.db import TEST_DATABASE_URL
 
@@ -507,13 +507,14 @@ def test_login_rate_limiting_lockout(client, test_db):
         json={"email": "lockout@example.com", "password": "SecurePassword123!"},
     )
 
-    shared_limiter = RateLimiter(
+    shared_limiter = LoginAttemptTracker(
         redis_client=None,
-        requests_per_minute=settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
-        burst=0,
+        max_attempts=settings.LOGIN_RATE_LIMIT_MAX_ATTEMPTS,
         window_seconds=float(settings.LOGIN_RATE_LIMIT_WINDOW_SECONDS),
     )
-    client.app.dependency_overrides[get_login_rate_limiter] = lambda: shared_limiter
+    client.app.dependency_overrides[get_login_failed_attempts_tracker] = lambda: (
+        shared_limiter
+    )
 
     try:
         # 5 attempts with wrong password
@@ -538,4 +539,4 @@ def test_login_rate_limiting_lockout(client, test_db):
         error_msg = body.get("detail") or body.get("error", {}).get("message", "")
         assert "5 minutes" in error_msg
     finally:
-        client.app.dependency_overrides.pop(get_login_rate_limiter, None)
+        client.app.dependency_overrides.pop(get_login_failed_attempts_tracker, None)
