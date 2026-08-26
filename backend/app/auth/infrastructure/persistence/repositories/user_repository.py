@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.domain.interfaces import UserRepository
@@ -95,10 +95,7 @@ class SQLAlchemyUserRepository(UserRepository):
         The database ON DELETE CASCADE constraints remove the user's sessions,
         conversations, and documents.
         """
-        result = await self._db.execute(
-            select(SQLAlchemyUser).where(SQLAlchemyUser.id == user_id)
+        await self._db.execute(
+            delete(SQLAlchemyUser).where(SQLAlchemyUser.id == user_id)
         )
-        db_user = result.scalar_one_or_none()
-        if db_user:
-            await self._db.delete(db_user)
-            await self._db.flush()
+        await self._db.flush()
