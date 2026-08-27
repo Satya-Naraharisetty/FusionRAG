@@ -69,6 +69,7 @@ norecursedirs = [".venv", ".git"]
 filterwarnings = [
     "ignore::starlette.exceptions.StarletteDeprecationWarning",
     "ignore:.*starlette.testclient.*:DeprecationWarning",
+    "ignore:.*Using `httpx` with `starlette.testclient`.*:DeprecationWarning",
 ]
 
 [tool.setuptools]
