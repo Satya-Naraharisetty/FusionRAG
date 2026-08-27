@@ -162,9 +162,15 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
 
   let response = await doFetch(getAccessToken());
 
-  // Single 401 retry: refresh the token once, then replay. Requests arriving
-  // while a refresh is in flight wait for its token instead of refreshing again.
-  if (response.status === 401 && !path.includes("/auth/refresh")) {
+  // Single 401 retry: refresh the token once, then replay.
+  // Never attempt to refresh on auth endpoints (login, register, refresh, oauth) where 401 is an expected credential error.
+  const isAuthEndpoint =
+    path.includes("/auth/login") ||
+    path.includes("/auth/register") ||
+    path.includes("/auth/refresh") ||
+    path.includes("/auth/oauth");
+
+  if (response.status === 401 && !isAuthEndpoint) {
     if (isRefreshing) {
       const token = await new Promise<string>((resolve, reject) => {
         failedQueue.push({ resolve, reject });

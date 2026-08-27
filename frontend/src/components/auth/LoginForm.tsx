@@ -83,6 +83,7 @@ export const LoginForm: React.FC = () => {
             e.message ||
             "Invalid email or password.";
       setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
