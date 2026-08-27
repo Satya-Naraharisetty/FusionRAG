@@ -468,6 +468,33 @@ async def lifespan(app: FastAPI):
             await worker.start()
             app.state.queue_worker = worker
 
+            # Durable Ingestion Reaper (Phase 2.5.5)
+            from app.documents.services.ingestion_reaper import DurableIngestionReaper
+
+            reaper = DurableIngestionReaper(
+                session_factory=app.state.db_session_factory,
+                task_queue=durable_queue,
+                stale_threshold_seconds=settings.INGESTION_REAPER_STALE_THRESHOLD_SECONDS,
+            )
+            # Run immediate startup recovery pass
+            try:
+                recovered_count = await reaper.reap()
+                if recovered_count > 0:
+                    logger.info(
+                        f"Startup ingestion reaper recovered {recovered_count} stale documents."
+                    )
+            except Exception as reaper_err:
+                logger.error(f"Startup ingestion reaper pass error: {reaper_err}")
+
+            reaper_stop_event = asyncio.Event()
+            app.state.reaper_stop_event = reaper_stop_event
+            app.state.reaper_task = asyncio.create_task(
+                reaper.run_loop(
+                    interval_seconds=settings.INGESTION_REAPER_INTERVAL_SECONDS,
+                    stop_event=reaper_stop_event,
+                )
+            )
+
         logger.info(
             "Application lifespan initialization completed. Web service online."
         )
@@ -484,6 +511,20 @@ async def lifespan(app: FastAPI):
     logger.info("Initiating shutdown cleanup...")
     try:
         app.state.is_draining = True
+
+        # Gracefully stop DurableIngestionReaper if running
+        if hasattr(app.state, "reaper_stop_event"):
+            app.state.reaper_stop_event.set()
+        if hasattr(app.state, "reaper_task"):
+            app.state.reaper_task.cancel()
+            try:
+                await asyncio.wait_for(
+                    asyncio.shield(app.state.reaper_task), timeout=2.0
+                )
+            except Exception:
+                pass
+            logger.info("DurableIngestionReaper stopped.")
+
         # Gracefully stop QueueWorker if running
         if hasattr(app.state, "queue_worker"):
             await app.state.queue_worker.stop(timeout_seconds=5.0)

@@ -124,7 +124,10 @@ async def test_benchmark_bm25_vs_postgres_fts():
                     character_start=idx * 100,
                     character_end=(idx + 1) * 100,
                     token_estimate=15,
-                    metadata_json={"document_scope": "LIBRARY", "document_name": "benchmark_corpus.txt"},
+                    metadata_json={
+                        "document_scope": "LIBRARY",
+                        "document_name": "benchmark_corpus.txt",
+                    },
                 )
             )
             domain_chunks.append(
@@ -136,7 +139,10 @@ async def test_benchmark_bm25_vs_postgres_fts():
                     character_start=idx * 100,
                     character_end=(idx + 1) * 100,
                     token_estimate=15,
-                    metadata={"document_scope": "LIBRARY", "document_name": "benchmark_corpus.txt"},
+                    metadata={
+                        "document_scope": "LIBRARY",
+                        "document_name": "benchmark_corpus.txt",
+                    },
                     created_at=datetime.now(UTC),
                 )
             )
@@ -264,7 +270,11 @@ async def test_benchmark_multi_worker_queue_throughput():
                     consumer_group=sub_group,
                     consumer_name=f"bench-worker-{w}",
                 )
-                workers.append(QueueWorker(task_queue=q, dispatcher=dispatcher, concurrency=4, block_ms=200))
+                workers.append(
+                    QueueWorker(
+                        task_queue=q, dispatcher=dispatcher, concurrency=4, block_ms=200
+                    )
+                )
 
             t_start = time.perf_counter()
             for worker in workers:
@@ -283,14 +293,16 @@ async def test_benchmark_multi_worker_queue_throughput():
             p50_enq = float(np.percentile(enqueue_latencies, 50))
             p95_enq = float(np.percentile(enqueue_latencies, 95))
 
-            results_summary.append({
-                "jobs": job_count,
-                "workers": worker_count,
-                "total_time_s": t_total,
-                "throughput_jobs_sec": throughput,
-                "enq_p50_ms": p50_enq,
-                "enq_p95_ms": p95_enq,
-            })
+            results_summary.append(
+                {
+                    "jobs": job_count,
+                    "workers": worker_count,
+                    "total_time_s": t_total,
+                    "throughput_jobs_sec": throughput,
+                    "enq_p50_ms": p50_enq,
+                    "enq_p95_ms": p95_enq,
+                }
+            )
             assert len(processed) == job_count
 
         print("\n--- BENCHMARK RESULTS: Redis Streams Multi-Worker Throughput ---")
@@ -307,4 +319,3 @@ async def test_benchmark_multi_worker_queue_throughput():
         if keys:
             await redis_client.delete(*keys)
         await redis_client.aclose()
-

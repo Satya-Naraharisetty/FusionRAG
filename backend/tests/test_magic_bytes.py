@@ -23,7 +23,9 @@ def test_unsupported_extension_rejected():
 
 
 def test_valid_pdf():
-    valid_pdf = b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
+    valid_pdf = (
+        b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
+    )
     # Should not raise
     MagicByteValidator.validate(valid_pdf, "document.pdf")
 

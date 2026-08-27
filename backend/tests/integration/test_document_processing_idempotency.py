@@ -36,7 +36,9 @@ async def test_duplicate_process_document_job_is_strictly_idempotent(
 
     doc_id = uuid4()
     user_id = uuid4()
-    content = b"This is idempotent document testing content for Phase 2.5.4 verification."
+    content = (
+        b"This is idempotent document testing content for Phase 2.5.4 verification."
+    )
     stored_path = await storage_provider.save(
         filename="idempotent_test.txt",
         content=content,
@@ -55,10 +57,10 @@ async def test_duplicate_process_document_job_is_strictly_idempotent(
         )
         session.add(
             SQLAlchemyDocument(
-                    id=doc_id,
-                    user_id=user_id,
-                    filename=stored_path,
-                    original_filename="idempotent_test.txt",
+                id=doc_id,
+                user_id=user_id,
+                filename=stored_path,
+                original_filename="idempotent_test.txt",
                 content_type="text/plain",
                 file_size=len(content),
                 checksum="dummy_sha256",
@@ -79,10 +81,14 @@ async def test_duplicate_process_document_job_is_strictly_idempotent(
 
     async with real_db_session_factory() as session:
         chunks_run1 = (
-            await session.execute(
-                select(SQLAlchemyChunk).where(SQLAlchemyChunk.document_id == doc_id)
+            (
+                await session.execute(
+                    select(SQLAlchemyChunk).where(SQLAlchemyChunk.document_id == doc_id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         chunk_count_1 = len(chunks_run1)
         assert chunk_count_1 > 0
         chunk_ids_1 = [c.id for c in chunks_run1]
@@ -97,10 +103,14 @@ async def test_duplicate_process_document_job_is_strictly_idempotent(
 
     async with real_db_session_factory() as session:
         chunks_run2 = (
-            await session.execute(
-                select(SQLAlchemyChunk).where(SQLAlchemyChunk.document_id == doc_id)
+            (
+                await session.execute(
+                    select(SQLAlchemyChunk).where(SQLAlchemyChunk.document_id == doc_id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         chunk_count_2 = len(chunks_run2)
         chunk_ids_2 = [c.id for c in chunks_run2]
 

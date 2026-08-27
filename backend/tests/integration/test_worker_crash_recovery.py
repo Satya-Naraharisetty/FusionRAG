@@ -78,7 +78,9 @@ async def test_worker_crash_and_orphan_recovery_via_xautoclaim(real_redis):
     disp_b.register("PROCESS_CRASH_TEST", RescuerHandler())
 
     worker_b = QueueWorker(task_queue=queue_b, dispatcher=disp_b)
-    result = await worker_b.handle_message(claimed_msg_id, claimed_job, is_reclaimed=True)
+    result = await worker_b.handle_message(
+        claimed_msg_id, claimed_job, is_reclaimed=True
+    )
 
     assert result.success is True
     assert len(processed_rescued) == 1

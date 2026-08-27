@@ -40,7 +40,9 @@ async def real_redis() -> AsyncGenerator[tuple[aioredis.Redis, str], None]:
 
 
 @pytest_asyncio.fixture(scope="function")
-async def real_db_session_factory() -> AsyncGenerator[async_sessionmaker[AsyncSession], None]:
+async def real_db_session_factory() -> AsyncGenerator[
+    async_sessionmaker[AsyncSession], None
+]:
     """
     Provides an async sessionmaker bound to the real test PostgreSQL database.
     """
@@ -65,7 +67,9 @@ async def real_db_session_factory() -> AsyncGenerator[async_sessionmaker[AsyncSe
 
 
 @pytest_asyncio.fixture(scope="function")
-async def real_qdrant_test_collection() -> AsyncGenerator[tuple[AsyncQdrantClient, str], None]:
+async def real_qdrant_test_collection() -> AsyncGenerator[
+    tuple[AsyncQdrantClient, str], None
+]:
     """
     Provides an AsyncQdrantClient connected to localhost:6333 and a uniquely named test collection.
     Automatically deletes the test collection on teardown.

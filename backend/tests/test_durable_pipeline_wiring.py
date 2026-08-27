@@ -232,7 +232,9 @@ async def test_replace_enqueues_durable_job(postgres_test_db):
         assert updated_doc.status == DocumentStatus.QUEUED
         assert len(durable_queue.jobs) == 1
         assert list(durable_queue.jobs.values())[0].task_type == "PROCESS_DOCUMENT"
-        assert list(durable_queue.jobs.values())[0].payload["document_id"] == str(doc_id)
+        assert list(durable_queue.jobs.values())[0].payload["document_id"] == str(
+            doc_id
+        )
 
 
 @pytest.mark.asyncio
@@ -283,15 +285,21 @@ async def test_reprocess_enqueues_durable_job(postgres_test_db):
             max_upload_size=1024 * 1024,
         )
 
-        reprocessed_doc = await doc_service.reprocess_document(id=doc_id, user_id=user_id)
+        reprocessed_doc = await doc_service.reprocess_document(
+            id=doc_id, user_id=user_id
+        )
         assert reprocessed_doc.status == DocumentStatus.QUEUED
         assert len(durable_queue.jobs) == 1
         assert list(durable_queue.jobs.values())[0].task_type == "PROCESS_DOCUMENT"
-        assert list(durable_queue.jobs.values())[0].payload["document_id"] == str(doc_id)
+        assert list(durable_queue.jobs.values())[0].payload["document_id"] == str(
+            doc_id
+        )
 
 
 @pytest.mark.asyncio
-async def test_process_document_handler_success_and_downstream_enqueue(postgres_test_db):
+async def test_process_document_handler_success_and_downstream_enqueue(
+    postgres_test_db,
+):
     async with postgres_test_db() as session:
         user_id = uuid4()
         session.add(
@@ -358,7 +366,9 @@ async def test_process_document_handler_success_and_downstream_enqueue(postgres_
         # Verify downstream GENERATE_EMBEDDINGS job was enqueued
         assert len(durable_queue.jobs) == 1
         assert list(durable_queue.jobs.values())[0].task_type == "GENERATE_EMBEDDINGS"
-        assert list(durable_queue.jobs.values())[0].payload["document_id"] == str(doc_id)
+        assert list(durable_queue.jobs.values())[0].payload["document_id"] == str(
+            doc_id
+        )
 
 
 @pytest.mark.asyncio
@@ -521,7 +531,9 @@ async def test_job_references_deleted_document_handled_cleanly(postgres_test_db)
 
 
 @pytest.mark.asyncio
-async def test_summarize_conversation_handler_below_threshold_is_skipped(postgres_test_db):
+async def test_summarize_conversation_handler_below_threshold_is_skipped(
+    postgres_test_db,
+):
     async with postgres_test_db() as session:
         user_id = uuid4()
         session.add(

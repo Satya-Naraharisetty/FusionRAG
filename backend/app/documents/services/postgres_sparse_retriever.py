@@ -74,7 +74,9 @@ class PostgresSparseRetriever(SparseIndex):
                 )
             else:
                 # Direct fallback if chunk_repo is not injected
-                allowed_doc_ids = await self._resolve_allowed_document_ids(retrieval_scope)
+                allowed_doc_ids = await self._resolve_allowed_document_ids(
+                    retrieval_scope
+                )
 
             if not allowed_doc_ids:
                 return []
@@ -89,11 +91,15 @@ class PostgresSparseRetriever(SparseIndex):
 
         # 2. Build PostgreSQL Full-Text Search expressions
         tsquery = func.websearch_to_tsquery(self._language, clean_query)
-        rank_expr = func.ts_rank_cd(SQLAlchemyChunk.search_vector, tsquery).label("rank_score")
+        rank_expr = func.ts_rank_cd(SQLAlchemyChunk.search_vector, tsquery).label(
+            "rank_score"
+        )
 
         stmt = (
             select(SQLAlchemyChunk, SQLAlchemyDocument, rank_expr)
-            .join(SQLAlchemyDocument, SQLAlchemyChunk.document_id == SQLAlchemyDocument.id)
+            .join(
+                SQLAlchemyDocument, SQLAlchemyChunk.document_id == SQLAlchemyDocument.id
+            )
             .where(
                 SQLAlchemyDocument.user_id == user_id,
                 SQLAlchemyChunk.search_vector.op("@@")(tsquery),

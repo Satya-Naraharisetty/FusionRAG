@@ -275,20 +275,22 @@ async def test_user_tenant_isolation(postgres_test_db):
         user_a = uuid4()
         user_b = uuid4()
 
-        session.add_all([
-            SQLAlchemyUser(
-                id=user_a,
-                email="usera@example.com",
-                hashed_password="pwd",
-                is_active=True,
-            ),
-            SQLAlchemyUser(
-                id=user_b,
-                email="userb@example.com",
-                hashed_password="pwd",
-                is_active=True,
-            ),
-        ])
+        session.add_all(
+            [
+                SQLAlchemyUser(
+                    id=user_a,
+                    email="usera@example.com",
+                    hashed_password="pwd",
+                    is_active=True,
+                ),
+                SQLAlchemyUser(
+                    id=user_b,
+                    email="userb@example.com",
+                    hashed_password="pwd",
+                    is_active=True,
+                ),
+            ]
+        )
         await session.flush()
 
         doc_a = SQLAlchemyDocument(
@@ -514,28 +516,30 @@ async def test_document_filtering(postgres_test_db):
         session.add_all([doc1, doc2])
         await session.flush()
 
-        session.add_all([
-            SQLAlchemyChunk(
-                id=uuid4(),
-                document_id=doc1.id,
-                chunk_index=0,
-                text="Architecture document on PostgreSQL scaling.",
-                character_start=0,
-                character_end=44,
-                token_estimate=6,
-                metadata_json={"document_scope": "LIBRARY"},
-            ),
-            SQLAlchemyChunk(
-                id=uuid4(),
-                document_id=doc2.id,
-                chunk_index=0,
-                text="Operations manual on PostgreSQL backup.",
-                character_start=0,
-                character_end=40,
-                token_estimate=6,
-                metadata_json={"document_scope": "LIBRARY"},
-            ),
-        ])
+        session.add_all(
+            [
+                SQLAlchemyChunk(
+                    id=uuid4(),
+                    document_id=doc1.id,
+                    chunk_index=0,
+                    text="Architecture document on PostgreSQL scaling.",
+                    character_start=0,
+                    character_end=44,
+                    token_estimate=6,
+                    metadata_json={"document_scope": "LIBRARY"},
+                ),
+                SQLAlchemyChunk(
+                    id=uuid4(),
+                    document_id=doc2.id,
+                    chunk_index=0,
+                    text="Operations manual on PostgreSQL backup.",
+                    character_start=0,
+                    character_end=40,
+                    token_estimate=6,
+                    metadata_json={"document_scope": "LIBRARY"},
+                ),
+            ]
+        )
         await session.commit()
 
         chunk_repo = SQLAlchemyChunkRepository(session)

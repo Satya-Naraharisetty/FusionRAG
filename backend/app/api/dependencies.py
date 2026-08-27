@@ -1046,9 +1046,7 @@ def get_event_dispatcher(
                         max_attempts=3,
                     )
                 except Exception as ex:
-                    logger.error(
-                        f"Failed to enqueue SUMMARIZE_CONVERSATION: {ex}"
-                    )
+                    logger.error(f"Failed to enqueue SUMMARIZE_CONVERSATION: {ex}")
 
             try:
                 loop = asyncio.get_running_loop()

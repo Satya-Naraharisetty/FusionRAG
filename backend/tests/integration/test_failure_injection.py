@@ -33,11 +33,17 @@ async def test_transient_failure_exponential_retry_and_dlq_exhaustion(real_redis
         async def handle(self, job: Job) -> JobResult:
             call_history.append({"attempt": job.attempt, "time": time.time()})
             if job.attempt == 1:
-                return JobResult(success=False, error="HTTP 429 Rate Limited", retryable=True)
+                return JobResult(
+                    success=False, error="HTTP 429 Rate Limited", retryable=True
+                )
             elif job.attempt == 2:
-                return JobResult(success=False, error="HTTP 503 Service Unavailable", retryable=True)
+                return JobResult(
+                    success=False, error="HTTP 503 Service Unavailable", retryable=True
+                )
             else:
-                return JobResult(success=False, error="Persistent 500 Failure", retryable=True)
+                return JobResult(
+                    success=False, error="Persistent 500 Failure", retryable=True
+                )
 
     dispatcher = JobDispatcher()
     dispatcher.register("FLAKY_API_TASK", FailingTransientHandler())
@@ -103,7 +109,11 @@ async def test_transient_failure_exponential_retry_and_dlq_exhaustion(real_redis
     dlq_entries = await redis_client.xrange(dlq_stream)
     assert len(dlq_entries) == 1
     _, dlq_payload = dlq_entries[0]
-    assert b"data" in dlq_payload or b"job" in dlq_payload or b"error_message" in dlq_payload
+    assert (
+        b"data" in dlq_payload
+        or b"job" in dlq_payload
+        or b"error_message" in dlq_payload
+    )
 
     # Retry set is now clean
     retry_final = await redis_client.zcard(retry_set)

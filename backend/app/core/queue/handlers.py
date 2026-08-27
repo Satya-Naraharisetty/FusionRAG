@@ -113,12 +113,81 @@ class ProcessDocumentJobHandler(JobHandler):
                 )
 
             if doc.status == DocumentStatus.COMPLETED:
-                logger.info(
-                    f"Document {document_id} already COMPLETED. Idempotent skip."
+                # Downstream verification: verify that all expected chunks have completed embeddings
+                chunk_repo = SQLAlchemyChunkRepository(session)
+                embedding_repo = SQLAlchemyEmbeddingRepository(session)
+
+                chunks = await chunk_repo.list_by_document(document_id)
+                if not chunks:
+                    logger.warning(
+                        f"Document {document_id} marked COMPLETED but has 0 chunks. Inconsistent state, triggering retry."
+                    )
+                    return JobResult(
+                        success=False,
+                        error=f"Document {document_id} marked COMPLETED but has 0 chunks",
+                        retryable=True,
+                    )
+
+                chunk_ids = [c.id for c in chunks]
+                embeddings = await embedding_repo.get_by_chunk_ids(chunk_ids)
+                emb_map = {e.chunk_id: e for e in embeddings}
+
+                # Check: every expected chunk must have exactly one COMPLETED embedding
+                all_completed = len(embeddings) == len(chunks) and all(
+                    emb_map.get(cid) is not None
+                    and emb_map[cid].status == EmbeddingStatus.COMPLETED
+                    for cid in chunk_ids
                 )
+
+                if all_completed:
+                    logger.info(
+                        f"Document {document_id} already COMPLETED with all {len(chunks)} embeddings verified. Idempotent skip."
+                    )
+                    return JobResult(
+                        success=True,
+                        details={
+                            "status": "already_completed",
+                            "embeddings": "verified_complete",
+                            "document_id": str(document_id),
+                        },
+                    )
+
+                logger.info(
+                    f"Document {document_id} is COMPLETED but has incomplete embeddings ({len(embeddings)}/{len(chunks)} recorded). Enqueueing GENERATE_EMBEDDINGS."
+                )
+                if self._task_queue is not None:
+                    try:
+                        await self._task_queue.enqueue(
+                            task_type="GENERATE_EMBEDDINGS",
+                            payload={
+                                "document_id": str(document_id),
+                                "user_id": str(user_id_raw) if user_id_raw else None,
+                            },
+                            max_attempts=3,
+                        )
+                        return JobResult(
+                            success=True,
+                            details={
+                                "status": "already_completed",
+                                "embeddings": "enqueued",
+                                "document_id": str(document_id),
+                            },
+                        )
+                    except Exception as enq_err:
+                        logger.error(
+                            f"Failed to enqueue downstream GENERATE_EMBEDDINGS for completed document {document_id}: {enq_err}"
+                        )
+                        return JobResult(
+                            success=False,
+                            error=f"Failed to enqueue downstream GENERATE_EMBEDDINGS: {enq_err}",
+                            retryable=True,
+                        )
                 return JobResult(
                     success=True,
-                    details={"status": "already_completed", "document_id": str(document_id)},
+                    details={
+                        "status": "already_completed",
+                        "document_id": str(document_id),
+                    },
                 )
 
             storage = self._storage_provider
@@ -150,22 +219,42 @@ class ProcessDocumentJobHandler(JobHandler):
 
             try:
                 await processing_service.process_document(document_id)
-            except (DocumentNotFound, DocumentCorrupted, UnsupportedDocumentType, DocumentExtractionFailed) as non_ret:
-                logger.warning(f"Non-retryable processing failure for document {document_id}: {non_ret}")
+            except (
+                DocumentNotFound,
+                DocumentCorrupted,
+                UnsupportedDocumentType,
+                DocumentExtractionFailed,
+            ) as non_ret:
+                logger.warning(
+                    f"Non-retryable processing failure for document {document_id}: {non_ret}"
+                )
                 return JobResult(success=False, error=str(non_ret), retryable=False)
             except Exception as exc:
-                logger.exception(f"Transient error processing document {document_id}: {exc}")
+                logger.exception(
+                    f"Transient error processing document {document_id}: {exc}"
+                )
                 return JobResult(success=False, error=str(exc), retryable=True)
 
         if self._task_queue is not None:
             try:
                 await self._task_queue.enqueue(
                     task_type="GENERATE_EMBEDDINGS",
-                    payload={"document_id": str(document_id), "user_id": str(user_id_raw) if user_id_raw else None},
+                    payload={
+                        "document_id": str(document_id),
+                        "user_id": str(user_id_raw) if user_id_raw else None,
+                    },
                     max_attempts=3,
                 )
             except Exception as enq_err:
-                logger.error(f"Failed to enqueue downstream GENERATE_EMBEDDINGS job: {enq_err}")
+                logger.error(
+                    f"Failed to enqueue downstream GENERATE_EMBEDDINGS job: {enq_err}"
+                )
+                return JobResult(
+                    success=False,
+                    error=f"Failed to enqueue downstream GENERATE_EMBEDDINGS: {enq_err}",
+                    retryable=True,
+                    details={"document_id": str(document_id)},
+                )
 
         return JobResult(
             success=True,
@@ -281,19 +370,29 @@ class GenerateEmbeddingsJobHandler(JobHandler):
             try:
                 await embedding_service.generate_embeddings(document_id, force=force)
             except DocumentNotFound as dnf:
-                logger.warning(f"Document {document_id} not found in embedding service: {dnf}")
+                logger.warning(
+                    f"Document {document_id} not found in embedding service: {dnf}"
+                )
                 return JobResult(success=False, error=str(dnf), retryable=False)
             except Exception as exc:
-                logger.exception(f"Transient error generating embeddings for document {document_id}: {exc}")
+                logger.exception(
+                    f"Transient error generating embeddings for document {document_id}: {exc}"
+                )
                 return JobResult(success=False, error=str(exc), retryable=True)
 
-            doc_chunks = await SQLAlchemyChunkRepository(session).list_by_document(document_id)
+            doc_chunks = await SQLAlchemyChunkRepository(session).list_by_document(
+                document_id
+            )
             if doc_chunks:
-                embs = await SQLAlchemyEmbeddingRepository(session).get_by_chunk_ids([c.id for c in doc_chunks])
+                embs = await SQLAlchemyEmbeddingRepository(session).get_by_chunk_ids(
+                    [c.id for c in doc_chunks]
+                )
                 emb_map = {e.chunk_id: e for e in embs}
                 uncompleted = [
-                    c for c in doc_chunks
-                    if emb_map.get(c.id) is None or emb_map[c.id].status != EmbeddingStatus.COMPLETED
+                    c
+                    for c in doc_chunks
+                    if emb_map.get(c.id) is None
+                    or emb_map[c.id].status != EmbeddingStatus.COMPLETED
                 ]
                 if uncompleted:
                     error_msg = f"Embedding generation incomplete: {len(uncompleted)}/{len(doc_chunks)} chunks not completed"
@@ -302,7 +401,10 @@ class GenerateEmbeddingsJobHandler(JobHandler):
                         success=False,
                         error=error_msg,
                         retryable=True,
-                        details={"document_id": str(document_id), "uncompleted_count": len(uncompleted)},
+                        details={
+                            "document_id": str(document_id),
+                            "uncompleted_count": len(uncompleted),
+                        },
                     )
 
         return JobResult(
@@ -389,7 +491,9 @@ class SummarizeConversationJobHandler(JobHandler):
                 summary_max_tokens=self._summary_max_tokens,
             )
 
-            messages = await message_repo.get_recent_messages(conversation_id, limit=1000)
+            messages = await message_repo.get_recent_messages(
+                conversation_id, limit=1000
+            )
             up_to_idx = count - self._max_messages_per_context - 1
             if up_to_idx >= 0 and up_to_idx < len(messages):
                 up_to_msg = messages[up_to_idx]
@@ -398,7 +502,10 @@ class SummarizeConversationJobHandler(JobHandler):
                     await session.commit()
                     return JobResult(
                         success=True,
-                        details={"status": "summarized", "up_to_message_id": str(up_to_msg.id)},
+                        details={
+                            "status": "summarized",
+                            "up_to_message_id": str(up_to_msg.id),
+                        },
                     )
                 except Exception as exc:
                     logger.exception(

@@ -104,7 +104,9 @@ async def test_shutdown_exceeding_grace_period_never_falsely_acks(real_redis):
         block_ms=200,
     )
 
-    await queue_a.enqueue(task_type="LONG_TASK", payload={"id": str(uuid4()), "doc": "uncompleted_work"})
+    await queue_a.enqueue(
+        task_type="LONG_TASK", payload={"id": str(uuid4()), "doc": "uncompleted_work"}
+    )
     await worker_a.start()
 
     # Wait until Worker A picks up the job

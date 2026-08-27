@@ -39,6 +39,18 @@ def sanitize_error_message(error: str, max_length: int = 1000) -> str:
     return sanitized[:max_length]
 
 
+_LUA_RETRY_PUMP_SCRIPT = """
+local items = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1], 'LIMIT', 0, tonumber(ARGV[2]))
+local pumped = 0
+for i, item in ipairs(items) do
+    redis.call('XADD', KEYS[2], 'MAXLEN', '~', tonumber(ARGV[3]), '*', 'data', item)
+    redis.call('ZREM', KEYS[1], item)
+    pumped = pumped + 1
+end
+return pumped
+"""
+
+
 class RedisStreamTaskQueue(DurableTaskQueue):
     """
     Durable Task Queue implementation backed by Redis Streams & Consumer Groups.
@@ -129,7 +141,9 @@ class RedisStreamTaskQueue(DurableTaskQueue):
             maxlen=self._max_stream_length,
             approximate=True,
         )
-        msg_id_str = msg_id.decode("utf-8") if isinstance(msg_id, bytes) else str(msg_id)
+        msg_id_str = (
+            msg_id.decode("utf-8") if isinstance(msg_id, bytes) else str(msg_id)
+        )
 
         logger.info(
             f"queue.job_enqueued: job_id={job.job_id} task_type={job.task_type} "
@@ -337,7 +351,9 @@ class RedisStreamTaskQueue(DurableTaskQueue):
                         f"by_consumer={self._consumer_name}"
                     )
                 except Exception as ex:
-                    logger.error(f"Failed to deserialize reclaimed job {msg_id_str}: {ex}")
+                    logger.error(
+                        f"Failed to deserialize reclaimed job {msg_id_str}: {ex}"
+                    )
                     await self.acknowledge(msg_id_str)
 
         return (next_id_str, reclaimed_jobs)
@@ -346,36 +362,25 @@ class RedisStreamTaskQueue(DurableTaskQueue):
         self, now_ts: float | None = None, limit: int = 50
     ) -> int:
         """
-        Transfers due retry jobs from the sorted set back into the main stream (XADD).
+        Transfers due retry jobs from the sorted set back into the main stream (XADD)
+        atomically using a Redis Lua script. Enforces the durability invariant that
+        a retry item is appended to the stream before it is removed from the ZSET.
         """
         current_time = now_ts if now_ts is not None else time.time()
-        # Fetch items due for execution
-        items: Any = await self._redis.zrangebyscore(
-            self._retry_sorted_set,
-            min="-inf",
-            max=current_time,
-            start=0,
-            num=limit,
-        )
-        if not items or not isinstance(items, list):
-            return 0
-
-        pumped = 0
-        for item in items:
-            if not isinstance(item, (bytes, str)):
-                continue
-            # Remove atomically from sorted set
-            removed = await self._redis.zrem(self._retry_sorted_set, item)
-            if removed > 0:
-                raw_str = item.decode("utf-8") if isinstance(item, bytes) else str(item)
-                await self._redis.xadd(
-                    name=self._stream_name,
-                    fields={"data": raw_str},
-                    maxlen=self._max_stream_length,
-                    approximate=True,
-                )
-                pumped += 1
-
-        if pumped > 0:
-            logger.info(f"queue.retries_pumped: count={pumped}")
-        return pumped
+        try:
+            result = await self._redis.eval(
+                _LUA_RETRY_PUMP_SCRIPT,
+                2,
+                self._retry_sorted_set,
+                self._stream_name,
+                str(current_time),
+                str(limit),
+                str(self._max_stream_length),
+            )
+            pumped = int(result or 0)
+            if pumped > 0:
+                logger.info(f"queue.retries_pumped: count={pumped}")
+            return pumped
+        except Exception as e:
+            logger.error(f"Failed to execute atomic retry pump Lua script: {e}")
+            raise

@@ -99,12 +99,16 @@ async def test_duplicate_summarize_conversation_job_is_idempotent(
 
     async with real_db_session_factory() as session:
         summaries_1 = (
-            await session.execute(
-                select(ConversationSummaryORM).where(
-                    ConversationSummaryORM.conversation_id == conv_id
+            (
+                await session.execute(
+                    select(ConversationSummaryORM).where(
+                        ConversationSummaryORM.conversation_id == conv_id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(summaries_1) == 1
         summary_id = summaries_1[0].id
         summary_text = summaries_1[0].summary
@@ -115,12 +119,16 @@ async def test_duplicate_summarize_conversation_job_is_idempotent(
 
     async with real_db_session_factory() as session:
         summaries_2 = (
-            await session.execute(
-                select(ConversationSummaryORM).where(
-                    ConversationSummaryORM.conversation_id == conv_id
+            (
+                await session.execute(
+                    select(ConversationSummaryORM).where(
+                        ConversationSummaryORM.conversation_id == conv_id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(summaries_2) == 1
         assert summaries_2[0].id == summary_id
         assert summaries_2[0].summary == summary_text
@@ -178,10 +186,14 @@ async def test_summarize_conversation_below_threshold_is_skipped(
 
     async with real_db_session_factory() as session:
         summaries = (
-            await session.execute(
-                select(ConversationSummaryORM).where(
-                    ConversationSummaryORM.conversation_id == conv_id
+            (
+                await session.execute(
+                    select(ConversationSummaryORM).where(
+                        ConversationSummaryORM.conversation_id == conv_id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(summaries) == 0

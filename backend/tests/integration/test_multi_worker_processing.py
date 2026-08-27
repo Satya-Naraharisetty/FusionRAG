@@ -137,8 +137,12 @@ async def test_two_workers_concurrently_process_batch_of_50_jobs(real_redis):
     disp_b = JobDispatcher()
     disp_b.register("BATCH_JOB", FastHandlerB())
 
-    worker_a = QueueWorker(task_queue=queue_a, dispatcher=disp_a, concurrency=4, block_ms=300)
-    worker_b = QueueWorker(task_queue=queue_b, dispatcher=disp_b, concurrency=4, block_ms=300)
+    worker_a = QueueWorker(
+        task_queue=queue_a, dispatcher=disp_a, concurrency=4, block_ms=300
+    )
+    worker_b = QueueWorker(
+        task_queue=queue_b, dispatcher=disp_b, concurrency=4, block_ms=300
+    )
 
     for i in range(50):
         await queue_a.enqueue(

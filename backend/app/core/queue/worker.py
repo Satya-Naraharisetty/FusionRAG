@@ -65,9 +65,15 @@ class QueueWorker:
         self._is_running = True
         await self._task_queue.ensure_consumer_group()
 
-        self._consume_task = asyncio.create_task(self._consume_loop(), name="queue_consume_loop")
-        self._recovery_task = asyncio.create_task(self._recovery_loop(), name="queue_recovery_loop")
-        self._pump_task = asyncio.create_task(self._retry_pump_loop(), name="queue_retry_pump_loop")
+        self._consume_task = asyncio.create_task(
+            self._consume_loop(), name="queue_consume_loop"
+        )
+        self._recovery_task = asyncio.create_task(
+            self._recovery_loop(), name="queue_recovery_loop"
+        )
+        self._pump_task = asyncio.create_task(
+            self._retry_pump_loop(), name="queue_retry_pump_loop"
+        )
 
         logger.info(
             f"QueueWorker started: consumer={self._task_queue.consumer_name} "
@@ -82,7 +88,9 @@ class QueueWorker:
         if not self._is_running:
             return
 
-        logger.info(f"Initiating graceful shutdown for QueueWorker ({self._task_queue.consumer_name})...")
+        logger.info(
+            f"Initiating graceful shutdown for QueueWorker ({self._task_queue.consumer_name})..."
+        )
         self._is_running = False
 
         # Cancel background loops
@@ -92,10 +100,16 @@ class QueueWorker:
 
         # Wait for in-flight job tasks to complete up to timeout
         if self._in_flight_tasks:
-            logger.info(f"Waiting for {len(self._in_flight_tasks)} in-flight job(s) to finish...")
-            _, pending = await asyncio.wait(self._in_flight_tasks, timeout=timeout_seconds)
+            logger.info(
+                f"Waiting for {len(self._in_flight_tasks)} in-flight job(s) to finish..."
+            )
+            _, pending = await asyncio.wait(
+                self._in_flight_tasks, timeout=timeout_seconds
+            )
             for pending_task in pending:
-                logger.warning("In-flight job task did not complete in grace period; cancelling. Message remains un-ACKed in PEL.")
+                logger.warning(
+                    "In-flight job task did not complete in grace period; cancelling. Message remains un-ACKed in PEL."
+                )
                 pending_task.cancel()
 
         self._in_flight_tasks.clear()
@@ -144,7 +158,9 @@ class QueueWorker:
                         break
 
                     for msg_id, job in claimed:
-                        task = asyncio.create_task(self.handle_message(msg_id, job, is_reclaimed=True))
+                        task = asyncio.create_task(
+                            self.handle_message(msg_id, job, is_reclaimed=True)
+                        )
                         self._in_flight_tasks.add(task)
                         task.add_done_callback(self._in_flight_tasks.discard)
 
@@ -187,8 +203,12 @@ class QueueWorker:
             try:
                 result = await self._dispatcher.dispatch(job)
             except Exception as unhandled_err:
-                logger.exception(f"Unhandled exception during job execution {job.job_id}: {unhandled_err}")
-                result = JobResult(success=False, error=str(unhandled_err), retryable=True)
+                logger.exception(
+                    f"Unhandled exception during job execution {job.job_id}: {unhandled_err}"
+                )
+                result = JobResult(
+                    success=False, error=str(unhandled_err), retryable=True
+                )
 
             duration_ms = (time.time() - start_time) * 1000
 
@@ -217,7 +237,9 @@ class QueueWorker:
                     if job.attempt >= job.max_attempts
                     else "NonRetryableError"
                 )
-                await self._task_queue.route_to_dead_letter(job, error_msg, error_type=error_type)
+                await self._task_queue.route_to_dead_letter(
+                    job, error_msg, error_type=error_type
+                )
                 # Acknowledge the old stream message since it is now stored in DLQ
                 await self._task_queue.acknowledge(msg_id)
 

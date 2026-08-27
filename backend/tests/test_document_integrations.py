@@ -127,7 +127,9 @@ def test_upload_pdf_success(mock_pdf_extract, client, doc_test_db):
     token = get_user_token(client)
 
     # Upload PDF file
-    file_payload = {"file": ("test.pdf", b"%PDF-1.4 dummy pdf bytes", "application/pdf")}
+    file_payload = {
+        "file": ("test.pdf", b"%PDF-1.4 dummy pdf bytes", "application/pdf")
+    }
     response = client.post(
         "/api/v1/documents/upload",
         files=file_payload,

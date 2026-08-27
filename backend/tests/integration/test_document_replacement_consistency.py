@@ -85,7 +85,10 @@ async def test_end_to_end_document_replacement_lifecycle(
         extractor_factory=extractor_factory,
     )
     res_proc_1 = await proc_handler.handle(
-        Job(task_type="PROCESS_DOCUMENT", payload={"document_id": str(doc_id), "user_id": str(user_id)})
+        Job(
+            task_type="PROCESS_DOCUMENT",
+            payload={"document_id": str(doc_id), "user_id": str(user_id)},
+        )
     )
     assert res_proc_1.success is True
 
@@ -98,7 +101,10 @@ async def test_end_to_end_document_replacement_lifecycle(
         vector_store=vector_store,
     )
     res_emb_1 = await emb_handler.handle(
-        Job(task_type="GENERATE_EMBEDDINGS", payload={"document_id": str(doc_id), "user_id": str(user_id)})
+        Job(
+            task_type="GENERATE_EMBEDDINGS",
+            payload={"document_id": str(doc_id), "user_id": str(user_id)},
+        )
     )
     assert res_emb_1.success is True
 
@@ -119,7 +125,9 @@ async def test_end_to_end_document_replacement_lifecycle(
     assert q_count_1.count == 1
 
     # Step 2: Replace with Version 2
-    content_v2 = b"Architecture Beta: Event-driven distributed microservices streaming platform."
+    content_v2 = (
+        b"Architecture Beta: Event-driven distributed microservices streaming platform."
+    )
     checksum_v2 = hashlib.sha256(content_v2).hexdigest()
     path_v2 = await storage_provider.save(
         filename="system_arch.txt",
@@ -131,7 +139,9 @@ async def test_end_to_end_document_replacement_lifecycle(
     async with real_db_session_factory() as session:
         # Update document record to V2
         doc_orm = (
-            await session.execute(select(SQLAlchemyDocument).where(SQLAlchemyDocument.id == doc_id))
+            await session.execute(
+                select(SQLAlchemyDocument).where(SQLAlchemyDocument.id == doc_id)
+            )
         ).scalar_one()
         doc_orm.checksum = checksum_v2
         doc_orm.filename = path_v2
@@ -141,7 +151,10 @@ async def test_end_to_end_document_replacement_lifecycle(
 
     # Process V2
     res_proc_2 = await proc_handler.handle(
-        Job(task_type="PROCESS_DOCUMENT", payload={"document_id": str(doc_id), "user_id": str(user_id)})
+        Job(
+            task_type="PROCESS_DOCUMENT",
+            payload={"document_id": str(doc_id), "user_id": str(user_id)},
+        )
     )
     assert res_proc_2.success is True
 
@@ -156,7 +169,11 @@ async def test_end_to_end_document_replacement_lifecycle(
     res_emb_2 = await emb_handler_v2.handle(
         Job(
             task_type="GENERATE_EMBEDDINGS",
-            payload={"document_id": str(doc_id), "user_id": str(user_id), "force": True},
+            payload={
+                "document_id": str(doc_id),
+                "user_id": str(user_id),
+                "force": True,
+            },
         )
     )
     assert res_emb_2.success is True

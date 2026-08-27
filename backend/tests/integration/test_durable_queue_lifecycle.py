@@ -52,7 +52,9 @@ async def test_redis_durable_queue_lifecycle_simulation():
         entries = []
         for msg_id, fields in stream_store:
             if msg_id not in ack_store:
-                entries.append((msg_id.encode("utf-8"), {b"data": fields["data"].encode("utf-8")}))
+                entries.append(
+                    (msg_id.encode("utf-8"), {b"data": fields["data"].encode("utf-8")})
+                )
         return [(b"stream:jobs:document_processing", entries)]
 
     async def mock_xack(name, group, *msg_ids):

@@ -88,7 +88,10 @@ class MagicByteValidator:
                         )
 
                 compressed_size = max(len(data), 1)
-                if (total_uncompressed / compressed_size) > cls.MAX_ZIP_EXPANSION_RATIO and total_uncompressed > 10 * 1024 * 1024:
+                if (
+                    (total_uncompressed / compressed_size) > cls.MAX_ZIP_EXPANSION_RATIO
+                    and total_uncompressed > 10 * 1024 * 1024
+                ):
                     raise DocumentCorrupted(
                         "DOCX archive exhibits suspicious compression ratio (potential zip bomb)."
                     )
@@ -104,17 +107,23 @@ class MagicByteValidator:
     def _validate_png(cls, data: bytes) -> None:
         png_header = b"\x89PNG\r\n\x1a\n"
         if len(data) < 8 or not data.startswith(png_header):
-            raise DocumentCorrupted("Invalid PNG file header: magic signature not found.")
+            raise DocumentCorrupted(
+                "Invalid PNG file header: magic signature not found."
+            )
 
     @classmethod
     def _validate_jpeg(cls, data: bytes) -> None:
         if len(data) < 3 or not data.startswith(b"\xff\xd8\xff"):
-            raise DocumentCorrupted("Invalid JPEG file header: SOI marker '\\xff\\xd8\\xff' not found.")
+            raise DocumentCorrupted(
+                "Invalid JPEG file header: SOI marker '\\xff\\xd8\\xff' not found."
+            )
 
     @classmethod
     def _validate_webp(cls, data: bytes) -> None:
         if len(data) < 12 or not (data.startswith(b"RIFF") and data[8:12] == b"WEBP"):
-            raise DocumentCorrupted("Invalid WEBP file header: RIFF/WEBP signature not found.")
+            raise DocumentCorrupted(
+                "Invalid WEBP file header: RIFF/WEBP signature not found."
+            )
 
     @classmethod
     def _validate_text(cls, data: bytes, ext: str) -> None:
@@ -128,4 +137,6 @@ class MagicByteValidator:
         try:
             data.decode("utf-8")
         except UnicodeDecodeError as e:
-            raise DocumentCorrupted(f"Text file with extension '{ext}' is not valid UTF-8: {e}") from e
+            raise DocumentCorrupted(
+                f"Text file with extension '{ext}' is not valid UTF-8: {e}"
+            ) from e

@@ -51,4 +51,6 @@ def test_chunk_ids_distinct_across_indices():
     assert len(result.chunks) > 1
 
     chunk_ids = [c.id for c in result.chunks]
-    assert len(chunk_ids) == len(set(chunk_ids)), "All chunk IDs in a document must be unique"
+    assert len(chunk_ids) == len(set(chunk_ids)), (
+        "All chunk IDs in a document must be unique"
+    )

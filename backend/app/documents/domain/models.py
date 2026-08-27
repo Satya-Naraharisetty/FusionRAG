@@ -156,7 +156,10 @@ class EmbeddingStateMachine:
         EmbeddingStatus.PENDING: [EmbeddingStatus.GENERATING],
         EmbeddingStatus.GENERATING: [EmbeddingStatus.COMPLETED, EmbeddingStatus.FAILED],
         EmbeddingStatus.FAILED: [EmbeddingStatus.PENDING, EmbeddingStatus.GENERATING],
-        EmbeddingStatus.COMPLETED: [EmbeddingStatus.PENDING, EmbeddingStatus.GENERATING],
+        EmbeddingStatus.COMPLETED: [
+            EmbeddingStatus.PENDING,
+            EmbeddingStatus.GENERATING,
+        ],
     }
 
     @classmethod

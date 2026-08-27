@@ -83,9 +83,13 @@ class Settings(BaseSettings):
     QUEUE_MAX_ATTEMPTS: int = 3
     QUEUE_BASE_BACKOFF_SECONDS: float = 2.0
     QUEUE_MAX_BACKOFF_SECONDS: float = 60.0
-    QUEUE_VISIBILITY_TIMEOUT_SECONDS: int = 60
+    QUEUE_VISIBILITY_TIMEOUT_SECONDS: int = 180
     QUEUE_WORKER_CONCURRENCY: int = 4
     QUEUE_WORKER_BLOCK_MS: int = 2000
+
+    # Ingestion Reaper Configurations (Phase 2.5.5)
+    INGESTION_REAPER_INTERVAL_SECONDS: float = 60.0
+    INGESTION_REAPER_STALE_THRESHOLD_SECONDS: float = 60.0
 
     # Sparse Retrieval Configurations (Phase 2.5)
     SPARSE_RETRIEVER_TYPE: str = "postgres_fts"  # "postgres_fts" | "bm25_memory"

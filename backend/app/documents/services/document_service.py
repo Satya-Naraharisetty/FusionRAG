@@ -74,7 +74,9 @@ class DocumentService:
                 payload={
                     "document_id": str(document.id),
                     "user_id": str(document.user_id),
-                    "scope": document.scope.value if hasattr(document.scope, "value") else str(document.scope),
+                    "scope": document.scope.value
+                    if hasattr(document.scope, "value")
+                    else str(document.scope),
                     "checksum": document.checksum,
                 },
                 max_attempts=3,

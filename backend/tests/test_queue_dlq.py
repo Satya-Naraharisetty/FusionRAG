@@ -24,7 +24,9 @@ async def test_route_to_dead_letter_writes_sanitized_dlq_stream():
     )
 
     secret_error = "Failed to connect using Bearer secret_api_key_12345"
-    await queue.route_to_dead_letter(job, secret_error, error_type="MaxAttemptsExceeded")
+    await queue.route_to_dead_letter(
+        job, secret_error, error_type="MaxAttemptsExceeded"
+    )
 
     mock_redis.xadd.assert_called_once()
     call_kwargs = mock_redis.xadd.call_args[1]

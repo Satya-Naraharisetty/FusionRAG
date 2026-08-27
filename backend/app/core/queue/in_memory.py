@@ -16,7 +16,9 @@ class InMemoryDurableTaskQueue(DurableTaskQueue):
     Preserves serializable Job contracts and allows synchronous or asynchronous job dispatch.
     """
 
-    def __init__(self, dispatcher: JobDispatcher | None = None, auto_dispatch: bool = False) -> None:
+    def __init__(
+        self, dispatcher: JobDispatcher | None = None, auto_dispatch: bool = False
+    ) -> None:
         self._dispatcher = dispatcher
         self._auto_dispatch = auto_dispatch
         self._jobs: dict[UUID, Job] = {}
@@ -59,7 +61,9 @@ class InMemoryDurableTaskQueue(DurableTaskQueue):
             if result.success:
                 await self.acknowledge(job.job_id)
             elif result.retryable and job.attempt < job.max_attempts:
-                await self.schedule_retry(job, result.error or "Error", delay_seconds=0.0)
+                await self.schedule_retry(
+                    job, result.error or "Error", delay_seconds=0.0
+                )
             else:
                 await self.route_to_dead_letter(job, result.error or "Error")
 
@@ -84,7 +88,9 @@ class InMemoryDurableTaskQueue(DurableTaskQueue):
         else:
             await self.route_to_dead_letter(job, error)
 
-    async def schedule_retry(self, job: Job, error: str, delay_seconds: float = 0.0) -> None:
+    async def schedule_retry(
+        self, job: Job, error: str, delay_seconds: float = 0.0
+    ) -> None:
         job.attempt += 1
         self._retries.append((time.time() + delay_seconds, job))
 
