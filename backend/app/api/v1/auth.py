@@ -95,7 +95,7 @@ async def login(
         value=refresh_token,
         max_age=settings.COOKIE_MAX_AGE,
         path=settings.COOKIE_PATH,
-        domain=settings.COOKIE_DOMAIN,
+        domain=settings.COOKIE_DOMAIN or None,
         secure=settings.COOKIE_SECURE,
         httponly=True,
         samesite=settings.COOKIE_SAMESITE,
@@ -140,7 +140,7 @@ async def refresh(
         value=new_refresh_token,
         max_age=settings.COOKIE_MAX_AGE,
         path=settings.COOKIE_PATH,
-        domain=settings.COOKIE_DOMAIN,
+        domain=settings.COOKIE_DOMAIN or None,
         secure=settings.COOKIE_SECURE,
         httponly=True,
         samesite=settings.COOKIE_SAMESITE,
@@ -169,7 +169,7 @@ async def logout(
     response.delete_cookie(
         key=settings.COOKIE_NAME,
         path=settings.COOKIE_PATH,
-        domain=settings.COOKIE_DOMAIN,
+        domain=settings.COOKIE_DOMAIN or None,
         secure=settings.COOKIE_SECURE,
         httponly=True,
         samesite=settings.COOKIE_SAMESITE,
@@ -268,9 +268,10 @@ def google_oauth_initiate(response: Response):
         value=state,
         max_age=600,  # 10 minutes — enough time for user to approve
         path=settings.API_V1_STR + "/auth",
+        domain=settings.COOKIE_DOMAIN or None,
         secure=settings.COOKIE_SECURE,
         httponly=True,
-        samesite="lax",
+        samesite=settings.COOKIE_SAMESITE,
     )
     return redirect
 
@@ -348,7 +349,7 @@ async def google_oauth_callback(
         value=refresh_token,
         max_age=settings.COOKIE_MAX_AGE,
         path=settings.COOKIE_PATH,
-        domain=settings.COOKIE_DOMAIN,
+        domain=settings.COOKIE_DOMAIN or None,
         secure=settings.COOKIE_SECURE,
         httponly=True,
         samesite=settings.COOKIE_SAMESITE,
@@ -357,9 +358,10 @@ async def google_oauth_callback(
     redirect.delete_cookie(
         key=_OAUTH_STATE_COOKIE,
         path=settings.API_V1_STR + "/auth",
+        domain=settings.COOKIE_DOMAIN or None,
         secure=settings.COOKIE_SECURE,
         httponly=True,
-        samesite="lax",
+        samesite=settings.COOKIE_SAMESITE,
     )
     return redirect
 
@@ -386,9 +388,10 @@ def github_oauth_initiate(
         value=state,
         max_age=600,  # 10 minutes — enough time for user to approve
         path=settings.API_V1_STR + "/auth",
+        domain=settings.COOKIE_DOMAIN or None,
         secure=settings.COOKIE_SECURE,
         httponly=True,
-        samesite="lax",
+        samesite=settings.COOKIE_SAMESITE,
     )
     return redirect
 
@@ -466,7 +469,7 @@ async def github_oauth_callback(
         value=refresh_token,
         max_age=settings.COOKIE_MAX_AGE,
         path=settings.COOKIE_PATH,
-        domain=settings.COOKIE_DOMAIN,
+        domain=settings.COOKIE_DOMAIN or None,
         secure=settings.COOKIE_SECURE,
         httponly=True,
         samesite=settings.COOKIE_SAMESITE,
@@ -475,8 +478,9 @@ async def github_oauth_callback(
     redirect.delete_cookie(
         key=_OAUTH_STATE_COOKIE,
         path=settings.API_V1_STR + "/auth",
+        domain=settings.COOKIE_DOMAIN or None,
         secure=settings.COOKIE_SECURE,
         httponly=True,
-        samesite="lax",
+        samesite=settings.COOKIE_SAMESITE,
     )
     return redirect

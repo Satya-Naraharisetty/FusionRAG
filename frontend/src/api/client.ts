@@ -1,8 +1,8 @@
 import { SSEEvent, SSEEventType } from "../types";
 
 // Base API configuration
-const BASE_URL =
-  (import.meta.env.VITE_API_URL || "http://localhost:8000") + "/api/v1";
+const rawBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+const BASE_URL = rawBase.endsWith("/api/v1") ? rawBase : `${rawBase}/api/v1`;
 
 export interface TokenResponse {
   access_token: string;
