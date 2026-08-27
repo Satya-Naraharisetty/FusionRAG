@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import {
+  getAccessToken,
   registerAuthFailureHandler,
   registerTokenRefreshHandler,
   setAccessToken,
@@ -34,7 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<UserResponse | null>(null);
-  const [accessToken, setAccessTokenState] = useState<string | null>(null);
+  const [accessToken, setAccessTokenState] = useState<string | null>(getAccessToken());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const refreshTimerRef = useRef<number | null>(null);
 
@@ -141,6 +142,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const initAuth = async () => {
       try {
+        const savedToken = getAccessToken();
+        if (savedToken) {
+          setAccessToken(savedToken);
+          setAccessTokenState(savedToken);
+          const userProfile = await authApi.getMe();
+          if (active) {
+            setUser(userProfile);
+            setIsLoading(false);
+          }
+          return;
+        }
+
         const response = await authApi.refresh();
         if (active) {
           setAccessTokenState(response.access_token);

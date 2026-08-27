@@ -9,16 +9,45 @@ export interface TokenResponse {
   expires_in: number;
 }
 
-let accessToken: string | null = null;
+const TOKEN_STORAGE_KEY = "hybrid_rag_access_token";
+
+let accessToken: string | null = (() => {
+  try {
+    return typeof window !== "undefined" ? localStorage.getItem(TOKEN_STORAGE_KEY) : null;
+  } catch {
+    return null;
+  }
+})();
+
 let onTokenRefreshed: ((token: string) => void) | null = null;
 let onAuthFailure: (() => void) | null = null;
 let activeRefreshPromise: Promise<TokenResponse> | null = null;
 
 export const setAccessToken = (token: string | null) => {
   accessToken = token;
+  try {
+    if (typeof window !== "undefined") {
+      if (token) {
+        localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      } else {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+      }
+    }
+  } catch {
+    // Ignore storage quota / access errors
+  }
 };
 
-export const getAccessToken = () => accessToken;
+export const getAccessToken = () => {
+  if (!accessToken && typeof window !== "undefined") {
+    try {
+      accessToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+    } catch {
+      // Ignore
+    }
+  }
+  return accessToken;
+};
 
 export const registerTokenRefreshHandler = (handler: (token: string) => void) => {
   onTokenRefreshed = handler;
