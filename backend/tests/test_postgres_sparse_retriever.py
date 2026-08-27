@@ -36,12 +36,6 @@ def _sync_setup_db(sync_engine):
         db.execute(text("DELETE FROM users;"))
         db.execute(
             text(
-                "ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS search_vector tsvector "
-                "GENERATED ALWAYS AS (to_tsvector('english', coalesce(text, ''))) STORED;"
-            )
-        )
-        db.execute(
-            text(
                 "CREATE INDEX IF NOT EXISTS ix_document_chunks_search_vector ON document_chunks USING gin (search_vector);"
             )
         )

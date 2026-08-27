@@ -67,7 +67,7 @@ def search_test_db():
         )
         yield async_session_local
     finally:
-        pass
+        async_engine.sync_engine.dispose()
 
 
 # --- 1. SearchRanker Unit Tests ---

@@ -69,7 +69,9 @@ norecursedirs = [".venv", ".git"]
 filterwarnings = [
     "ignore::starlette.exceptions.StarletteDeprecationWarning",
     "ignore:.*starlette.testclient.*:DeprecationWarning",
+    "ignore:.*Using `httpx` with `starlette.testclient`.*:Warning",
     "ignore:.*Using `httpx` with `starlette.testclient`.*:DeprecationWarning",
+    "ignore:.*coroutine 'AsyncMockMixin.*' was never awaited.*:RuntimeWarning",
 ]
 
 [tool.setuptools]

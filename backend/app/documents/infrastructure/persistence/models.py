@@ -102,6 +102,21 @@ class SQLAlchemyChunk(Base):
     )
 
 
+from sqlalchemy import DDL, event  # noqa: E402
+
+event.listen(
+    SQLAlchemyChunk.__table__,
+    "after_create",
+    DDL(
+        "ALTER TABLE document_chunks DROP COLUMN IF EXISTS search_vector;\n"
+        "ALTER TABLE document_chunks ADD COLUMN search_vector tsvector "
+        "GENERATED ALWAYS AS (to_tsvector('english', coalesce(text, ''))) STORED;\n"
+        "CREATE INDEX IF NOT EXISTS ix_document_chunks_search_vector "
+        "ON document_chunks USING gin (search_vector);"
+    ).execute_if(dialect="postgresql"),
+)
+
+
 class SQLAlchemyEmbedding(Base):
     __tablename__ = "document_embeddings"
 

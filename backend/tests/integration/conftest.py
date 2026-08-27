@@ -4,6 +4,7 @@ from uuid import uuid4
 import pytest_asyncio
 import redis.asyncio as aioredis
 from qdrant_client import AsyncQdrantClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -51,6 +52,11 @@ async def real_db_session_factory() -> AsyncGenerator[
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_document_chunks_search_vector ON document_chunks USING gin (search_vector);"
+            )
+        )
 
     session_factory = async_sessionmaker(
         bind=engine,
