@@ -274,3 +274,31 @@ class AuthService:
         Query a user by UUID.
         """
         return await self._user_repo.get_by_id(user_id)
+
+    async def get_or_create_magic_link_user(self, email: str) -> UserDomain:
+        """
+        Find an existing user by email or create a new passwordless user account.
+        """
+        try:
+            normalized_email = email.strip().lower()
+            user = await self._user_repo.get_by_email(normalized_email)
+            if user:
+                return user
+
+            now = self._time_provider.get_now()
+            new_user = UserDomain(
+                id=self._uuid_generator.generate(),
+                email=normalized_email,
+                hashed_password=None,
+                role="user",
+                is_active=True,
+                created_at=now,
+                updated_at=now,
+                oauth_provider="magic_link",
+            )
+            saved = await self._user_repo.save(new_user)
+            await self._uow.commit()
+            return saved
+        except Exception:
+            await self._uow.rollback()
+            raise

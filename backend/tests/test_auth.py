@@ -540,3 +540,35 @@ def test_login_rate_limiting_lockout(client, test_db):
         assert "5 minutes" in error_msg
     finally:
         client.app.dependency_overrides.pop(get_login_failed_attempts_tracker, None)
+
+
+def test_magic_link_dispatch_new_user(client, test_db):
+    """
+    Test requesting a magic link for a new email automatically provisions
+    the user and dispatches an email via Resend mock.
+    """
+    res = client.post(
+        "/api/v1/auth/magic-link",
+        json={"email": "newuser-magic@example.com"},
+    )
+    assert res.status_code == status.HTTP_200_OK
+    assert "Magic sign-in link dispatched" in res.json()["message"]
+
+
+def test_magic_link_dispatch_existing_user(client, test_db):
+    """
+    Test requesting a magic link for an existing user account.
+    """
+    # Register user first
+    reg_res = client.post(
+        "/api/v1/auth/register",
+        json={"email": "existing-magic@example.com", "password": "Password123!"},
+    )
+    assert reg_res.status_code == status.HTTP_201_CREATED
+
+    res = client.post(
+        "/api/v1/auth/magic-link",
+        json={"email": "existing-magic@example.com"},
+    )
+    assert res.status_code == status.HTTP_200_OK
+    assert "Magic sign-in link dispatched" in res.json()["message"]

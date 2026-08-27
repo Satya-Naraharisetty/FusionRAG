@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../hooks/useAuth";
+import { authApi } from "../../api/auth";
 import { LoginCard } from "./LoginCard";
 import toast from "react-hot-toast";
 import { useSearchParams } from "react-router-dom";
@@ -53,10 +54,26 @@ export const LoginForm: React.FC = () => {
     if (isMagicLink) {
       if (!email) { setError("Please enter your email to receive a magic link."); return; }
       setIsSubmitting(true);
-      setTimeout(() => {
+      try {
+        const res = await authApi.requestMagicLink(email);
+        toast.success(res.message || "Magic sign-in link sent! Check your inbox.");
+      } catch (err: unknown) {
+        const e = err as {
+          status?: number;
+          message?: string;
+          data?: { message?: string; detail?: string; error?: { message?: string } };
+        };
+        const msg =
+          e.data?.error?.message ||
+          (typeof e.data?.detail === "string" ? e.data.detail : undefined) ||
+          e.data?.message ||
+          e.message ||
+          "Failed to send magic link. Please try again.";
+        setError(msg);
+        toast.error(msg);
+      } finally {
         setIsSubmitting(false);
-        toast.success("Magic sign-in link sent!");
-      }, 1000);
+      }
       return;
     }
 

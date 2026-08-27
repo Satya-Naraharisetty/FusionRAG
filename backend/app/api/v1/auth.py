@@ -14,6 +14,7 @@ from app.api.dependencies import (
 )
 from app.auth.domain.schemas import (
     DeleteAccountSchema,
+    MagicLinkRequestSchema,
     TokenResponseSchema,
     UserCreateSchema,
     UserLoginSchema,
@@ -22,6 +23,7 @@ from app.auth.domain.schemas import (
 from app.auth.services.auth_service import AuthService
 from app.auth.services.oauth_service import OAuthService
 from app.core.config import settings
+from app.core.email.resend_service import ResendEmailService, get_resend_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -228,6 +230,47 @@ async def delete_account(
         httponly=True,
         samesite=settings.COOKIE_SAMESITE,
     )
+
+
+# ── Passwordless Magic Link (Resend) ──────────────────────────────────────────
+
+
+@router.post(
+    "/magic-link",
+    summary="Request a passwordless magic sign-in link",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(check_rate_limit)],
+)
+async def request_magic_link(
+    payload: MagicLinkRequestSchema,
+    request: Request,
+    auth_service: AuthService = Depends(get_auth_service),
+    resend_service: ResendEmailService = Depends(get_resend_service),
+):
+    """
+    Generate and dispatch a passwordless Magic Sign-In link via Resend.
+    """
+    user = await auth_service.get_or_create_magic_link_user(payload.email)
+    user_agent = request.headers.get("User-Agent")
+    ip_address = request.client.host if request.client else None
+    access_token, _ = await auth_service.create_session(
+        user_id=user.id, user_agent=user_agent, ip_address=ip_address
+    )
+    frontend_base = settings.FRONTEND_URL.rstrip("/")
+    magic_url = f"{frontend_base}/oauth/callback#token={access_token}"
+
+    try:
+        await resend_service.send_magic_link(
+            to_email=user.email,
+            magic_url=magic_url,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to dispatch magic link email. Please check your email configuration.",
+        ) from exc
+
+    return {"message": "Magic sign-in link dispatched to your inbox."}
 
 
 # ── Google OAuth ───────────────────────────────────────────────────────────────

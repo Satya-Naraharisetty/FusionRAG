@@ -58,6 +58,10 @@ export const authApi = {
     });
   },
 
+  requestMagicLink(email: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>("/auth/magic-link", { email });
+  },
+
   openOAuthPopup(provider: "google" | "github"): Window | null {
     const rawBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
     const apiBase = rawBase.endsWith("/api/v1") ? rawBase.replace(/\/api\/v1$/, "") : rawBase;

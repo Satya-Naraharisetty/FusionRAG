@@ -64,6 +64,10 @@ class TokenResponseSchema(BaseModel):
     expires_in: int
 
 
+class MagicLinkRequestSchema(BaseModel):
+    email: EmailStr
+
+
 class UserDomain(BaseModel):
     id: UUID
     email: EmailStr
