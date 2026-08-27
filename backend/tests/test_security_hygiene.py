@@ -133,6 +133,7 @@ def test_oauth_configuration_disabled_behaves_correctly():
         JWT_SECRET="a_very_long_secure_secret_signing_key_32_bytes_long",
         ENCRYPTION_MASTER_KEY="a_very_secure_encryption_master_key_32_bytes_long",
         GEMINI_API_KEY="valid_key",
+        JINA_API_KEY="valid_jina_key",
         GOOGLE_CLIENT_ID="",
         GOOGLE_CLIENT_SECRET="",
         GITHUB_CLIENT_ID="",
