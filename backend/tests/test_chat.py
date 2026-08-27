@@ -392,7 +392,7 @@ async def test_answer_generation_service_success():
         conversation_manager=MockConversationManager(
             document_service=MockDocumentService(global_docs=[_stub_doc(doc_id)])
         ),
-        model="gpt-4o-mini",
+        model="gemini-3.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
@@ -406,7 +406,7 @@ async def test_answer_generation_service_success():
     assert len(response.citations) == 1
     assert response.citations[0].chunk_id == chunk_id
     assert response.citations[0].document_name == "doc.txt"
-    assert response.model == "gpt-4o-mini"
+    assert response.model == "gemini-3.5-flash-lite"
     assert response.usage.prompt_tokens == 10
 
 
@@ -436,7 +436,7 @@ async def test_answer_generation_service_empty_retrieval_answers_generally():
         llm_provider=llm_provider,
         token_estimator=estimator,
         conversation_manager=MockConversationManager(),
-        model="gpt-4o-mini",
+        model="gemini-3.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
@@ -482,7 +482,7 @@ async def test_answer_generation_service_documents_mention_notes_missing_context
         llm_provider=llm_provider,
         token_estimator=estimator,
         conversation_manager=MockConversationManager(),
-        model="gpt-4o-mini",
+        model="gemini-3.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
@@ -544,7 +544,7 @@ async def test_answer_generation_service_documents_mention_keeps_grounded_answer
         conversation_manager=MockConversationManager(
             document_service=MockDocumentService(global_docs=[_stub_doc(doc_id)])
         ),
-        model="gpt-4o-mini",
+        model="gemini-3.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
@@ -605,7 +605,7 @@ async def test_global_documents_not_retrieved_without_mention():
         conversation_manager=MockConversationManager(
             document_service=MockDocumentService(global_docs=[_stub_doc(doc_id)])
         ),
-        model="gpt-4o-mini",
+        model="gemini-3.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
@@ -677,7 +677,7 @@ async def test_chat_scoped_documents_always_retrieved():
         conversation_manager=MockConversationManager(
             document_service=MockDocumentService(scoped_docs=[_stub_doc(doc_id)])
         ),
-        model="gpt-4o-mini",
+        model="gemini-3.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
@@ -733,7 +733,7 @@ async def test_documents_mention_combines_scoped_and_global_ids():
                 scoped_docs=[_stub_doc(scoped_doc_id)],
             )
         ),
-        model="gpt-4o-mini",
+        model="gemini-3.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
@@ -789,7 +789,7 @@ async def test_answer_generation_service_budget_violations():
         llm_provider=llm_provider,
         token_estimator=estimator,
         conversation_manager=MockConversationManager(),
-        model="gpt-4o-mini",
+        model="gemini-3.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=5,  # Tiny system prompt budget
@@ -808,7 +808,7 @@ async def test_answer_generation_service_budget_violations():
         llm_provider=llm_provider,
         token_estimator=estimator,
         conversation_manager=MockConversationManager(),
-        model="gpt-4o-mini",
+        model="gemini-3.5-flash-lite",
         temperature=0.0,
         max_response_tokens=100,
         system_prompt_tokens_limit=500,
@@ -844,7 +844,7 @@ def test_api_chat_success(client):
         retrieval_time_ms=10.0,
         generation_time_ms=150.0,
         total_time_ms=160.0,
-        model="gpt-4o-mini",
+        model="gemini-3.5-flash-lite",
         usage=Usage(prompt_tokens=20, completion_tokens=10, total_tokens=30),
     )
 
@@ -932,7 +932,7 @@ def test_api_chat_streaming(client):
                 ],
                 "generation_time_ms": 100.0,
                 "total_time_ms": 110.0,
-                "model": "gpt-4o-mini",
+                "model": "gemini-3.5-flash-lite",
                 "usage": {
                     "prompt_tokens": 15,
                     "completion_tokens": 5,

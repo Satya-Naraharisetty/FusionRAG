@@ -169,7 +169,12 @@ class EmbeddingService:
                 tracer = get_tracer("hybrid-rag.embedding")
 
                 # 2. Call embedding generator
-                texts = [c.text for c in batch]
+                texts = [
+                    c.metadata.get("contextual_text", c.text)
+                    if isinstance(c.metadata, dict)
+                    else c.text
+                    for c in batch
+                ]
                 t0 = time.perf_counter()
                 with tracer.start_as_current_span("embedding.batch_generate") as span:
                     span.set_attribute("embedding.provider", self._provider_name)

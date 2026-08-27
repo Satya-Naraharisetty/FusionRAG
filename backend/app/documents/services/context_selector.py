@@ -26,6 +26,7 @@ class SelectedContext(BaseModel):
 class ContextSelector:
     """
     ContextSelector enforces relevance thresholds, deterministic ordering,
+    hierarchical parent-child resolution, sentence-window expansion,
     optional post-reranking neighbor chunk expansion, deduplication,
     and strict token budgets.
     """
@@ -42,6 +43,8 @@ class ContextSelector:
         ordering_strategy: str = "rerank_score_desc",
         enable_neighbor_chunks: bool = False,
         neighbor_window: int = 1,
+        enable_parent_child: bool = False,
+        enable_sentence_window: bool = False,
         chunk_repo: ChunkRepository | None = None,
     ) -> None:
         self.token_estimator = token_estimator
@@ -52,6 +55,8 @@ class ContextSelector:
         self.ordering_strategy = ordering_strategy
         self.enable_neighbor_chunks = enable_neighbor_chunks
         self.neighbor_window = max(1, neighbor_window)
+        self.enable_parent_child = enable_parent_child
+        self.enable_sentence_window = enable_sentence_window
         self.chunk_repo = chunk_repo
 
     def _get_target_score(self, chunk: RetrievedChunk) -> float:
@@ -188,21 +193,50 @@ class ContextSelector:
         # 4. Context Ordering
         ordered_chunks = self._sort_chunks(expanded_chunks)
 
-        # 5. Token Budget Enforcement & Truncation
+        # 5. Token Budget Enforcement & Parent/Window Resolution
         final_chunks: list[RetrievedChunk] = []
         concatenated_parts: list[str] = []
         accumulated_tokens = 0
         truncated = False
+        seen_parent_ids: set[str] = set()
 
         for chunk in ordered_chunks:
             if len(final_chunks) >= self.max_chunks:
                 truncated = True
                 break
 
+            # Resolve text based on strategy
+            parent_id = (
+                chunk.metadata.get("parent_chunk_id")
+                if isinstance(chunk.metadata, dict)
+                else None
+            )
+            parent_text = (
+                chunk.metadata.get("parent_text")
+                if isinstance(chunk.metadata, dict)
+                else None
+            )
+            window_text = (
+                chunk.metadata.get("window_text")
+                if isinstance(chunk.metadata, dict)
+                else None
+            )
+
+            if (self.enable_parent_child or parent_text) and parent_id:
+                # Deduplicate multiple child chunks belonging to the same parent
+                if parent_id in seen_parent_ids:
+                    continue
+                seen_parent_ids.add(parent_id)
+                display_text = parent_text or chunk.text
+            elif (self.enable_sentence_window or window_text) and window_text:
+                display_text = window_text
+            else:
+                display_text = chunk.text
+
             idx = len(final_chunks) + 1
             formatted_chunk = (
                 f"[Chunk {idx}] Document: {chunk.document_name} (ID: {chunk.document_id})\n"
-                f"{chunk.text.strip()}\n\n"
+                f"{display_text.strip()}\n\n"
             )
             chunk_tokens = self.token_estimator.estimate(formatted_chunk)
 

@@ -109,7 +109,7 @@ class LLMProviderRouter(LLMProvider):
         # Use fallback model name for backup if we failed over
         actual_model = model
         if provider_key == "openai" and "gemini" in model:
-            actual_model = "gpt-4o-mini"  # Default backup model
+            actual_model = "gemini-3.5-flash-lite"  # Default backup model
         elif provider_key == "gemini" and "gpt" in model:
             actual_model = "gemini-3.5-flash-lite"  # Default backup model
 
@@ -270,7 +270,7 @@ class LLMProviderRouter(LLMProvider):
 
         actual_model = model
         if provider_key == "openai" and "gemini" in model:
-            actual_model = "gpt-4o-mini"
+            actual_model = "gemini-3.5-flash-lite"
         elif provider_key == "gemini" and "gpt" in model:
             actual_model = "gemini-3.5-flash-lite"
 

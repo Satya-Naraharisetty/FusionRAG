@@ -133,6 +133,7 @@ class DocumentProcessingService:
                     cleaned_text,
                     document.id,
                     document.checksum,
+                    document_name=document.original_filename,
                 )
                 span.set_attribute("document.chunk_count", len(chunk_result.chunks))
             chunk_dur = time.perf_counter() - t0

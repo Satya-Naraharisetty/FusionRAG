@@ -330,6 +330,14 @@ def get_chunking_service() -> ChunkingService:
         chunk_overlap=settings.CHUNK_OVERLAP,
         min_chunk_size=settings.MIN_CHUNK_SIZE,
         strategy=settings.CHUNK_STRATEGY,
+        parent_chunk_size=settings.PARENT_CHUNK_SIZE,
+        parent_chunk_overlap=settings.PARENT_CHUNK_OVERLAP,
+        child_chunk_size=settings.CHILD_CHUNK_SIZE,
+        child_chunk_overlap=settings.CHILD_CHUNK_OVERLAP,
+        sentence_window_size=settings.SENTENCE_WINDOW_SIZE,
+        enable_parent_child=settings.ENABLE_PARENT_CHILD_RAG,
+        enable_sentence_window=settings.ENABLE_SENTENCE_WINDOW_RAG,
+        enable_contextual=settings.ENABLE_CONTEXTUAL_RETRIEVAL,
     )
 
 
@@ -863,6 +871,8 @@ def get_context_selector(
         ordering_strategy=settings.CONTEXT_ORDERING_STRATEGY,
         enable_neighbor_chunks=settings.ENABLE_NEIGHBOR_CHUNKS,
         neighbor_window=settings.NEIGHBOR_CHUNK_WINDOW,
+        enable_parent_child=settings.ENABLE_PARENT_CHILD_RAG,
+        enable_sentence_window=settings.ENABLE_SENTENCE_WINDOW_RAG,
         chunk_repo=chunk_repo,
     )
 

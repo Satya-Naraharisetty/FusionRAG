@@ -109,7 +109,7 @@ def _setup_mock_orchestrator():
         token_estimator=mock_token_estimator,
         llm_generation_service=mock_llm_service,
         agent_executor=AsyncMock(),
-        model="gpt-4o-mini",
+        model="gemini-3.5-flash-lite",
         enable_conversation_memory=True,
         enable_tool_calling=False,
         enable_multi_agent=False,

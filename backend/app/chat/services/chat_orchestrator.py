@@ -326,12 +326,124 @@ class ChatOrchestrator:
                     )
                     query_to_retrieve = question
 
-                # 3. Retrieve chunks using the standalone query
+                # 3. Execution Branching: Multi-Agent vs Baseline Single-Agent RAG
+                if self.enable_multi_agent and self.master_agent is not None:
+                    # -------------------------------------------------------------
+                    # Multi-Agent Path: ResearchAgent owns retrieval execution.
+                    # Upfront retrieval in ChatOrchestrator is bypassed to eliminate duplicate work.
+                    # -------------------------------------------------------------
+                    assistant_message_id = uuid.uuid4()
+                    await self.conversation_manager._message_repo.create_assistant_message(
+                        conversation_id=conversation_id,
+                        message_id=assistant_message_id,
+                        role=MessageRole.ASSISTANT,
+                    )
+
+                    from app.chat.domain.multi_agent import AgentExecutionContext
+
+                    agent_ctx = AgentExecutionContext(
+                        request_id=request_id_ctx.get() or str(uuid.uuid4()),
+                        user_id=user_id,
+                        conversation_id=conversation_id,
+                        include_library_documents=documents_priority,
+                        include_conversation_documents=True,
+                        document_ids=retrieval_doc_ids,
+                    )
+
+                    gen_start_time = time.perf_counter()
+                    try:
+                        multi_resp = await self.master_agent.execute_request(
+                            request=question,
+                            context=agent_ctx,
+                            model=self.model,
+                            temperature=self.temperature,
+                            max_tokens=self.max_response_tokens,
+                        )
+                        answer_text = multi_resp.answer
+                        usage = multi_resp.usage
+                        citations = multi_resp.citations or []
+                        generation_time_ms = (
+                            time.perf_counter() - gen_start_time
+                        ) * 1000
+                    except Exception as e:
+                        await self.conversation_manager._message_repo.fail_message(
+                            assistant_message_id, str(e)
+                        )
+                        raise
+
+                    research_latency = getattr(
+                        multi_resp.diagnostics, "research_retrieval_latency_ms", 0.0
+                    )
+                    evidence_count = getattr(
+                        multi_resp.diagnostics,
+                        "research_evidence_count",
+                        len(citations),
+                    )
+                    diagnostics = RetrievalDiagnostics(
+                        rewritten=rewrite_result.rewrite_applied,
+                        retrieval_skipped=skip_retrieval,
+                        dense_count=evidence_count,
+                        sparse_count=0,
+                        fusion_count=evidence_count,
+                        rerank_count=len(citations),
+                        latencies={
+                            "research_retrieval": research_latency,
+                            "multi_agent_total": multi_resp.total_time_ms,
+                        },
+                    )
+
+                    citations_data = [
+                        {
+                            "document_id": str(cit.document_id),
+                            "document_name": cit.document_name,
+                            "chunk_id": str(cit.chunk_id) if cit.chunk_id else None,
+                            "chunk_index": cit.chunk_index,
+                        }
+                        for cit in citations
+                    ]
+
+                    total_time_ms = (time.perf_counter() - start_time) * 1000
+                    metadata = {
+                        "retrieval_time_ms": research_latency,
+                        "generation_time_ms": generation_time_ms,
+                        "total_time_ms": total_time_ms,
+                    }
+
+                    await self.conversation_manager.finalize_message(
+                        conversation_id=conversation_id,
+                        message_id=assistant_message_id,
+                        assistant_content=answer_text,
+                        prompt_tokens=usage.prompt_tokens,
+                        completion_tokens=usage.completion_tokens,
+                        citations=citations_data,
+                        metadata=metadata,
+                    )
+
+                    req_id = request_id_ctx.get() or "N/A"
+                    logger.info(
+                        f"Multi-Agent answer generation completed - RequestID: {req_id} - "
+                        f"ConversationID: {conversation_id} - Model: {self.model} - "
+                        f"Retrieval latency: {research_latency:.2f}ms - Total latency: {total_time_ms:.2f}ms"
+                    )
+
+                    status_label = "success"
+                    return AnswerResponse(
+                        answer=answer_text,
+                        citations=citations,
+                        retrieval_time_ms=round(research_latency, 2),
+                        generation_time_ms=round(generation_time_ms, 2),
+                        total_time_ms=round(total_time_ms, 2),
+                        model=self.model,
+                        usage=usage,
+                        conversation_id=conversation_id,
+                        diagnostics=diagnostics,
+                    )
+
+                # -------------------------------------------------------------
+                # Baseline Single-Agent RAG Path
+                # -------------------------------------------------------------
                 retrieval_start = time.perf_counter()
                 if skip_retrieval:
-                    # Nothing to search (no chat-scoped documents and no @documents
-                    # mention): the prompt builder relaxes the context rule so the LLM
-                    # answers from general knowledge.
                     search_result = SearchResult(
                         original_query=query_to_retrieve,
                         retrieval_time=0.0,
@@ -375,11 +487,6 @@ class ChatOrchestrator:
                         )
                 retrieval_time_ms = (time.perf_counter() - retrieval_start) * 1000
 
-                # Note: an empty retrieval does NOT abort the request. The prompt is
-                # built with an empty context and the assistant answers from general
-                # knowledge (calling out the gap when @documents was used).
-
-                # 4. Gather Diagnostics
                 dense_count = (
                     len(search_result.dense_matches)
                     if search_result.dense_matches
@@ -400,7 +507,6 @@ class ChatOrchestrator:
                     latencies={"retrieval_service": retrieval_time_ms},
                 )
 
-                # 5. Build structured ConversationContext
                 full_context = self.context_builder.build_context(
                     conversation=conversation,
                     recent_messages=context_obj.recent_messages,
@@ -409,7 +515,6 @@ class ChatOrchestrator:
                     diagnostics=diagnostics,
                 )
 
-                # 6. Budget prompts and extract final fitting chunks
                 with tracer.start_as_current_span("rag.build_prompt") as prompt_span:
                     messages, final_chunks = self.prompt_builder.build_prompt(
                         context_obj=full_context,
@@ -421,10 +526,6 @@ class ChatOrchestrator:
                     )
                     prompt_span.set_attribute("prompt.chunks_count", len(final_chunks))
 
-                # If final_chunks is empty, citations will be empty and the assistant
-                # answers from general knowledge (see PromptBuilder instructions).
-
-                # 7. Create assistant message in database (status = PENDING)
                 assistant_message_id = uuid.uuid4()
                 await self.conversation_manager._message_repo.create_assistant_message(
                     conversation_id=conversation_id,
@@ -432,40 +533,13 @@ class ChatOrchestrator:
                     role=MessageRole.ASSISTANT,
                 )
 
-                # 8. Call LLM, Multi-Agent, or Single-Agent Loop
                 gen_start_time = time.perf_counter()
                 try:
-                    if self.enable_multi_agent and self.master_agent is not None:
-                        from app.chat.domain.multi_agent import AgentExecutionContext
-
-                        agent_ctx = AgentExecutionContext(
-                            request_id=request_id_ctx.get() or str(uuid.uuid4()),
-                            user_id=user_id,
-                            conversation_id=conversation_id,
-                            include_library_documents=documents_priority,
-                            include_conversation_documents=True,
-                            document_ids=retrieval_doc_ids,
-                        )
-                        multi_resp = await self.master_agent.execute_request(
-                            request=question,
-                            context=agent_ctx,
-                            model=self.model,
-                            temperature=self.temperature,
-                            max_tokens=self.max_response_tokens,
-                        )
-                        answer_text = multi_resp.answer
-                        usage = multi_resp.usage
-                        if multi_resp.citations:
-                            citations = multi_resp.citations
-                    elif self.enable_tool_calling and final_chunks:
-                        # Instantiate thread-safe execution context
+                    if self.enable_tool_calling and final_chunks:
                         tool_context = ToolContext(
                             user_id=user_id,
                             conversation_id=conversation_id,
-                            db_session=self.conversation_manager._conversation_repo._db,  # type: ignore[attr-defined]  # access underlying SQLAlchemy Session
-                            # Explicit retrieval intent: set from the @documents mention.
-                            # This is the only authoritative source for agent tools;
-                            # never derived from model-supplied document IDs.
+                            db_session=self.conversation_manager._conversation_repo._db,  # type: ignore[attr-defined]
                             include_library_documents=documents_priority,
                             include_conversation_documents=True,
                         )
@@ -508,7 +582,6 @@ class ChatOrchestrator:
                     )
                     raise
 
-                # 9. Map Citations
                 citations = [
                     Citation(
                         document_id=chunk.document_id,
@@ -535,7 +608,6 @@ class ChatOrchestrator:
                     "total_time_ms": total_time_ms,
                 }
 
-                # 10. Persist completion details
                 await self.conversation_manager.finalize_message(
                     conversation_id=conversation_id,
                     message_id=assistant_message_id,
@@ -546,7 +618,6 @@ class ChatOrchestrator:
                     metadata=metadata,
                 )
 
-                # Log Observability Metrics
                 req_id = request_id_ctx.get() or "N/A"
                 logger.info(
                     f"Answer generation completed - RequestID: {req_id} - "
@@ -688,12 +759,171 @@ class ChatOrchestrator:
             )
             query_to_retrieve = question
 
-        # 3. Retrieve chunks
+        assistant_message_id = uuid.uuid4()
+        message_finalized = False
+
+        async def _mark_interrupted_if_incomplete() -> None:
+            if message_finalized:
+                return
+            try:
+                await self.conversation_manager._message_repo.interrupt_message(
+                    assistant_message_id, reason="client_disconnected"
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to mark interrupted assistant message %s",
+                    assistant_message_id,
+                )
+
+        # 3. Execution Branching: Multi-Agent vs Baseline Single-Agent RAG Streaming
+        if self.enable_multi_agent and self.master_agent is not None:
+            await self.conversation_manager._message_repo.create_assistant_message(
+                conversation_id=conversation_id,
+                message_id=assistant_message_id,
+                role=MessageRole.ASSISTANT,
+            )
+
+            try:
+                from app.chat.domain.multi_agent import AgentExecutionContext
+
+                # Yield initial metadata event
+                yield {
+                    "event": "metadata",
+                    "data": {
+                        "citations": [],
+                        "retrieval_time_ms": 0.0,
+                        "conversation_id": str(conversation_id),
+                        "diagnostics": {
+                            "retrieval_skipped": skip_retrieval,
+                            "dense_count": 0,
+                            "sparse_count": 0,
+                            "fusion_count": 0,
+                            "rerank_count": 0,
+                            "rewritten": rewrite_result.rewrite_applied,
+                            "latencies": {},
+                        },
+                    },
+                }
+
+                agent_ctx = AgentExecutionContext(
+                    request_id=request_id_ctx.get() or str(uuid.uuid4()),
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    include_library_documents=documents_priority,
+                    include_conversation_documents=True,
+                    document_ids=retrieval_doc_ids,
+                )
+
+                gen_start_time = time.perf_counter()
+                full_answer_list = []
+                final_usage = None
+                stream_citations = []
+
+                async for event in self.master_agent.execute_request_stream(
+                    request=question,
+                    context=agent_ctx,
+                    model=self.model,
+                    temperature=self.temperature,
+                    max_tokens=self.max_response_tokens,
+                ):
+                    if event.get("event") == "text":
+                        text_val = event["data"]["text"]
+                        full_answer_list.append(text_val)
+                        await (
+                            self.conversation_manager._message_repo.append_stream_chunk(
+                                assistant_message_id, text_val
+                            )
+                        )
+                    elif event.get("event") == "synthesis_done":
+                        if "usage" in event.get("data", {}):
+                            u_data = event["data"]["usage"]
+                            final_usage = Usage(
+                                prompt_tokens=u_data.get("prompt_tokens", 0),
+                                completion_tokens=u_data.get("completion_tokens", 0),
+                                total_tokens=u_data.get("total_tokens", 0),
+                            )
+                        if "citations" in event.get("data", {}):
+                            stream_citations = event["data"]["citations"]
+                    yield event
+
+                total_time_ms = (time.perf_counter() - start_time) * 1000
+                gen_time_ms = (time.perf_counter() - gen_start_time) * 1000
+                full_answer_text = "".join(full_answer_list)
+                usage_to_save = final_usage or Usage(
+                    prompt_tokens=0, completion_tokens=0, total_tokens=0
+                )
+
+                citations_data = [
+                    {
+                        "document_id": str(cit.get("document_id", "")),
+                        "document_name": cit.get("document_name", ""),
+                        "chunk_id": str(cit.get("chunk_id", ""))
+                        if cit.get("chunk_id")
+                        else None,
+                        "chunk_index": cit.get("chunk_index", 0),
+                    }
+                    if isinstance(cit, dict)
+                    else {
+                        "document_id": str(cit.document_id),
+                        "document_name": cit.document_name,
+                        "chunk_id": str(cit.chunk_id) if cit.chunk_id else None,
+                        "chunk_index": cit.chunk_index,
+                    }
+                    for cit in stream_citations
+                ]
+
+                metadata = {
+                    "retrieval_time_ms": 0.0,
+                    "generation_time_ms": gen_time_ms,
+                    "total_time_ms": total_time_ms,
+                }
+
+                await self.conversation_manager.finalize_message(
+                    conversation_id=conversation_id,
+                    message_id=assistant_message_id,
+                    assistant_content=full_answer_text,
+                    prompt_tokens=usage_to_save.prompt_tokens,
+                    completion_tokens=usage_to_save.completion_tokens,
+                    citations=citations_data,
+                    metadata=metadata,
+                )
+                message_finalized = True
+
+                yield {
+                    "event": "done",
+                    "data": {
+                        "assistant_message_id": str(assistant_message_id),
+                        "conversation_id": str(conversation_id),
+                        "total_time_ms": round(total_time_ms, 2),
+                        "citations": citations_data,
+                        "answer": full_answer_text,
+                        "diagnostics": {
+                            "retrieval_skipped": skip_retrieval,
+                            "dense_count": len(citations_data),
+                            "sparse_count": 0,
+                            "fusion_count": len(citations_data),
+                            "rerank_count": len(citations_data),
+                            "rewritten": rewrite_result.rewrite_applied,
+                            "latencies": {},
+                        },
+                    },
+                }
+                return
+            except Exception as e:
+                await self.conversation_manager._message_repo.fail_message(
+                    assistant_message_id, str(e)
+                )
+                yield {"event": "error", "data": {"error": str(e)}}
+                return
+            finally:
+                if not message_finalized:
+                    await _mark_interrupted_if_incomplete()
+
+        # -------------------------------------------------------------
+        # Baseline Single-Agent RAG Streaming Path
+        # -------------------------------------------------------------
         retrieval_start = time.perf_counter()
         if skip_retrieval:
-            # Nothing to search (no chat-scoped documents and no @documents
-            # mention): the prompt builder relaxes the context rule so the LLM
-            # answers from general knowledge.
             search_result = SearchResult(
                 original_query=query_to_retrieve,
                 retrieval_time=0.0,
@@ -776,7 +1006,6 @@ class ChatOrchestrator:
         # answers from general knowledge (see PromptBuilder instructions).
 
         # 7. Create assistant message in database (status = PENDING)
-        assistant_message_id = uuid.uuid4()
         await self.conversation_manager._message_repo.create_assistant_message(
             conversation_id=conversation_id,
             message_id=assistant_message_id,
@@ -803,26 +1032,6 @@ class ChatOrchestrator:
             for cit in citations
         ]
 
-        message_finalized = False
-
-        async def _mark_interrupted_if_incomplete() -> None:
-            """
-            Persist any partially streamed assistant output in a terminal state
-            when the stream ends abnormally (client disconnect, task
-            cancellation, or any other unexpected exit).
-            """
-            if message_finalized:
-                return
-            try:
-                await self.conversation_manager._message_repo.interrupt_message(
-                    assistant_message_id, reason="client_disconnected"
-                )
-            except Exception:
-                logger.exception(
-                    "Failed to mark interrupted assistant message %s",
-                    assistant_message_id,
-                )
-
         try:
             # Yield metadata first event
             yield {
@@ -841,42 +1050,7 @@ class ChatOrchestrator:
             final_usage = None
 
             try:
-                if self.enable_multi_agent and self.master_agent is not None:
-                    from app.chat.domain.multi_agent import AgentExecutionContext
-
-                    agent_ctx = AgentExecutionContext(
-                        request_id=request_id_ctx.get() or str(uuid.uuid4()),
-                        user_id=user_id,
-                        conversation_id=conversation_id,
-                        include_library_documents=documents_priority,
-                        include_conversation_documents=True,
-                        document_ids=retrieval_doc_ids,
-                    )
-                    async for event in self.master_agent.execute_request_stream(
-                        request=question,
-                        context=agent_ctx,
-                        model=self.model,
-                        temperature=self.temperature,
-                        max_tokens=self.max_response_tokens,
-                    ):
-                        if event.get("event") == "text":
-                            text_val = event["data"]["text"]
-                            full_answer_list.append(text_val)
-                            await self.conversation_manager._message_repo.append_stream_chunk(
-                                assistant_message_id, text_val
-                            )
-                        elif event.get("event") == "synthesis_done":
-                            if "usage" in event.get("data", {}):
-                                u_data = event["data"]["usage"]
-                                final_usage = Usage(
-                                    prompt_tokens=u_data.get("prompt_tokens", 0),
-                                    completion_tokens=u_data.get(
-                                        "completion_tokens", 0
-                                    ),
-                                    total_tokens=u_data.get("total_tokens", 0),
-                                )
-                        yield event
-                elif self.enable_tool_calling and final_chunks:
+                if self.enable_tool_calling and final_chunks:
                     tool_context = ToolContext(
                         user_id=user_id,
                         conversation_id=conversation_id,

@@ -981,3 +981,78 @@ async def test_master_agent_compound_query_end_to_end():
     assert len(resp.specialist_results) == 2
     assert len(resp.citations) == 1
     assert resp.citations[0].document_name == "q2_report.pdf"
+
+
+@pytest.mark.asyncio
+async def test_chat_orchestrator_multi_agent_eliminates_duplicate_retrieval():
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.chat.domain.models import Usage
+    from app.chat.domain.multi_agent import (
+        ExecutionPlan,
+        MultiAgentDiagnostics,
+        MultiAgentResponse,
+    )
+    from app.chat.services.chat_orchestrator import ChatOrchestrator
+
+    mock_conv_mgr = AsyncMock()
+    mock_conv = MagicMock()
+    mock_conv.id = uuid4()
+    mock_conv_mgr.get_or_create_conversation.return_value = mock_conv
+
+    mock_ctx = MagicMock()
+    mock_ctx.recent_messages = []
+    mock_ctx.summary = None
+    mock_rewrite = MagicMock()
+    mock_rewrite.rewritten_query = "What is the policy?"
+    mock_rewrite.rewrite_applied = False
+    mock_conv_mgr.prepare_context.return_value = (mock_ctx, mock_rewrite)
+
+    # Mock retrieval service to track calls
+    mock_retrieval = AsyncMock()
+
+    # Mock master agent
+    mock_master = AsyncMock()
+    mock_master.execute_request.return_value = MultiAgentResponse(
+        answer="The refund policy allows 30 days.",
+        plan=ExecutionPlan(request_id="r1", tasks=[]),
+        specialist_results=[],
+        citations=[],
+        usage=Usage(prompt_tokens=10, completion_tokens=10, total_tokens=20),
+        total_time_ms=120.0,
+        diagnostics=MultiAgentDiagnostics(
+            research_retrieval_latency_ms=45.0, research_evidence_count=1
+        ),
+    )
+
+    doc_service = AsyncMock()
+    doc_service.list_documents.return_value = [MagicMock(id=uuid4())]
+    mock_conv_mgr._document_service = doc_service
+
+    orchestrator = ChatOrchestrator(
+        conversation_manager=mock_conv_mgr,
+        retrieval_service=mock_retrieval,
+        prompt_builder=MagicMock(),
+        context_builder=MagicMock(),
+        token_estimator=MagicMock(estimate=MagicMock(return_value=10)),
+        llm_generation_service=AsyncMock(),
+        agent_executor=AsyncMock(),
+        master_agent=mock_master,
+        model="gemini-3.5-flash-lite",
+        enable_conversation_memory=True,
+        enable_multi_agent=True,
+    )
+
+    resp = await orchestrator.generate_answer(
+        conversation_id=mock_conv.id,
+        user_id=uuid4(),
+        question="What is the policy? @documents",
+        top_k=5,
+    )
+
+    # Critical Assertion: RetrievalService was NOT called upfront by ChatOrchestrator!
+    mock_retrieval.retrieve.assert_not_called()
+    # MasterAgent was called to own the request
+    mock_master.execute_request.assert_called_once()
+    assert resp.answer == "The refund policy allows 30 days."
+    assert resp.retrieval_time_ms == 45.0

@@ -90,7 +90,7 @@ async def test_chat_orchestration_trace_hierarchy():
             token_estimator=mock_token_estimator,
             llm_generation_service=mock_llm_service,
             agent_executor=AsyncMock(),
-            model="gpt-4o-mini",
+            model="gemini-3.5-flash-lite",
             enable_conversation_memory=True,
             enable_tool_calling=False,
         )

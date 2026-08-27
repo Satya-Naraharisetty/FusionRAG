@@ -209,6 +209,11 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 50
     MIN_CHUNK_SIZE: int = 50
     CHUNK_STRATEGY: str = "recursive"
+    PARENT_CHUNK_SIZE: int = 1500
+    PARENT_CHUNK_OVERLAP: int = 150
+    CHILD_CHUNK_SIZE: int = 400
+    CHILD_CHUNK_OVERLAP: int = 50
+    SENTENCE_WINDOW_SIZE: int = 2
 
     # Retrieval & Search Configurations
     DEFAULT_TOP_K: int = 10
@@ -264,6 +269,9 @@ class Settings(BaseSettings):
     CONTEXT_ORDERING_STRATEGY: str = "rerank_score_desc"
     ENABLE_NEIGHBOR_CHUNKS: bool = False
     NEIGHBOR_CHUNK_WINDOW: int = 1
+    ENABLE_PARENT_CHILD_RAG: bool = False
+    ENABLE_SENTENCE_WINDOW_RAG: bool = False
+    ENABLE_CONTEXTUAL_RETRIEVAL: bool = False
     TOTAL_ADVANCED_RAG_TIMEOUT_MS: int = 3000
 
     # Adaptive / Agentic RAG Orchestration Configurations (Phase 2.5)
