@@ -12,18 +12,11 @@ root.render(
   </React.StrictMode>
 );
 
-// PWA Service Worker Registration
-if ("serviceWorker" in navigator && !import.meta.env.DEV) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/sw.js")
-      .then((_reg) => {
-        // eslint-disable-next-line no-console
-        console.log("PWA Service Worker registered successfully.");
-      })
-      .catch((err) => {
-        // eslint-disable-next-line no-console
-        console.error("PWA Service Worker registration failed:", err);
-      });
+// Ensure stale service workers are cleanly unregistered
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      registration.unregister();
+    }
   });
 }

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { UploadQueueProvider } from "./context/UploadQueueContext";
@@ -12,13 +12,14 @@ import { ErrorBoundary } from "./components/error/ErrorBoundary";
 import { ErrorPage } from "./components/error/ErrorPage";
 import { Toaster } from "react-hot-toast";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazyWithRetry } from "./utils/lazyWithRetry";
 
-// Lazy-loaded pages for route-based chunk splitting
-const ChatPage = lazy(() => import("./pages/ChatPage"));
-const DocumentsPage = lazy(() => import("./pages/DocumentsPage"));
-const SettingsPage = lazy(() => import("./pages/SettingsPage"));
-const OAuthCallbackPage = lazy(() => import("./pages/OAuthCallbackPage"));
-const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
+// Lazy-loaded pages with auto-recovery on new deployment chunk rotations
+const ChatPage = lazyWithRetry(() => import("./pages/ChatPage"));
+const DocumentsPage = lazyWithRetry(() => import("./pages/DocumentsPage"));
+const SettingsPage = lazyWithRetry(() => import("./pages/SettingsPage"));
+const OAuthCallbackPage = lazyWithRetry(() => import("./pages/OAuthCallbackPage"));
+const AdminDashboardPage = lazyWithRetry(() => import("./pages/AdminDashboardPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
