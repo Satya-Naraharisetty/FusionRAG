@@ -122,10 +122,24 @@ class RedisStreamTaskQueue(DurableTaskQueue):
         Enqueues a job onto the Redis Stream.
         Serializes strictly metadata — never raw binaries or Python callables.
         """
+        from app.core.telemetry import (
+            QUEUE_JOBS,
+            get_tracer,
+            inject_trace_context,
+        )
+
+        tracer = get_tracer("hybrid-rag.queue")
+
+        # Inject active W3C trace context into payload metadata if active
+        enriched_payload = dict(payload)
+        trace_ctx = inject_trace_context({})
+        if trace_ctx:
+            enriched_payload["_trace_context"] = trace_ctx
+
         job = Job(
             job_id=job_id or uuid4(),
             task_type=task_type,
-            payload=payload,
+            payload=enriched_payload,
             attempt=1,
             max_attempts=max_attempts,
             created_at=datetime.now(UTC),
@@ -135,15 +149,25 @@ class RedisStreamTaskQueue(DurableTaskQueue):
         job_data = job.model_dump_json_safe()
         serialized = json.dumps(job_data)
 
-        msg_id = await self._redis.xadd(
-            name=self._stream_name,
-            fields={"data": serialized},
-            maxlen=self._max_stream_length,
-            approximate=True,
-        )
+        with tracer.start_as_current_span("queue.enqueue") as span:
+            span.set_attribute("queue.task_type", task_type)
+            span.set_attribute("queue.stream_name", self._stream_name)
+
+            msg_id = await self._redis.xadd(
+                name=self._stream_name,
+                fields={"data": serialized},
+                maxlen=self._max_stream_length,
+                approximate=True,
+            )
+
         msg_id_str = (
             msg_id.decode("utf-8") if isinstance(msg_id, bytes) else str(msg_id)
         )
+
+        try:
+            QUEUE_JOBS.labels(task_type=task_type, status="enqueued").inc()
+        except Exception:
+            pass
 
         logger.info(
             f"queue.job_enqueued: job_id={job.job_id} task_type={job.task_type} "
@@ -384,3 +408,32 @@ class RedisStreamTaskQueue(DurableTaskQueue):
         except Exception as e:
             logger.error(f"Failed to execute atomic retry pump Lua script: {e}")
             raise
+
+    async def get_stream_length(self) -> int:
+        """Returns the total number of entries in the main stream via XLEN."""
+        try:
+            length = await self._redis.xlen(self._stream_name)
+            return int(length or 0)
+        except Exception as e:
+            logger.debug(f"Failed to get stream length for '{self._stream_name}': {e}")
+            return 0
+
+    async def get_consumer_lag(self) -> int:
+        """
+        Returns the total number of pending entries in the configured consumer group (PEL count).
+        Consistent with the QUEUE_CONSUMER_LAG metric definition.
+        """
+        try:
+            pending_info = await self._redis.xpending(
+                self._stream_name, self._consumer_group
+            )
+            if isinstance(pending_info, dict):
+                return int(pending_info.get("pending", 0))
+            elif isinstance(pending_info, (list, tuple)) and len(pending_info) > 0:
+                return int(pending_info[0])
+            return 0
+        except Exception as e:
+            logger.debug(
+                f"Failed to get consumer lag for '{self._stream_name}' group '{self._consumer_group}': {e}"
+            )
+            return 0

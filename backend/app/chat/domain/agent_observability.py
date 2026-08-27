@@ -13,6 +13,7 @@ SENSITIVE_KEYS = {
     "set-cookie",
     "access_token",
     "refresh_token",
+    "token",
     "api_key",
     "apikey",
     "secret",

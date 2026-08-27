@@ -251,6 +251,11 @@ async def lifespan(app: FastAPI):
         app.state.error_count = 0
         app.state.started_at = time.time()
 
+        # Initialize OpenTelemetry and Prometheus subsystems (Phase 2.6)
+        from app.core.telemetry import init_telemetry, shutdown_telemetry
+
+        init_telemetry(app)
+
         run_startup_validations()
 
         # Initialize clients & save to app.state
@@ -544,6 +549,8 @@ async def lifespan(app: FastAPI):
         if hasattr(app.state, "redis"):
             await app.state.redis.close()
             logger.info("Redis cache client closed.")
+
+        shutdown_telemetry()
         logger.info("Lifespan connections clean up completed.")
     except Exception as e:
         logger.error(f"Error occurred during shutdown teardown: {e}", exc_info=True)
@@ -558,11 +565,37 @@ app = FastAPI(
 # 3. Request ID middleware
 
 
+def resolve_route_template(request: Request) -> str:
+    """
+    Resolves the parameterized route pattern (e.g. /api/v1/conversations/{conversation_id})
+    from the FastAPI router to prevent high-cardinality label explosion in Prometheus.
+    Falls back to dynamic segment sanitization ({id}) if router match is not available.
+    """
+    app = request.app
+    if app and hasattr(app, "routes"):
+        for route in app.routes:
+            match, _ = route.matches(request.scope)
+            if match.name == "FULL":
+                return getattr(route, "path", request.url.path)
+
+    path = request.url.path
+    parts = path.split("/")
+    sanitized = []
+    for p in parts:
+        if (len(p) == 36 and "-" in p) or p.isdigit():
+            sanitized.append("{id}")
+        else:
+            sanitized.append(p)
+    return "/".join(sanitized) or "/unknown"
+
+
 class ProductionMiddleware(BaseHTTPMiddleware):
     """
     Comprehensive middleware pipeline:
     - Graceful shutdown check (returns 503 if draining)
     - Correlation ID tracking (X-Request-ID)
+    - OpenTelemetry Distributed Tracing (HTTP Server Span + W3C Context)
+    - Prometheus HTTP Server Metrics (Requests, Duration, In-Flight)
     - RequestContext initialization (ContextVar with immutable defaults)
     - Secure Headers injection
     - Structured Logging contexts
@@ -628,43 +661,121 @@ class ProductionMiddleware(BaseHTTPMiddleware):
         request_path_ctx.set(request.url.path)
         client_ip_ctx.set(context.client_ip)
 
+        from opentelemetry.trace import SpanKind
+
+        from app.core.telemetry import (
+            HTTP_SERVER_ACTIVE_REQUESTS,
+            HTTP_SERVER_DURATION,
+            HTTP_SERVER_REQUESTS,
+            extract_trace_context,
+            get_current_trace_id,
+            get_tracer,
+            hash_user_id,
+            mask_ip_address,
+        )
+
+        tracer = get_tracer("hybrid-rag.http")
+        parent_ctx = extract_trace_context(dict(request.headers))
+
+        route_template = resolve_route_template(request)
+
+        HTTP_SERVER_ACTIVE_REQUESTS.inc()
         start_time = time.perf_counter()
 
-        try:
-            logger.info("Request processing started")
-            response = await call_next(request)
+        with tracer.start_as_current_span(
+            "http.server.request",
+            context=parent_ctx,
+            kind=SpanKind.SERVER,
+        ) as root_span:
+            otel_trace_id = get_current_trace_id()
+            if otel_trace_id:
+                context.trace_id = otel_trace_id
 
-            duration_ms = (time.perf_counter() - start_time) * 1000
-            request_status_ctx.set(response.status_code)
-            request_duration_ctx.set(round(duration_ms, 2))
-            if response.status_code >= 500:
-                request.app.state.error_count = (
-                    getattr(request.app.state, "error_count", 0) + 1
+            root_span.set_attribute("http.method", request.method)
+            root_span.set_attribute("http.route", route_template)
+            if context.client_ip:
+                masked_ip = mask_ip_address(context.client_ip)
+                if masked_ip:
+                    root_span.set_attribute("client.address", masked_ip)
+            if user_id:
+                h_uid = hash_user_id(user_id)
+                if h_uid:
+                    root_span.set_attribute("user.id", h_uid)
+
+            try:
+                logger.info("Request processing started")
+                response = await call_next(request)
+
+                duration_s = time.perf_counter() - start_time
+                duration_ms = duration_s * 1000
+                request_status_ctx.set(response.status_code)
+                request_duration_ctx.set(round(duration_ms, 2))
+                if response.status_code >= 500:
+                    request.app.state.error_count = (
+                        getattr(request.app.state, "error_count", 0) + 1
+                    )
+
+                root_span.set_attribute("http.status_code", response.status_code)
+
+                # Record Prometheus metrics with bounded labels
+                try:
+                    HTTP_SERVER_REQUESTS.labels(
+                        method=request.method,
+                        route=route_template,
+                        status_code=str(response.status_code),
+                    ).inc()
+                    HTTP_SERVER_DURATION.labels(
+                        method=request.method,
+                        route=route_template,
+                        status_code=str(response.status_code),
+                    ).observe(duration_s)
+                except Exception:
+                    pass
+
+                logger.info(
+                    f"Request processing completed - Duration: {duration_ms:.2f}ms"
                 )
 
-            logger.info(f"Request processing completed - Duration: {duration_ms:.2f}ms")
+                # Inject correlation ID and Secure Headers
+                response.headers["X-Request-ID"] = req_id
+                response.headers["X-Content-Type-Options"] = "nosniff"
+                response.headers["X-Frame-Options"] = "DENY"
+                response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+                response.headers["Content-Security-Policy"] = (
+                    "default-src 'self'; frame-ancestors 'none'; object-src 'none';"
+                )
 
-            # Inject correlation ID and Secure Headers
-            response.headers["X-Request-ID"] = req_id
-            response.headers["X-Content-Type-Options"] = "nosniff"
-            response.headers["X-Frame-Options"] = "DENY"
-            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-            response.headers["Content-Security-Policy"] = (
-                "default-src 'self'; frame-ancestors 'none'; object-src 'none';"
-            )
+                return response
+            except Exception as e:
+                duration_s = time.perf_counter() - start_time
+                duration_ms = duration_s * 1000
+                request_status_ctx.set(500)
+                request_duration_ctx.set(round(duration_ms, 2))
+                root_span.set_attribute("http.status_code", 500)
+                root_span.record_exception(e)
 
-            return response
-        except Exception as e:
-            duration_ms = (time.perf_counter() - start_time) * 1000
-            request_status_ctx.set(500)
-            request_duration_ctx.set(round(duration_ms, 2))
-            logger.exception(f"Request crashed during execution: {e}")
-            raise e
-        finally:
-            current_request_context.reset(ctx_token)
-            request.app.state.active_requests_count = max(
-                0, request.app.state.active_requests_count - 1
-            )
+                try:
+                    HTTP_SERVER_REQUESTS.labels(
+                        method=request.method,
+                        route=route_template,
+                        status_code="500",
+                    ).inc()
+                    HTTP_SERVER_DURATION.labels(
+                        method=request.method,
+                        route=route_template,
+                        status_code="500",
+                    ).observe(duration_s)
+                except Exception:
+                    pass
+
+                logger.exception(f"Request crashed during execution: {e}")
+                raise e
+            finally:
+                HTTP_SERVER_ACTIVE_REQUESTS.dec()
+                current_request_context.reset(ctx_token)
+                request.app.state.active_requests_count = max(
+                    0, request.app.state.active_requests_count - 1
+                )
 
 
 app.add_middleware(ProductionMiddleware)
@@ -969,27 +1080,13 @@ app.include_router(observability_router, prefix=settings.API_V1_STR)
 
 @app.get("/metrics")
 def metrics_endpoint():
-    """Prometheus scraping endpoint backed by live request counters."""
-    request_count = getattr(app.state, "request_count", 0)
-    error_count = getattr(app.state, "error_count", 0)
-    active_requests = getattr(app.state, "active_requests_count", 0)
-    started_at = getattr(app.state, "started_at", None)
-    uptime = max(0.0, time.time() - started_at) if started_at else 0.0
-    metrics_lines = [
-        "# HELP http_requests_total Total HTTP requests processed",
-        "# TYPE http_requests_total counter",
-        f"http_requests_total {request_count}",
-        "# HELP http_requests_failed_total HTTP requests returning 5xx responses",
-        "# TYPE http_requests_failed_total counter",
-        f"http_requests_failed_total {error_count}",
-        "# HELP http_active_requests Current in-flight HTTP requests",
-        "# TYPE http_active_requests gauge",
-        f"http_active_requests {active_requests}",
-        "# HELP process_uptime_seconds Seconds elapsed since application start",
-        "# TYPE process_uptime_seconds gauge",
-        f"process_uptime_seconds {uptime:.2f}",
-    ]
-    return Response(content="\n".join(metrics_lines) + "\n", media_type="text/plain")
+    """Prometheus scraping endpoint backed by live prometheus-client registry."""
+    from app.core.telemetry import export_prometheus_metrics
+
+    return Response(
+        content=export_prometheus_metrics(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 @app.get("/")

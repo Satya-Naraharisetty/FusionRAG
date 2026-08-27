@@ -126,7 +126,16 @@ class ConversationManager:
                 rewrite_applied=False,
             )
         else:
-            rewrite_result = await self._rewriter.rewrite(question, recent_messages)
+            from app.core.telemetry import get_tracer
+
+            tracer = get_tracer("hybrid-rag.conversation")
+            with tracer.start_as_current_span("llm.query_rewrite") as span:
+                rewrite_result = await self._rewriter.rewrite(question, recent_messages)
+                span.set_attribute("rewrite.applied", rewrite_result.rewrite_applied)
+                if rewrite_result.rewrite_reason:
+                    span.set_attribute(
+                        "rewrite.reason", str(rewrite_result.rewrite_reason)[:100]
+                    )
 
         # 4. Save user message to database
         user_message = ConversationMessage(

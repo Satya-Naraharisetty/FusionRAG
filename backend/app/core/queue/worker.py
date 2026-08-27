@@ -46,6 +46,8 @@ class QueueWorker:
         self._consume_task: asyncio.Task[None] | None = None
         self._recovery_task: asyncio.Task[None] | None = None
         self._pump_task: asyncio.Task[None] | None = None
+        self._metrics_task: asyncio.Task[None] | None = None
+        self._metrics_poll_interval_s: float = 15.0
 
     @property
     def is_running(self) -> bool:
@@ -57,7 +59,7 @@ class QueueWorker:
 
     async def start(self) -> None:
         """
-        Starts the worker consumption, retry pump, and orphan recovery loops.
+        Starts the worker consumption, retry pump, orphan recovery, and telemetry poll loops.
         """
         if self._is_running:
             return
@@ -73,6 +75,9 @@ class QueueWorker:
         )
         self._pump_task = asyncio.create_task(
             self._retry_pump_loop(), name="queue_retry_pump_loop"
+        )
+        self._metrics_task = asyncio.create_task(
+            self._metrics_poll_loop(), name="queue_metrics_poll_loop"
         )
 
         logger.info(
@@ -94,7 +99,12 @@ class QueueWorker:
         self._is_running = False
 
         # Cancel background loops
-        for loop_task in (self._consume_task, self._recovery_task, self._pump_task):
+        for loop_task in (
+            self._consume_task,
+            self._recovery_task,
+            self._pump_task,
+            self._metrics_task,
+        ):
             if loop_task and not loop_task.done():
                 loop_task.cancel()
 
@@ -158,6 +168,17 @@ class QueueWorker:
                         break
 
                     for msg_id, job in claimed:
+                        try:
+                            from app.core.telemetry import (
+                                QUEUE_ORPHANS_RECOVERED,
+                            )
+
+                            QUEUE_ORPHANS_RECOVERED.labels(
+                                task_type=job.task_type
+                            ).inc()
+                        except Exception:
+                            pass
+
                         task = asyncio.create_task(
                             self.handle_message(msg_id, job, is_reclaimed=True)
                         )
@@ -186,12 +207,59 @@ class QueueWorker:
             except Exception as e:
                 logger.error(f"Error in retry pump loop: {e}")
 
+    async def _metrics_poll_loop(self) -> None:
+        """Periodically polls queue stream depth and consumer lag gauges."""
+        while self._is_running:
+            try:
+                from app.core.telemetry import (
+                    QUEUE_CONSUMER_LAG,
+                    QUEUE_STREAM_LENGTH,
+                )
+
+                if hasattr(self._task_queue, "get_stream_length"):
+                    length = await self._task_queue.get_stream_length()
+                    QUEUE_STREAM_LENGTH.labels(stream=self._task_queue.stream_name).set(
+                        length
+                    )
+
+                if hasattr(self._task_queue, "get_consumer_lag"):
+                    lag = await self._task_queue.get_consumer_lag()
+                    QUEUE_CONSUMER_LAG.labels(
+                        stream=self._task_queue.stream_name,
+                        group=self._task_queue.consumer_group,
+                    ).set(lag)
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.debug(f"Queue telemetry poll skipped: {e}")
+
+            try:
+                await asyncio.sleep(self._metrics_poll_interval_s)
+            except asyncio.CancelledError:
+                break
+
     async def handle_message(
         self, msg_id: str, job: Job, is_reclaimed: bool = False
     ) -> JobResult:
         """
         Executes a single job with concurrency management, retry scheduling, and DLQ routing.
         """
+        from opentelemetry.trace import SpanKind
+
+        from app.core.telemetry import (
+            QUEUE_JOB_DURATION,
+            QUEUE_JOBS,
+            extract_trace_context,
+            get_tracer,
+        )
+
+        tracer = get_tracer("hybrid-rag.worker")
+        trace_ctx_payload = (
+            job.payload.get("_trace_context") if isinstance(job.payload, dict) else None
+        )
+        parent_ctx = extract_trace_context(trace_ctx_payload)
+
         async with self._semaphore:
             start_time = time.time()
             logger.info(
@@ -200,47 +268,87 @@ class QueueWorker:
                 f"reclaimed={is_reclaimed}"
             )
 
-            try:
-                result = await self._dispatcher.dispatch(job)
-            except Exception as unhandled_err:
-                logger.exception(
-                    f"Unhandled exception during job execution {job.job_id}: {unhandled_err}"
-                )
-                result = JobResult(
-                    success=False, error=str(unhandled_err), retryable=True
-                )
+            with tracer.start_as_current_span(
+                "queue.consume",
+                context=parent_ctx,
+                kind=SpanKind.CONSUMER,
+            ) as span:
+                span.set_attribute("queue.task_type", job.task_type)
+                span.set_attribute("queue.attempt", job.attempt)
+                span.set_attribute("queue.is_reclaimed", is_reclaimed)
 
-            duration_ms = (time.time() - start_time) * 1000
+                try:
+                    result = await self._dispatcher.dispatch(job)
+                except Exception as unhandled_err:
+                    span.record_exception(unhandled_err)
+                    logger.exception(
+                        f"Unhandled exception during job execution {job.job_id}: {unhandled_err}"
+                    )
+                    result = JobResult(
+                        success=False, error=str(unhandled_err), retryable=True
+                    )
 
-            if result.success:
-                await self._task_queue.acknowledge(msg_id)
-                logger.info(
-                    f"queue.job_completed: job_id={job.job_id} task_type={job.task_type} "
-                    f"attempt={job.attempt}/{job.max_attempts} duration_ms={duration_ms:.2f}"
-                )
+                duration_s = time.time() - start_time
+                duration_ms = duration_s * 1000
+
+                if result.success:
+                    span.set_attribute("queue.status", "success")
+                    try:
+                        QUEUE_JOBS.labels(
+                            task_type=job.task_type, status="success"
+                        ).inc()
+                        QUEUE_JOB_DURATION.labels(
+                            task_type=job.task_type, status="success"
+                        ).observe(duration_s)
+                    except Exception:
+                        pass
+                    await self._task_queue.acknowledge(msg_id)
+                    logger.info(
+                        f"queue.job_completed: job_id={job.job_id} task_type={job.task_type} "
+                        f"attempt={job.attempt}/{job.max_attempts} duration_ms={duration_ms:.2f}"
+                    )
+                    return result
+
+                # Failure handling
+                error_msg = result.error or "Unknown failure"
+                span.set_attribute("queue.status", "failed")
+                if result.retryable and job.attempt < job.max_attempts:
+                    span.set_attribute("queue.failure_action", "retry")
+                    try:
+                        QUEUE_JOBS.labels(task_type=job.task_type, status="retry").inc()
+                        QUEUE_JOB_DURATION.labels(
+                            task_type=job.task_type, status="failed"
+                        ).observe(duration_s)
+                    except Exception:
+                        pass
+                    backoff_delay = calculate_backoff(
+                        job.attempt,
+                        base_delay=self._retry_base_delay,
+                        max_delay=self._retry_max_delay,
+                    )
+                    await self._task_queue.schedule_retry(job, error_msg, backoff_delay)
+                    # Acknowledge the old stream message since it has been transferred to retry set
+                    await self._task_queue.acknowledge(msg_id)
+                else:
+                    span.set_attribute("queue.failure_action", "dead_letter")
+                    try:
+                        QUEUE_JOBS.labels(
+                            task_type=job.task_type, status="dead_letter"
+                        ).inc()
+                        QUEUE_JOB_DURATION.labels(
+                            task_type=job.task_type, status="failed"
+                        ).observe(duration_s)
+                    except Exception:
+                        pass
+                    error_type = (
+                        "MaxAttemptsExceeded"
+                        if job.attempt >= job.max_attempts
+                        else "NonRetryableError"
+                    )
+                    await self._task_queue.route_to_dead_letter(
+                        job, error_msg, error_type=error_type
+                    )
+                    # Acknowledge the old stream message since it is now stored in DLQ
+                    await self._task_queue.acknowledge(msg_id)
+
                 return result
-
-            # Failure handling
-            error_msg = result.error or "Unknown failure"
-            if result.retryable and job.attempt < job.max_attempts:
-                backoff_delay = calculate_backoff(
-                    job.attempt,
-                    base_delay=self._retry_base_delay,
-                    max_delay=self._retry_max_delay,
-                )
-                await self._task_queue.schedule_retry(job, error_msg, backoff_delay)
-                # Acknowledge the old stream message since it has been transferred to retry set
-                await self._task_queue.acknowledge(msg_id)
-            else:
-                error_type = (
-                    "MaxAttemptsExceeded"
-                    if job.attempt >= job.max_attempts
-                    else "NonRetryableError"
-                )
-                await self._task_queue.route_to_dead_letter(
-                    job, error_msg, error_type=error_type
-                )
-                # Acknowledge the old stream message since it is now stored in DLQ
-                await self._task_queue.acknowledge(msg_id)
-
-            return result

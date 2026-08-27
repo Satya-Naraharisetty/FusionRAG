@@ -21,17 +21,30 @@ class StructuredJsonFormatter(logging.Formatter):
     """
 
     def format(self, record: logging.LogRecord) -> str:
+        span_id = None
+        otel_trace_id = None
+        try:
+            from app.core.telemetry import (
+                get_current_span_id,
+                get_current_trace_id,
+            )
+
+            otel_trace_id = get_current_trace_id()
+            span_id = get_current_span_id()
+        except Exception:
+            pass
+
         try:
             from app.core.context.request_context import current_request_context
 
             ctx = current_request_context.get()
             user_id = ctx.user_id if ctx else None
-            trace_id = ctx.trace_id if ctx else None
+            trace_id = otel_trace_id or (ctx.trace_id if ctx else None)
             req_id = ctx.request_id if ctx else request_id_ctx.get()
             ip = ctx.client_ip if ctx else client_ip_ctx.get()
         except Exception:
             user_id = None
-            trace_id = None
+            trace_id = otel_trace_id
             req_id = request_id_ctx.get()
             ip = client_ip_ctx.get()
 
@@ -41,6 +54,7 @@ class StructuredJsonFormatter(logging.Formatter):
             "level": record.levelname,
             "request_id": req_id,
             "trace_id": trace_id or req_id,
+            "span_id": span_id,
             "user_id": user_id,
             "method": request_method_ctx.get(),
             "path": request_path_ctx.get(),

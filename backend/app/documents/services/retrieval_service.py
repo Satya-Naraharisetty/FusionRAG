@@ -418,23 +418,42 @@ class RetrievalService:
             dense_latency = 0.0
             sparse_latency = 0.0
 
+            from app.core.telemetry import (
+                RETRIEVAL_CANDIDATES_COUNT,
+                RETRIEVAL_REQUESTS,
+                RETRIEVAL_STAGE_DURATION,
+                get_tracer,
+            )
+
+            tracer = get_tracer("hybrid-rag.retrieval")
+
             async def run_dense_baseline():
                 nonlocal dense_latency, dense_results
                 if (
                     resolved_mode in (RetrievalMode.SEMANTIC, RetrievalMode.HYBRID)
                     and self._dense_retriever
                 ):
-                    t0 = time.perf_counter()
-                    dense_results = await self._dense_retriever.retrieve(
-                        query=processed_query_obj.cleaned_query,
-                        user_id=user_id,
-                        top_k=v_top_k,
-                        document_ids=allowed_doc_ids,
-                        tags=tags,
-                        filter_metadata=filter_metadata,
-                        retrieval_scope=retrieval_scope,
-                    )
-                    dense_latency = time.perf_counter() - t0
+                    with tracer.start_as_current_span("retrieval.dense_search") as span:
+                        t0 = time.perf_counter()
+                        dense_results = await self._dense_retriever.retrieve(
+                            query=processed_query_obj.cleaned_query,
+                            user_id=user_id,
+                            top_k=v_top_k,
+                            document_ids=allowed_doc_ids,
+                            tags=tags,
+                            filter_metadata=filter_metadata,
+                            retrieval_scope=retrieval_scope,
+                        )
+                        dense_latency = time.perf_counter() - t0
+                        span.set_attribute(
+                            "retrieval.candidates_count", len(dense_results)
+                        )
+                        RETRIEVAL_STAGE_DURATION.labels(stage="dense").observe(
+                            dense_latency
+                        )
+                        RETRIEVAL_CANDIDATES_COUNT.labels(stage="dense").observe(
+                            len(dense_results)
+                        )
 
             async def run_sparse_baseline():
                 nonlocal sparse_latency, sparse_results
@@ -442,17 +461,29 @@ class RetrievalService:
                     resolved_mode in (RetrievalMode.SPARSE, RetrievalMode.HYBRID)
                     and self._sparse_retriever
                 ):
-                    t0 = time.perf_counter()
-                    sparse_results = await self._sparse_retriever.retrieve(
-                        query=processed_query_obj.expanded_query,
-                        user_id=user_id,
-                        top_k=s_top_k,
-                        document_ids=allowed_doc_ids,
-                        tags=tags,
-                        filter_metadata=filter_metadata,
-                        retrieval_scope=retrieval_scope,
-                    )
-                    sparse_latency = time.perf_counter() - t0
+                    with tracer.start_as_current_span(
+                        "retrieval.sparse_search"
+                    ) as span:
+                        t0 = time.perf_counter()
+                        sparse_results = await self._sparse_retriever.retrieve(
+                            query=processed_query_obj.expanded_query,
+                            user_id=user_id,
+                            top_k=s_top_k,
+                            document_ids=allowed_doc_ids,
+                            tags=tags,
+                            filter_metadata=filter_metadata,
+                            retrieval_scope=retrieval_scope,
+                        )
+                        sparse_latency = time.perf_counter() - t0
+                        span.set_attribute(
+                            "retrieval.candidates_count", len(sparse_results)
+                        )
+                        RETRIEVAL_STAGE_DURATION.labels(stage="sparse").observe(
+                            sparse_latency
+                        )
+                        RETRIEVAL_CANDIDATES_COUNT.labels(stage="sparse").observe(
+                            len(sparse_results)
+                        )
 
             await asyncio.gather(run_dense_baseline(), run_sparse_baseline())
 
@@ -462,17 +493,26 @@ class RetrievalService:
             fusion_method = None
 
             if resolved_mode == RetrievalMode.HYBRID:
-                t0 = time.perf_counter()
-                if self._enable_weighted_rrf:
-                    fused_results = self._weighted_fusion_engine.fuse(
-                        dense_results, sparse_results
+                with tracer.start_as_current_span("retrieval.fusion") as span:
+                    t0 = time.perf_counter()
+                    if self._enable_weighted_rrf:
+                        fused_results = self._weighted_fusion_engine.fuse(
+                            dense_results, sparse_results
+                        )
+                    else:
+                        fused_results = self._fusion_engine.fuse(
+                            dense_results, sparse_results
+                        )
+                    fusion_latency = time.perf_counter() - t0
+                    fusion_method = FusionMethod.RRF
+                    span.set_attribute("fusion.method", "rrf")
+                    span.set_attribute("fusion.candidates_count", len(fused_results))
+                    RETRIEVAL_STAGE_DURATION.labels(stage="fusion").observe(
+                        fusion_latency
                     )
-                else:
-                    fused_results = self._fusion_engine.fuse(
-                        dense_results, sparse_results
+                    RETRIEVAL_CANDIDATES_COUNT.labels(stage="fused").observe(
+                        len(fused_results)
                     )
-                fusion_latency = time.perf_counter() - t0
-                fusion_method = FusionMethod.RRF
             elif resolved_mode == RetrievalMode.SEMANTIC:
                 fused_results = dense_results
             else:  # SPARSE
@@ -480,11 +520,13 @@ class RetrievalService:
 
             # MMR Diversity Selection
             if self._enable_mmr:
-                mmr_results = self._mmr_selector.select(
-                    chunks=fused_results,
-                    top_k=top_k,
-                    mmr_lambda=self._mmr_lambda,
-                )
+                with tracer.start_as_current_span("retrieval.mmr_selection") as span:
+                    mmr_results = self._mmr_selector.select(
+                        chunks=fused_results,
+                        top_k=top_k,
+                        mmr_lambda=self._mmr_lambda,
+                    )
+                    span.set_attribute("mmr.selected_count", len(mmr_results))
             else:
                 mmr_results = fused_results[:top_k]
 
@@ -492,19 +534,35 @@ class RetrievalService:
             reranked_results = mmr_results
             rerank_latency = 0.0
             if self._enable_reranker:
-                t0 = time.perf_counter()
-                if self._ranker:
-                    reranked_results = self._ranker.rank(
-                        processed_query_obj.cleaned_query, mmr_results
+                with tracer.start_as_current_span(
+                    "retrieval.cross_encoder_rerank"
+                ) as span:
+                    t0 = time.perf_counter()
+                    if self._ranker:
+                        reranked_results = self._ranker.rank(
+                            processed_query_obj.cleaned_query, mmr_results
+                        )
+                    else:
+                        reranked_results = await self._reranker.rerank(
+                            processed_query_obj.cleaned_query, mmr_results
+                        )
+                    reranked_results = reranked_results[: self._rerank_top_k]
+                    rerank_latency = time.perf_counter() - t0
+                    span.set_attribute("rerank.output_count", len(reranked_results))
+                    RETRIEVAL_STAGE_DURATION.labels(stage="rerank").observe(
+                        rerank_latency
                     )
-                else:
-                    reranked_results = await self._reranker.rerank(
-                        processed_query_obj.cleaned_query, mmr_results
+                    RETRIEVAL_CANDIDATES_COUNT.labels(stage="reranked").observe(
+                        len(reranked_results)
                     )
-                reranked_results = reranked_results[: self._rerank_top_k]
-                rerank_latency = time.perf_counter() - t0
 
             total_latency = time.perf_counter() - start_time
+            try:
+                RETRIEVAL_REQUESTS.labels(
+                    mode=resolved_mode.value, status="success"
+                ).inc()
+            except Exception:
+                pass
 
             logger.info(
                 f"Retrieval stats [mode: {resolved_mode.value}] - "
@@ -745,10 +803,33 @@ class RetrievalService:
             rerank_latency = time.perf_counter() - t0
 
         total_latency = time.perf_counter() - start_time
-
         # Flatten dense/sparse matches for reporting
         flat_dense = [c for sub in all_dense_results for c in sub]
         flat_sparse = [c for sub in all_sparse_results for c in sub]
+
+        try:
+            from app.core.telemetry import (
+                RETRIEVAL_CANDIDATES_COUNT,
+                RETRIEVAL_REQUESTS,
+                RETRIEVAL_STAGE_DURATION,
+            )
+
+            RETRIEVAL_REQUESTS.labels(mode=resolved_mode.value, status="success").inc()
+            RETRIEVAL_STAGE_DURATION.labels(stage="dense").observe(
+                multi_retrieval_latency
+            )
+            RETRIEVAL_STAGE_DURATION.labels(stage="fusion").observe(fusion_latency)
+            RETRIEVAL_STAGE_DURATION.labels(stage="rerank").observe(rerank_latency)
+            RETRIEVAL_CANDIDATES_COUNT.labels(stage="dense").observe(len(flat_dense))
+            RETRIEVAL_CANDIDATES_COUNT.labels(stage="sparse").observe(len(flat_sparse))
+            RETRIEVAL_CANDIDATES_COUNT.labels(stage="fused").observe(
+                len(fused_candidates)
+            )
+            RETRIEVAL_CANDIDATES_COUNT.labels(stage="reranked").observe(
+                len(reranked_results)
+            )
+        except Exception:
+            pass
 
         diagnostics_data = {
             "query_type": classification.query_type.value,

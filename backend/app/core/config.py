@@ -191,6 +191,14 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "TEXT"
     LOG_LEVEL: str = "INFO"
 
+    # Observability & OpenTelemetry Configurations (Phase 2.6)
+    ENABLE_TELEMETRY: bool = True
+    ENABLE_TRACING: bool = True
+    ENABLE_PROMETHEUS_METRICS: bool = True
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://localhost:4317"
+    OTEL_SERVICE_NAME: str = "hybrid-rag-backend"
+    OTEL_TRACES_SAMPLER_RATIO: float = 1.0
+
     # Ingestion & Upload Configurations
     UPLOAD_DIR: str = "data/uploads"
     MAX_UPLOAD_SIZE: int = 25 * 1024 * 1024  # 25 MB default
@@ -460,9 +468,7 @@ class Settings(BaseSettings):
     SECRET_MANAGER_PROVIDER: str = "env"  # env | vault | aws
     MAX_CONTENT_LENGTH: int = 25 * 1024 * 1024  # 25 MB
 
-    # Observability
-    ENABLE_OTEL_TRACING: bool = False
-    OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://localhost:4317"
+    # Observability Legacy Aliases & Extra
     PROMETHEUS_MULTIPROC_DIR: str | None = None
 
     # Feature Flags

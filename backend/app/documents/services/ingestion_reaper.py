@@ -78,6 +78,12 @@ class DurableIngestionReaper:
                     )
 
         if reaped_count > 0:
+            try:
+                from app.core.telemetry import QUEUE_REAPER_RECOVERED
+
+                QUEUE_REAPER_RECOVERED.inc(reaped_count)
+            except Exception:
+                pass
             logger.info(f"ingestion.reaper_cycle_completed: recovered={reaped_count}")
         return reaped_count
 

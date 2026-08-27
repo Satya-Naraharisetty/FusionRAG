@@ -44,6 +44,11 @@ class QdrantDenseRetriever(DenseRetriever):
             query_vector = gen_res
 
         # 2. Vector Search (applying user context, document IDs, tags, metadata, and timeout)
+        import time
+
+        from app.core.telemetry import QDRANT_OPERATION_DURATION
+
+        t0 = time.perf_counter()
         search_results = await self._vector_store.search(
             query_vector=query_vector,
             top_k=top_k,
@@ -54,6 +59,11 @@ class QdrantDenseRetriever(DenseRetriever):
             timeout=self._search_timeout,
             retrieval_scope=retrieval_scope,
         )
+        search_dur = time.perf_counter() - t0
+        try:
+            QDRANT_OPERATION_DURATION.labels(operation="search").observe(search_dur)
+        except Exception:
+            pass
 
         if not search_results:
             return []

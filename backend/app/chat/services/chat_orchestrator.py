@@ -230,297 +230,360 @@ class ChatOrchestrator:
         filters: dict[str, Any] | None = None,
     ) -> AnswerResponse:
         start_time = time.perf_counter()
-
-        # Strip the @documents priority mention (if present) before any
-        # processing so it never leaks into retrieval, prompts or history.
-        question, documents_priority = self._parse_documents_mention(question)
-
-        # 1. Resolve / Create conversation session
-        conversation = await self.conversation_manager.get_or_create_conversation(
-            conversation_id, user_id
+        strategy_label = (
+            "multi_agent"
+            if self.enable_multi_agent
+            else ("adaptive" if self.enable_adaptive_rag else "baseline")
         )
-        conversation_id = conversation.id
-        # A brand-new conversation must be committed before its id leaves this
-        # process (the streaming path announces it in the first SSE metadata
-        # event, which triggers the frontend's attachment flush).
-        await self._ensure_conversation_durable()
+        status_label = "error"
 
-        # Enforce budget checks on system prompt and baseline question size
-        system_prompt = self.prompt_builder.get_system_prompt()
-        system_tokens = self.token_estimator.estimate(system_prompt)
-        if system_tokens > self.system_prompt_tokens_limit:
-            raise TokenBudgetExceeded(
-                f"System prompt size ({system_tokens}) exceeds limit ({self.system_prompt_tokens_limit})"
-            )
-
-        baseline_question = f"Context:\n\n\nQuestion: {question}\n\nAnswer:"
-        question_tokens = self.token_estimator.estimate(baseline_question)
-        if system_tokens + question_tokens > self.max_context_tokens:
-            raise PromptTooLarge("Prompt size exceeds maximum context token budget.")
-
-        # 2. Resolve the retrieval scope under the two-tier document model.
-        # Chat-scoped documents (uploaded in THIS conversation) are always part
-        # of its retrieval — no @documents mention needed. The user's global
-        # documents (Documents section) are only searched when the @documents
-        # mention was used (or explicit document_ids were passed). Everything
-        # else answers from general knowledge: retrieval and the LLM
-        # query-rewrite that feeds it are both skipped (see PromptBuilder
-        # _NO_CONTEXT_NOTE). Resolving the scope here (before prepare_context)
-        # lets skip_rewrite match the retrieval decision.
-        retrieval_doc_ids = await self._resolve_retrieval_scope(
-            conversation_id=conversation_id,
-            user_id=user_id,
-            document_ids=document_ids,
-            documents_priority=documents_priority,
+        from app.core.telemetry import (
+            RAG_PIPELINE_DURATION,
+            RAG_REQUESTS,
+            get_tracer,
+            hash_user_id,
         )
-        skip_retrieval = not bool(retrieval_doc_ids)
 
-        if self.enable_conversation_memory:
-            (
-                context_obj,
-                rewrite_result,
-            ) = await self.conversation_manager.prepare_context(
-                conversation_id, user_id, question, skip_rewrite=skip_retrieval
-            )
-            query_to_retrieve = rewrite_result.rewritten_query
-        else:
-            context_obj = ConversationContext(
-                conversation=conversation, recent_messages=[]
-            )
-            rewrite_result = HistoryRewriteResult(
-                original_query=question,
-                rewritten_query=question,
-                rewrite_reason="Conversation memory disabled.",
-                rewrite_applied=False,
-            )
-            query_to_retrieve = question
+        tracer = get_tracer("hybrid-rag.orchestration")
 
-        # 3. Retrieve chunks using the standalone query
-        retrieval_start = time.perf_counter()
-        if skip_retrieval:
-            # Nothing to search (no chat-scoped documents and no @documents
-            # mention): the prompt builder relaxes the context rule so the LLM
-            # answers from general knowledge.
-            search_result = SearchResult(
-                original_query=query_to_retrieve,
-                retrieval_time=0.0,
-                total_matches=0,
-                retrieved_chunks=[],
-                dense_matches=[],
-                sparse_matches=[],
-            )
-        else:
-            retrieval_scope = DocumentRetrievalScope(
-                user_id=user_id,
-                conversation_id=conversation_id,
-                include_conversation_documents=True,
-                include_library_documents=documents_priority,
-                document_ids=retrieval_doc_ids if retrieval_doc_ids else None,
-            )
-            if self.enable_adaptive_rag and self.adaptive_rag_orchestrator is not None:
-                search_result = await self.adaptive_rag_orchestrator.orchestrate(
-                    query=query_to_retrieve,
-                    user_id=user_id,
-                    top_k=top_k,
+        with tracer.start_as_current_span("rag.chat_orchestration") as orch_span:
+            orch_span.set_attribute("rag.strategy", strategy_label)
+            orch_span.set_attribute("rag.top_k", top_k)
+            h_uid = hash_user_id(user_id)
+            if h_uid:
+                orch_span.set_attribute("user.id", h_uid)
+
+            try:
+                # Strip the @documents priority mention (if present) before any
+                # processing so it never leaks into retrieval, prompts or history.
+                question, documents_priority = self._parse_documents_mention(question)
+
+                # 1. Resolve / Create conversation session
+                conversation = (
+                    await self.conversation_manager.get_or_create_conversation(
+                        conversation_id, user_id
+                    )
+                )
+                conversation_id = conversation.id
+                # A brand-new conversation must be committed before its id leaves this
+                # process (the streaming path announces it in the first SSE metadata
+                # event, which triggers the frontend's attachment flush).
+                await self._ensure_conversation_durable()
+
+                # Enforce budget checks on system prompt and baseline question size
+                system_prompt = self.prompt_builder.get_system_prompt()
+                system_tokens = self.token_estimator.estimate(system_prompt)
+                if system_tokens > self.system_prompt_tokens_limit:
+                    raise TokenBudgetExceeded(
+                        f"System prompt size ({system_tokens}) exceeds limit ({self.system_prompt_tokens_limit})"
+                    )
+
+                baseline_question = f"Context:\n\n\nQuestion: {question}\n\nAnswer:"
+                question_tokens = self.token_estimator.estimate(baseline_question)
+                if system_tokens + question_tokens > self.max_context_tokens:
+                    raise PromptTooLarge(
+                        "Prompt size exceeds maximum context token budget."
+                    )
+
+                # 2. Resolve the retrieval scope under the two-tier document model.
+                # Chat-scoped documents (uploaded in THIS conversation) are always part
+                # of its retrieval — no @documents mention needed. The user's global
+                # documents (Documents section) are only searched when the @documents
+                # mention was used (or explicit document_ids were passed). Everything
+                # else answers from general knowledge: retrieval and the LLM
+                # query-rewrite that feeds it are both skipped (see PromptBuilder
+                # _NO_CONTEXT_NOTE). Resolving the scope here (before prepare_context)
+                # lets skip_rewrite match the retrieval decision.
+                retrieval_doc_ids = await self._resolve_retrieval_scope(
                     conversation_id=conversation_id,
-                    document_ids=retrieval_doc_ids if retrieval_doc_ids else None,
-                    filter_metadata=filters,
-                    retrieval_scope=retrieval_scope,
-                )
-            else:
-                search_result = await self.retrieval_service.retrieve(
-                    query=query_to_retrieve,
                     user_id=user_id,
-                    top_k=top_k,
-                    filter_metadata=filters,
-                    retrieval_scope=retrieval_scope,
+                    document_ids=document_ids,
+                    documents_priority=documents_priority,
                 )
-        retrieval_time_ms = (time.perf_counter() - retrieval_start) * 1000
+                skip_retrieval = not bool(retrieval_doc_ids)
 
-        # Note: an empty retrieval does NOT abort the request. The prompt is
-        # built with an empty context and the assistant answers from general
-        # knowledge (calling out the gap when @documents was used).
+                if self.enable_conversation_memory:
+                    with tracer.start_as_current_span("conversation.prepare_context"):
+                        (
+                            context_obj,
+                            rewrite_result,
+                        ) = await self.conversation_manager.prepare_context(
+                            conversation_id,
+                            user_id,
+                            question,
+                            skip_rewrite=skip_retrieval,
+                        )
+                    query_to_retrieve = rewrite_result.rewritten_query
+                else:
+                    context_obj = ConversationContext(
+                        conversation=conversation, recent_messages=[]
+                    )
+                    rewrite_result = HistoryRewriteResult(
+                        original_query=question,
+                        rewritten_query=question,
+                        rewrite_reason="Conversation memory disabled.",
+                        rewrite_applied=False,
+                    )
+                    query_to_retrieve = question
 
-        # 4. Gather Diagnostics
-        dense_count = (
-            len(search_result.dense_matches) if search_result.dense_matches else 0
-        )
-        sparse_count = (
-            len(search_result.sparse_matches) if search_result.sparse_matches else 0
-        )
-        diagnostics = RetrievalDiagnostics(
-            rewritten=rewrite_result.rewrite_applied,
-            retrieval_skipped=skip_retrieval,
-            dense_count=dense_count,
-            sparse_count=sparse_count,
-            fusion_count=len(search_result.retrieved_chunks),
-            rerank_count=len(search_result.retrieved_chunks),
-            latencies={"retrieval_service": retrieval_time_ms},
-        )
+                # 3. Retrieve chunks using the standalone query
+                retrieval_start = time.perf_counter()
+                if skip_retrieval:
+                    # Nothing to search (no chat-scoped documents and no @documents
+                    # mention): the prompt builder relaxes the context rule so the LLM
+                    # answers from general knowledge.
+                    search_result = SearchResult(
+                        original_query=query_to_retrieve,
+                        retrieval_time=0.0,
+                        total_matches=0,
+                        retrieved_chunks=[],
+                        dense_matches=[],
+                        sparse_matches=[],
+                    )
+                else:
+                    retrieval_scope = DocumentRetrievalScope(
+                        user_id=user_id,
+                        conversation_id=conversation_id,
+                        include_conversation_documents=True,
+                        include_library_documents=documents_priority,
+                        document_ids=retrieval_doc_ids if retrieval_doc_ids else None,
+                    )
+                    if (
+                        self.enable_adaptive_rag
+                        and self.adaptive_rag_orchestrator is not None
+                    ):
+                        search_result = (
+                            await self.adaptive_rag_orchestrator.orchestrate(
+                                query=query_to_retrieve,
+                                user_id=user_id,
+                                top_k=top_k,
+                                conversation_id=conversation_id,
+                                document_ids=retrieval_doc_ids
+                                if retrieval_doc_ids
+                                else None,
+                                filter_metadata=filters,
+                                retrieval_scope=retrieval_scope,
+                            )
+                        )
+                    else:
+                        search_result = await self.retrieval_service.retrieve(
+                            query=query_to_retrieve,
+                            user_id=user_id,
+                            top_k=top_k,
+                            filter_metadata=filters,
+                            retrieval_scope=retrieval_scope,
+                        )
+                retrieval_time_ms = (time.perf_counter() - retrieval_start) * 1000
 
-        # 5. Build structured ConversationContext
-        full_context = self.context_builder.build_context(
-            conversation=conversation,
-            recent_messages=context_obj.recent_messages,
-            summary=context_obj.summary,
-            retrieved_chunks=search_result.retrieved_chunks,
-            diagnostics=diagnostics,
-        )
+                # Note: an empty retrieval does NOT abort the request. The prompt is
+                # built with an empty context and the assistant answers from general
+                # knowledge (calling out the gap when @documents was used).
 
-        # 6. Budget prompts and extract final fitting chunks
-        messages, final_chunks = self.prompt_builder.build_prompt(
-            context_obj=full_context,
-            question=question,
-            token_estimator=self.token_estimator,
-            max_context_tokens=self.max_context_tokens,
-            max_memory_tokens=self.max_memory_tokens,
-            document_priority=documents_priority,
-        )
+                # 4. Gather Diagnostics
+                dense_count = (
+                    len(search_result.dense_matches)
+                    if search_result.dense_matches
+                    else 0
+                )
+                sparse_count = (
+                    len(search_result.sparse_matches)
+                    if search_result.sparse_matches
+                    else 0
+                )
+                diagnostics = RetrievalDiagnostics(
+                    rewritten=rewrite_result.rewrite_applied,
+                    retrieval_skipped=skip_retrieval,
+                    dense_count=dense_count,
+                    sparse_count=sparse_count,
+                    fusion_count=len(search_result.retrieved_chunks),
+                    rerank_count=len(search_result.retrieved_chunks),
+                    latencies={"retrieval_service": retrieval_time_ms},
+                )
 
-        # If final_chunks is empty, citations will be empty and the assistant
-        # answers from general knowledge (see PromptBuilder instructions).
+                # 5. Build structured ConversationContext
+                full_context = self.context_builder.build_context(
+                    conversation=conversation,
+                    recent_messages=context_obj.recent_messages,
+                    summary=context_obj.summary,
+                    retrieved_chunks=search_result.retrieved_chunks,
+                    diagnostics=diagnostics,
+                )
 
-        # 7. Create assistant message in database (status = PENDING)
-        assistant_message_id = uuid.uuid4()
-        await self.conversation_manager._message_repo.create_assistant_message(
-            conversation_id=conversation_id,
-            message_id=assistant_message_id,
-            role=MessageRole.ASSISTANT,
-        )
+                # 6. Budget prompts and extract final fitting chunks
+                with tracer.start_as_current_span("rag.build_prompt") as prompt_span:
+                    messages, final_chunks = self.prompt_builder.build_prompt(
+                        context_obj=full_context,
+                        question=question,
+                        token_estimator=self.token_estimator,
+                        max_context_tokens=self.max_context_tokens,
+                        max_memory_tokens=self.max_memory_tokens,
+                        document_priority=documents_priority,
+                    )
+                    prompt_span.set_attribute("prompt.chunks_count", len(final_chunks))
 
-        # 8. Call LLM, Multi-Agent, or Single-Agent Loop
-        gen_start_time = time.perf_counter()
-        try:
-            if self.enable_multi_agent and self.master_agent is not None:
-                from app.chat.domain.multi_agent import AgentExecutionContext
+                # If final_chunks is empty, citations will be empty and the assistant
+                # answers from general knowledge (see PromptBuilder instructions).
 
-                agent_ctx = AgentExecutionContext(
-                    request_id=request_id_ctx.get() or str(uuid.uuid4()),
-                    user_id=user_id,
+                # 7. Create assistant message in database (status = PENDING)
+                assistant_message_id = uuid.uuid4()
+                await self.conversation_manager._message_repo.create_assistant_message(
                     conversation_id=conversation_id,
-                    include_library_documents=documents_priority,
-                    include_conversation_documents=True,
-                    document_ids=retrieval_doc_ids,
+                    message_id=assistant_message_id,
+                    role=MessageRole.ASSISTANT,
                 )
-                multi_resp = await self.master_agent.execute_request(
-                    request=question,
-                    context=agent_ctx,
-                    model=self.model,
-                    temperature=self.temperature,
-                    max_tokens=self.max_response_tokens,
-                )
-                answer_text = multi_resp.answer
-                usage = multi_resp.usage
-                if multi_resp.citations:
-                    citations = multi_resp.citations
-            elif self.enable_tool_calling and final_chunks:
-                # Instantiate thread-safe execution context
-                tool_context = ToolContext(
-                    user_id=user_id,
+
+                # 8. Call LLM, Multi-Agent, or Single-Agent Loop
+                gen_start_time = time.perf_counter()
+                try:
+                    if self.enable_multi_agent and self.master_agent is not None:
+                        from app.chat.domain.multi_agent import AgentExecutionContext
+
+                        agent_ctx = AgentExecutionContext(
+                            request_id=request_id_ctx.get() or str(uuid.uuid4()),
+                            user_id=user_id,
+                            conversation_id=conversation_id,
+                            include_library_documents=documents_priority,
+                            include_conversation_documents=True,
+                            document_ids=retrieval_doc_ids,
+                        )
+                        multi_resp = await self.master_agent.execute_request(
+                            request=question,
+                            context=agent_ctx,
+                            model=self.model,
+                            temperature=self.temperature,
+                            max_tokens=self.max_response_tokens,
+                        )
+                        answer_text = multi_resp.answer
+                        usage = multi_resp.usage
+                        if multi_resp.citations:
+                            citations = multi_resp.citations
+                    elif self.enable_tool_calling and final_chunks:
+                        # Instantiate thread-safe execution context
+                        tool_context = ToolContext(
+                            user_id=user_id,
+                            conversation_id=conversation_id,
+                            db_session=self.conversation_manager._conversation_repo._db,  # type: ignore[attr-defined]  # access underlying SQLAlchemy Session
+                            # Explicit retrieval intent: set from the @documents mention.
+                            # This is the only authoritative source for agent tools;
+                            # never derived from model-supplied document IDs.
+                            include_library_documents=documents_priority,
+                            include_conversation_documents=True,
+                        )
+                        agent_resp = await self.agent_executor.execute(
+                            messages=messages,
+                            model=self.model,
+                            temperature=self.temperature,
+                            max_tokens=self.max_response_tokens,
+                            context=tool_context,
+                        )
+                        answer_text = agent_resp.answer
+                        usage = Usage(
+                            prompt_tokens=agent_resp.total_prompt_tokens,
+                            completion_tokens=agent_resp.total_completion_tokens,
+                            total_tokens=agent_resp.total_prompt_tokens
+                            + agent_resp.total_completion_tokens,
+                        )
+                    else:
+                        response = await self.llm_generation_service.generate(
+                            messages=messages,
+                            model=self.model,
+                            temperature=self.temperature,
+                            max_tokens=self.max_response_tokens,
+                        )
+                        from app.chat.domain.interfaces import ProviderResponse
+
+                        if isinstance(response, tuple) and not hasattr(
+                            response, "content"
+                        ):
+                            response = ProviderResponse(
+                                content=response[0], usage=response[1]
+                            )
+                        answer_text = response.content
+                        usage = response.usage
+
+                    generation_time_ms = (time.perf_counter() - gen_start_time) * 1000
+                except Exception as e:
+                    await self.conversation_manager._message_repo.fail_message(
+                        assistant_message_id, str(e)
+                    )
+                    raise
+
+                # 9. Map Citations
+                citations = [
+                    Citation(
+                        document_id=chunk.document_id,
+                        document_name=chunk.document_name,
+                        chunk_id=chunk.chunk_id,
+                        chunk_index=chunk.chunk_index,
+                    )
+                    for chunk in final_chunks
+                ]
+                citations_data = [
+                    {
+                        "document_id": str(cit.document_id),
+                        "document_name": cit.document_name,
+                        "chunk_id": str(cit.chunk_id),
+                        "chunk_index": cit.chunk_index,
+                    }
+                    for cit in citations
+                ]
+
+                total_time_ms = (time.perf_counter() - start_time) * 1000
+                metadata = {
+                    "retrieval_time_ms": retrieval_time_ms,
+                    "generation_time_ms": generation_time_ms,
+                    "total_time_ms": total_time_ms,
+                }
+
+                # 10. Persist completion details
+                await self.conversation_manager.finalize_message(
                     conversation_id=conversation_id,
-                    db_session=self.conversation_manager._conversation_repo._db,  # type: ignore[attr-defined]  # access underlying SQLAlchemy Session
-                    # Explicit retrieval intent: set from the @documents mention.
-                    # This is the only authoritative source for agent tools;
-                    # never derived from model-supplied document IDs.
-                    include_library_documents=documents_priority,
-                    include_conversation_documents=True,
+                    message_id=assistant_message_id,
+                    assistant_content=answer_text,
+                    prompt_tokens=usage.prompt_tokens,
+                    completion_tokens=usage.completion_tokens,
+                    citations=citations_data,
+                    metadata=metadata,
                 )
-                agent_resp = await self.agent_executor.execute(
-                    messages=messages,
+
+                # Log Observability Metrics
+                req_id = request_id_ctx.get() or "N/A"
+                logger.info(
+                    f"Answer generation completed - RequestID: {req_id} - "
+                    f"ConversationID: {conversation_id} - "
+                    f"Model: {self.model} - AgentEnabled: {self.enable_tool_calling} - "
+                    f"Retrieval latency: {retrieval_time_ms:.2f}ms - "
+                    f"Generation latency: {generation_time_ms:.2f}ms - "
+                    f"Total latency: {total_time_ms:.2f}ms - "
+                    f"Usage: prompt={usage.prompt_tokens}, completion={usage.completion_tokens}"
+                )
+
+                status_label = "success"
+                return AnswerResponse(
+                    answer=answer_text,
+                    citations=citations,
+                    retrieval_time_ms=round(retrieval_time_ms, 2),
+                    generation_time_ms=round(generation_time_ms, 2),
+                    total_time_ms=round(total_time_ms, 2),
                     model=self.model,
-                    temperature=self.temperature,
-                    max_tokens=self.max_response_tokens,
-                    context=tool_context,
+                    usage=usage,
+                    conversation_id=conversation_id,
+                    diagnostics=diagnostics,
                 )
-                answer_text = agent_resp.answer
-                usage = Usage(
-                    prompt_tokens=agent_resp.total_prompt_tokens,
-                    completion_tokens=agent_resp.total_completion_tokens,
-                    total_tokens=agent_resp.total_prompt_tokens
-                    + agent_resp.total_completion_tokens,
-                )
-            else:
-                response = await self.llm_generation_service.generate(
-                    messages=messages,
-                    model=self.model,
-                    temperature=self.temperature,
-                    max_tokens=self.max_response_tokens,
-                )
-                from app.chat.domain.interfaces import ProviderResponse
-
-                if isinstance(response, tuple) and not hasattr(response, "content"):
-                    response = ProviderResponse(content=response[0], usage=response[1])
-                answer_text = response.content
-                usage = response.usage
-
-            generation_time_ms = (time.perf_counter() - gen_start_time) * 1000
-        except Exception as e:
-            await self.conversation_manager._message_repo.fail_message(
-                assistant_message_id, str(e)
-            )
-            raise
-
-        # 9. Map Citations
-        citations = [
-            Citation(
-                document_id=chunk.document_id,
-                document_name=chunk.document_name,
-                chunk_id=chunk.chunk_id,
-                chunk_index=chunk.chunk_index,
-            )
-            for chunk in final_chunks
-        ]
-        citations_data = [
-            {
-                "document_id": str(cit.document_id),
-                "document_name": cit.document_name,
-                "chunk_id": str(cit.chunk_id),
-                "chunk_index": cit.chunk_index,
-            }
-            for cit in citations
-        ]
-
-        total_time_ms = (time.perf_counter() - start_time) * 1000
-        metadata = {
-            "retrieval_time_ms": retrieval_time_ms,
-            "generation_time_ms": generation_time_ms,
-            "total_time_ms": total_time_ms,
-        }
-
-        # 10. Persist completion details
-        await self.conversation_manager.finalize_message(
-            conversation_id=conversation_id,
-            message_id=assistant_message_id,
-            assistant_content=answer_text,
-            prompt_tokens=usage.prompt_tokens,
-            completion_tokens=usage.completion_tokens,
-            citations=citations_data,
-            metadata=metadata,
-        )
-
-        # Log Observability Metrics
-        req_id = request_id_ctx.get() or "N/A"
-        logger.info(
-            f"Answer generation completed - RequestID: {req_id} - "
-            f"ConversationID: {conversation_id} - "
-            f"Model: {self.model} - AgentEnabled: {self.enable_tool_calling} - "
-            f"Retrieval latency: {retrieval_time_ms:.2f}ms - "
-            f"Generation latency: {generation_time_ms:.2f}ms - "
-            f"Total latency: {total_time_ms:.2f}ms - "
-            f"Usage: prompt={usage.prompt_tokens}, completion={usage.completion_tokens}"
-        )
-
-        return AnswerResponse(
-            answer=answer_text,
-            citations=citations,
-            retrieval_time_ms=round(retrieval_time_ms, 2),
-            generation_time_ms=round(generation_time_ms, 2),
-            total_time_ms=round(total_time_ms, 2),
-            model=self.model,
-            usage=usage,
-            conversation_id=conversation_id,
-            diagnostics=diagnostics,
-        )
+            except Exception:
+                status_label = "error"
+                raise
+            finally:
+                total_dur_s = time.perf_counter() - start_time
+                try:
+                    RAG_REQUESTS.labels(
+                        strategy=strategy_label, status=status_label
+                    ).inc()
+                    RAG_PIPELINE_DURATION.labels(
+                        strategy=strategy_label, status=status_label
+                    ).observe(total_dur_s)
+                except Exception:
+                    pass
 
     async def generate_answer_stream(
         self,
@@ -532,6 +595,35 @@ class ChatOrchestrator:
         filters: dict[str, Any] | None = None,
     ) -> AsyncIterator[dict]:
         start_time = time.perf_counter()
+        strategy_label = (
+            "multi_agent"
+            if self.enable_multi_agent
+            else ("adaptive" if self.enable_adaptive_rag else "baseline")
+        )
+        status_label = "error"
+        telemetry_recorded = False
+
+        from app.core.telemetry import (
+            RAG_PIPELINE_DURATION,
+            RAG_REQUESTS,
+            get_tracer,
+        )
+
+        def record_stream_telemetry(final_status: str) -> None:
+            nonlocal telemetry_recorded
+            if telemetry_recorded:
+                return
+            telemetry_recorded = True
+            total_dur_s = time.perf_counter() - start_time
+            try:
+                RAG_REQUESTS.labels(strategy=strategy_label, status=final_status).inc()
+                RAG_PIPELINE_DURATION.labels(
+                    strategy=strategy_label, status=final_status
+                ).observe(total_dur_s)
+            except Exception:
+                pass
+
+        tracer = get_tracer("hybrid-rag.orchestration")
 
         # Strip the @documents priority mention (if present) before any
         # processing so it never leaks into retrieval, prompts or history.
@@ -576,12 +668,13 @@ class ChatOrchestrator:
         skip_retrieval = not bool(retrieval_doc_ids)
 
         if self.enable_conversation_memory:
-            (
-                context_obj,
-                rewrite_result,
-            ) = await self.conversation_manager.prepare_context(
-                conversation_id, user_id, question, skip_rewrite=skip_retrieval
-            )
+            with tracer.start_as_current_span("conversation.prepare_context"):
+                (
+                    context_obj,
+                    rewrite_result,
+                ) = await self.conversation_manager.prepare_context(
+                    conversation_id, user_id, question, skip_rewrite=skip_retrieval
+                )
             query_to_retrieve = rewrite_result.rewritten_query
         else:
             context_obj = ConversationContext(
@@ -668,14 +761,16 @@ class ChatOrchestrator:
         )
 
         # 6. Budget prompts
-        messages, final_chunks = self.prompt_builder.build_prompt(
-            context_obj=full_context,
-            question=question,
-            token_estimator=self.token_estimator,
-            max_context_tokens=self.max_context_tokens,
-            max_memory_tokens=self.max_memory_tokens,
-            document_priority=documents_priority,
-        )
+        with tracer.start_as_current_span("rag.build_prompt") as prompt_span:
+            messages, final_chunks = self.prompt_builder.build_prompt(
+                context_obj=full_context,
+                question=question,
+                token_estimator=self.token_estimator,
+                max_context_tokens=self.max_context_tokens,
+                max_memory_tokens=self.max_memory_tokens,
+                document_priority=documents_priority,
+            )
+            prompt_span.set_attribute("prompt.chunks_count", len(final_chunks))
 
         # If final_chunks is empty, citations will be empty and the assistant
         # answers from general knowledge (see PromptBuilder instructions).
@@ -889,11 +984,17 @@ class ChatOrchestrator:
                         "diagnostics": diagnostics.model_dump(),
                     },
                 }
+                status_label = "success"
+                record_stream_telemetry("success")
             except StreamingCancelled:
                 # Client-initiated disconnect. Let the outer finally persist the
                 # partial answer as INTERRUPTED rather than marking it FAILED.
+                status_label = "cancelled"
+                record_stream_telemetry("cancelled")
                 raise
             except Exception as e:
+                status_label = "error"
+                record_stream_telemetry("error")
                 await self.conversation_manager._message_repo.fail_message(
                     assistant_message_id, str(e)
                 )
@@ -927,7 +1028,10 @@ class ChatOrchestrator:
                     metadata=metadata,
                 )
                 message_finalized = True
+                status_label = "success"
+                record_stream_telemetry("success")
         finally:
+            record_stream_telemetry(status_label)
             await _mark_interrupted_if_incomplete()
 
         generation_time_ms = (time.perf_counter() - gen_start_time) * 1000

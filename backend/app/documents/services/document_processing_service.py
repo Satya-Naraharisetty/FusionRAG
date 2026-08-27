@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from uuid import UUID
 
 from app.auth.domain.interfaces import TimeProvider, UnitOfWork
@@ -83,6 +84,14 @@ class DocumentProcessingService:
 
         # 2. Execute extraction, cleaning, metadata gathering, and chunking
         try:
+            from app.core.telemetry import (
+                INGESTION_DOCUMENTS,
+                INGESTION_STAGE_DURATION,
+                get_tracer,
+            )
+
+            tracer = get_tracer("hybrid-rag.ingestion")
+
             file_bytes = await self._storage_provider.get(document.filename)
 
             # Retrieve strategy class
@@ -91,7 +100,18 @@ class DocumentProcessingService:
             )
 
             # Extraction
-            extraction_result = await extractor.extract(file_bytes)
+            t0 = time.perf_counter()
+            with tracer.start_as_current_span("document.extract_text") as span:
+                extraction_result = await extractor.extract(file_bytes)
+                span.set_attribute(
+                    "document.page_count", extraction_result.page_count or 0
+                )
+                span.set_attribute("document.mime_type", document.content_type or "")
+            ext_dur = time.perf_counter() - t0
+            try:
+                INGESTION_STAGE_DURATION.labels(stage="extraction").observe(ext_dur)
+            except Exception:
+                pass
 
             # Text cleaning (CPU bound, run in thread)
             cleaned_text = await asyncio.to_thread(
@@ -106,12 +126,20 @@ class DocumentProcessingService:
             )
 
             # Chunk generation (CPU bound, run in thread)
-            chunk_result = await asyncio.to_thread(
-                self._chunking_service.chunk_document,
-                cleaned_text,
-                document.id,
-                document.checksum,
-            )
+            t0 = time.perf_counter()
+            with tracer.start_as_current_span("document.chunk_text") as span:
+                chunk_result = await asyncio.to_thread(
+                    self._chunking_service.chunk_document,
+                    cleaned_text,
+                    document.id,
+                    document.checksum,
+                )
+                span.set_attribute("document.chunk_count", len(chunk_result.chunks))
+            chunk_dur = time.perf_counter() - t0
+            try:
+                INGESTION_STAGE_DURATION.labels(stage="chunking").observe(chunk_dur)
+            except Exception:
+                pass
 
             # 3. Batch commit results (idempotent: delete previous chunks first)
             document = await self._document_repo.get_by_id_for_update(document_id)
@@ -134,6 +162,12 @@ class DocumentProcessingService:
             await self._document_repo.save(document)
 
             await self._uow.commit()
+            try:
+                INGESTION_DOCUMENTS.labels(
+                    mime_type=document.content_type or "unknown", status="success"
+                ).inc()
+            except Exception:
+                pass
             logger.info(f"Ingestion completed successfully for document {document_id}")
 
             # Invalidate the user's index-cache entry

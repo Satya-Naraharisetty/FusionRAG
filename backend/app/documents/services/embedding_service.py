@@ -1,4 +1,5 @@
 import logging
+import time
 from uuid import UUID
 
 from app.auth.domain.interfaces import TimeProvider, UnitOfWork, UUIDGenerator
@@ -158,9 +159,30 @@ class EmbeddingService:
                     await self._embedding_repo.save(emb)
                 await self._uow.commit()
 
+                from app.core.telemetry import (
+                    EMBEDDING_CHUNKS,
+                    INGESTION_STAGE_DURATION,
+                    QDRANT_OPERATION_DURATION,
+                    get_tracer,
+                )
+
+                tracer = get_tracer("hybrid-rag.embedding")
+
                 # 2. Call embedding generator
                 texts = [c.text for c in batch]
-                vectors = await self._embedding_generator.batch_generate(texts)
+                t0 = time.perf_counter()
+                with tracer.start_as_current_span("embedding.batch_generate") as span:
+                    span.set_attribute("embedding.provider", self._provider_name)
+                    span.set_attribute("embedding.batch_size", len(batch))
+                    vectors = await self._embedding_generator.batch_generate(texts)
+                gen_dur = time.perf_counter() - t0
+                try:
+                    INGESTION_STAGE_DURATION.labels(stage="embedding").observe(gen_dur)
+                    EMBEDDING_CHUNKS.labels(
+                        provider=self._provider_name, status="success"
+                    ).inc(len(batch))
+                except Exception:
+                    pass
 
                 # 3. Store vectors in VectorStore
                 payloads = []
@@ -178,11 +200,22 @@ class EmbeddingService:
                         }
                     )
 
-                await self._vector_store.upsert(
-                    vectors=vectors,
-                    payloads=payloads,
-                    ids=[c.id for c in batch],
-                )
+                t0 = time.perf_counter()
+                with tracer.start_as_current_span("qdrant.upsert_vectors") as span:
+                    span.set_attribute("qdrant.operation", "upsert")
+                    span.set_attribute("qdrant.vectors_count", len(vectors))
+                    await self._vector_store.upsert(
+                        vectors=vectors,
+                        payloads=payloads,
+                        ids=[c.id for c in batch],
+                    )
+                upsert_dur = time.perf_counter() - t0
+                try:
+                    QDRANT_OPERATION_DURATION.labels(operation="upsert").observe(
+                        upsert_dur
+                    )
+                except Exception:
+                    pass
 
                 # 4. Mark status as COMPLETED in DB
                 now = self._time_provider.get_now()

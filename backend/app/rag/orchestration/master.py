@@ -326,6 +326,19 @@ class AdaptiveRAGOrchestrator:
                 final_status = OrchestrationStatus.PARTIAL
                 break
 
+            # Wire Prometheus metric for accepted replanning iteration
+            replan_reason = (
+                "conflict"
+                if (assessment and assessment.conflicting_evidence)
+                else "missing_evidence"
+            )
+            try:
+                from app.core.telemetry import RAG_ADAPTIVE_REPLANS
+
+                RAG_ADAPTIVE_REPLANS.labels(reason=replan_reason).inc()
+            except Exception:
+                pass
+
         total_latency = time.perf_counter() - start_time
         total_latency_ms = total_latency * 1000.0
 
