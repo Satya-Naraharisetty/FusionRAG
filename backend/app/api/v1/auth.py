@@ -337,9 +337,9 @@ async def google_oauth_callback(
             status_code=302,
         )
 
-    # ── Redirect to frontend cleanly (token retrieved via HttpOnly cookie silent refresh) ───
+    # ── Redirect to frontend cleanly with access_token fragment for cross-origin SPAs ───
     redirect = RedirectResponse(
-        url=f"{frontend_base}/oauth/callback",
+        url=f"{frontend_base}/oauth/callback#token={access_token}",
         status_code=302,
     )
 
@@ -457,9 +457,9 @@ async def github_oauth_callback(
             status_code=302,
         )
 
-    # ── Redirect to frontend cleanly (token retrieved via HttpOnly cookie silent refresh) ───
+    # ── Redirect to frontend cleanly with access_token fragment for cross-origin SPAs ───
     redirect = RedirectResponse(
-        url=f"{frontend_base}/oauth/callback",
+        url=f"{frontend_base}/oauth/callback#token={access_token}",
         status_code=302,
     )
 

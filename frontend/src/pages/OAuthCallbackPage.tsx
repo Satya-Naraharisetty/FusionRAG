@@ -10,9 +10,9 @@ import { authApi } from "../api/auth";
  * a successful OAuth exchange.
  *
  * Security:
- *   Zero tokens are passed in the URL. The backend sets a secure, HttpOnly
- *   refresh cookie during the redirect. This page triggers a silent refresh
- *   to exchange the cookie for an in-memory access token via JSON response.
+ *   Extracts the short-lived token from the URL fragment / query param,
+ *   immediately wipes the browser address bar / history, sets the in-memory
+ *   token, and smoothly directs the user to /chat.
  */
 export default function OAuthCallbackPage() {
   const navigate = useNavigate();
@@ -23,10 +23,16 @@ export default function OAuthCallbackPage() {
     if (processed.current) return;
     processed.current = true;
 
-    const params = new URLSearchParams(window.location.search);
-    const oauthError = params.get("oauth_error");
+    // 1. Extract params from search and hash fragment
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(
+      window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash
+    );
 
-    // Clear any query params immediately from the URL
+    const oauthError = searchParams.get("oauth_error") || hashParams.get("oauth_error");
+    const token = searchParams.get("token") || hashParams.get("token");
+
+    // Clear any token / query params immediately from browser address bar & history
     window.history.replaceState({}, "", "/oauth/callback");
 
     if (oauthError) {
@@ -42,12 +48,28 @@ export default function OAuthCallbackPage() {
 
     // ── If opened inside popup, notify opener window and close ────────────────
     if (window.opener) {
-      window.opener.postMessage({ type: "OAUTH_SUCCESS" }, window.location.origin);
+      window.opener.postMessage({ type: "OAUTH_SUCCESS", token: token || undefined }, window.location.origin);
       window.close();
       return;
     }
 
-    // ── Silent Refresh via HttpOnly Cookie (Full-Page Fallback) ───────────────
+    // ── Direct Token Sign-In (Cross-Origin SPA) ──────────────────────────────
+    if (token) {
+      setAccessToken(token);
+      authApi
+        .getMe()
+        .then(() => {
+          navigate("/chat", { replace: true });
+        })
+        .catch((err) => {
+          console.error("Failed to fetch user profile with OAuth token:", err);
+          setAccessToken(null);
+          navigate("/login?oauth_error=session_failed", { replace: true });
+        });
+      return;
+    }
+
+    // ── Silent Refresh via HttpOnly Cookie (Fallback) ─────────────────────────
     authApi
       .refresh()
       .then((tokenData) => {
@@ -63,7 +85,6 @@ export default function OAuthCallbackPage() {
         navigate("/login?oauth_error=session_failed", { replace: true });
       });
   }, [navigate]);
-
 
   return (
     <div className="flex h-dvh w-dvw items-center justify-center bg-[var(--bg-primary)]">

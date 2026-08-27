@@ -186,11 +186,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (event.data?.type === "OAUTH_SUCCESS") {
         try {
           setIsLoading(true);
-          const response = await authApi.refresh();
-          setAccessTokenState(response.access_token);
+          const incomingToken = event.data?.token;
+          if (incomingToken) {
+            setAccessToken(incomingToken);
+            setAccessTokenState(incomingToken);
+          } else {
+            const response = await authApi.refresh();
+            setAccessToken(response.access_token);
+            setAccessTokenState(response.access_token);
+            scheduleRefresh(response.expires_in);
+          }
           const userProfile = await authApi.getMe();
           setUser(userProfile);
-          scheduleRefresh(response.expires_in);
         } catch (err) {
           console.error("Failed to complete OAuth popup session:", err);
         } finally {
