@@ -50,7 +50,7 @@ class RetrievalService:
     """
     RetrievalService coordinates the hybrid retrieval pipeline.
     In baseline mode, executes single-query Dense + BM25 retrieval, RRF fusion, MMR, and Cross-Encoder reranking.
-    In Phase 2.4 advanced mode, orchestrates query classification, conservative decomposition,
+    In advanced mode, orchestrates query classification, conservative decomposition,
     lexical/semantic expansion, concurrent multi-query retrieval, weighted RRF, and canonical deduplication.
     """
 
@@ -79,7 +79,7 @@ class RetrievalService:
         bm25_top_k: int | None = None,
         mmr_lambda: float | None = None,
         rerank_top_k: int | None = None,
-        # Phase 2.4 Advanced RAG configurations
+        # Advanced RAG configurations
         query_classifier: QueryClassifier | None = None,
         query_expander: QueryExpander | None = None,
         query_decomposer: QueryDecomposer | None = None,
@@ -143,7 +143,7 @@ class RetrievalService:
             else getattr(settings, "EMPTY_KB_CACHE_TTL_SECONDS", 60.0)
         )
 
-        # Phase 2.4 Feature Flags and Knobs
+        # Advanced Retrieval Feature Flags and Knobs
         self._enable_query_classification = (
             enable_query_classification
             if enable_query_classification is not None
@@ -235,7 +235,7 @@ class RetrievalService:
                 rrf_k=getattr(settings, "RRF_K", 60)
             )
 
-        # Weighted Fusion Engine for Phase 2.4
+        # Weighted Fusion Engine
         self._weighted_fusion_engine = WeightedReciprocalRankFusionEngine(
             rrf_k=getattr(settings, "RRF_K", 60),
             dense_weight=self._dense_weight,
@@ -403,7 +403,7 @@ class RetrievalService:
         )
 
         if not is_advanced_active:
-            # Exact Phase 2.3 baseline implementation path
+            # Standard baseline implementation path
             processed_query_obj = self._query_processor.process(query)
 
             v_top_k = (
@@ -592,7 +592,7 @@ class RetrievalService:
             )
 
         # -------------------------------------------------------------
-        # Branch 2: Advanced Multi-Query Retrieval Path (Phase 2.4)
+        # Branch 2: Advanced Multi-Query Retrieval Path
         # -------------------------------------------------------------
         # 1. Query Classification
         classification_start = time.perf_counter()

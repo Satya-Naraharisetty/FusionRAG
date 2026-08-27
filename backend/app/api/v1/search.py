@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
+    check_rate_limit,
     get_conversation_manager,
     get_current_user_context,
     get_document_service,
@@ -13,6 +14,7 @@ from app.api.dependencies import (
 )
 from app.chat.services.conversation_manager import ConversationManager
 from app.core.config import settings
+from app.core.security import PromptInjectionScanner
 from app.documents.domain.exceptions import UnauthorizedDocumentAccess
 from app.documents.domain.models import RetrievalMode, RetrievedChunk
 from app.documents.services.document_service import DocumentService
@@ -22,7 +24,9 @@ router = APIRouter(tags=["Search"])
 
 
 class SearchRequest(BaseModel):
-    query: str = Field(..., min_length=1, description="The search query text.")
+    query: str = Field(
+        ..., min_length=1, max_length=2000, description="The search query text."
+    )
     conversation_id: UUID | None = Field(
         default=None,
         description=(
@@ -31,10 +35,14 @@ class SearchRequest(BaseModel):
         ),
     )
     top_k: int | None = Field(
-        default=None, description="The maximum number of chunks to return."
+        default=None,
+        ge=1,
+        description="The maximum number of chunks to return.",
     )
     document_ids: list[UUID] | None = Field(
-        default_factory=list, description="Optional document IDs to restrict search."
+        default_factory=list,
+        max_length=50,
+        description="Optional document IDs to restrict search.",
     )
     filters: dict[str, Any] | None = Field(
         default_factory=dict, description="Optional metadata filters."
@@ -60,7 +68,12 @@ class SearchResponse(BaseModel):
     )
 
 
-@router.post("/search", response_model=SearchResponse, status_code=status.HTTP_200_OK)
+@router.post(
+    "/search",
+    response_model=SearchResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def search_documents(
     request: SearchRequest,
     user_context: dict[str, Any] = Depends(get_current_user_context),
@@ -71,16 +84,10 @@ async def search_documents(
     """
     Search document chunks using history-aware hybrid retrieval.
     Returns ranked chunks matching query and filters.
-
-    The two-tier document model is enforced here, mirroring chat retrieval
-    (ChatOrchestrator._resolve_retrieval_scope):
-
-    * Chat-scoped documents (uploaded in a conversation) are searchable ONLY
-      within their own conversation — pass ``conversation_id`` to search them.
-    * Global Documents-section documents are searchable without conversation
-      context.
-    * Explicit ``document_ids`` are always honored (ownership is verified).
     """
+    # Scan search query for injection attempts before processing
+    PromptInjectionScanner.scan_prompt(request.query)
+
     user_id = UUID(user_context["user_id"])
 
     # 0. Load or create conversation session to retrieve history context.
@@ -201,11 +208,11 @@ async def search_documents(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e),
         )
-    except Exception as e:
+    except Exception:
         import logging
 
         logging.getLogger(__name__).exception("Search endpoint exception occurred")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Search retrieval pipeline encountered an internal error: {e}",
+            detail="Search retrieval pipeline encountered an internal error.",
         )

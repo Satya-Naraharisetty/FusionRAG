@@ -4,7 +4,11 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 
 # Lazily import DI dependency providers
-from app.api.dependencies import get_current_user_context, get_llm_provider
+from app.api.dependencies import (
+    check_rate_limit,
+    get_current_user_context,
+    get_llm_provider,
+)
 from app.chat.infrastructure.router import LLMProviderRouter
 from app.core.cache.interfaces import BaseCache
 
@@ -33,7 +37,11 @@ def get_cache_provider() -> BaseCache:
     return get_cache()
 
 
-@router.post("/cache/clear", status_code=status.HTTP_200_OK)
+@router.post(
+    "/cache/clear",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def clear_cache(
     namespace: str | None = None,
     cache: BaseCache = Depends(get_cache_provider),
@@ -56,11 +64,11 @@ async def clear_cache(
             ]:
                 await cache.invalidate_namespace(ns)
             return {"message": "Successfully invalidated all cache namespaces."}
-    except Exception as e:
-        logger.error(f"Failed to clear cache: {e}")
+    except Exception:
+        logger.exception("Failed to clear cache due to an internal error.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to clear cache: {str(e)}",
+            detail="Failed to clear cache due to an internal error.",
         )
 
 

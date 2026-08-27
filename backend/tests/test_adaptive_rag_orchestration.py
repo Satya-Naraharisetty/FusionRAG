@@ -333,9 +333,9 @@ async def test_adaptive_rag_orchestrator_replanning_loop():
 async def test_three_way_comparative_matrix_execution():
     """
     Validates the 3 configurations on conceptual and multi-hop queries:
-    A: Phase 2.4 Baseline (Standard deterministic retrieval)
-    B: Phase 2.5 Adaptive (Strategy routing without HyDE)
-    C: Phase 2.5 Adaptive + HyDE (Strategy routing with HyDE enabled)
+    A: Standard Baseline (Standard deterministic retrieval)
+    B: Adaptive Strategy (Strategy routing without HyDE)
+    C: Adaptive Strategy + HyDE (Strategy routing with HyDE enabled)
     """
     from app.documents.domain.interfaces import DenseRetriever, EmbeddingGenerator
     from app.documents.services.hyde import (
@@ -371,7 +371,7 @@ async def test_three_way_comparative_matrix_execution():
     evaluator = EvidenceSufficiencyEvaluator(min_relevance_threshold=0.3)
     replanner = Replanner()
 
-    # Configuration A: Standard Retrieval (2.4 Baseline)
+    # Configuration A: Standard Baseline Retrieval
     res_a = await mock_retrieval_service.retrieve(
         query="How does cloud architecture encrypt database volumes?",
         user_id=user_id,
@@ -379,7 +379,7 @@ async def test_three_way_comparative_matrix_execution():
     )
     assert len(res_a.retrieved_chunks) == 1
 
-    # Configuration B: Phase 2.5 Adaptive without HyDE
+    # Configuration B: Adaptive Strategy without HyDE
     orchestrator_b = AdaptiveRAGOrchestrator(
         retrieval_service=mock_retrieval_service,
         strategy_router=RetrievalStrategyRouter(classifier),
@@ -399,7 +399,7 @@ async def test_three_way_comparative_matrix_execution():
     assert res_b.diagnostics is not None
     assert res_b.diagnostics["final_status"] == "success"
 
-    # Configuration C: Phase 2.5 Adaptive with HyDE
+    # Configuration C: Adaptive Strategy with HyDE
     mock_dense = MagicMock(spec=DenseRetriever)
     mock_dense.retrieve = AsyncMock(return_value=[ground_truth_chunk])
     mock_embed = MagicMock(spec=EmbeddingGenerator)

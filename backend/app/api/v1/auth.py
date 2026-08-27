@@ -107,7 +107,11 @@ async def login(
     }
 
 
-@router.post("/refresh", response_model=TokenResponseSchema)
+@router.post(
+    "/refresh",
+    response_model=TokenResponseSchema,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def refresh(
     response: Response,
     request: Request,
@@ -148,7 +152,7 @@ async def refresh(
     }
 
 
-@router.post("/logout")
+@router.post("/logout", dependencies=[Depends(check_rate_limit)])
 async def logout(
     response: Response,
     request: Request,

@@ -1,3 +1,10 @@
+"""Telemetry lifecycle integration test suite.
+
+Verifies end-to-end telemetry metric accounting, streaming events, adaptive RAG
+replan tracking, queue consumer lag gauges, orphan task recovery metrics, and HTTP
+route template parameterization to avoid label cardinality explosion.
+"""
+
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -33,6 +40,7 @@ from app.rag.orchestration.models import (
 
 
 def _setup_mock_orchestrator():
+    """Build mock ChatOrchestrator dependencies for telemetry verification."""
     mock_conv_mgr = AsyncMock()
     conv_id = uuid4()
     mock_conv = MagicMock()
@@ -118,6 +126,8 @@ def _setup_mock_orchestrator():
 
 
 class TestRAGRequestTelemetry:
+    """Verifies telemetry counters on synchronous RAG requests."""
+
     @pytest.mark.asyncio
     async def test_sync_success_lifecycle_accounting(self):
         orchestrator, conv_id = _setup_mock_orchestrator()
@@ -169,6 +179,8 @@ class TestRAGRequestTelemetry:
 
 
 class TestRAGStreamingTelemetry:
+    """Verifies telemetry metrics for streaming RAG responses."""
+
     @pytest.mark.asyncio
     async def test_stream_success_lifecycle_accounting(self):
         orchestrator, conv_id = _setup_mock_orchestrator()
@@ -196,6 +208,8 @@ class TestRAGStreamingTelemetry:
 
 
 class TestAdaptiveRAGTelemetry:
+    """Verifies telemetry tracking for adaptive RAG replans."""
+
     @pytest.mark.asyncio
     async def test_replan_increments_metric_when_tasks_accepted(self):
         from app.documents.domain.models import DocumentRetrievalScope
@@ -323,6 +337,8 @@ class TestAdaptiveRAGTelemetry:
 
 
 class TestQueueTelemetry:
+    """Verifies Redis task queue length, consumer lag, and recovery metrics."""
+
     @pytest.mark.asyncio
     async def test_queue_stream_length_and_consumer_lag_gauges(self):
         mock_redis = AsyncMock()
@@ -406,6 +422,8 @@ class TestQueueTelemetry:
 
 
 class TestHTTPMetricCardinality:
+    """Verifies parameterized route templates prevent label cardinality explosion."""
+
     def test_dynamic_routes_are_parameterized(self):
         mock_app = MagicMock()
         mock_app.routes = []
@@ -430,7 +448,7 @@ class TestHTTPMetricCardinality:
         req_2 = Request(scope_2)
         template_2 = resolve_route_template(req_2)
 
-        # Distinct UUIDs must collapse to the identical route template!
+        # Distinct UUIDs must collapse to the identical route template
         assert template_1 == "/api/v1/conversations/{id}"
         assert template_2 == "/api/v1/conversations/{id}"
         assert template_1 == template_2

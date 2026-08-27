@@ -32,7 +32,7 @@ class ContextBuilder:
         Deduplicates chunks, formats them with doc boundaries and sequential renumbering,
         and truncates at chunk boundaries to stay within the MAX_CONTEXT_TOKENS budget.
         When context selection is enabled, utilizes ContextSelector score thresholds and ordering.
-        When context selection is disabled or unavailable, follows the exact Phase 2.3 baseline path.
+        When context selection is disabled or unavailable, follows the exact standard baseline path.
         """
         if self._enable_context_selection and self._context_selector is not None:
             # Score filter & sort chunks synchronously via context selector helper
@@ -52,7 +52,7 @@ class ContextBuilder:
                 deduped[: self._context_selector.max_chunks]
             )
         else:
-            # Baseline Path (exact Phase 2.3 implementation)
+            # Baseline Path (standard deterministic implementation)
             seen_chunk_ids = set()
             unique_chunks: list[RetrievedChunk] = []
             for chunk in chunks:

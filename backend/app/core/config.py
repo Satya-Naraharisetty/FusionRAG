@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     REDIS_SSL: bool = False
     REDIS_URL: str | None = None
 
-    # Queue Configurations (Phase 2.5)
+    # Queue Configurations
     QUEUE_TYPE: str = "in_memory"  # "redis_stream" | "in_memory"
     QUEUE_STREAM_NAME: str = "stream:jobs:document_processing"
     QUEUE_CONSUMER_GROUP: str = "group:document_workers"
@@ -87,11 +87,11 @@ class Settings(BaseSettings):
     QUEUE_WORKER_CONCURRENCY: int = 4
     QUEUE_WORKER_BLOCK_MS: int = 2000
 
-    # Ingestion Reaper Configurations (Phase 2.5.5)
+    # Ingestion Reaper Configurations
     INGESTION_REAPER_INTERVAL_SECONDS: float = 60.0
     INGESTION_REAPER_STALE_THRESHOLD_SECONDS: float = 60.0
 
-    # Sparse Retrieval Configurations (Phase 2.5)
+    # Sparse Retrieval Configurations
     SPARSE_RETRIEVER_TYPE: str = "postgres_fts"  # "postgres_fts" | "bm25_memory"
 
     # Qdrant Vector DB Configurations
@@ -187,11 +187,14 @@ class Settings(BaseSettings):
     COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
     COOKIE_MAX_AGE: int = 7 * 24 * 60 * 60
 
+    # Encryption Configuration
+    ENCRYPTION_MASTER_KEY: str | None = None
+
     # Logging Configurations
     LOG_FORMAT: str = "TEXT"
     LOG_LEVEL: str = "INFO"
 
-    # Observability & OpenTelemetry Configurations (Phase 2.6)
+    # Observability & OpenTelemetry Configurations
     ENABLE_TELEMETRY: bool = True
     ENABLE_TRACING: bool = True
     ENABLE_PROMETHEUS_METRICS: bool = True
@@ -203,6 +206,13 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "data/uploads"
     MAX_UPLOAD_SIZE: int = 25 * 1024 * 1024  # 25 MB default
     STORAGE_PROVIDER: Literal["database", "local"] = "database"
+
+    # Malware Scanning Configurations
+    MALWARE_SCANNER_TYPE: Literal["stub", "clamav"] = "stub"
+    CLAMAV_HOST: str | None = None
+    CLAMAV_PORT: int = 3310
+    CLAMAV_TIMEOUT_SECONDS: float = 10.0
+    MALWARE_SCAN_FAIL_CLOSED: bool = True
 
     # Chunking Configurations
     CHUNK_SIZE: int = 500
@@ -243,7 +253,7 @@ class Settings(BaseSettings):
     VECTOR_TOP_K: int = 20
     RRF_K: int = 60
     MMR_LAMBDA: float = 0.5
-    # Advanced RAG Configurations (Phase 2.4)
+    # Advanced RAG Configurations
     ENABLE_QUERY_CLASSIFICATION: bool = True
     ENABLE_QUERY_EXPANSION: bool = False
     QUERY_EXPANSION_MAX_QUERIES: int = 3
@@ -274,7 +284,7 @@ class Settings(BaseSettings):
     ENABLE_CONTEXTUAL_RETRIEVAL: bool = False
     TOTAL_ADVANCED_RAG_TIMEOUT_MS: int = 3000
 
-    # Adaptive / Agentic RAG Orchestration Configurations (Phase 2.5)
+    # Adaptive / Agentic RAG Orchestration Configurations
     ENABLE_ADAPTIVE_RAG: bool = False
     ENABLE_HYDE: bool = False
     HYDE_GENERATOR_TYPE: Literal["deterministic", "llm"] = "deterministic"
@@ -552,6 +562,25 @@ class Settings(BaseSettings):
             if github_id and not github_secret:
                 raise ConfigurationError(
                     "GITHUB_CLIENT_SECRET is required when GITHUB_CLIENT_ID is configured."
+                )
+
+            # 4. ENCRYPTION_MASTER_KEY check
+            enc_key = getattr(self, "ENCRYPTION_MASTER_KEY", None)
+            if not enc_key:
+                raise ConfigurationError(
+                    "ENCRYPTION_MASTER_KEY is required in production."
+                )
+            if len(enc_key) < 32:
+                raise ConfigurationError(
+                    "ENCRYPTION_MASTER_KEY must be at least 32 characters long in production."
+                )
+            if (
+                enc_key.lower() in known_placeholders
+                or "default-insecure" in enc_key.lower()
+                or any(p in enc_key.lower() for p in ["development", "testing", "mock"])
+            ):
+                raise ConfigurationError(
+                    "ENCRYPTION_MASTER_KEY contains an insecure placeholder in production."
                 )
 
         return self

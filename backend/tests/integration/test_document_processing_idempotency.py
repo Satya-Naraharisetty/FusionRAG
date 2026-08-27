@@ -37,7 +37,7 @@ async def test_duplicate_process_document_job_is_strictly_idempotent(
     doc_id = uuid4()
     user_id = uuid4()
     content = (
-        b"This is idempotent document testing content for Phase 2.5.4 verification."
+        b"This is idempotent document testing content for processing verification."
     )
     stored_path = await storage_provider.save(
         filename="idempotent_test.txt",

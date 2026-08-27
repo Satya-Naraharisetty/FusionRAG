@@ -50,7 +50,7 @@ class GroundedContext(BaseModel):
     token_estimate: int
 
 
-# --- Milestone 8 Additions ---
+# --- Provider & Conversation Domain Models ---
 
 
 class LLMProviderType(str, Enum):

@@ -11,6 +11,7 @@ from fastapi import (
 from pydantic import BaseModel, ConfigDict
 
 from app.api.dependencies import (
+    check_rate_limit,
     get_current_user_context,
     get_document_service,
     get_durable_task_queue,
@@ -49,7 +50,10 @@ class DocumentResponse(BaseModel):
 
 
 @router.post(
-    "/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED
+    "/upload",
+    response_model=DocumentResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(check_rate_limit)],
 )
 async def upload_document(
     file: UploadFile = File(...),
@@ -100,7 +104,11 @@ async def get_document(
     return await document_service.get_document_by_id(id, user_id)
 
 
-@router.put("/{id}", response_model=DocumentResponse)
+@router.put(
+    "/{id}",
+    response_model=DocumentResponse,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def replace_document(
     id: UUID,
     file: UploadFile = File(...),
@@ -136,7 +144,11 @@ async def delete_document(
     return None
 
 
-@router.post("/{id}/reprocess", response_model=DocumentResponse)
+@router.post(
+    "/{id}/reprocess",
+    response_model=DocumentResponse,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def reprocess_document(
     id: UUID,
     current_user: dict = Depends(get_current_user_context),
@@ -158,7 +170,11 @@ class EmbeddingStatusResponse(BaseModel):
     model: str
 
 
-@router.post("/{id}/embeddings/regenerate", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/{id}/embeddings/regenerate",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def regenerate_embeddings(
     id: UUID,
     current_user: dict = Depends(get_current_user_context),

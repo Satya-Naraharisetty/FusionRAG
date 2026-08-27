@@ -16,11 +16,11 @@ from app.documents.services.retrieval_service import RetrievalService
 
 
 @pytest.mark.asyncio
-async def test_disabled_advanced_path_preserves_exact_phase_2_3_behavior():
+async def test_disabled_advanced_path_preserves_exact_baseline_behavior():
     """
     CRITICAL BASELINE COMPATIBILITY TEST:
     Verifies that when advanced RAG features (query expansion, query decomposition,
-    weighted RRF) are disabled, the RetrievalService executes the exact Phase 2.3 baseline
+    weighted RRF) are disabled, the RetrievalService executes the exact standard baseline
     pipeline, returning identical candidate chunk IDs, ordering, scores, citations,
     and retrieval parameters.
     """
@@ -160,7 +160,7 @@ async def test_context_builder_enable_flag_exact_equivalence():
     """
     CRITICAL INVARIANT:
     When ENABLE_CONTEXT_SELECTION=False, ContextBuilder must produce 100% exact identical
-    chunk IDs, ordering, formatted context string, citations, and token count as the Phase 2.3 baseline.
+    chunk IDs, ordering, formatted context string, citations, and token count as the standard baseline.
     """
     from app.chat.services.context_builder import ContextBuilder
     from app.chat.services.token_estimator import CharacterTokenEstimator

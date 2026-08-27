@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class ReciprocalRankFusionEngine(FusionEngine):
     """
-    Standard Reciprocal Rank Fusion Engine (Phase 2.3 implementation).
+    Standard Reciprocal Rank Fusion Engine.
     Direct baseline path used when ENABLE_WEIGHTED_RRF=False.
     """
 
@@ -77,7 +77,7 @@ class ReciprocalRankFusionEngine(FusionEngine):
 
 class WeightedReciprocalRankFusionEngine(FusionEngine):
     """
-    Weighted Reciprocal Rank Fusion Engine (Phase 2.4).
+    Weighted Reciprocal Rank Fusion Engine.
     Calculates: score(d) = sum_j (w_j / (k + rank_j(d)))
     When all weights are 1.0, this is mathematically identical to standard RRF.
     """

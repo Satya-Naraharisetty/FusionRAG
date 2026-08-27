@@ -27,7 +27,7 @@ from app.documents.services.retrieval_service import RetrievalService
 @pytest.mark.asyncio
 async def test_advanced_rag_end_to_end_pipeline():
     """
-    End-to-End integration test for Phase 2.4 Advanced RAG:
+    End-to-End integration test for Advanced RAG pipeline:
     Query -> Query Classification -> Query Expansion & Decomposition ->
     Concurrent Dense + Sparse Retrieval -> Weighted RRF -> Canonical Deduplication ->
     MMR -> Cross-Encoder -> Neighbor Expansion -> Context Selection & Budgeting.

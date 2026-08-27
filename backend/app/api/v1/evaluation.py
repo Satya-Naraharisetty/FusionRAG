@@ -10,7 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.dependencies import get_benchmark_runner, get_current_user_context, get_db
+from app.api.dependencies import (
+    check_rate_limit,
+    get_benchmark_runner,
+    get_current_user_context,
+    get_db,
+)
 from app.core.config import settings
 from app.evaluation.datasets.dataset_loader import DatasetLoader
 from app.evaluation.infrastructure.persistence.models import (
@@ -86,7 +91,11 @@ class RegressionRequest(BaseModel):
     )
 
 
-@router.post("/benchmark", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/benchmark",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def start_benchmark(
     req: RunBenchmarkRequest,
     db: AsyncSession = Depends(get_db),
@@ -137,14 +146,21 @@ async def start_benchmark(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e:
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception("Benchmark execution failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Benchmark execution failed: {e}",
+            detail="Benchmark execution failed due to an internal error.",
         )
 
 
-@router.post("/regression", response_model=None)
+@router.post(
+    "/regression",
+    response_model=None,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def run_regression_check(
     req: RegressionRequest,
     db: AsyncSession = Depends(get_db),
@@ -186,10 +202,13 @@ async def run_regression_check(
 
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except Exception as e:
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception("Regression analysis failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Regression analysis failed: {e}",
+            detail="Regression analysis failed due to an internal error.",
         )
 
 

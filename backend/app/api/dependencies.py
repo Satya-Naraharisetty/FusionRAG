@@ -488,8 +488,18 @@ def get_document_processing_service(
 
 
 def get_malware_scanner() -> Any:
-    from app.core.security.malware import StubMalwareScanner
+    from app.core.config import settings
+    from app.core.security.malware import ClamAVScanner, StubMalwareScanner
 
+    scanner_type = getattr(settings, "MALWARE_SCANNER_TYPE", "stub")
+    clamav_host = getattr(settings, "CLAMAV_HOST", None)
+    if scanner_type == "clamav" or (settings.is_production and clamav_host):
+        return ClamAVScanner(
+            host=clamav_host or "localhost",
+            port=getattr(settings, "CLAMAV_PORT", 3310),
+            timeout_seconds=getattr(settings, "CLAMAV_TIMEOUT_SECONDS", 10.0),
+            fail_closed=getattr(settings, "MALWARE_SCAN_FAIL_CLOSED", True),
+        )
     return StubMalwareScanner()
 
 

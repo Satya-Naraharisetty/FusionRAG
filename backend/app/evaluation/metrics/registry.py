@@ -1109,7 +1109,7 @@ class DuplicateContextRateMetric(Metric):
         )
 
 
-# --- PHASE 2.5 ADAPTIVE & AGENTIC RAG METRICS ---
+# --- ADAPTIVE & AGENTIC RAG METRICS ---
 
 
 @MetricRegistry.register("strategy_selection_accuracy")

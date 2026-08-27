@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
+    check_rate_limit,
     get_conversation_manager,
     get_current_user_context,
     get_document_service,
@@ -192,6 +193,7 @@ async def list_messages(
     "/{conversation_id}/documents",
     response_model=DocumentResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(check_rate_limit)],
 )
 async def upload_conversation_document(
     conversation_id: UUID,

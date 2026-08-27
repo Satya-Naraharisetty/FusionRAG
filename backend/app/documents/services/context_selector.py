@@ -170,9 +170,11 @@ class ContextSelector:
                 neighbor_chunks_added=0,
             )
 
-        # 1. Score threshold filtering
+        # 1. Score threshold & tenant document scope filtering
         filtered_chunks: list[RetrievedChunk] = []
         for c in chunks:
+            if allowed_doc_ids is not None and c.document_id not in allowed_doc_ids:
+                continue
             score = self._get_target_score(c)
             if score >= self.min_chunk_score:
                 filtered_chunks.append(c)

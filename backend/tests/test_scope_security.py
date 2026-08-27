@@ -421,7 +421,7 @@ async def test_replace_document_preserves_conversation_scope():
 
 
 # ---------------------------------------------------------------------------
-# 7. Multi-Query Expansion Scope Security (Phase 2.4)
+# 7. Multi-Query Expansion Scope Security
 # ---------------------------------------------------------------------------
 
 

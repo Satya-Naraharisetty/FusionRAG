@@ -81,17 +81,17 @@ async def main() -> None:
     parser.add_argument(
         "--enable-query-expansion",
         action="store_true",
-        help="Enable Phase 2.4 query expansion during benchmark.",
+        help="Enable query expansion during benchmark.",
     )
     parser.add_argument(
         "--enable-query-decomposition",
         action="store_true",
-        help="Enable Phase 2.4 query decomposition during benchmark.",
+        help="Enable query decomposition during benchmark.",
     )
     parser.add_argument(
         "--enable-weighted-rrf",
         action="store_true",
-        help="Enable Phase 2.4 weighted RRF during benchmark.",
+        help="Enable weighted RRF during benchmark.",
     )
     parser.add_argument(
         "--dense-weight",
@@ -108,23 +108,23 @@ async def main() -> None:
     parser.add_argument(
         "--enable-neighbor-chunks",
         action="store_true",
-        help="Enable Phase 2.4 neighbor chunk expansion.",
+        help="Enable neighbor chunk expansion.",
     )
     parser.add_argument(
         "--enable-context-selection",
         action="store_true",
         default=True,
-        help="Enable Phase 2.4 context selection.",
+        help="Enable context selection.",
     )
     parser.add_argument(
         "--enable-adaptive-rag",
         action="store_true",
-        help="Enable Phase 2.5 Adaptive / Agentic RAG Orchestration.",
+        help="Enable Adaptive / Agentic RAG Orchestration.",
     )
     parser.add_argument(
         "--enable-hyde",
         action="store_true",
-        help="Enable Phase 2.5 HyDE (Hypothetical Document Embeddings).",
+        help="Enable HyDE (Hypothetical Document Embeddings).",
     )
     args = parser.parse_args()
 

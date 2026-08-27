@@ -10,6 +10,9 @@ from app.auth.infrastructure.providers import (
     SystemTimeProvider,
     SystemUUIDGenerator,
 )
+from app.chat.infrastructure.persistence.repositories.conversation_repository import (
+    SQLAlchemyConversationRepository,
+)
 from app.chat.infrastructure.persistence.repositories.message_repository import (
     SQLAlchemyMessageRepository,
 )
@@ -111,6 +114,25 @@ class ProcessDocumentJobHandler(JobHandler):
                     error=f"Document {document_id} not found",
                     retryable=False,
                 )
+
+            if user_id_raw is not None:
+                try:
+                    payload_user_id = UUID(str(user_id_raw))
+                    if doc.user_id != payload_user_id:
+                        logger.error(
+                            f"Tenant mismatch in job payload: doc user_id={doc.user_id} vs payload user_id={payload_user_id}."
+                        )
+                        return JobResult(
+                            success=False,
+                            error="Tenant authorization mismatch in job payload",
+                            retryable=False,
+                        )
+                except (ValueError, TypeError):
+                    return JobResult(
+                        success=False,
+                        error=f"Invalid user_id in job payload: {user_id_raw}",
+                        retryable=False,
+                    )
 
             if doc.status == DocumentStatus.COMPLETED:
                 # Downstream verification: verify that all expected chunks have completed embeddings
@@ -359,6 +381,26 @@ class GenerateEmbeddingsJobHandler(JobHandler):
                     retryable=False,
                 )
 
+            user_id_raw = job.payload.get("user_id")
+            if user_id_raw is not None:
+                try:
+                    payload_user_id = UUID(str(user_id_raw))
+                    if doc.user_id != payload_user_id:
+                        logger.error(
+                            f"Tenant mismatch in embedding job payload: doc user_id={doc.user_id} vs payload user_id={payload_user_id}."
+                        )
+                        return JobResult(
+                            success=False,
+                            error="Tenant authorization mismatch in job payload",
+                            retryable=False,
+                        )
+                except (ValueError, TypeError):
+                    return JobResult(
+                        success=False,
+                        error=f"Invalid user_id in job payload: {user_id_raw}",
+                        retryable=False,
+                    )
+
             embedding_service = EmbeddingService(
                 embedding_generator=generator,
                 vector_store=store,
@@ -481,6 +523,36 @@ class SummarizeConversationJobHandler(JobHandler):
 
         session_factory = self._get_session_factory()
         async with session_factory() as session:
+            conv_repo = SQLAlchemyConversationRepository(session)
+            conv = await conv_repo.get_conversation(conversation_id)
+            if not conv:
+                return JobResult(
+                    success=False,
+                    error=f"Conversation not found: {conversation_id}",
+                    retryable=False,
+                )
+
+            # Security verification: Ensure payload user_id matches database ownership if present
+            payload_user_id = job.payload.get("user_id")
+            if payload_user_id:
+                try:
+                    parsed_user_id = UUID(str(payload_user_id))
+                    if conv.user_id != parsed_user_id:
+                        logger.warning(
+                            f"Security mismatch: Job payload user_id {payload_user_id} does not match conversation owner {conv.user_id} for conv {conversation_id}."
+                        )
+                        return JobResult(
+                            success=False,
+                            error="Security violation: Job payload user_id does not match conversation ownership.",
+                            retryable=False,
+                        )
+                except (ValueError, TypeError):
+                    return JobResult(
+                        success=False,
+                        error=f"Invalid payload user_id UUID: {payload_user_id}",
+                        retryable=False,
+                    )
+
             message_repo = SQLAlchemyMessageRepository(session)
             summary_repo = SQLAlchemySummaryRepository(session)
 

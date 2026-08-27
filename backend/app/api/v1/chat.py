@@ -30,15 +30,21 @@ router = APIRouter(tags=["Chat"])
 
 
 class ChatRequest(BaseModel):
-    question: str = Field(..., min_length=1, description="The user's question.")
+    question: str = Field(
+        ..., min_length=1, max_length=4000, description="The user's question."
+    )
     conversation_id: UUID | None = Field(
         default=None, description="Optional conversation ID to continue a session."
     )
     document_ids: list[UUID] | None = Field(
-        default_factory=list, description="Optional document IDs to restrict search."
+        default_factory=list,
+        max_length=50,
+        description="Optional document IDs to restrict search.",
     )
     top_k: int | None = Field(
-        default=None, description="The maximum number of chunks to retrieve."
+        default=None,
+        ge=1,
+        description="The maximum number of chunks to retrieve.",
     )
     filters: dict[str, Any] | None = Field(
         default_factory=dict, description="Optional metadata filters."
@@ -110,9 +116,9 @@ async def chat(
                 logger.info(
                     "Streaming connection closed gracefully after client disconnect."
                 )
-            except Exception as e:
+            except Exception:
                 logger.exception("Unhandled error during chat streaming.")
-                yield f"event: error\ndata: {json.dumps({'code': 'INTERNAL_ERROR', 'message': str(e)})}\n\n"
+                yield f"event: error\ndata: {json.dumps({'code': 'INTERNAL_ERROR', 'message': 'An unexpected error occurred during answer generation.'})}\n\n"
 
         return StreamingResponse(
             event_generator(),

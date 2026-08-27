@@ -89,6 +89,10 @@ def run_startup_validations() -> None:
     infra_vars: dict[str, str | None] = {
         "JWT_SECRET": settings.JWT_SECRET,
     }
+    if settings.is_production:
+        infra_vars["ENCRYPTION_MASTER_KEY"] = getattr(
+            settings, "ENCRYPTION_MASTER_KEY", None
+        )
     if not settings.DATABASE_URL:
         infra_vars["POSTGRES_SERVER"] = settings.POSTGRES_SERVER
         infra_vars["POSTGRES_DB"] = settings.POSTGRES_DB
@@ -251,7 +255,7 @@ async def lifespan(app: FastAPI):
         app.state.error_count = 0
         app.state.started_at = time.time()
 
-        # Initialize OpenTelemetry and Prometheus subsystems (Phase 2.6)
+        # Initialize OpenTelemetry and Prometheus subsystems
         from app.core.telemetry import init_telemetry, shutdown_telemetry
 
         init_telemetry(app)
@@ -473,7 +477,7 @@ async def lifespan(app: FastAPI):
             await worker.start()
             app.state.queue_worker = worker
 
-            # Durable Ingestion Reaper (Phase 2.5.5)
+            # Durable Ingestion Reaper
             from app.documents.services.ingestion_reaper import DurableIngestionReaper
 
             reaper = DurableIngestionReaper(
@@ -741,9 +745,16 @@ class ProductionMiddleware(BaseHTTPMiddleware):
                 response.headers["X-Content-Type-Options"] = "nosniff"
                 response.headers["X-Frame-Options"] = "DENY"
                 response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+                response.headers["Permissions-Policy"] = (
+                    "geolocation=(), camera=(), microphone=()"
+                )
                 response.headers["Content-Security-Policy"] = (
                     "default-src 'self'; frame-ancestors 'none'; object-src 'none';"
                 )
+                if settings.is_production and settings.COOKIE_SECURE:
+                    response.headers["Strict-Transport-Security"] = (
+                        "max-age=31536000; includeSubDomains"
+                    )
 
                 return response
             except Exception as e:
