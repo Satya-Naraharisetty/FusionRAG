@@ -549,6 +549,20 @@ class Settings(BaseSettings):
                     "GEMINI_FALLBACK_API_KEY (or GEMINI_API_KEY / GEMINI_LLM_API_KEY) is required in production when Gemini is enabled."
                 )
 
+            # 2b. Jina API Key check
+            if getattr(self, "EMBEDDING_PROVIDER", "") == "jina" or (
+                getattr(self, "ENABLE_RERANKER", False)
+                and getattr(self, "RERANKER_PROVIDER", "") == "jina"
+            ):
+                jina_key = getattr(self, "JINA_API_KEY", "")
+                if not jina_key or jina_key.strip() in (
+                    "",
+                    "your_jina_api_key_here",
+                ):
+                    raise ConfigurationError(
+                        "JINA_API_KEY is required in production when Jina embeddings or reranker is enabled."
+                    )
+
             # 3. OAuth checks
             google_id = getattr(self, "GOOGLE_CLIENT_ID", "")
             google_secret = getattr(self, "GOOGLE_CLIENT_SECRET", "")

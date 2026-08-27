@@ -170,6 +170,11 @@ class QdrantVectorStore(VectorStore):
         timeout: float | None = None,
         retrieval_scope: Any | None = None,
     ) -> list[dict[str, Any]]:
+        if not user_id:
+            raise ValueError(
+                "user_id is required for Qdrant vector search and cannot be None."
+            )
+
         await self._ensure_collection()
 
         must_conditions: list[Any] = [
