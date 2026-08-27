@@ -1100,9 +1100,11 @@ def metrics_endpoint():
     )
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
+@app.api_route("/health", methods=["GET", "HEAD"])
 def root_route():
     return {
+        "status": "ok",
         "message": f"Welcome to the {settings.PROJECT_NAME} API.",
         "health_liveness_endpoint": f"{settings.API_V1_STR}/health/liveness",
         "health_readiness_endpoint": f"{settings.API_V1_STR}/health/readiness",

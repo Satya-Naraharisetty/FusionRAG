@@ -70,8 +70,24 @@ def init_telemetry(app: Any = None) -> None:
             or getattr(settings, "ENVIRONMENT", "").lower() == "testing"
             or getattr(settings, "is_testing", False)
         )
+        is_prod = (
+            getattr(settings, "is_production", False)
+            or getattr(settings, "ENV", "").lower() == "production"
+        )
+        is_local_endpoint = bool(
+            endpoint and ("localhost" in endpoint or "127.0.0.1" in endpoint)
+        )
 
-        if endpoint and endpoint.strip() and not is_test_env:
+        # In standalone cloud production without a dedicated local Jaeger container,
+        # only attach the network gRPC exporter if an explicit remote collector is provided.
+        should_export_network = (
+            endpoint
+            and endpoint.strip()
+            and not is_test_env
+            and not (is_prod and is_local_endpoint)
+        )
+
+        if should_export_network:
             try:
                 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
                     OTLPSpanExporter,
@@ -93,7 +109,9 @@ def init_telemetry(app: Any = None) -> None:
                     f"Could not initialize OTLPSpanExporter ({exp_err}). Traces will be collected in-memory."
                 )
         else:
-            logger.debug("Local/testing mode; remote OTLP exporter bypassed.")
+            logger.debug(
+                "Standalone production or testing mode; remote OTLP exporter bypassed."
+            )
 
         trace.set_tracer_provider(provider)
         _tracer_provider = provider
