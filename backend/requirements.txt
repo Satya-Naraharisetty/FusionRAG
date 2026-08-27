@@ -15,6 +15,8 @@ argon2-cffi==25.1.0
     # via hybrid-rag-backend
 argon2-cffi-bindings==25.1.0
     # via argon2-cffi
+asgiref==3.12.1
+    # via opentelemetry-instrumentation-asgi
 asyncpg==0.31.0
     # via hybrid-rag-backend
 certifi==2026.7.22
@@ -29,7 +31,7 @@ click==8.3.3
     # via uvicorn
 colorama==0.4.6 ; sys_platform == 'win32'
     # via click
-cryptography==50.0.0
+cryptography==44.0.1
     # via hybrid-rag-backend
 dnspython==2.8.0
     # via email-validator
@@ -37,11 +39,14 @@ email-validator==2.3.0
     # via hybrid-rag-backend
 fastapi==0.141.0
     # via hybrid-rag-backend
+googleapis-common-protos==1.75.2
+    # via opentelemetry-exporter-otlp-proto-grpc
 greenlet==3.5.4 ; platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64'
     # via sqlalchemy
 grpcio==1.83.0
     # via
     #   grpcio-tools
+    #   opentelemetry-exporter-otlp-proto-grpc
     #   qdrant-client
 grpcio-tools==1.83.0
     # via qdrant-client
@@ -78,10 +83,58 @@ markupsafe==3.0.3
     # via mako
 numpy==2.5.1
     # via qdrant-client
+opentelemetry-api==1.44.0
+    # via
+    #   hybrid-rag-backend
+    #   opentelemetry-exporter-otlp-proto-grpc
+    #   opentelemetry-instrumentation
+    #   opentelemetry-instrumentation-asgi
+    #   opentelemetry-instrumentation-fastapi
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+opentelemetry-exporter-otlp-proto-common==1.44.0
+    # via opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-exporter-otlp-proto-grpc==1.44.0
+    # via hybrid-rag-backend
+opentelemetry-instrumentation==0.65b0
+    # via
+    #   opentelemetry-instrumentation-asgi
+    #   opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-asgi==0.65b0
+    # via opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-fastapi==0.65b0
+    # via hybrid-rag-backend
+opentelemetry-proto==1.44.0
+    # via
+    #   opentelemetry-exporter-otlp-proto-common
+    #   opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-sdk==1.44.0
+    # via
+    #   hybrid-rag-backend
+    #   opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-semantic-conventions==0.65b0
+    # via
+    #   opentelemetry-instrumentation
+    #   opentelemetry-instrumentation-asgi
+    #   opentelemetry-instrumentation-fastapi
+    #   opentelemetry-sdk
+opentelemetry-util-http==0.65b0
+    # via
+    #   opentelemetry-instrumentation-asgi
+    #   opentelemetry-instrumentation-fastapi
+orjson==3.12.0
+    # via hybrid-rag-backend
+packaging==26.2
+    # via opentelemetry-instrumentation
 portalocker==2.10.1
     # via qdrant-client
+prometheus-client==0.26.0
+    # via hybrid-rag-backend
 protobuf==7.35.1
-    # via grpcio-tools
+    # via
+    #   googleapis-common-protos
+    #   grpcio-tools
+    #   opentelemetry-proto
 psycopg2-binary==2.9.12
     # via hybrid-rag-backend
 pycparser==3.0 ; implementation_name != 'PyPy'
@@ -132,6 +185,10 @@ typing-extensions==4.16.0
     #   anyio
     #   fastapi
     #   grpcio
+    #   opentelemetry-api
+    #   opentelemetry-exporter-otlp-proto-grpc
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
     #   pydantic
     #   pydantic-core
     #   python-docx
@@ -153,3 +210,5 @@ watchfiles==1.2.0
     # via uvicorn
 websockets==15.0.1
     # via uvicorn
+wrapt==2.3.0
+    # via opentelemetry-instrumentation
