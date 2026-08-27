@@ -75,7 +75,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const login = async (email: string, password: string) => {
-    setIsLoading(true);
     try {
       const response = await authApi.login(email, password);
       setAccessTokenState(response.access_token);
@@ -88,21 +87,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setAccessToken(null);
       clearRefreshTimer();
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const register = async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      await authApi.register(email, password);
-      // Automatically log user in upon successful registration
-      await login(email, password);
-    } catch (err) {
-      setIsLoading(false);
-      throw err;
-    }
+    await authApi.register(email, password);
+    // Automatically log user in upon successful registration
+    await login(email, password);
   };
 
   const logout = useCallback(async () => {
