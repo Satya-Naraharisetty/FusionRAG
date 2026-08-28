@@ -71,7 +71,6 @@ export const LoginForm: React.FC = () => {
           e.message ||
           "Failed to send magic link. Please try again.";
         setError(msg);
-        toast.error(msg);
       } finally {
         setIsSubmitting(false);
       }
@@ -119,7 +118,6 @@ export const LoginForm: React.FC = () => {
             e.message ||
             "Invalid email or password.";
       setError(errorMessage);
-      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
