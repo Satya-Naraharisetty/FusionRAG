@@ -78,8 +78,8 @@ export const ConversationMenu: React.FC<ConversationMenuProps> = ({
           <span>{isPinned ? "Unpin" : "Pin"}</span>
         </DropdownMenuItem>
 
-        {/* Direct Remove from Folder if currently foldered */}
-        {currentFolderId && (
+        {/* Direct Remove from Folder ONLY if currently foldered */}
+        {Boolean(currentFolderId) && (
           <DropdownMenuItem
             onClick={(e) => { e.stopPropagation(); onMoveToFolder(null); }}
             className="gap-2 cursor-pointer text-amber-500 dark:text-amber-400"
@@ -95,13 +95,13 @@ export const ConversationMenu: React.FC<ConversationMenuProps> = ({
             <FolderOpen size={13} />
             <span>Move to Project / Folder</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-48">
+          <DropdownMenuSubContent className="w-52 max-h-60 overflow-y-auto scrollbar-thin">
             <DropdownMenuItem
               onClick={(e) => { e.stopPropagation(); onMoveToFolder(null); }}
               className="cursor-pointer"
             >
               <span className={!currentFolderId ? "font-semibold text-[var(--accent-primary)]" : ""}>
-                None (Remove from folder)
+                {currentFolderId ? "Remove from folder" : "None"}
               </span>
             </DropdownMenuItem>
             {folders.map((folder) => (
@@ -124,7 +124,7 @@ export const ConversationMenu: React.FC<ConversationMenuProps> = ({
             <TagIcon size={13} />
             <span>Tags</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-48 p-1.5 space-y-0.5">
+          <DropdownMenuSubContent className="w-48 max-h-60 overflow-y-auto scrollbar-thin p-1.5 space-y-0.5">
             <div className="px-2 py-1 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
               Add Tag
             </div>

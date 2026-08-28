@@ -17,6 +17,7 @@ import { lazyWithRetry } from "./utils/lazyWithRetry";
 // Lazy-loaded pages with auto-recovery on new deployment chunk rotations
 const ChatPage = lazyWithRetry(() => import("./pages/ChatPage"));
 const DocumentsPage = lazyWithRetry(() => import("./pages/DocumentsPage"));
+const ProjectsPage = lazyWithRetry(() => import("./pages/ProjectsPage"));
 const SettingsPage = lazyWithRetry(() => import("./pages/SettingsPage"));
 const OAuthCallbackPage = lazyWithRetry(() => import("./pages/OAuthCallbackPage"));
 const AdminDashboardPage = lazyWithRetry(() => import("./pages/AdminDashboardPage"));
@@ -85,6 +86,14 @@ function App() {
                       element={
                         <ErrorBoundary>
                           <DocumentsPage />
+                        </ErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="/projects"
+                      element={
+                        <ErrorBoundary>
+                          <ProjectsPage />
                         </ErrorBoundary>
                       }
                     />

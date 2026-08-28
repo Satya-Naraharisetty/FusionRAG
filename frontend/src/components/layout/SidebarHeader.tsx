@@ -21,7 +21,6 @@ interface SidebarHeaderProps {
   setSearchQuery: (query: string) => void;
   onNewChat: () => void;
   collapsed: boolean;
-  onOpenProjects?: () => void;
 }
 
 export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
@@ -29,12 +28,12 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   setSearchQuery,
   onNewChat,
   collapsed,
-  onOpenProjects,
 }) => {
   const { t } = useLocale();
   const navigate = useNavigate();
   const location = useLocation();
   const isDocumentsActive = location.pathname === "/documents";
+  const isProjectsActive = location.pathname === "/projects";
   const isNewChatActive = location.pathname === "/chat" || location.pathname === "/";
   const { data: documents = [] } = useDocuments();
   const pipeline = useDocumentPipelineSummary();
@@ -84,6 +83,25 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             <TooltipContent side="right">{documentsTooltip}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => navigate("/projects")}
+                className={cn(
+                  "w-10 h-10 rounded-[var(--radius-lg)] flex items-center justify-center cursor-pointer transition-colors",
+                  isProjectsActive
+                    ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
+                    : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                )}
+                aria-label="Projects"
+              >
+                <Folder size={16} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Projects</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         {/* Mini upload-queue indicator */}
         <SidebarUploadIndicator collapsed />
       </div>
@@ -98,7 +116,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
         className={cn(
           "w-full h-9 rounded-[var(--radius-lg)] flex items-center gap-3 px-3 cursor-pointer text-[13px] font-medium transition-colors text-left",
           isNewChatActive
-            ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
+            ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)] font-semibold"
             : "bg-transparent hover:bg-[var(--bg-tertiary)]/70 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
         )}
       >
@@ -115,7 +133,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
               className={cn(
                 "w-full h-9 rounded-[var(--radius-lg)] flex items-center justify-between px-3 cursor-pointer text-[13px] font-medium transition-colors text-left",
                 isDocumentsActive
-                  ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
+                  ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)] font-semibold"
                   : "bg-transparent hover:bg-[var(--bg-tertiary)]/70 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               )}
             >
@@ -142,21 +160,15 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
 
       {/* ── Projects Link ── */}
       <button
-        onClick={() => {
-          if (onOpenProjects) {
-            onOpenProjects();
-          } else {
-            const el = document.getElementById("sidebar-projects-section");
-            if (el) {
-              el.scrollIntoView({ behavior: "smooth", block: "start" });
-            }
-          }
-        }}
+        onClick={() => navigate("/projects")}
         className={cn(
-          "w-full h-9 rounded-[var(--radius-lg)] flex items-center gap-3 px-3 cursor-pointer text-[13px] font-medium transition-colors text-left bg-transparent hover:bg-[var(--bg-tertiary)]/70 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          "w-full h-9 rounded-[var(--radius-lg)] flex items-center gap-3 px-3 cursor-pointer text-[13px] font-medium transition-colors text-left",
+          isProjectsActive
+            ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)] font-semibold"
+            : "bg-transparent hover:bg-[var(--bg-tertiary)]/70 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
         )}
       >
-        <Folder size={15} className="flex-shrink-0 text-[var(--text-secondary)]" />
+        <Folder size={15} className={cn("flex-shrink-0", isProjectsActive ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]")} />
         <span>Projects</span>
       </button>
 
