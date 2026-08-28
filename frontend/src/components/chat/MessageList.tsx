@@ -157,12 +157,6 @@ export const MessageList: React.FC<MessageListProps> = ({
           )}
         </Button>
       )}
-
-      {isStreaming && !showScrollBtn && (
-        <div className="absolute bottom-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] animate-pulse" aria-live="polite" aria-atomic="true">
-          <span className="text-xs font-mono">AI</span>
-        </div>
-      )}
     </div>
   );
 };

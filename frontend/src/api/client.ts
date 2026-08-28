@@ -250,23 +250,41 @@ export async function* createSSEStream(
   body: object,
   signal?: AbortSignal
 ): AsyncGenerator<SSEEvent> {
-  const token = getAccessToken();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
   const url = BASE_URL + path;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-    signal,
-  });
+  const doFetch = (authToken: string | null): Promise<Response> => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (authToken) {
+      headers["Authorization"] = `Bearer ${authToken}`;
+    }
+    return fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal,
+      credentials: "include",
+    });
+  };
+
+  let response = await doFetch(getAccessToken());
+
+  // Automatic token refresh on 401 for idle sessions
+  if (response.status === 401) {
+    try {
+      const tokenResponse = await executeRefresh();
+      if (onTokenRefreshed) {
+        onTokenRefreshed(tokenResponse.access_token);
+      }
+      response = await doFetch(tokenResponse.access_token);
+    } catch (refreshError) {
+      if (onAuthFailure) {
+        onAuthFailure();
+      }
+      throw refreshError;
+    }
+  }
 
   if (!response.ok) {
     const errText = await response.text();

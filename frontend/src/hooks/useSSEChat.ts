@@ -10,12 +10,19 @@ interface StreamError {
   message: string;
 }
 
-export const useSSEChat = () => {
+export interface UseSSEChatOptions {
+  onConversationCreated?: (conversationId: string) => void;
+}
+
+export const useSSEChat = (options?: UseSSEChatOptions) => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamError, setStreamError] = useState<StreamError | null>(null);
   const [connectionLost, setConnectionLost] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+
+  const onConversationCreatedRef = useRef(options?.onConversationCreated);
+  onConversationCreatedRef.current = options?.onConversationCreated;
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastQuestionRef = useRef<string>("");
@@ -122,6 +129,9 @@ export const useSSEChat = () => {
 
           if (eventType === "metadata") {
             const conversation_id = data.conversation_id as string;
+            if (!conversationId && conversation_id) {
+              onConversationCreatedRef.current?.(conversation_id);
+            }
             setCurrentConversationId(conversation_id);
 
             const diagnostics = data.diagnostics as
@@ -191,6 +201,9 @@ export const useSSEChat = () => {
             });
           } else if (eventType === "done") {
             const conversation_id = data.conversation_id as string;
+            if (!conversationId && conversation_id) {
+              onConversationCreatedRef.current?.(conversation_id);
+            }
             setCurrentConversationId(conversation_id);
 
             // Fire configured completion alerts (desktop notification / chime)
@@ -302,7 +315,12 @@ export const useSSEChat = () => {
     // Re-send original question but prompt LLM to continue writing
     if (lastQuestionRef.current && chatMessages.length > 0) {
       const last = chatMessages[chatMessages.length - 1];
-      const partialText = last.content;
+      const partialText = last?.content?.trim() || "";
+
+      if (!partialText) {
+        retry();
+        return;
+      }
       
       // Remove last failed assistant message
       setChatMessages((prev) => {
@@ -320,7 +338,7 @@ export const useSSEChat = () => {
         filters: lastFiltersRef.current,
       });
     }
-  }, [chatMessages, send, currentConversationId]);
+  }, [chatMessages, retry, send, currentConversationId]);
 
   const cancel = useCallback(() => {
     setStreamError(null);

@@ -142,7 +142,13 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
         )}
       >
         {/* Swipe quick-actions drawer */}
-        <div className="absolute right-0 top-0 bottom-0 flex items-center bg-[var(--bg-secondary)] border-l border-[var(--border-subtle)]">
+        <div
+          className={cn(
+            "absolute right-0 top-0 bottom-0 z-0 flex items-center bg-[var(--bg-secondary)] border-l border-[var(--border-subtle)] transition-opacity duration-150",
+            swipeOffset < 0 ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none invisible"
+          )}
+          aria-hidden={swipeOffset === 0}
+        >
           <button
             onClick={(e) => { e.stopPropagation(); onTogglePin(); setSwipeOffset(0); }}
             className="flex flex-col items-center justify-center h-full w-[42px] bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 cursor-pointer transition-colors"
@@ -177,9 +183,11 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           onClick={isEditing ? undefined : onSelect}
           style={{ transform: `translateX(${swipeOffset}px)` }}
           className={cn(
-            "relative flex items-center justify-between gap-2 px-2.5 py-[calc(var(--space-factor,1)*8px)] rounded-[var(--radius-md)] text-xs cursor-pointer transition-colors",
+            "relative z-10 flex items-center justify-between gap-2 px-2.5 py-[calc(var(--space-factor,1)*8px)] rounded-[var(--radius-md)] text-xs cursor-pointer transition-colors",
             isActive
               ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] font-medium"
+              : swipeOffset < 0
+              ? "bg-[var(--bg-secondary)] text-[var(--text-secondary)]"
               : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60"
           )}
           role="button"

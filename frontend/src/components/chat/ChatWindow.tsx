@@ -23,13 +23,21 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
   const { data: activeConv } = useConversation(conversationId);
   const [isDraggingWindow, setIsDraggingWindow] = useState(false);
   const [windowDroppedFiles, setWindowDroppedFiles] = useState<File[]>([]);
+  const { uploadQueuedChatRows, discardQueuedNewChatRows } = useUploadQueue();
+
+  const handleConversationCreated = React.useCallback(
+    (newId: string) => {
+      uploadQueuedChatRows(newId);
+      navigate(`/chat/${newId}`, { replace: true });
+    },
+    [navigate, uploadQueuedChatRows]
+  );
 
   const {
     chatMessages,
     setChatMessages,
     isStreaming,
     connectionLost,
-    currentConversationId,
     setCurrentConversationId,
     send,
     stop,
@@ -37,19 +45,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
     continueFromPartial,
     cancel,
     clearChat,
-  } = useSSEChat();
-  const { uploadQueuedChatRows, discardQueuedNewChatRows } = useUploadQueue();
-
-  // First message in a brand-new chat: the backend creates the conversation
-  // lazily, so attachments added there are deferred (queued) in the upload
-  // queue until its id is known. Hand them over — scoped to the conversation
-  // — the moment the id arrives, then dismiss them (the uploads continue
-  // server-side, same as a send in an existing chat).
-  useEffect(() => {
-    if (conversationId === null && currentConversationId) {
-      uploadQueuedChatRows(currentConversationId);
-    }
-  }, [conversationId, currentConversationId, uploadQueuedChatRows]);
+  } = useSSEChat({ onConversationCreated: handleConversationCreated });
 
   // Leaving a brand-new chat without sending abandons its deferred
   // attachments: when the chat id appears (navigation into a real
@@ -66,14 +62,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
     }
   }, [conversationId, discardQueuedNewChatRows]);
 
-  // Sync URL when a new conversation is created
-  useEffect(() => {
-    if (currentConversationId && currentConversationId !== conversationId) {
-      navigate(`/chat/${currentConversationId}`, { replace: true });
-    }
-  }, [currentConversationId, conversationId, navigate]);
-
-  // Set conversationId context inside hook on mount/change
+  // Keep hook conversationId in sync with props
   useEffect(() => {
     setCurrentConversationId(conversationId);
   }, [conversationId, setCurrentConversationId]);
@@ -218,6 +207,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
             onRetry={retry}
             onContinue={continueFromPartial}
             onCancel={cancel}
+            hasPartialContent={Boolean(chatMessages[chatMessages.length - 1]?.content?.trim())}
           />
         </div>
       )}
