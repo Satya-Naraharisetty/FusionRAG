@@ -124,30 +124,30 @@ def test_dual_gemini_api_key_resolution():
     # Test case 1: Dedicated keys provided
     settings = Settings(
         GEMINI_FALLBACK_API_KEY="universal_fallback_key",
-        GEMINI_EMBEDDING_API_KEY="dedicated_embedding_key",
+        GEMINI_PLANNER_API_KEY="dedicated_planner_key",
         GEMINI_LLM_API_KEY="dedicated_llm_key",
     )
-    assert settings.get_gemini_embedding_api_key() == "dedicated_embedding_key"
+    assert settings.get_gemini_planner_api_key() == "dedicated_planner_key"
     assert settings.get_gemini_llm_api_key() == "dedicated_llm_key"
     assert settings.get_gemini_fallback_api_key() == "universal_fallback_key"
 
     # Test case 2: Dedicated keys empty, falls back to GEMINI_FALLBACK_API_KEY
     settings_fallback = Settings(
         GEMINI_FALLBACK_API_KEY="universal_fallback_key",
-        GEMINI_EMBEDDING_API_KEY="",
+        GEMINI_PLANNER_API_KEY="",
         GEMINI_LLM_API_KEY="",
     )
-    assert settings_fallback.get_gemini_embedding_api_key() == "universal_fallback_key"
+    assert settings_fallback.get_gemini_planner_api_key() == "universal_fallback_key"
     assert settings_fallback.get_gemini_llm_api_key() == "universal_fallback_key"
 
     # Test case 3: Legacy GEMINI_API_KEY still supported
     settings_legacy = Settings(
         GEMINI_API_KEY="legacy_key",
         GEMINI_FALLBACK_API_KEY="",
-        GEMINI_EMBEDDING_API_KEY="",
+        GEMINI_PLANNER_API_KEY="",
         GEMINI_LLM_API_KEY="",
     )
-    assert settings_legacy.get_gemini_embedding_api_key() == "legacy_key"
+    assert settings_legacy.get_gemini_planner_api_key() == "legacy_key"
     assert settings_legacy.get_gemini_llm_api_key() == "legacy_key"
 
 

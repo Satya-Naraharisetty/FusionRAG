@@ -313,18 +313,19 @@ class Settings(BaseSettings):
     ENABLE_STREAMING: bool = True
     GEMINI_API_KEY: str = ""
     GEMINI_FALLBACK_API_KEY: str = ""
-    GEMINI_EMBEDDING_API_KEY: str = ""
+    GEMINI_PLANNER_API_KEY: str = ""
     GEMINI_LLM_API_KEY: str = ""
 
     def get_gemini_fallback_api_key(self) -> str:
         """Returns the fallback Gemini API key."""
         return (self.GEMINI_FALLBACK_API_KEY or self.GEMINI_API_KEY).strip()
 
-    def get_gemini_embedding_api_key(self) -> str:
-        """Returns the dedicated embedding Gemini API key, falling back to fallback key."""
+    def get_gemini_planner_api_key(self) -> str:
+        """Returns the dedicated Planner/Master Gemini API key, falling back to LLM key."""
         return (
-            self.GEMINI_EMBEDDING_API_KEY
+            self.GEMINI_PLANNER_API_KEY
             or self.GEMINI_FALLBACK_API_KEY
+            or self.GEMINI_LLM_API_KEY
             or self.GEMINI_API_KEY
         ).strip()
 

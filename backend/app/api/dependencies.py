@@ -777,6 +777,23 @@ def get_llm_provider(request: Request = None):  # type: ignore[assignment]
     return GeminiProvider(api_key=settings.get_gemini_llm_api_key())
 
 
+def get_planner_llm_provider(request: Request = None):  # type: ignore[assignment]
+    import sys
+
+    main_mod = sys.modules.get("app.main")
+    if (
+        main_mod
+        and hasattr(main_mod, "app")
+        and hasattr(main_mod.app, "dependency_overrides")
+        and get_planner_llm_provider in main_mod.app.dependency_overrides
+    ):
+        return main_mod.app.dependency_overrides[get_planner_llm_provider]()
+
+    from app.chat.infrastructure.gemini_provider import GeminiProvider
+
+    return GeminiProvider(api_key=settings.get_gemini_planner_api_key())
+
+
 def get_hyde_executor(
     generator: EmbeddingGenerator = Depends(get_embedding_generator),
     retrieval_service: Any = Depends(get_retrieval_service),
@@ -1211,7 +1228,7 @@ def get_agent_executor(
 
 def get_research_agent(
     retrieval_service=Depends(get_retrieval_service),
-    llm_provider=Depends(get_llm_provider),
+    llm_provider=Depends(get_planner_llm_provider),
 ) -> Any:
     from app.chat.services.multi_agent.research_agent import ResearchAgent
 
@@ -1291,7 +1308,7 @@ def get_agent_observability_service(
 
 def get_task_router(
     registry=Depends(get_capability_registry),
-    llm_provider=Depends(get_llm_provider),
+    llm_provider=Depends(get_planner_llm_provider),
     observability=Depends(get_agent_observability_service),
 ) -> Any:
     from app.chat.services.multi_agent.task_router import TaskRouter
@@ -1344,7 +1361,7 @@ def get_synthesis_agent(
 
 
 def get_master_agent(
-    llm_provider=Depends(get_llm_provider),
+    llm_provider=Depends(get_planner_llm_provider),
     execution_engine=Depends(get_agent_execution_engine),
     synthesis_agent=Depends(get_synthesis_agent),
     observability=Depends(get_agent_observability_service),

@@ -115,7 +115,7 @@ def test_production_fails_when_secrets_missing():
             GEMINI_API_KEY="",
             GEMINI_FALLBACK_API_KEY="",
             GEMINI_LLM_API_KEY="",
-            GEMINI_EMBEDDING_API_KEY="",
+            GEMINI_PLANNER_API_KEY="",
         )
 
     # 2. Missing JWT secret
