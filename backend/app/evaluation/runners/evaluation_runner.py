@@ -138,8 +138,6 @@ class EvaluationRunner:
                     metrics=[
                         "faithfulness",
                         "answer_relevancy",
-                        "context_precision",
-                        "context_recall",
                     ],
                     mock=mock,
                 )
@@ -223,6 +221,16 @@ class EvaluationRunner:
                 total_cost += cost
                 latencies.append(latency)
 
+                # Deduplicate metrics preserving first registered pipeline score
+                metrics_dict = {}
+                for m in sample_metrics:
+                    if m.name not in metrics_dict:
+                        metrics_dict[m.name] = {
+                            "score": m.score,
+                            "passed": m.passed,
+                            "reason": m.reason,
+                        }
+
                 # Save SQLAlchemyResult
                 db_result = SQLAlchemyEvaluationResult(
                     id=uuid.uuid4(),
@@ -236,14 +244,7 @@ class EvaluationRunner:
                     output_tokens=out_tokens,
                     cost=cost,
                     error_category=error_cat,
-                    metrics={
-                        m.name: {
-                            "score": m.score,
-                            "passed": m.passed,
-                            "reason": m.reason,
-                        }
-                        for m in sample_metrics
-                    },
+                    metrics=metrics_dict,
                     retrieved_contexts=[
                         {"text": c.text, "score": c.score} for c in sample_contexts
                     ],
