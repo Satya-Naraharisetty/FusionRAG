@@ -168,7 +168,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-hidden flex flex-col h-full w-full">
         {isLoading ? (
-          <div className="flex-1 flex flex-col gap-6 p-8 max-w-[780px] mx-auto w-full pt-16 select-none">
+          <div className="flex-1 flex flex-col gap-6 p-8 max-w-[860px] mx-auto w-full pt-16 select-none">
             <div className="flex items-center gap-3">
               <Skeleton className="h-8 w-8 rounded-full bg-[var(--bg-tertiary)]" />
               <div className="space-y-2 flex-1">

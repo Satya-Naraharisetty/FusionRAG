@@ -62,7 +62,7 @@ export const ConversationDocumentChips: React.FC<
 
   return (
     <TooltipProvider>
-      <div className="w-full max-w-[780px] px-5">
+      <div className="w-full max-w-[860px] px-4 sm:px-6">
         {hasDocs && (
           <>
             <div className="mb-1.5 flex items-center gap-1.5 pl-0.5 text-[11px] font-medium text-[var(--text-muted)]">
@@ -115,9 +115,10 @@ export const ConversationDocumentChips: React.FC<
             </div>
           </>
         )}
-        <p className="mt-1.5 pl-0.5 text-[11px] leading-snug text-[var(--text-muted)]">
-          {t("chatFiles.caption")}
-        </p>
+        <div className="mt-1.5 flex items-center gap-1.5 pl-0.5 text-[11px] font-medium leading-snug text-[var(--text-muted)]">
+          <Paperclip size={11} className="flex-shrink-0 opacity-60" />
+          <span>{t("chatFiles.caption")}</span>
+        </div>
       </div>
     </TooltipProvider>
   );

@@ -61,7 +61,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onRetry, on
           role="article"
           aria-label="User message"
         >
-          <div className="w-full max-w-[780px] flex justify-end px-3 sm:px-6">
+          <div className="w-full max-w-[860px] flex justify-end px-3 sm:px-6">
             <div className="flex flex-col items-end gap-1.5 max-w-[90%] sm:max-w-[75%]">
               {/* Bubble */}
               <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-[var(--radius-md)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] text-[14px] sm:text-[15px] leading-relaxed select-text">
@@ -98,7 +98,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({ message, onRetry, on
         onMouseEnter={() => setShowActions(true)}
         onMouseLeave={() => setShowActions(false)}
       >
-        <div className="w-full max-w-[780px] flex gap-2.5 sm:gap-4 px-3 sm:px-6 items-start">
+        <div className="w-full max-w-[860px] flex gap-2.5 sm:gap-4 px-3 sm:px-6 items-start">
           {/* Avatar */}
           <Avatar className="w-8 h-8 flex-shrink-0 bg-[var(--bg-tertiary)] border border-[var(--border-default)]">
             <AvatarFallback className="bg-transparent">

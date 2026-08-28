@@ -296,7 +296,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   return (
     <form
       onSubmit={handleSubmit}
-      className="relative w-full max-w-195 select-none px-5"
+      className="relative w-full max-w-[860px] select-none px-4 sm:px-6"
     >
       <input
         ref={fileInputRef}
@@ -402,18 +402,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           {/* Same lifecycle hint as the persisted chips strip: these files are
               scoped to this chat, never the global library, and die with the
               conversation. */}
-          <p className="px-1.5 text-[11px] leading-snug text-(--text-muted)">
-            {t("chatFiles.caption")}
-          </p>
+          <div className="flex items-center gap-1.5 px-2 pb-0.5 text-[11px] font-medium leading-snug text-[var(--text-muted)]">
+            <Paperclip size={11} className="flex-shrink-0 opacity-60" />
+            <span>{t("chatFiles.caption")}</span>
+          </div>
           </div>
         )}
 
         {/* Brand-new chat with nothing attached yet — the same lifecycle note.
             (For existing conversations the chips strip owns this hint.) */}
         {conversationId === null && chatRows.length === 0 && (
-          <p className="px-1.5 text-[11px] leading-snug text-(--text-muted)">
-            {t("chatFiles.caption")}
-          </p>
+          <div className="flex items-center gap-1.5 px-2 pb-0.5 text-[11px] font-medium leading-snug text-[var(--text-muted)]">
+            <Paperclip size={11} className="flex-shrink-0 opacity-60" />
+            <span>{t("chatFiles.caption")}</span>
+          </div>
         )}
 
         {/* Input Wrapper — Premium composer with Drag & Drop */}
@@ -422,15 +424,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={cn(
-            "relative flex items-end rounded-[var(--radius-lg)] border bg-[var(--bg-secondary)] transition-all duration-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_4px_24px_rgba(0,0,0,0.4)] focus-within:bg-[var(--bg-elevated)] focus-within:border-[var(--accent-primary)]/30 focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_0_16px_rgba(0,210,253,0.1)]",
+            "relative flex items-end rounded-[20px] sm:rounded-[24px] border bg-[var(--bg-secondary)] transition-all duration-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_4px_24px_rgba(0,0,0,0.4)] focus-within:bg-[var(--bg-elevated)] focus-within:border-[var(--accent-primary)]/40 focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_0_24px_rgba(0,210,253,0.12),0_4px_24px_rgba(0,0,0,0.5)]",
             isDraggingOver
               ? "border-dashed border-[var(--accent-primary)]/70 bg-[var(--accent-primary)]/8"
-              : "border-transparent",
+              : "border-[var(--border-default)] hover:border-[var(--border-hover)]",
             isRecording && "border-[var(--accent-error)]/45 bg-red-950/10"
           )}
         >
           {/* Paperclip button with Recent Attachments dropdown */}
-          <div className="flex items-center justify-center pl-3 pr-1 pb-[calc(var(--space-factor,1)*10px)] pt-[calc(var(--space-factor,1)*10px)]">
+          <div className="flex items-center justify-center pl-3.5 pr-1.5 pb-2.5 pt-2.5">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -441,10 +443,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     isStreaming ||
                     chatRows.length >= UPLOAD_LIMITS.CHAT_MAX_ATTACHMENTS
                   }
-                  className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-(--text-muted) transition-colors hover:bg-(--bg-tertiary) hover:text-(--text-primary)"
+                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
                   aria-label="Attach files options"
                 >
-                  <Paperclip size={17} />
+                  <Paperclip size={18} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="top" className="w-56">
@@ -452,7 +454,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   onClick={() => fileInputRef.current?.click()}
                   className="gap-2 cursor-pointer"
                 >
-                  <Paperclip size={14} className="text-(--accent-primary)" />
+                  <Paperclip size={14} className="text-[var(--accent-primary)]" />
                   <span>Upload from computer…</span>
                 </DropdownMenuItem>
 
@@ -460,13 +462,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   <>
                     <DropdownMenuSeparator />
                     <div className="flex items-center justify-between px-2 py-1">
-                      <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-(--text-muted)">
+                      <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                         <History size={10} /> Recent Files
                       </span>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); clearRecents(); }}
-                        className="cursor-pointer p-0.5 text-[10px] text-(--text-muted) hover:text-(--accent-error)"
+                        className="cursor-pointer p-0.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--accent-error)]"
                         title="Clear recent list"
                       >
                         <Trash2 size={10} />
@@ -480,7 +482,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         className="flex items-center justify-between cursor-pointer py-1.5"
                       >
                         <span className="truncate max-w-32.5 font-medium">{rec.name}</span>
-                        <span className="shrink-0 font-mono text-[10px] text-(--text-muted)">
+                        <span className="shrink-0 font-mono text-[10px] text-[var(--text-muted)]">
                           {(rec.size / 1024).toFixed(0)} KB
                         </span>
                       </DropdownMenuItem>
@@ -506,12 +508,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               }
               rows={1}
               disabled={!isOnline || isStreaming}
-              className="min-h-[calc(var(--space-factor,1)*52px)] max-h-50 w-full flex-1 resize-none border-0 bg-transparent px-2 py-[calc(var(--space-factor,1)*16px)] text-[15px] leading-[1.55] text-(--text-primary) shadow-none outline-none placeholder:text-(--text-muted) disabled:opacity-50 scrollbar-none"
+              className="min-h-[58px] max-h-52 w-full flex-1 resize-none border-0 bg-transparent px-2 py-3.5 sm:py-4 text-[15px] sm:text-[16px] leading-relaxed text-[var(--text-primary)] shadow-none outline-none placeholder:text-[var(--text-muted)] disabled:opacity-50 scrollbar-none"
               aria-label="Message prompt input"
             />
 
             {showCommands && (
-              <Command className="absolute bottom-full left-0 right-0 z-10 mb-2 overflow-hidden rounded-2xl border border-(--border-subtle) bg-(--bg-elevated) text-(--text-primary) shadow-md animate-in fade-in slide-in-from-bottom-2 duration-150">
+              <Command className="absolute bottom-full left-0 right-0 z-10 mb-2 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-md animate-in fade-in slide-in-from-bottom-2 duration-150">
                 <CommandInput
                   value={commandSearch}
                   onValueChange={setCommandSearch}
@@ -519,7 +521,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   className="h-10 bg-transparent border-0 text-sm focus-visible:ring-0 focus:outline-none"
                   autoFocus
                 />
-                <CommandEmpty className="py-4 text-center text-xs text-(--text-muted)">
+                <CommandEmpty className="py-4 text-center text-xs text-[var(--text-muted)]">
                   {t("chat.commandEmpty")}
                 </CommandEmpty>
                 <CommandGroup>
@@ -531,10 +533,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     >
                       <span className="shrink-0 text-base">{cmd.icon}</span>
                       <div className="flex-1 text-left min-w-0">
-                        <div className="truncate text-sm font-medium text-(--text-primary)">{cmd.label}</div>
-                        <div className="truncate text-xs text-(--text-muted)">{cmd.description}</div>
+                        <div className="truncate text-sm font-medium text-[var(--text-primary)]">{cmd.label}</div>
+                        <div className="truncate text-xs text-[var(--text-muted)]">{cmd.description}</div>
                       </div>
-                      <kbd className="shrink-0 rounded-sm border border-(--border-subtle) bg-(--bg-tertiary) px-1.5 py-0.5 font-mono text-[10px] text-(--text-muted)">
+                      <kbd className="shrink-0 rounded-sm border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-muted)]">
                         {cmd.shortcut}
                       </kbd>
                     </CommandItem>
@@ -545,7 +547,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
 
           {/* Right Action buttons: Voice & Send */}
-          <div className="flex items-center gap-1.5 px-3 pl-1 pt-[calc(var(--space-factor,1)*10px)] pb-[calc(var(--space-factor,1)*10px)]">
+          <div className="flex items-center gap-1.5 px-3 pl-1 pb-2.5 pt-2.5">
             {/* Voice Input */}
             {onVoiceInput && (
               <Button
@@ -555,7 +557,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 onClick={() => { onVoiceInput(); setIsRecording(!isRecording); }}
                 disabled={isStreaming}
                 className={cn(
-                  "h-9 w-9 shrink-0 rounded-sm border transition-colors",
+                  "h-10 w-10 shrink-0 rounded-full border transition-colors",
                   isRecording
                     ? "border-[var(--accent-error)]/20 bg-[var(--accent-error)]/12 text-[var(--accent-error)] animate-pulse"
                     : "border-transparent text-[var(--text-muted)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
@@ -563,7 +565,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 aria-label={isRecording ? "Stop recording" : "Record voice"}
                 data-pressed={isRecording}
               >
-                <Mic size={17} />
+                <Mic size={18} />
               </Button>
             )}
 
@@ -573,10 +575,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 type="button"
                 onClick={onStop}
                 size="icon"
-                className="h-9 w-9 shrink-0 rounded-sm border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-primary)] transition-all hover:bg-[var(--bg-tertiary)] active:scale-95"
+                className="h-10 w-10 shrink-0 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-primary)] transition-all hover:bg-[var(--bg-tertiary)] active:scale-95"
                 aria-label="Stop generation"
               >
-                <Square size={9} fill="currentColor" />
+                <Square size={10} fill="currentColor" />
               </Button>
             ) : (
               <Button
@@ -584,14 +586,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 disabled={!hasContent || !isOnline}
                 size="icon"
                 className={cn(
-                  "h-9 w-9 shrink-0 rounded-sm border transition-all active:scale-95",
+                  "h-10 w-10 shrink-0 rounded-full border transition-all duration-150 active:scale-95",
                   hasContent && isOnline
-                    ? "border-transparent bg-[image:var(--gradient-main)] text-white shadow-[var(--shadow-glow)] hover:shadow-[var(--shadow-glow)] hover:brightness-110"
-                    : "border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed"
+                    ? "border-transparent bg-[image:var(--gradient-main)] text-slate-950 font-semibold shadow-[0_0_16px_rgba(0,210,253,0.3)] hover:brightness-110"
+                    : "border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed opacity-60"
                 )}
                 aria-label="Send query"
               >
-                <ArrowUp size={16} strokeWidth={2.5} />
+                <ArrowUp size={18} strokeWidth={2.5} />
               </Button>
             )}
           </div>
