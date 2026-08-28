@@ -96,25 +96,34 @@ export const ConversationMenu: React.FC<ConversationMenuProps> = ({
             <span>Move to Project / Folder</span>
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-52 max-h-60 overflow-y-auto scrollbar-thin">
-            <DropdownMenuItem
-              onClick={(e) => { e.stopPropagation(); onMoveToFolder(null); }}
-              className="cursor-pointer"
-            >
-              <span className={!currentFolderId ? "font-semibold text-[var(--accent-primary)]" : ""}>
-                {currentFolderId ? "Remove from folder" : "None"}
-              </span>
-            </DropdownMenuItem>
-            {folders.map((folder) => (
-              <DropdownMenuItem
-                key={folder.id}
-                onClick={(e) => { e.stopPropagation(); onMoveToFolder(folder.id); }}
-                className="cursor-pointer"
-              >
-                <span className={currentFolderId === folder.id ? "font-semibold text-[var(--accent-primary)]" : ""}>
-                  {folder.name}
-                </span>
-              </DropdownMenuItem>
-            ))}
+            {Boolean(currentFolderId) && (
+              <>
+                <DropdownMenuItem
+                  onClick={(e) => { e.stopPropagation(); onMoveToFolder(null); }}
+                  className="cursor-pointer text-amber-500 dark:text-amber-400"
+                >
+                  <span>Remove from folder</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            {folders.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-[var(--text-muted)] italic">
+                No projects yet
+              </div>
+            ) : (
+              folders.map((folder) => (
+                <DropdownMenuItem
+                  key={folder.id}
+                  onClick={(e) => { e.stopPropagation(); onMoveToFolder(folder.id); }}
+                  className="cursor-pointer"
+                >
+                  <span className={currentFolderId === folder.id ? "font-semibold text-[var(--accent-primary)]" : ""}>
+                    {folder.name}
+                  </span>
+                </DropdownMenuItem>
+              ))
+            )}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
 

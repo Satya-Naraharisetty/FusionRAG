@@ -61,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       // Attempt to refresh 60 seconds before expiration
       const refreshInMs = Math.max((expiresInSeconds - 60) * 1000, 10000);
 
-      refreshTimerRef.current = window.setTimeout(async () => {
+      const timer = window.setTimeout(async () => {
         try {
           const response = await authApi.refresh();
           const updatedUser = await authApi.getMe();
@@ -76,6 +76,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           clearRefreshTimer();
         }
       }, refreshInMs);
+
+      if (
+        typeof timer === "object" &&
+        timer !== null &&
+        "unref" in timer &&
+        typeof (timer as { unref?: () => void }).unref === "function"
+      ) {
+        (timer as { unref: () => void }).unref();
+      }
+
+      refreshTimerRef.current = timer as unknown as number;
     },
     [clearRefreshTimer]
   );

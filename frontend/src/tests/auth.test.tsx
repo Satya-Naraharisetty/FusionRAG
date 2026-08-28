@@ -40,8 +40,10 @@ describe("deleteAccount", () => {
     const { result } = renderHook(() => useAuth(), { wrapper });
 
     // Wait for the initial refresh + /me boot probe to complete
-    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
-    expect(result.current.user?.email).toBe("test@example.com");
+    await waitFor(() => {
+      expect(result.current.isAuthenticated).toBe(true);
+      expect(result.current.user?.email).toBe("test@example.com");
+    });
 
     await act(async () => {
       await result.current.deleteAccount("password");

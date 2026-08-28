@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { UploadQueueProvider } from "./context/UploadQueueContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ConversationMetadataProvider } from "./hooks/useLocalConversationMetadata";
 import { LoginForm } from "./components/auth/LoginForm";
 import { RegisterForm } from "./components/auth/RegisterForm";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
@@ -43,6 +44,7 @@ function App() {
                 survives navigation — in-flight uploads keep processing in the
                 background wherever the user goes. */}
             <UploadQueueProvider>
+            <ConversationMetadataProvider>
             <Suspense
               fallback={
                 <div className="flex h-dvh w-dvw items-center justify-center bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -127,6 +129,7 @@ function App() {
                 <Route path="*" element={<ErrorPage status={404} />} />
               </Routes>
             </Suspense>
+            </ConversationMetadataProvider>
             </UploadQueueProvider>
             <Toaster
               position="bottom-right"

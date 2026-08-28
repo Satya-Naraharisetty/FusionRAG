@@ -1,20 +1,36 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it } from "vitest";
-import { http, HttpResponse } from "msw";
-import { AuthProvider } from "../context/AuthContext";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { VerifyEmailPage } from "../pages/VerifyEmailPage";
-import { server } from "./handlers";
+
+const mockVerifyEmail = vi.fn();
+const mockResendVerification = vi.fn();
+
+vi.mock("../hooks/useAuth", () => ({
+  useAuth: () => ({
+    verifyEmail: mockVerifyEmail,
+    resendVerification: mockResendVerification,
+    isAuthenticated: false,
+    user: null,
+  }),
+}));
 
 describe("VerifyEmailPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockVerifyEmail.mockResolvedValue({
+      access_token: "mock-verified-token",
+      expires_in: 3600,
+    });
+    mockResendVerification.mockResolvedValue({ message: "Dispatched" });
+  });
+
   it("renders 6 digit input boxes and email parameter from URL", () => {
-    render(
+    const { unmount } = render(
       <MemoryRouter initialEntries={["/verify-email?email=user@example.com"]}>
-        <AuthProvider>
-          <Routes>
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
-          </Routes>
-        </AuthProvider>
+        <Routes>
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+        </Routes>
       </MemoryRouter>
     );
 
@@ -23,108 +39,71 @@ describe("VerifyEmailPage", () => {
 
     const digitInputs = screen.getAllByRole("textbox", { name: /Digit/i });
     expect(digitInputs).toHaveLength(6);
+    unmount();
   });
 
   it("submits 6-digit OTP code when all boxes are filled via paste or input", async () => {
-    let verifyPayload: Record<string, unknown> | null = null;
-    server.use(
-      http.post("*/api/v1/auth/verify-email", async ({ request }) => {
-        verifyPayload = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({
-          access_token: "mock-verified-token",
-          expires_in: 3600,
-        });
-      })
-    );
-
-    render(
+    const { unmount } = render(
       <MemoryRouter initialEntries={["/verify-email?email=otpuser@example.com"]}>
-        <AuthProvider>
-          <Routes>
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
-          </Routes>
-        </AuthProvider>
+        <Routes>
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+        </Routes>
       </MemoryRouter>
     );
 
     const digitInputs = screen.getAllByRole("textbox", { name: /Digit/i });
 
     // Paste 6 digits into the first box
-    await act(async () => {
-      fireEvent.paste(digitInputs[0], {
-        clipboardData: {
-          getData: () => "654321",
-        },
-      });
+    fireEvent.paste(digitInputs[0], {
+      clipboardData: {
+        getData: () => "654321",
+      },
     });
 
     await waitFor(() => {
-      expect(verifyPayload).not.toBeNull();
-      expect(verifyPayload).toEqual({
+      expect(mockVerifyEmail).toHaveBeenCalledWith({
         email: "otpuser@example.com",
         otp: "654321",
       });
     });
+    unmount();
   });
 
   it("auto-verifies on load when token query parameter is present", async () => {
-    let verifyPayload: Record<string, unknown> | null = null;
-    server.use(
-      http.post("*/api/v1/auth/verify-email", async ({ request }) => {
-        verifyPayload = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({
-          access_token: "mock-verified-token",
-          expires_in: 3600,
-        });
-      })
-    );
-
-    render(
+    const { unmount } = render(
       <MemoryRouter initialEntries={["/verify-email?token=magic_link_token_123"]}>
-        <AuthProvider>
-          <Routes>
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
-          </Routes>
-        </AuthProvider>
+        <Routes>
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+        </Routes>
       </MemoryRouter>
     );
 
     await waitFor(() => {
-      expect(verifyPayload).toEqual({
+      expect(mockVerifyEmail).toHaveBeenCalledWith({
         token: "magic_link_token_123",
       });
     });
+    unmount();
   });
 
   it("triggers resend verification and starts cooldown timer", async () => {
-    let resendCalled = false;
-    server.use(
-      http.post("*/api/v1/auth/resend-verification", () => {
-        resendCalled = true;
-        return HttpResponse.json({ message: "Dispatched" });
-      })
-    );
-
-    render(
+    const { unmount } = render(
       <MemoryRouter initialEntries={["/verify-email?email=resenduser@example.com"]}>
-        <AuthProvider>
-          <Routes>
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
-          </Routes>
-        </AuthProvider>
+        <Routes>
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+        </Routes>
       </MemoryRouter>
     );
 
     const resendBtn = screen.getByRole("button", { name: /Resend Code/i });
     expect(resendBtn).not.toBeDisabled();
 
-    await act(async () => {
-      fireEvent.click(resendBtn);
-    });
+    fireEvent.click(resendBtn);
 
-    expect(resendCalled).toBe(true);
     await waitFor(() => {
+      expect(mockResendVerification).toHaveBeenCalledWith("resenduser@example.com");
       expect(screen.getByText(/Resend available in/i)).toBeInTheDocument();
     });
+    unmount();
   });
 });

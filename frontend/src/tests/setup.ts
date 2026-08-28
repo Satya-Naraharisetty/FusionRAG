@@ -7,10 +7,33 @@ beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 
 // Reset any request handlers that we may add during the tests,
 // so they don't affect other tests.
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  localStorage.clear();
+});
 
 // Clean up after the tests are finished.
 afterAll(() => server.close());
+
+// Mocking BroadcastChannel for jsdom
+if (typeof window !== "undefined" && !("BroadcastChannel" in window)) {
+  class MockBroadcastChannel {
+    name: string;
+    onmessage: ((event: MessageEvent) => void) | null = null;
+    constructor(name: string) {
+      this.name = name;
+    }
+    postMessage() {}
+    close() {}
+    addEventListener() {}
+    removeEventListener() {}
+    dispatchEvent() {
+      return true;
+    }
+  }
+  (window as unknown as { BroadcastChannel: unknown }).BroadcastChannel =
+    MockBroadcastChannel;
+}
 
 // Mocking window.matchMedia
 Object.defineProperty(window, "matchMedia", {

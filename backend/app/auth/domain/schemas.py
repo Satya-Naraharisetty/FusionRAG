@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -121,3 +122,30 @@ class EmailVerificationTokenDomain(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserSettingsResponseSchema(BaseModel):
+    user_id: UUID
+    folders: list[dict[str, Any]] = Field(default_factory=list)
+    pinned_conversations: list[str] = Field(default_factory=list)
+    conversation_tags: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
+    document_folders: list[dict[str, Any]] = Field(default_factory=list)
+    document_folder_mappings: dict[str, str] = Field(default_factory=dict)
+    document_custom_order: list[str] = Field(default_factory=list)
+    document_filter_presets: list[dict[str, Any]] = Field(default_factory=list)
+    preferences: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserSettingsPatchSchema(BaseModel):
+    folders: list[dict[str, Any]] | None = None
+    pinned_conversations: list[str] | None = None
+    conversation_tags: dict[str, list[dict[str, Any]]] | None = None
+    document_folders: list[dict[str, Any]] | None = None
+    document_folder_mappings: dict[str, str] | None = None
+    document_custom_order: list[str] | None = None
+    document_filter_presets: list[dict[str, Any]] | None = None
+    preferences: dict[str, Any] | None = None

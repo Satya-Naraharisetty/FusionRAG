@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme, Theme, Density } from "../context/ThemeContext";
 import { useConversations, useDeleteConversation } from "../hooks/useConversations";
@@ -43,6 +43,8 @@ import {
   DialogTitle,
 } from "../components/ui/Modal";
 import toast from "react-hot-toast";
+
+import { useUserSettings, useUpdateUserSettings } from "../hooks/useUserSettings";
 
 interface ConversationDefaults {
   temperature: number;
@@ -143,36 +145,37 @@ const SettingsPage: React.FC = () => {
   const [isClearingHistory, setIsClearingHistory] = useState(false);
 
   const navTabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
-    { id: "profile",       label: t("settings.tab.profile"),       icon: <User size={14} /> },
-    { id: "appearance",    label: t("settings.tab.appearance"),     icon: <Palette size={14} /> },
-    { id: "notifications", label: t("settings.tab.notifications"),  icon: <Bell size={14} /> },
-    { id: "advanced",      label: t("settings.tab.conversation"),   icon: <Sliders size={14} /> },
-    { id: "data",          label: t("settings.tab.data"),           icon: <Database size={14} /> },
+    { id: "profile", label: t("settings.tab.profile"), icon: <User size={14} /> },
+    { id: "appearance", label: t("settings.tab.appearance"), icon: <Palette size={14} /> },
+    { id: "notifications", label: t("settings.tab.notifications"), icon: <Bell size={14} /> },
+    { id: "advanced", label: t("settings.tab.conversation"), icon: <Sliders size={14} /> },
+    { id: "data", label: t("settings.tab.data"), icon: <Database size={14} /> },
   ];
 
-  const [defaults, setDefaults] = useState<ConversationDefaults>(() => {
-    try {
-      const saved = localStorage.getItem("conversation-defaults");
-      return saved ? { ...DEFAULT_VALUES, ...JSON.parse(saved) } : DEFAULT_VALUES;
-    } catch {
-      return DEFAULT_VALUES;
-    }
-  });
+  const { data: settingsData } = useUserSettings();
+  const updateSettingsMutation = useUpdateUserSettings();
 
-  const [showClearHistoryDialog, setShowClearHistoryDialog]   = useState(false);
-  const [showResetConfigDialog,  setShowResetConfigDialog]    = useState(false);
+  const defaults: ConversationDefaults = useMemo(() => {
+    const cloudDefaults = (settingsData?.preferences?.conversation_defaults as ConversationDefaults) || null;
+    return cloudDefaults ? { ...DEFAULT_VALUES, ...cloudDefaults } : DEFAULT_VALUES;
+  }, [settingsData?.preferences]);
+
+  const [showClearHistoryDialog, setShowClearHistoryDialog] = useState(false);
+  const [showResetConfigDialog, setShowResetConfigDialog] = useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
-  const [comingSoonLang, setComingSoonLang]                   = useState<LanguageOption | null>(null);
+  const [comingSoonLang, setComingSoonLang] = useState<LanguageOption | null>(null);
 
   const updateSetting = <K extends keyof ConversationDefaults>(key: K, value: ConversationDefaults[K]) => {
     const updated = { ...defaults, [key]: value };
-    setDefaults(updated);
-    localStorage.setItem("conversation-defaults", JSON.stringify(updated));
+    updateSettingsMutation.mutate({
+      preferences: { conversation_defaults: updated },
+    });
   };
 
   const handleResetDefaults = () => {
-    setDefaults(DEFAULT_VALUES);
-    localStorage.setItem("conversation-defaults", JSON.stringify(DEFAULT_VALUES));
+    updateSettingsMutation.mutate({
+      preferences: { conversation_defaults: DEFAULT_VALUES },
+    });
     toast.success("Defaults reset.");
   };
 

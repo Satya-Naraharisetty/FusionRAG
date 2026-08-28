@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import {
   useDocuments,
   useDeleteDocument,
@@ -28,65 +28,74 @@ import {
 } from "../components/ui/Modal";
 import toast from "react-hot-toast";
 import { useLocale } from "../lib/messages";
+import { useUserSettings, useUpdateUserSettings } from "../hooks/useUserSettings";
 
 interface DocFolder {
   id: string;
   name: string;
 }
 
+const DEFAULT_DOC_FOLDERS: DocFolder[] = [
+  { id: "folder-invoices", name: "Invoices" },
+  { id: "folder-contracts", name: "Contracts" },
+  { id: "folder-reports", name: "Reports" },
+];
+
 const DocumentsPage: React.FC = () => {
   const { t } = useLocale();
   const { data: documents = [], isLoading, error } = useDocuments();
-  const embeddingStatus     = useEmbeddingStatus();
-  const deleteMutation       = useDeleteDocument();
-  const reprocessMutation    = useReprocessDocument();
-  const regenerateMutation   = useRegenerateEmbeddings();
-  const replaceMutation      = useReplaceDocument();
+  const { data: settingsData } = useUserSettings();
+  const updateSettingsMutation = useUpdateUserSettings();
 
-  const [viewMode, setViewMode]     = useState<"grid" | "list">("grid");
-  const [search, setSearch]         = useState("");
-  const [sort, setSort]             = useState<DocumentSortType>("newest");
-  const [filter, setFilter]         = useState<DocumentFilterType>("all");
-  const [selectedFolderId, setSelectedFolderId]     = useState<string | null>(null);
-  const [selectedLanguages, setSelectedLanguages]   = useState<string[]>([]);
-  const [dateRange, setDateRange]   = useState<DateRange>({ start: "", end: "" });
+  const embeddingStatus = useEmbeddingStatus();
+  const deleteMutation = useDeleteDocument();
+  const reprocessMutation = useReprocessDocument();
+  const regenerateMutation = useRegenerateEmbeddings();
+  const replaceMutation = useReplaceDocument();
 
-  const [folders, setFolders] = useState<DocFolder[]>(() => {
-    const saved = localStorage.getItem("document-folders");
-    return saved
-      ? JSON.parse(saved)
-      : [
-          { id: "folder-invoices",  name: "Invoices" },
-          { id: "folder-contracts", name: "Contracts" },
-          { id: "folder-reports",   name: "Reports" },
-        ];
-  });
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<DocumentSortType>("newest");
+  const [filter, setFilter] = useState<DocumentFilterType>("all");
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<DateRange>({ start: "", end: "" });
+
+  const folders: DocFolder[] = useMemo(() => {
+    return settingsData?.document_folders && settingsData.document_folders.length > 0
+      ? settingsData.document_folders
+      : DEFAULT_DOC_FOLDERS;
+  }, [settingsData?.document_folders]);
+
+  const folderMappings = useMemo(() => {
+    return settingsData?.document_folder_mappings ?? {};
+  }, [settingsData?.document_folder_mappings]);
+
+  const customOrder = useMemo(() => {
+    return settingsData?.document_custom_order ?? [];
+  }, [settingsData?.document_custom_order]);
+
+  const presets: Record<string, Record<string, unknown>> = useMemo(() => {
+    if (!settingsData?.document_filter_presets) return {};
+    const map: Record<string, Record<string, unknown>> = {};
+    settingsData.document_filter_presets.forEach((p) => {
+      map[p.name] = p.filters;
+    });
+    return map;
+  }, [settingsData?.document_filter_presets]);
+
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
-  const [newFolderName, setNewFolderName]           = useState("");
-
-  const [folderMappings, setFolderMappings] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem("document-folder-mappings");
-    return saved ? JSON.parse(saved) : {};
-  });
-
-  const [customOrder, setCustomOrder] = useState<string[]>(() => {
-    const saved = localStorage.getItem("document-custom-order");
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [presets, setPresets] = useState<Record<string, Record<string, unknown>>>(() => {
-    const saved = localStorage.getItem("document-filter-presets");
-    return saved ? JSON.parse(saved) : {};
-  });
-
-  const [selectedIds, setSelectedIds]   = useState<string[]>([]);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [draggedDocId, setDraggedDocId] = useState<string | null>(null);
 
-  // Persist to localStorage
-  useEffect(() => { localStorage.setItem("document-folders", JSON.stringify(folders)); }, [folders]);
-  useEffect(() => { localStorage.setItem("document-folder-mappings", JSON.stringify(folderMappings)); }, [folderMappings]);
-  useEffect(() => { localStorage.setItem("document-custom-order", JSON.stringify(customOrder)); }, [customOrder]);
-  useEffect(() => { localStorage.setItem("document-filter-presets", JSON.stringify(presets)); }, [presets]);
+  const handleUpdateFolderMappings = (
+    updater: React.SetStateAction<Record<string, string>>
+  ) => {
+    const updated =
+      typeof updater === "function" ? updater(folderMappings) : updater;
+    updateSettingsMutation.mutate({ document_folder_mappings: updated });
+  };
 
   const availableLanguages = useMemo(() => {
     const langs = new Set<string>();
@@ -97,7 +106,12 @@ const DocumentsPage: React.FC = () => {
   const handleCreateFolder = () => {
     const name = newFolderName.trim();
     if (!name) return;
-    setFolders((prev) => [...prev, { id: `doc-folder-${Math.random().toString(36).substring(2, 9)}`, name }]);
+    const newFolder = {
+      id: `doc-folder-${Math.random().toString(36).substring(2, 9)}`,
+      name,
+    };
+    const updated = [...folders, newFolder];
+    updateSettingsMutation.mutate({ document_folders: updated });
     setNewFolderName("");
     setShowNewFolderModal(false);
     toast.success(`Created folder "${name}"`);
@@ -108,7 +122,7 @@ const DocumentsPage: React.FC = () => {
     setSelectedFolderId(null); setSelectedLanguages([]); setDateRange({ start: "", end: "" });
   };
 
-  const handleSelectToggle   = (id: string) =>
+  const handleSelectToggle = (id: string) =>
     setSelectedIds((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
 
   const handleSelectAllToggle = (visibleDocs: Document[]) => {
@@ -174,14 +188,12 @@ const DocumentsPage: React.FC = () => {
   };
 
   const handleBulkMoveToFolder = (folderId: string | null) => {
-    setFolderMappings((prev) => {
-      const updated = { ...prev };
-      selectedIds.forEach((id) => {
-        if (folderId === null) delete updated[id];
-        else updated[id] = folderId;
-      });
-      return updated;
+    const updated = { ...folderMappings };
+    selectedIds.forEach((id) => {
+      if (folderId === null) delete updated[id];
+      else updated[id] = folderId;
     });
+    updateSettingsMutation.mutate({ document_folder_mappings: updated });
     setSelectedIds([]);
     toast.success("Moved to folder.");
   };
@@ -201,7 +213,7 @@ const DocumentsPage: React.FC = () => {
     if (fromIdx !== -1 && toIdx !== -1) {
       newOrder.splice(fromIdx, 1);
       newOrder.splice(toIdx, 0, draggedDocId);
-      setCustomOrder(newOrder);
+      updateSettingsMutation.mutate({ document_custom_order: newOrder });
     }
     setDraggedDocId(null);
   };
@@ -287,14 +299,20 @@ const DocumentsPage: React.FC = () => {
           onClearAll={handleClearAllFilters}
           savedPresets={presets}
           onSavePreset={(name) => {
-            setPresets((prev) => ({
-              ...prev,
-              [name]: { search, sort, filter, selectedFolderId, selectedLanguages, dateRange },
-            }));
+            const updatedPresets = [
+              ...(settingsData?.document_filter_presets?.filter((p) => p.name !== name) ?? []),
+              {
+                id: `preset-${Math.random().toString(36).substring(2, 9)}`,
+                name,
+                filters: { search, sort, filter, selectedFolderId, selectedLanguages, dateRange },
+              },
+            ];
+            updateSettingsMutation.mutate({ document_filter_presets: updatedPresets });
             toast.success(`Saved preset "${name}"`);
           }}
           onDeletePreset={(name) => {
-            setPresets((prev) => { const u = { ...prev }; delete u[name]; return u; });
+            const updatedPresets = (settingsData?.document_filter_presets ?? []).filter((p) => p.name !== name);
+            updateSettingsMutation.mutate({ document_filter_presets: updatedPresets });
             toast.success(`Deleted preset "${name}"`);
           }}
           onLoadPreset={(name) => {
@@ -326,7 +344,7 @@ const DocumentsPage: React.FC = () => {
           onReplace={async (id, file) => replaceMutation.mutateAsync({ id, file })}
           folders={folders}
           folderMappings={folderMappings}
-          setFolderMappings={setFolderMappings}
+          setFolderMappings={handleUpdateFolderMappings}
           handleDragStart={handleDragStart}
           handleDragOver={handleDragOver}
           handleDrop={handleDrop}

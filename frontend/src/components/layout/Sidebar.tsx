@@ -36,9 +36,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
     folders,
     tags,
     togglePin,
-    createFolder,
-    renameFolder,
-    deleteFolder,
     moveConversationToFolder,
     addTag,
     removeTag,
@@ -155,9 +152,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           folders={folders}
           tags={tags}
           togglePin={togglePin}
-          createFolder={createFolder}
-          renameFolder={renameFolder}
-          deleteFolder={deleteFolder}
           moveConversationToFolder={moveConversationToFolder}
           addTag={addTag}
           removeTag={removeTag}

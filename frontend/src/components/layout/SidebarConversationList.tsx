@@ -1,8 +1,9 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Conversation } from "../../types";
 import { ConversationItem } from "../sidebar/ConversationItem";
-import { Folder, Tag } from "../../hooks/useLocalConversationMetadata";
+import { Folder, Tag, useLocalConversationMetadata } from "../../hooks/useLocalConversationMetadata";
 import { useLocale } from "../../lib/messages";
+import { X, Tag as TagIcon } from "lucide-react";
 
 interface SidebarConversationListProps {
   conversations: Conversation[];
@@ -15,9 +16,6 @@ interface SidebarConversationListProps {
   folders: Folder[];
   tags: Record<string, Tag[]>;
   togglePin: (id: string) => void;
-  createFolder: (name: string) => void;
-  renameFolder: (id: string, name: string) => void;
-  deleteFolder: (id: string) => void;
   moveConversationToFolder: (conversationId: string, folderId: string | null) => void;
   addTag: (conversationId: string, tag: Tag) => void;
   removeTag: (conversationId: string, name: string) => void;
@@ -39,6 +37,7 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
   removeTag,
 }) => {
   const { t } = useLocale();
+  const { activeFilterTag, setActiveFilterTag } = useLocalConversationMetadata();
   const [keyboardSelectIdx, setKeyboardSelectIdx] = useState<number>(-1);
 
   const conversationMap = useMemo(
@@ -46,11 +45,28 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
     [conversations]
   );
 
+  // Collect unique applied tags
+  const appliedTags = useMemo(() => {
+    const map = new Map<string, string>();
+    Object.values(tags).forEach((tagList) => {
+      tagList.forEach((t) => map.set(t.name.toLowerCase(), t.color));
+    });
+    return Array.from(map.entries()).map(([name, color]) => ({ name, color }));
+  }, [tags]);
+
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return conversations;
-    const q = searchQuery.toLowerCase();
-    return conversations.filter((c) => c.title.toLowerCase().includes(q));
-  }, [conversations, searchQuery]);
+    let result = conversations;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((c) => c.title.toLowerCase().includes(q));
+    }
+    if (activeFilterTag) {
+      result = result.filter((c) =>
+        tags[c.id]?.some((t) => t.name.toLowerCase() === activeFilterTag.toLowerCase())
+      );
+    }
+    return result;
+  }, [conversations, searchQuery, activeFilterTag, tags]);
 
   const sortedConversations = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -119,6 +135,31 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
 
   return (
     <div className="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-3 scrollbar-thin">
+      {/* ── Active Tag Filter Pill / Tags Bar ── */}
+      {appliedTags.length > 0 && (
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5 px-1">
+          <TagIcon size={11} className="text-[var(--text-muted)] flex-shrink-0" />
+          {appliedTags.map((t) => {
+            const isSelected = activeFilterTag?.toLowerCase() === t.name.toLowerCase();
+            return (
+              <button
+                key={t.name}
+                onClick={() => setActiveFilterTag(isSelected ? null : t.name)}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors cursor-pointer flex-shrink-0 ${
+                  isSelected
+                    ? "bg-[var(--accent-primary)] text-zinc-950 font-semibold"
+                    : "bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${t.color}`} />
+                <span>{t.name}</span>
+                {isSelected && <X size={10} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* ── Pinned Section ── */}
       {pinned.length > 0 && (
         <div className="flex flex-col gap-0.5">

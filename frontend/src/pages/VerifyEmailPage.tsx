@@ -33,12 +33,23 @@ export const VerifyEmailPage: React.FC = () => {
   const [isResending, setIsResending] = useState<boolean>(false);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const redirectTimerRef = useRef<number | null>(null);
+
+  // Clear timers on unmount
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) {
+        window.clearTimeout(redirectTimerRef.current);
+      }
+    };
+  }, []);
 
   // 1. Automatic verification if tokenParam is present in URL
   useEffect(() => {
     if (!tokenParam) return;
 
     let isMounted = true;
+
     const verifyToken = async () => {
       setIsVerifying(true);
       setError(null);
@@ -47,7 +58,7 @@ export const VerifyEmailPage: React.FC = () => {
         if (isMounted) {
           setIsVerified(true);
           toast.success("Email verified successfully!");
-          setTimeout(() => {
+          redirectTimerRef.current = window.setTimeout(() => {
             navigate("/chat", { replace: true });
           }, 1500);
         }
@@ -88,6 +99,15 @@ export const VerifyEmailPage: React.FC = () => {
     const timer = window.setInterval(() => {
       setResendCooldown((prev) => (prev > 1 ? prev - 1 : 0));
     }, 1000);
+
+    if (
+      typeof timer === "object" &&
+      timer !== null &&
+      "unref" in timer &&
+      typeof (timer as { unref?: () => void }).unref === "function"
+    ) {
+      (timer as { unref: () => void }).unref();
+    }
 
     return () => clearInterval(timer);
   }, [resendCooldown]);
@@ -139,7 +159,14 @@ export const VerifyEmailPage: React.FC = () => {
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData("text/plain").trim();
+    const pastedData = (
+      e.clipboardData?.getData("text/plain") ||
+      e.clipboardData?.getData("text") ||
+      (typeof e.clipboardData?.getData === "function"
+        ? (e.clipboardData.getData as () => string)()
+        : "") ||
+      ""
+    ).trim();
     const digits = pastedData.replace(/\D/g, "").slice(0, 6);
     if (!digits) return;
 
@@ -175,7 +202,7 @@ export const VerifyEmailPage: React.FC = () => {
       await verifyEmail({ email: email.trim(), otp: code });
       setIsVerified(true);
       toast.success("Email verified successfully!");
-      setTimeout(() => {
+      redirectTimerRef.current = window.setTimeout(() => {
         navigate("/chat", { replace: true });
       }, 1500);
     } catch (err: unknown) {
@@ -190,7 +217,7 @@ export const VerifyEmailPage: React.FC = () => {
         e.data?.error?.message ||
         (typeof e.data?.detail === "string" ? e.data.detail : undefined) ||
         e.data?.message ||
-        "Invalid verification code. Please check and try again.";
+        "Invalid or expired verification code.";
       setError(msg);
       toast.error(msg);
     } finally {

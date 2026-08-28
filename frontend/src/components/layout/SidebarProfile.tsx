@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, LogOut, ChevronUp, Activity } from "lucide-react";
+import { Settings, LogOut, ChevronUp, Activity, Cloud, Loader2, CloudOff } from "lucide-react";
 import { Avatar, AvatarFallback } from "../ui/Avatar";
 import {
   DropdownMenu,
@@ -11,6 +11,7 @@ import {
 } from "../ui/Dropdown";
 import { cn } from "../../lib/utils";
 import { useLocale } from "../../lib/messages";
+import { useLocalConversationMetadata } from "../../hooks/useLocalConversationMetadata";
 
 interface SidebarProfileProps {
   user: { email: string; role: string } | null;
@@ -21,6 +22,8 @@ interface SidebarProfileProps {
 export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, collapsed }) => {
   const { t } = useLocale();
   const navigate = useNavigate();
+  const { syncStatus } = useLocalConversationMetadata();
+
   const initials = user?.email
     ? user.email
         .split("@")[0]
@@ -53,9 +56,33 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, co
                   <p className="text-[13px] font-medium text-[var(--text-primary)] truncate leading-tight">
                     {user.email}
                   </p>
-                  <span className="text-[11px] text-[var(--text-muted)] capitalize block leading-tight mt-0.5">
-                    {user.role === "admin" ? "Admin" : "Pro"}
-                  </span>
+                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] mt-0.5 leading-tight">
+                    <span className="capitalize">{user.role === "admin" ? "Admin" : "Pro"}</span>
+                    <span>•</span>
+                    <span className={cn(
+                      "flex items-center gap-0.5 text-[10px]",
+                      syncStatus === "saving" && "text-amber-500",
+                      syncStatus === "error" && "text-red-400",
+                      syncStatus === "synced" && "text-emerald-500 dark:text-emerald-400"
+                    )}>
+                      {syncStatus === "saving" ? (
+                        <>
+                          <Loader2 size={10} className="animate-spin" />
+                          <span>Syncing...</span>
+                        </>
+                      ) : syncStatus === "error" ? (
+                        <>
+                          <CloudOff size={10} />
+                          <span>Sync error</span>
+                        </>
+                      ) : (
+                        <>
+                          <Cloud size={10} />
+                          <span>Synced</span>
+                        </>
+                      )}
+                    </span>
+                  </div>
                 </div>
                 <ChevronUp size={14} className="flex-shrink-0 text-[var(--text-muted)] opacity-70" />
               </>
