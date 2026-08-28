@@ -60,6 +60,7 @@ from app.chat.services.multi_agent.research_planner import ResearchPlanner
 from app.chat.services.multi_agent.result_evaluator import ResultEvaluator
 from app.chat.services.multi_agent.synthesis_agent import SynthesisAgent
 from app.chat.services.multi_agent.task_router import TaskRouter
+from app.chat.services.multi_agent.web_search_agent import WebSearchAgent
 
 __all__ = [
     "AgentType",
@@ -105,6 +106,7 @@ __all__ = [
     "ResearchAgent",
     "DocumentAgent",
     "AnalysisAgent",
+    "WebSearchAgent",
     "CapabilityRegistry",
     "create_default_capability_registry",
     "TaskRouter",

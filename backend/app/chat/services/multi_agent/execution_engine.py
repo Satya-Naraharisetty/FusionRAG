@@ -37,6 +37,7 @@ ALLOWED_SPECIALIST_TYPES = {
     AgentType.RESEARCH,
     AgentType.DOCUMENT,
     AgentType.ANALYSIS,
+    AgentType.WEB_SEARCH,
 }
 
 

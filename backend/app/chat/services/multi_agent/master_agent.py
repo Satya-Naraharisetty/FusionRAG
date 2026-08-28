@@ -36,14 +36,15 @@ PLANNER_SYSTEM_PROMPT = """You are a master planning agent in a hierarchical mul
 Decompose the user's request into a structured execution plan containing specialist tasks with explicit dependencies.
 
 Available Specialist Agents:
-- RESEARCH: Performs Hybrid RAG search across knowledge base chunks. Use for questions about general facts, concepts, policies, or documentation.
+- RESEARCH: Performs Hybrid RAG search across uploaded knowledge base chunks. Use for questions about user uploaded documents, internal company policies, or documentation.
 - DOCUMENT: Inspects specific known documents/chunks by ID, or lists documents in conversation. Use when specific document UUIDs or document metadata are explicitly mentioned.
 - ANALYSIS: Performs deterministic mathematical calculations, growth rates, sums, averages, or structured data comparisons via SafeCalculator.
+- WEB_SEARCH: Searches the live public web for real-time information, current facts, news, online market data, or external topics not found in uploaded documents.
 
 Planning Rules:
 1. Only create tasks for necessary specialists.
 2. Max 5 tasks in a single plan.
-3. Use 'dependencies' to sequence tasks (e.g. ANALYSIS depending on RESEARCH).
+3. Use 'dependencies' to sequence tasks (e.g. ANALYSIS depending on RESEARCH and/or WEB_SEARCH).
 4. Independent tasks should have empty dependencies [] so they run concurrently.
 5. Return strictly valid JSON conforming to the schema below.
 
@@ -53,7 +54,7 @@ JSON Schema:
   "tasks": [
     {
       "task_id": "task_1",
-      "agent_type": "RESEARCH" | "DOCUMENT" | "ANALYSIS",
+      "agent_type": "RESEARCH" | "DOCUMENT" | "ANALYSIS" | "WEB_SEARCH",
       "request": "Detailed task description",
       "dependencies": [],
       "parameters": {},
@@ -273,26 +274,109 @@ class MasterAgent:
                 )
             )
         else:
-            tasks.append(
-                AgentTask(
-                    task_id="research_1",
-                    request=request,
-                    agent_type=AgentType.RESEARCH,
-                    dependencies=[],
-                    parameters={"query": request, "top_k": 5},
-                    expected_outputs=["Relevant evidence chunks for query"],
-                )
+            web_keywords = [
+                "web",
+                "online",
+                "latest",
+                "news",
+                "current price",
+                "today",
+                "search the web",
+                "internet",
+                "live",
+                "stock price",
+                "market",
+            ]
+            is_web_query = any(w in req_lower for w in web_keywords)
+            doc_keywords = [
+                "doc",
+                "document",
+                "pdf",
+                "file",
+                "uploaded",
+                "my data",
+                "my report",
+                "internal",
+            ]
+            has_doc_context = (
+                any(w in req_lower for w in doc_keywords)
+                or bool(context.document_ids)
+                or getattr(context, "include_library_documents", False)
             )
-            if has_math:
+
+            if is_web_query and has_doc_context:
                 tasks.append(
                     AgentTask(
-                        task_id="analysis_1",
-                        request=f"Perform calculation on retrieved research: {request}",
-                        agent_type=AgentType.ANALYSIS,
-                        dependencies=["research_1"],
-                        parameters={"action": "calculate"},
+                        task_id="research_1",
+                        request=request,
+                        agent_type=AgentType.RESEARCH,
+                        dependencies=[],
+                        parameters={"query": request, "top_k": 5},
+                        expected_outputs=["Uploaded document evidence"],
                     )
                 )
+                tasks.append(
+                    AgentTask(
+                        task_id="web_search_1",
+                        request=request,
+                        agent_type=AgentType.WEB_SEARCH,
+                        dependencies=[],
+                        parameters={"query": request, "max_results": 5},
+                        expected_outputs=["Live web search results"],
+                    )
+                )
+                if has_math:
+                    tasks.append(
+                        AgentTask(
+                            task_id="analysis_1",
+                            request=f"Perform calculation on document and web findings: {request}",
+                            agent_type=AgentType.ANALYSIS,
+                            dependencies=["research_1", "web_search_1"],
+                            parameters={"action": "calculate"},
+                        )
+                    )
+            elif is_web_query:
+                tasks.append(
+                    AgentTask(
+                        task_id="web_search_1",
+                        request=request,
+                        agent_type=AgentType.WEB_SEARCH,
+                        dependencies=[],
+                        parameters={"query": request, "max_results": 5},
+                        expected_outputs=["Live web search results"],
+                    )
+                )
+                if has_math:
+                    tasks.append(
+                        AgentTask(
+                            task_id="analysis_1",
+                            request=f"Perform calculation on web search results: {request}",
+                            agent_type=AgentType.ANALYSIS,
+                            dependencies=["web_search_1"],
+                            parameters={"action": "calculate"},
+                        )
+                    )
+            else:
+                tasks.append(
+                    AgentTask(
+                        task_id="research_1",
+                        request=request,
+                        agent_type=AgentType.RESEARCH,
+                        dependencies=[],
+                        parameters={"query": request, "top_k": 5},
+                        expected_outputs=["Relevant evidence chunks for query"],
+                    )
+                )
+                if has_math:
+                    tasks.append(
+                        AgentTask(
+                            task_id="analysis_1",
+                            request=f"Perform calculation on retrieved research: {request}",
+                            agent_type=AgentType.ANALYSIS,
+                            dependencies=["research_1"],
+                            parameters={"action": "calculate"},
+                        )
+                    )
 
         return ExecutionPlan(
             request_id=context.request_id,

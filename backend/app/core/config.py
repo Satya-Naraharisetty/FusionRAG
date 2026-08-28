@@ -388,6 +388,14 @@ class Settings(BaseSettings):
     MAX_TOTAL_AGENT_CALLS: int = 8
     MULTI_AGENT_TASK_TIMEOUT: float = 20.0
 
+    # Web Search Configurations
+    ENABLE_WEB_SEARCH: bool = True
+    WEB_SEARCH_PROVIDER: str = "auto"
+    SERPAPI_API_KEY: str | None = None
+    FIRECRAWL_API_KEY: str | None = None
+    WEB_SEARCH_MAX_RESULTS: int = 5
+    WEB_SEARCH_TIMEOUT: float = 10.0
+
     # Research Planner Configurations (Prompt 3.3)
     RESEARCH_MAX_SUBQUERIES: int = 4
     RESEARCH_MAX_RETRIEVAL_CALLS: int = 6

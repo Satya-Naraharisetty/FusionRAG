@@ -23,6 +23,7 @@ AGENT_TYPE_TO_CAPABILITY_TYPE: dict[AgentType, CapabilityType] = {
     AgentType.RESEARCH: CapabilityType.RESEARCH,
     AgentType.DOCUMENT: CapabilityType.DOCUMENT_INSPECTION,
     AgentType.ANALYSIS: CapabilityType.ANALYSIS,
+    AgentType.WEB_SEARCH: CapabilityType.WEB_SEARCH,
 }
 
 # Non-executable agent types

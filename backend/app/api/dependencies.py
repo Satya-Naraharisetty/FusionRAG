@@ -1155,6 +1155,7 @@ def get_tool_registry(retrieval_service=Depends(get_retrieval_service)) -> Any:
     from app.chat.services.tools.datetime import DateTimeTool
     from app.chat.services.tools.document_retrieval import RetrieveDocumentTool
     from app.chat.services.tools.semantic_search import SearchKnowledgeTool
+    from app.chat.services.tools.web_search import WebSearchTool
 
     tools: list[Tool] = [
         SearchKnowledgeTool(retrieval_service),
@@ -1163,10 +1164,12 @@ def get_tool_registry(retrieval_service=Depends(get_retrieval_service)) -> Any:
         CitationLookupTool(),
         CalculatorTool(),
         DateTimeTool(),
+        WebSearchTool(),
     ]
     registry = ToolRegistry(tools)
     # Register aliases
     registry.register(tools[0], aliases=["semantic_search", "document_search"])
+    registry.register(tools[6], aliases=["live_search", "search_web"])
     return registry
 
 
@@ -1228,6 +1231,20 @@ def get_analysis_agent() -> Any:
     from app.chat.services.multi_agent.analysis_agent import AnalysisAgent
 
     return AnalysisAgent()
+
+
+def get_web_search_service() -> Any:
+    from app.chat.services.web_search_service import WebSearchService
+
+    return WebSearchService()
+
+
+def get_web_search_agent(
+    web_search_service=Depends(get_web_search_service),
+) -> Any:
+    from app.chat.services.multi_agent.web_search_agent import WebSearchAgent
+
+    return WebSearchAgent(web_search_service=web_search_service)
 
 
 _capability_registry_instance: Any = None
@@ -1293,6 +1310,7 @@ def get_agent_execution_engine(
     research_agent=Depends(get_research_agent),
     document_agent=Depends(get_document_agent),
     analysis_agent=Depends(get_analysis_agent),
+    web_search_agent=Depends(get_web_search_agent),
     task_router=Depends(get_task_router),
     capability_registry=Depends(get_capability_registry),
     observability=Depends(get_agent_observability_service),
@@ -1300,7 +1318,12 @@ def get_agent_execution_engine(
     from app.chat.services.multi_agent.execution_engine import AgentExecutionEngine
 
     return AgentExecutionEngine(
-        specialist_agents=[research_agent, document_agent, analysis_agent],
+        specialist_agents=[
+            research_agent,
+            document_agent,
+            analysis_agent,
+            web_search_agent,
+        ],
         task_router=task_router,
         capability_registry=capability_registry,
         observability=observability,

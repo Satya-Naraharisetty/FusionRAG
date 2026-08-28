@@ -123,6 +123,17 @@ def create_default_capability_registry() -> CapabilityRegistry:
             metadata={"specialist": "AnalysisAgent"},
         ),
         CapabilityDescriptor(
+            capability_id="web_search.live",
+            capability_type=CapabilityType.WEB_SEARCH,
+            description="Searches the live public web for real-time information, current news, facts, and online sources.",
+            supported_operations=["web_search", "search_web", "live_search"],
+            required_context=[],
+            estimated_latency_ms=1500.0,
+            estimated_cost_units=0.8,
+            enabled=True,
+            metadata={"specialist": "WebSearchAgent"},
+        ),
+        CapabilityDescriptor(
             capability_id="synthesis.grounded_summary",
             capability_type=CapabilityType.SYNTHESIS,
             description="Grounded multi-agent result synthesis and citation attribution.",
