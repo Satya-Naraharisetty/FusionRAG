@@ -44,3 +44,35 @@ class UserNotFoundException(AuthException):
     """
 
     pass
+
+
+class EmailNotVerifiedException(AuthException):
+    """
+    Raised when an unverified user attempts to log in.
+    """
+
+    pass
+
+
+class InvalidVerificationTokenException(AuthException):
+    """
+    Raised when a verification token or OTP is invalid or not found.
+    """
+
+    pass
+
+
+class ExpiredVerificationTokenException(AuthException):
+    """
+    Raised when a verification token or OTP has expired.
+    """
+
+    pass
+
+
+class MaxVerificationAttemptsException(AuthException):
+    """
+    Raised when the maximum number of failed OTP verification attempts is exceeded.
+    """
+
+    pass

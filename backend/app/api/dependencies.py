@@ -9,6 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.domain.interfaces import TokenProvider
 from app.auth.infrastructure.crypto.password_hasher import Argon2PasswordHasher
 from app.auth.infrastructure.crypto.token_provider import JWTTokenProvider
+from app.auth.infrastructure.persistence.repositories.email_verification_repository import (
+    SQLAlchemyEmailVerificationRepository,
+)
 from app.auth.infrastructure.persistence.repositories.session_repository import (
     SQLAlchemySessionRepository,
 )
@@ -23,6 +26,7 @@ from app.auth.infrastructure.providers import (
 from app.auth.services.auth_service import AuthService
 from app.auth.services.oauth_service import OAuthService
 from app.core.config import settings
+from app.core.email.resend_service import get_resend_service
 from app.core.queue.interfaces import DurableTaskQueue
 from app.db.session import get_db
 from app.documents.domain.events import DocumentProcessingCompleted
@@ -71,11 +75,13 @@ def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
     """
     user_repo = SQLAlchemyUserRepository(db)
     session_repo = SQLAlchemySessionRepository(db)
+    verification_repo = SQLAlchemyEmailVerificationRepository(db)
     hasher = Argon2PasswordHasher()
     token_provider = JWTTokenProvider()
     time_provider = SystemTimeProvider()
     uuid_generator = SystemUUIDGenerator()
     uow = SQLAlchemyUnitOfWork(db)
+    email_service = get_resend_service()
 
     return AuthService(
         user_repo=user_repo,
@@ -85,6 +91,8 @@ def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
         time_provider=time_provider,
         uuid_generator=uuid_generator,
         uow=uow,
+        verification_repo=verification_repo,
+        email_service=email_service,
     )
 
 

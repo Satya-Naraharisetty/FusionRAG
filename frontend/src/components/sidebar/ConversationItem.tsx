@@ -138,7 +138,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
         onTouchEnd={handleTouchEnd}
         className={cn(
           "relative overflow-hidden group select-none rounded-[var(--radius-md)] transition-all duration-150",
-          isHighlighted && "bg-[var(--bg-tertiary)]"
+          isHighlighted && !isActive && "ring-1 ring-[var(--border-hover)] bg-[var(--bg-tertiary)]/50"
         )}
       >
         {/* Swipe quick-actions drawer */}

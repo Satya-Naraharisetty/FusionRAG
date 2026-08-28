@@ -305,6 +305,7 @@ class OAuthService:
                         **user.model_dump(),
                         "oauth_provider": provider,
                         "oauth_sub": sub,
+                        "is_verified": True,
                         "updated_at": now,
                     }
                 )
@@ -319,6 +320,7 @@ class OAuthService:
                 hashed_password=None,
                 role="user",
                 is_active=True,
+                is_verified=True,
                 created_at=now,
                 updated_at=now,
                 oauth_provider=provider,

@@ -33,6 +33,7 @@ class SQLAlchemyUser(Base):
     hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role: Mapped[str] = mapped_column(String(50), default="user", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -57,6 +58,13 @@ class SQLAlchemyUser(Base):
         back_populates="user",
         cascade="all, delete-orphan",
         uselist=False,
+    )
+    verification_tokens: Mapped[list["SQLAlchemyEmailVerificationToken"]] = (
+        relationship(
+            "SQLAlchemyEmailVerificationToken",
+            back_populates="user",
+            cascade="all, delete-orphan",
+        )
     )
 
 
@@ -116,4 +124,30 @@ class SQLAlchemyUserEncryptionKey(Base):
     # Relationships
     user: Mapped["SQLAlchemyUser"] = relationship(
         "SQLAlchemyUser", back_populates="encryption_key"
+    )
+
+
+class SQLAlchemyEmailVerificationToken(Base):
+    __tablename__ = "email_verification_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(
+        String(255), unique=True, index=True, nullable=False
+    )
+    otp_code: Mapped[str] = mapped_column(String(6), index=True, nullable=False)
+    attempts: Mapped[int] = mapped_column(default=0, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    is_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    user: Mapped["SQLAlchemyUser"] = relationship(
+        "SQLAlchemyUser", back_populates="verification_tokens"
     )

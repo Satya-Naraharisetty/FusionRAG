@@ -20,6 +20,7 @@ const DocumentsPage = lazyWithRetry(() => import("./pages/DocumentsPage"));
 const SettingsPage = lazyWithRetry(() => import("./pages/SettingsPage"));
 const OAuthCallbackPage = lazyWithRetry(() => import("./pages/OAuthCallbackPage"));
 const AdminDashboardPage = lazyWithRetry(() => import("./pages/AdminDashboardPage"));
+const VerifyEmailPage = lazyWithRetry(() => import("./pages/VerifyEmailPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,6 +57,7 @@ function App() {
                 <Route element={<PublicRoute />}>
                   <Route path="/login" element={<LoginForm />} />
                   <Route path="/register" element={<RegisterForm />} />
+                  <Route path="/verify-email" element={<VerifyEmailPage />} />
                 </Route>
 
                 {/* Secure application routes */}

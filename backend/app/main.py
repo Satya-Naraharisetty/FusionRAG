@@ -29,8 +29,12 @@ from app.api.v1.search import router as search_router
 from app.auth.domain.exceptions import (
     AccountDisabledException,
     DuplicateAccountException,
+    EmailNotVerifiedException,
+    ExpiredVerificationTokenException,
     InvalidCredentialsException,
     InvalidSessionException,
+    InvalidVerificationTokenException,
+    MaxVerificationAttemptsException,
     UserNotFoundException,
 )
 from app.auth.infrastructure.crypto.token_provider import JWTTokenProvider
@@ -896,6 +900,55 @@ async def user_not_found_exception_handler(
         code="USER_NOT_FOUND",
         message="User account no longer exists.",
         status_code=status.HTTP_404_NOT_FOUND,
+    )
+
+
+@app.exception_handler(EmailNotVerifiedException)
+async def email_not_verified_exception_handler(
+    _request: Request, exc: EmailNotVerifiedException
+):
+    logger.info(f"Authentication blocked: email unverified ({exc})")
+    return format_error_response(
+        code="EMAIL_NOT_VERIFIED",
+        message=str(exc) or "Please verify your email address before logging in.",
+        status_code=status.HTTP_403_FORBIDDEN,
+    )
+
+
+@app.exception_handler(InvalidVerificationTokenException)
+async def invalid_verification_token_exception_handler(
+    _request: Request, exc: InvalidVerificationTokenException
+):
+    logger.info(f"Verification rejected: {exc}")
+    return format_error_response(
+        code="INVALID_VERIFICATION_TOKEN",
+        message=str(exc) or "Invalid verification code or link.",
+        status_code=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+@app.exception_handler(ExpiredVerificationTokenException)
+async def expired_verification_token_exception_handler(
+    _request: Request, exc: ExpiredVerificationTokenException
+):
+    logger.info(f"Verification expired: {exc}")
+    return format_error_response(
+        code="EXPIRED_VERIFICATION_TOKEN",
+        message=str(exc) or "Verification code has expired. Please request a new one.",
+        status_code=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+@app.exception_handler(MaxVerificationAttemptsException)
+async def max_verification_attempts_exception_handler(
+    _request: Request, exc: MaxVerificationAttemptsException
+):
+    logger.warning(f"Verification rate limit reached: {exc}")
+    return format_error_response(
+        code="MAX_VERIFICATION_ATTEMPTS",
+        message=str(exc)
+        or "Too many failed attempts. Please request a new verification code.",
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
     )
 
 

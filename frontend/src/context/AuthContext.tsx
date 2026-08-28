@@ -22,6 +22,12 @@ export interface AuthContextType {
   loginWithGoogle: () => void;
   loginWithGithub: () => void;
   register: (email: string, password: string) => Promise<void>;
+  verifyEmail: (params: {
+    token?: string;
+    email?: string;
+    otp?: string;
+  }) => Promise<void>;
+  resendVerification: (email: string) => Promise<{ message: string }>;
   logout: () => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
 }
@@ -92,8 +98,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const register = async (email: string, password: string) => {
     await authApi.register(email, password);
-    // Automatically log user in upon successful registration
-    await login(email, password);
+  };
+
+  const verifyEmail = async (params: {
+    token?: string;
+    email?: string;
+    otp?: string;
+  }) => {
+    try {
+      const response = await authApi.verifyEmail(params);
+      setAccessTokenState(response.access_token);
+      const userProfile = await authApi.getMe();
+      setUser(userProfile);
+      scheduleRefresh(response.expires_in);
+    } catch (err) {
+      setUser(null);
+      setAccessTokenState(null);
+      setAccessToken(null);
+      clearRefreshTimer();
+      throw err;
+    }
+  };
+
+  const resendVerification = async (email: string) => {
+    return authApi.resendVerification(email);
   };
 
   const logout = useCallback(async () => {
@@ -237,6 +265,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     loginWithGoogle,
     loginWithGithub,
     register,
+    verifyEmail,
+    resendVerification,
     logout,
     deleteAccount,
   };

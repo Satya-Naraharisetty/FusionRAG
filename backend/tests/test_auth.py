@@ -17,6 +17,7 @@ from tests.db import TEST_DATABASE_URL
 
 def _truncate_auth_tables(session) -> None:
     """Delete every user and session so tests start from (and end on) a clean slate."""
+    session.execute(text("DELETE FROM email_verification_tokens;"))
     session.execute(text("DELETE FROM refresh_sessions;"))
     session.execute(text("DELETE FROM users;"))
     session.commit()
@@ -572,3 +573,41 @@ def test_magic_link_dispatch_existing_user(client, test_db):
     )
     assert res.status_code == status.HTTP_200_OK
     assert "Magic sign-in link dispatched" in res.json()["message"]
+
+
+def test_login_unverified_email_blocked_when_verification_required(client, test_db):
+    """
+    When REQUIRE_EMAIL_VERIFICATION is True, unverified registered users must be blocked with 403.
+    """
+    settings.REQUIRE_EMAIL_VERIFICATION = True
+    try:
+        client.post(
+            "/api/v1/auth/register",
+            json={"email": "unverified@example.com", "password": "SecurePassword123!"},
+        )
+
+        res = client.post(
+            "/api/v1/auth/login",
+            json={"email": "unverified@example.com", "password": "SecurePassword123!"},
+        )
+        assert res.status_code == status.HTTP_403_FORBIDDEN
+        assert res.json()["error"]["code"] == "EMAIL_NOT_VERIFIED"
+    finally:
+        settings.REQUIRE_EMAIL_VERIFICATION = False
+
+
+def test_resend_verification_endpoint_success(client, test_db):
+    """
+    Test resend verification endpoint dispatches successfully.
+    """
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "resend-test@example.com", "password": "SecurePassword123!"},
+    )
+
+    res = client.post(
+        "/api/v1/auth/resend-verification",
+        json={"email": "resend-test@example.com"},
+    )
+    assert res.status_code == status.HTTP_200_OK
+    assert "dispatched" in res.json()["message"].lower()

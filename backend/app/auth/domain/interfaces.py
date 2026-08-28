@@ -3,7 +3,11 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from app.auth.domain.schemas import SessionDomain, UserDomain
+from app.auth.domain.schemas import (
+    EmailVerificationTokenDomain,
+    SessionDomain,
+    UserDomain,
+)
 
 
 class PasswordHasher(ABC):
@@ -123,6 +127,56 @@ class SessionRepository(ABC):
     async def update_last_used(self, token: str, last_used_at: datetime) -> None:
         """
         Update the last_used_at timestamp of a session.
+        """
+        pass
+
+
+class EmailVerificationRepository(ABC):
+    @abstractmethod
+    async def create(
+        self, verification_token: EmailVerificationTokenDomain
+    ) -> EmailVerificationTokenDomain:
+        """
+        Save a new email verification token.
+        """
+        pass
+
+    @abstractmethod
+    async def get_by_token_hash(
+        self, token_hash: str
+    ) -> EmailVerificationTokenDomain | None:
+        """
+        Find an email verification record by hashed URL token.
+        """
+        pass
+
+    @abstractmethod
+    async def get_latest_by_user_id(
+        self, user_id: UUID
+    ) -> EmailVerificationTokenDomain | None:
+        """
+        Find the most recent pending email verification record for a user.
+        """
+        pass
+
+    @abstractmethod
+    async def increment_attempts(self, token_id: UUID) -> int:
+        """
+        Increment the failed attempt counter for a token and return the new count.
+        """
+        pass
+
+    @abstractmethod
+    async def mark_used(self, token_id: UUID) -> None:
+        """
+        Mark a verification token as used.
+        """
+        pass
+
+    @abstractmethod
+    async def invalidate_all_for_user(self, user_id: UUID) -> None:
+        """
+        Invalidate (mark used/expired) any pending verification tokens for a user.
         """
         pass
 

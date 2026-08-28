@@ -5,6 +5,7 @@ export interface UserResponse {
   email: string;
   role: string;
   is_active: boolean;
+  is_verified: boolean;
   created_at: string;
   updated_at: string;
   oauth_provider: string | null;
@@ -31,6 +32,23 @@ export const authApi = {
     // Store in-memory access token
     setAccessToken(data.access_token);
     return data;
+  },
+
+  async verifyEmail(params: {
+    token?: string;
+    email?: string;
+    otp?: string;
+  }): Promise<TokenResponse> {
+    const data = await api.post<TokenResponse>("/auth/verify-email", params);
+    // Store in-memory access token
+    setAccessToken(data.access_token);
+    return data;
+  },
+
+  resendVerification(email: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>("/auth/resend-verification", {
+      email,
+    });
   },
 
   refresh(): Promise<TokenResponse> {

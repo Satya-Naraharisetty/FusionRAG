@@ -1,15 +1,22 @@
+import hashlib
 import logging
+import secrets
 from datetime import timedelta
 from uuid import UUID
 
 from app.auth.domain.exceptions import (
     AccountDisabledException,
     DuplicateAccountException,
+    EmailNotVerifiedException,
+    ExpiredVerificationTokenException,
     InvalidCredentialsException,
     InvalidSessionException,
+    InvalidVerificationTokenException,
+    MaxVerificationAttemptsException,
     UserNotFoundException,
 )
 from app.auth.domain.interfaces import (
+    EmailVerificationRepository,
     PasswordHasher,
     SessionRepository,
     TimeProvider,
@@ -18,8 +25,13 @@ from app.auth.domain.interfaces import (
     UserRepository,
     UUIDGenerator,
 )
-from app.auth.domain.schemas import SessionDomain, UserDomain
+from app.auth.domain.schemas import (
+    EmailVerificationTokenDomain,
+    SessionDomain,
+    UserDomain,
+)
 from app.core.config import settings
+from app.core.email.resend_service import ResendEmailService
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +46,8 @@ class AuthService:
         time_provider: TimeProvider,
         uuid_generator: UUIDGenerator,
         uow: UnitOfWork,
+        verification_repo: EmailVerificationRepository | None = None,
+        email_service: ResendEmailService | None = None,
     ) -> None:
         self._user_repo = user_repo
         self._session_repo = session_repo
@@ -42,10 +56,12 @@ class AuthService:
         self._time_provider = time_provider
         self._uuid_generator = uuid_generator
         self._uow = uow
+        self._verification_repo = verification_repo
+        self._email_service = email_service
 
     async def register_user(self, email: str, password: str) -> UserDomain:
         """
-        Register a new user account after validating credentials and unique email check.
+        Register a new user account with is_verified=False and dispatch a verification email.
         """
         try:
             normalized_email = email.strip().lower()
@@ -55,16 +71,53 @@ class AuthService:
                 raise DuplicateAccountException("Email is already registered.")
 
             hashed_password = self._hasher.hash(password)
+            now = self._time_provider.get_now()
             user = UserDomain(
                 id=self._uuid_generator.generate(),
                 email=normalized_email,
                 hashed_password=hashed_password,
                 role="user",
                 is_active=True,
-                created_at=self._time_provider.get_now(),
-                updated_at=self._time_provider.get_now(),
+                is_verified=False,
+                created_at=now,
+                updated_at=now,
             )
             saved_user = await self._user_repo.save(user)
+
+            # Generate verification token & OTP and dispatch email
+            if self._verification_repo:
+                raw_token = secrets.token_urlsafe(32)
+                token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+                otp_code = f"{secrets.randbelow(1000000):06d}"
+                expires_at = now + timedelta(
+                    minutes=settings.EMAIL_VERIFICATION_EXPIRE_MINUTES
+                )
+
+                token_domain = EmailVerificationTokenDomain(
+                    id=self._uuid_generator.generate(),
+                    user_id=saved_user.id,
+                    token_hash=token_hash,
+                    otp_code=otp_code,
+                    attempts=0,
+                    expires_at=expires_at,
+                    is_used=False,
+                    created_at=now,
+                )
+                await self._verification_repo.create(token_domain)
+
+                if self._email_service:
+                    verify_url = f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={raw_token}"
+                    try:
+                        await self._email_service.send_verification_email(
+                            to_email=saved_user.email,
+                            verify_url=verify_url,
+                            otp_code=otp_code,
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to dispatch verification email on register: %s", e
+                        )
+
             await self._uow.commit()
             return saved_user
         except Exception:
@@ -83,6 +136,11 @@ class AuthService:
         if not user.is_active:
             raise AccountDisabledException("Account has been deactivated.")
 
+        if settings.REQUIRE_EMAIL_VERIFICATION and not user.is_verified:
+            raise EmailNotVerifiedException(
+                "Please verify your email address before logging in."
+            )
+
         if not user.hashed_password:
             raise InvalidCredentialsException("Invalid email or password.")
 
@@ -90,6 +148,154 @@ class AuthService:
             raise InvalidCredentialsException("Invalid email or password.")
 
         return user
+
+    async def verify_email(
+        self,
+        token: str | None = None,
+        email: str | None = None,
+        otp: str | None = None,
+    ) -> UserDomain:
+        """
+        Verify a user's email via link token or 6-digit OTP code.
+        """
+        if not self._verification_repo:
+            raise InvalidVerificationTokenException(
+                "Email verification is not configured."
+            )
+
+        now = self._time_provider.get_now()
+        try:
+            if token:
+                token_hash = hashlib.sha256(token.strip().encode("utf-8")).hexdigest()
+                rec = await self._verification_repo.get_by_token_hash(token_hash)
+                if not rec or rec.is_used:
+                    raise InvalidVerificationTokenException(
+                        "Invalid or already used verification link."
+                    )
+                if rec.expires_at < now:
+                    raise ExpiredVerificationTokenException(
+                        "Verification link has expired. Please request a new code."
+                    )
+
+                user = await self._user_repo.get_by_id(rec.user_id)
+                if not user:
+                    raise UserNotFoundException("User account not found.")
+
+                await self._verification_repo.mark_used(rec.id)
+                updated_user = UserDomain(
+                    **{
+                        **user.model_dump(),
+                        "is_verified": True,
+                        "updated_at": now,
+                    }
+                )
+                saved_user = await self._user_repo.save(updated_user)
+                await self._uow.commit()
+                return saved_user
+
+            elif email and otp:
+                normalized_email = email.strip().lower()
+                user = await self._user_repo.get_by_email(normalized_email)
+                if not user:
+                    raise InvalidVerificationTokenException("Account not found.")
+
+                if user.is_verified:
+                    return user
+
+                rec = await self._verification_repo.get_latest_by_user_id(user.id)
+                if not rec:
+                    raise InvalidVerificationTokenException(
+                        "No pending verification found. Please request a new code."
+                    )
+                if rec.expires_at < now:
+                    raise ExpiredVerificationTokenException(
+                        "Verification code has expired. Please request a new code."
+                    )
+                if rec.attempts >= 5:
+                    await self._verification_repo.mark_used(rec.id)
+                    await self._uow.commit()
+                    raise MaxVerificationAttemptsException(
+                        "Too many incorrect attempts. Please request a new verification code."
+                    )
+
+                if not secrets.compare_digest(rec.otp_code, otp.strip()):
+                    attempts = await self._verification_repo.increment_attempts(rec.id)
+                    await self._uow.commit()
+                    remaining = max(0, 5 - attempts)
+                    raise InvalidVerificationTokenException(
+                        f"Invalid verification code. {remaining} attempt(s) remaining."
+                    )
+
+                await self._verification_repo.mark_used(rec.id)
+                updated_user = UserDomain(
+                    **{
+                        **user.model_dump(),
+                        "is_verified": True,
+                        "updated_at": now,
+                    }
+                )
+                saved_user = await self._user_repo.save(updated_user)
+                await self._uow.commit()
+                return saved_user
+
+            else:
+                raise InvalidVerificationTokenException(
+                    "Either verification token or email and OTP code must be provided."
+                )
+        except Exception:
+            await self._uow.rollback()
+            raise
+
+    async def resend_verification_email(self, email: str) -> None:
+        """
+        Invalidate older pending verification tokens and dispatch a fresh code & link.
+        """
+        if not self._verification_repo or not self._email_service:
+            return
+
+        try:
+            normalized_email = email.strip().lower()
+            user = await self._user_repo.get_by_email(normalized_email)
+            if not user or user.is_verified:
+                # Silently return to avoid account enumeration
+                return
+
+            now = self._time_provider.get_now()
+            # Invalidate older pending tokens
+            await self._verification_repo.invalidate_all_for_user(user.id)
+
+            # Generate new token & OTP
+            raw_token = secrets.token_urlsafe(32)
+            token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+            otp_code = f"{secrets.randbelow(1000000):06d}"
+            expires_at = now + timedelta(
+                minutes=settings.EMAIL_VERIFICATION_EXPIRE_MINUTES
+            )
+
+            token_domain = EmailVerificationTokenDomain(
+                id=self._uuid_generator.generate(),
+                user_id=user.id,
+                token_hash=token_hash,
+                otp_code=otp_code,
+                attempts=0,
+                expires_at=expires_at,
+                is_used=False,
+                created_at=now,
+            )
+            await self._verification_repo.create(token_domain)
+
+            verify_url = (
+                f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={raw_token}"
+            )
+            await self._email_service.send_verification_email(
+                to_email=user.email,
+                verify_url=verify_url,
+                otp_code=otp_code,
+            )
+            await self._uow.commit()
+        except Exception:
+            await self._uow.rollback()
+            raise
 
     async def create_session(
         self,
@@ -158,33 +364,21 @@ class AuthService:
                         "Refresh token reuse detected",
                         extra={
                             "user_id": str(user_id),
-                            "event": "refresh_token_reuse",
+                            "ip": ip_address,
+                            "user_agent": user_agent,
                         },
                     )
-                    await self._uow.commit()  # Commit the mass revocation immediately
-                raise InvalidSessionException(
-                    "Session is invalid, expired, or revoked."
-                )
+                raise InvalidSessionException("Session expired or invalid.")
 
+            # 2. Verify user is still active and valid
             user = await self._user_repo.get_by_id(session.user_id)
             if not user or not user.is_active:
-                await self._session_repo.revoke(raw_refresh_token)
-                await self._uow.commit()
-                if not user:
-                    raise InvalidSessionException(
-                        "User associated with session no longer exists."
-                    )
-                else:
-                    raise AccountDisabledException("Account has been deactivated.")
+                raise AccountDisabledException("Account is inactive.")
 
-            # 3. Update last_used_at
-            now = self._time_provider.get_now()
-            await self._session_repo.update_last_used(raw_refresh_token, now)
-
-            # 4. Revoke old session
+            # 3. Revoke existing session
             await self._session_repo.revoke(raw_refresh_token)
 
-            # 5. Create new session
+            # 4. Generate rotated tokens
             claims = {
                 "sub": str(user.id),
                 "role": user.role,
@@ -192,8 +386,10 @@ class AuthService:
             new_access_token = self._token_provider.create_access_token(claims)
             new_refresh_token = self._token_provider.create_refresh_token(claims)
 
+            now = self._time_provider.get_now()
             expires_at = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
+            # 5. Persist rotated session
             new_session = SessionDomain(
                 id=self._uuid_generator.generate(),
                 token_hash="",
@@ -229,20 +425,10 @@ class AuthService:
     async def verify_user_password(self, user_id: UUID, password: str) -> None:
         """
         Re-verify a user's password before a destructive action (account deletion).
-
-        Unlike authenticate_user, this intentionally does not check is_active:
-        a deactivated account may still be deleted by its owner when the
-        correct password is supplied.
-
-        Raises UserNotFoundException if the account no longer exists,
-        InvalidCredentialsException if the password does not match, and
-        InvalidCredentialsException with a descriptive message for OAuth-only
-        accounts that have no local password set.
         """
         user = await self._user_repo.get_by_id(user_id)
         if not user:
             raise UserNotFoundException("User account no longer exists.")
-        # OAuth-only accounts have no local password — inform the caller.
         if not user.hashed_password:
             raise InvalidCredentialsException(
                 "This account uses Google Sign-In and has no password set. "
@@ -254,10 +440,6 @@ class AuthService:
     async def delete_user(self, user_id: UUID) -> None:
         """
         Permanently delete a user account.
-
-        The database ON DELETE CASCADE constraints remove the user's refresh
-        sessions (and any conversations, documents, etc.). Raises
-        UserNotFoundException if the account no longer exists.
         """
         try:
             user = await self._user_repo.get_by_id(user_id)
@@ -283,6 +465,13 @@ class AuthService:
             normalized_email = email.strip().lower()
             user = await self._user_repo.get_by_email(normalized_email)
             if user:
+                if not user.is_verified:
+                    now = self._time_provider.get_now()
+                    updated = UserDomain(
+                        **{**user.model_dump(), "is_verified": True, "updated_at": now}
+                    )
+                    user = await self._user_repo.save(updated)
+                    await self._uow.commit()
                 return user
 
             now = self._time_provider.get_now()
@@ -292,6 +481,7 @@ class AuthService:
                 hashed_password=None,
                 role="user",
                 is_active=True,
+                is_verified=True,
                 created_at=now,
                 updated_at=now,
                 oauth_provider="magic_link",

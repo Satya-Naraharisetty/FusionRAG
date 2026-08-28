@@ -51,6 +51,7 @@ class UserResponseSchema(BaseModel):
     email: EmailStr
     role: str
     is_active: bool
+    is_verified: bool = False
     created_at: datetime
     updated_at: datetime
     oauth_provider: str | None = None
@@ -68,6 +69,16 @@ class MagicLinkRequestSchema(BaseModel):
     email: EmailStr
 
 
+class VerifyEmailSchema(BaseModel):
+    token: str | None = None
+    email: EmailStr | None = None
+    otp: str | None = None
+
+
+class ResendVerificationSchema(BaseModel):
+    email: EmailStr
+
+
 class UserDomain(BaseModel):
     id: UUID
     email: EmailStr
@@ -75,6 +86,7 @@ class UserDomain(BaseModel):
     hashed_password: str | None = None
     role: str
     is_active: bool
+    is_verified: bool = False
     created_at: datetime
     updated_at: datetime
     oauth_provider: str | None = None
@@ -94,5 +106,18 @@ class SessionDomain(BaseModel):
     revoked_at: datetime | None = None
     user_agent: str | None = None
     ip_address: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EmailVerificationTokenDomain(BaseModel):
+    id: UUID
+    user_id: UUID
+    token_hash: str
+    otp_code: str
+    attempts: int = 0
+    expires_at: datetime
+    is_used: bool = False
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -1,10 +1,12 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { RegisterCard } from "./RegisterCard";
 import { checkPasswordStrength } from "../../lib/passwordStrength";
 import toast from "react-hot-toast";
 
 export const RegisterForm: React.FC = () => {
+  const navigate = useNavigate();
   const { register, loginWithGoogle, loginWithGithub } = useAuth();
   const [email, setEmail]                       = useState("");
   const [password, setPassword]                 = useState("");
@@ -39,7 +41,8 @@ export const RegisterForm: React.FC = () => {
     setIsSubmitting(true);
     try {
       await register(email, password);
-      toast.success("Account created!");
+      toast.success("Account created! Verification code sent to your inbox.");
+      navigate(`/verify-email?email=${encodeURIComponent(email)}`);
     } catch (err: unknown) {
       const e = err as { data?: { message?: string } };
       setError(e.data?.message || "Registration failed. Try again.");

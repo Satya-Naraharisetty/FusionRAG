@@ -15,10 +15,12 @@ from app.api.dependencies import (
 from app.auth.domain.schemas import (
     DeleteAccountSchema,
     MagicLinkRequestSchema,
+    ResendVerificationSchema,
     TokenResponseSchema,
     UserCreateSchema,
     UserLoginSchema,
     UserResponseSchema,
+    VerifyEmailSchema,
 )
 from app.auth.services.auth_service import AuthService
 from app.auth.services.oauth_service import OAuthService
@@ -42,9 +44,72 @@ async def register(
 ):
     """
     Register a new user account canonicalizing their email and enforcing credentials checks.
+    Sends a verification link and 6-digit OTP code to the provided email.
     """
     user = await auth_service.register_user(payload.email, payload.password)
     return user
+
+
+@router.post(
+    "/verify-email",
+    response_model=TokenResponseSchema,
+    dependencies=[Depends(check_rate_limit)],
+)
+async def verify_email(
+    response: Response,
+    request: Request,
+    payload: VerifyEmailSchema,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    Verify user email using a link token or 6-digit OTP code, then establish session.
+    """
+    user = await auth_service.verify_email(
+        token=payload.token,
+        email=payload.email,
+        otp=payload.otp,
+    )
+
+    user_agent = request.headers.get("User-Agent")
+    ip_address = request.client.host if request.client else None
+
+    access_token, refresh_token = await auth_service.create_session(
+        user_id=user.id, user_agent=user_agent, ip_address=ip_address
+    )
+
+    # Configure secure browser cookie
+    response.set_cookie(
+        key=settings.COOKIE_NAME,
+        value=refresh_token,
+        max_age=settings.COOKIE_MAX_AGE,
+        path=settings.COOKIE_PATH,
+        domain=settings.COOKIE_DOMAIN or None,
+        secure=settings.COOKIE_SECURE,
+        httponly=True,
+        samesite=settings.COOKIE_SAMESITE,
+    )
+
+    return {
+        "access_token": access_token,
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    }
+
+
+@router.post(
+    "/resend-verification",
+    dependencies=[Depends(check_rate_limit)],
+)
+async def resend_verification(
+    payload: ResendVerificationSchema,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    Resend verification code and link to the given email address.
+    """
+    await auth_service.resend_verification_email(payload.email)
+    return {
+        "message": "If an unverified account exists for this email, a new verification code and link have been dispatched."
+    }
 
 
 @router.post(

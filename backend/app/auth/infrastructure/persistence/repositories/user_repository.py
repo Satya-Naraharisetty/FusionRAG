@@ -66,6 +66,7 @@ class SQLAlchemyUserRepository(UserRepository):
                 hashed_password=user.hashed_password,
                 role=user.role,
                 is_active=user.is_active,
+                is_verified=user.is_verified,
                 created_at=user.created_at,
                 updated_at=user.updated_at,
                 oauth_provider=user.oauth_provider,
@@ -77,6 +78,7 @@ class SQLAlchemyUserRepository(UserRepository):
             db_user.hashed_password = user.hashed_password
             db_user.role = user.role
             db_user.is_active = user.is_active
+            db_user.is_verified = user.is_verified
             db_user.updated_at = user.updated_at
             # Update OAuth fields if provided
             if user.oauth_provider is not None:

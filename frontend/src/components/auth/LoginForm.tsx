@@ -3,7 +3,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { authApi } from "../../api/auth";
 import { LoginCard } from "./LoginCard";
 import toast from "react-hot-toast";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   access_denied: "Google sign-in was cancelled.",
@@ -16,6 +16,7 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
 };
 
 export const LoginForm: React.FC = () => {
+  const navigate = useNavigate();
   const { login, loginWithGoogle, loginWithGithub } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [email, setEmail]             = useState("");
@@ -89,8 +90,26 @@ export const LoginForm: React.FC = () => {
       const e = err as {
         status?: number;
         message?: string;
-        data?: { message?: string; detail?: string; error?: { message?: string } };
+        data?: {
+          code?: string;
+          message?: string;
+          detail?: string;
+          error?: { code?: string; message?: string };
+        };
       };
+
+      const isUnverified =
+        e.status === 403 ||
+        e.data?.error?.code === "EMAIL_NOT_VERIFIED" ||
+        e.data?.code === "EMAIL_NOT_VERIFIED" ||
+        (e.message && e.message.toLowerCase().includes("verify your email"));
+
+      if (isUnverified) {
+        toast.error("Please verify your email address to log in.");
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+        return;
+      }
+
       const errorMessage =
         e.status === 429
           ? (typeof e.data?.detail === "string" ? e.data.detail : "Too many login attempts. Please wait 5 minutes and try again.")

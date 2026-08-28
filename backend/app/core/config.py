@@ -354,10 +354,12 @@ class Settings(BaseSettings):
     # Local: http://localhost:5173 | Production: https://hybrid-rag-frontend.vercel.app
     FRONTEND_URL: str = "http://localhost:5173"
 
-    # Transactional Email (Resend) & Magic Link
+    # Transactional Email (Resend) & Magic Link & Email Verification
     RESEND_API_KEY: str = ""
     RESEND_FROM_EMAIL: str = "onboarding@resend.dev"
     MAGIC_LINK_EXPIRE_MINUTES: int = 10
+    EMAIL_VERIFICATION_EXPIRE_MINUTES: int = 15
+    REQUIRE_EMAIL_VERIFICATION: bool = True
 
     # Conversation Memory & History-Aware Retrieval Configurations
     ENABLE_CONVERSATION_MEMORY: bool = True

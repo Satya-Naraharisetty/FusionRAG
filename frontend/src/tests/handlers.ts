@@ -15,8 +15,22 @@ const handlers = [
       email: "test@example.com",
       role: "admin",
       is_active: true,
+      is_verified: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+    });
+  }),
+
+  http.post("*/api/v1/auth/verify-email", () => {
+    return HttpResponse.json({
+      access_token: "mock-verified-token",
+      expires_in: 3600,
+    });
+  }),
+
+  http.post("*/api/v1/auth/resend-verification", () => {
+    return HttpResponse.json({
+      message: "Verification email dispatched",
     });
   }),
 

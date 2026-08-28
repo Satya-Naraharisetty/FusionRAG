@@ -36,6 +36,7 @@ jobs:
           cat > backend/.env <<EOF
           JWT_SECRET=$JWT_SECRET
           COOKIE_SECURE=False
+          REQUIRE_EMAIL_VERIFICATION=False
           DATABASE_URL=postgresql://postgres:postgres@postgres:5432/hybrid_rag
           POSTGRES_SERVER=postgres
           POSTGRES_PORT=5432

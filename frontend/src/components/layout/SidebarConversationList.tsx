@@ -156,7 +156,9 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
   useEffect(() => {
     if (activeId) {
       const idx = flatVisible.findIndex((c) => c.id === activeId);
-      if (idx !== -1) setKeyboardSelectIdx(idx);
+      setKeyboardSelectIdx(idx);
+    } else {
+      setKeyboardSelectIdx(-1);
     }
   }, [activeId, flatVisible]);
 

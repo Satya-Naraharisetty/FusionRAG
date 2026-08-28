@@ -168,7 +168,9 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
     path.includes("/auth/login") ||
     path.includes("/auth/register") ||
     path.includes("/auth/refresh") ||
-    path.includes("/auth/oauth");
+    path.includes("/auth/oauth") ||
+    path.includes("/auth/verify-email") ||
+    path.includes("/auth/resend-verification");
 
   if (response.status === 401 && !isAuthEndpoint) {
     if (isRefreshing) {

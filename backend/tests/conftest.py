@@ -15,6 +15,7 @@ os.environ["REDIS_HOST"] = "mock_redis"
 os.environ["QDRANT_HOST"] = "mock_qdrant"
 os.environ["GEMINI_API_KEY"] = "mock-gemini-key"
 os.environ["JWT_SECRET"] = "mock_secret_key_at_least_32_bytes_long_for_tests!"
+os.environ["REQUIRE_EMAIL_VERIFICATION"] = "false"
 os.environ["BACKEND_CORS_ORIGINS"] = (
     '["http://localhost:5173","http://127.0.0.1:5173","http://localhost","http://127.0.0.1"]'
 )
