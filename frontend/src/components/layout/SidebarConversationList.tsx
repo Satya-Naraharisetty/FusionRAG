@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Conversation } from "../../types";
 import { ConversationItem } from "../sidebar/ConversationItem";
 import { Folder, Tag } from "../../hooks/useLocalConversationMetadata";
+import { SidebarFolders } from "./SidebarFolders";
 import { useLocale } from "../../lib/messages";
 
 interface SidebarConversationListProps {
@@ -15,9 +16,9 @@ interface SidebarConversationListProps {
   folders: Folder[];
   tags: Record<string, Tag[]>;
   togglePin: (id: string) => void;
-  createFolder?: (name: string) => void;
-  renameFolder?: (id: string, name: string) => void;
-  deleteFolder?: (id: string) => void;
+  createFolder: (name: string) => void;
+  renameFolder: (id: string, name: string) => void;
+  deleteFolder: (id: string) => void;
   moveConversationToFolder: (conversationId: string, folderId: string | null) => void;
   addTag: (conversationId: string, tag: Tag) => void;
   removeTag: (conversationId: string, name: string) => void;
@@ -34,6 +35,9 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
   folders,
   tags,
   togglePin,
+  createFolder,
+  renameFolder,
+  deleteFolder,
   moveConversationToFolder,
   addTag,
   removeTag,
@@ -51,6 +55,18 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
     const q = searchQuery.toLowerCase();
     return conversations.filter((c) => c.title.toLowerCase().includes(q));
   }, [conversations, searchQuery]);
+
+  const folderConversations = useMemo(() => {
+    const map: Record<string, Conversation[]> = {};
+    folders.forEach((f) => {
+      map[f.id] = f.conversationIds
+        .map((id) => conversationMap.get(id))
+        .filter((c): c is Conversation =>
+          !!c && (!searchQuery.trim() || c.title.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+    });
+    return map;
+  }, [folders, conversationMap, searchQuery]);
 
   const sortedConversations = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -111,6 +127,29 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
 
   return (
     <div className="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-3 scrollbar-thin">
+      {/* ── Projects / Folders Section ── */}
+      {folders.length > 0 && (
+        <SidebarFolders
+          folders={folders}
+          folderConversations={folderConversations}
+          activeId={activeId}
+          onSelect={onSelect}
+          onRename={onRename}
+          onDelete={onDelete}
+          pinnedIds={pinnedIds}
+          tags={tags}
+          togglePin={togglePin}
+          createFolder={createFolder}
+          renameFolder={renameFolder}
+          deleteFolder={deleteFolder}
+          moveConversationToFolder={moveConversationToFolder}
+          addTag={addTag}
+          removeTag={removeTag}
+          keyboardSelectIdx={keyboardSelectIdx}
+          flatVisibleConversations={flatVisible}
+        />
+      )}
+
       {/* ── Pinned Section ── */}
       {pinned.length > 0 && (
         <div className="flex flex-col gap-0.5">

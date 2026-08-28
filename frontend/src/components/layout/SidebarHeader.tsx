@@ -21,6 +21,7 @@ interface SidebarHeaderProps {
   setSearchQuery: (query: string) => void;
   onNewChat: () => void;
   collapsed: boolean;
+  onOpenProjects?: () => void;
 }
 
 export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
@@ -28,6 +29,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   setSearchQuery,
   onNewChat,
   collapsed,
+  onOpenProjects,
 }) => {
   const { t } = useLocale();
   const navigate = useNavigate();
@@ -140,7 +142,13 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
 
       {/* ── Projects Link ── */}
       <button
-        onClick={() => navigate("/documents")}
+        onClick={() => {
+          if (onOpenProjects) {
+            onOpenProjects();
+          } else {
+            navigate("/documents");
+          }
+        }}
         className={cn(
           "w-full h-9 rounded-[var(--radius-lg)] flex items-center gap-3 px-3 cursor-pointer text-[13px] font-medium transition-colors text-left bg-transparent hover:bg-[var(--bg-tertiary)]/70 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
         )}

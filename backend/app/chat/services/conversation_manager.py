@@ -158,6 +158,19 @@ class ConversationManager:
         conversation.metadata.message_count = await self._message_repo.count_messages(
             conversation_id
         )
+        # If conversation still has default placeholder title, set immediate title from user's first query
+        if not conversation.title or conversation.title in (
+            "New Conversation",
+            "New Chat",
+            "Untitled",
+        ):
+            trimmed_q = question.strip()
+            conversation.title = (
+                (trimmed_q[:40] + "...")
+                if len(trimmed_q) > 40
+                else (trimmed_q or "New Conversation")
+            )
+
         await self._conversation_repo.update_conversation(conversation)
 
         # COMMIT the transaction to make the user message durable.
@@ -199,28 +212,35 @@ class ConversationManager:
             metadata=metadata,
         )
 
-        # 2. Check if we need to auto-generate the title (if conversation only has first user + assistant messages)
+        # 2. Check if we need to auto-generate the title (first turn)
         conversation = await self._conversation_repo.get_conversation(conversation_id)
-        if conversation and conversation.title == "New Conversation":
-            # Check message count
+        if conversation:
             count = await self._message_repo.count_messages(conversation_id)
-            if count == 2:
+            if count <= 4:
                 # Retrieve the messages
                 messages = await self._message_repo.get_recent_messages(
-                    conversation_id, limit=2
+                    conversation_id, limit=4
                 )
                 user_msg = next(
                     (m.content for m in messages if m.role == MessageRole.USER), None
                 )
                 if user_msg:
-                    new_title = await self._title_generator.generate_title(
-                        first_user_message=user_msg,
-                        assistant_answer=assistant_content,
-                    )
-                    conversation.title = new_title
-                    conversation = await self._conversation_repo.update_conversation(
-                        conversation
-                    )
+                    try:
+                        new_title = await self._title_generator.generate_title(
+                            first_user_message=user_msg,
+                            assistant_answer=assistant_content,
+                        )
+                        if new_title and new_title != "New Conversation":
+                            conversation.title = new_title
+                            conversation = (
+                                await self._conversation_repo.update_conversation(
+                                    conversation
+                                )
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to auto-generate title in finalize_message: %s", e
+                        )
 
         # 3. Update last message metadata
         if conversation:
