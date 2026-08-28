@@ -17,6 +17,7 @@ from app.auth.domain.schemas import (
     MagicLinkRequestSchema,
     ResendVerificationSchema,
     TokenResponseSchema,
+    UpdatePasswordSchema,
     UserCreateSchema,
     UserLoginSchema,
     UserResponseSchema,
@@ -260,6 +261,30 @@ async def get_me(
             detail="User account no longer exists",
         )
     return user
+
+
+@router.post(
+    "/password",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(check_rate_limit)],
+)
+async def update_password(
+    payload: UpdatePasswordSchema,
+    current_user: dict[str, Any] = Depends(get_current_user_context),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    Set or change password for the authenticated user.
+    If the account has an existing password, current_password must be provided and verified.
+    If the account has no password (OAuth-only), current_password is not required.
+    """
+    user_id = UUID(current_user["user_id"])
+    await auth_service.update_password(
+        user_id=user_id,
+        new_password=payload.new_password,
+        current_password=payload.current_password,
+    )
+    return {"message": "Password updated successfully"}
 
 
 @router.delete(

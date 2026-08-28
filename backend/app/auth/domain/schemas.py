@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
 
 # Banned common weak passwords as per modern NIST recommendations
 BANNED_PASSWORDS = {
@@ -36,15 +36,30 @@ class UserLoginSchema(BaseModel):
     password: str
 
 
+class UpdatePasswordSchema(BaseModel):
+    current_password: str | None = None
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_policy(cls, v: str) -> str:
+        """
+        Enforce backend password strength rules.
+        """
+        if v.lower() in BANNED_PASSWORDS:
+            raise ValueError("Password is too common and easily guessed.")
+        return v
+
+
 class DeleteAccountSchema(BaseModel):
     """
     Body for DELETE /auth/account.
 
-    Requires the account password to be re-entered so that a stolen access
-    token alone cannot destroy the account (account-takeover protection).
+    Requires the account password to be re-entered if the user has one,
+    so that a stolen access token alone cannot destroy the account (account-takeover protection).
     """
 
-    password: str
+    password: str | None = None
 
 
 class UserResponseSchema(BaseModel):
@@ -56,6 +71,7 @@ class UserResponseSchema(BaseModel):
     created_at: datetime
     updated_at: datetime
     oauth_provider: str | None = None
+    has_password: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -94,6 +110,11 @@ class UserDomain(BaseModel):
     oauth_sub: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def has_password(self) -> bool:
+        return bool(self.hashed_password)
 
 
 class SessionDomain(BaseModel):

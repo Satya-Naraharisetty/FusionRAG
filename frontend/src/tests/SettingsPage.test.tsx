@@ -134,3 +134,87 @@ describe("SettingsPage — Language switcher", () => {
     expect(englishBtn).toHaveAttribute("data-active", "true");
   });
 });
+
+describe("SettingsPage — Password Management", () => {
+  it("renders Change Password button when user already has a password", async () => {
+    renderSettings();
+    await screen.findByText("test@example.com");
+
+    expect(screen.getByText("Account Password")
+  ).toBeInTheDocument();
+    const changeBtn = screen.getByRole("button", { name: /^Change Password$/i });
+    expect(changeBtn).toBeInTheDocument();
+
+    fireEvent.click(changeBtn);
+    expect(screen.getByLabelText(/Current Password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^New Password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Confirm New Password/i)).toBeInTheDocument();
+  });
+
+  it("renders Set Password for OAuth user without a password", async () => {
+    server.use(
+      http.get("*/api/v1/auth/me", () => {
+        return HttpResponse.json({
+          id: "oauth-user-123",
+          email: "oauth@example.com",
+          role: "user",
+          is_active: true,
+          is_verified: true,
+          oauth_provider: "google",
+          has_password: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      })
+    );
+
+    renderSettings();
+    await screen.findByText("oauth@example.com");
+
+    expect(screen.getByText("Set Account Password")).toBeInTheDocument();
+    expect(screen.getByText(/You signed in via Google/i)).toBeInTheDocument();
+
+    const setBtn = screen.getByRole("button", { name: /^Set Password$/i });
+    fireEvent.click(setBtn);
+
+    // Should NOT ask for Current Password since OAuth user has none
+    expect(screen.queryByLabelText(/Current Password/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^Password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Confirm New Password/i)).toBeInTheDocument();
+  });
+
+  it("submits password update successfully", async () => {
+    let passwordUpdated = false;
+    server.use(
+      http.post("*/api/v1/auth/password", async ({ request }) => {
+        const body = (await request.json()) as { new_password?: string };
+        if (body.new_password === "NewSecurePass123!") {
+          passwordUpdated = true;
+        }
+        return HttpResponse.json({ message: "Password updated successfully" });
+      })
+    );
+
+    renderSettings();
+    await screen.findByText("test@example.com");
+
+    fireEvent.click(screen.getByRole("button", { name: /^Change Password$/i }));
+
+    fireEvent.change(screen.getByLabelText(/Current Password/i), {
+      target: { value: "OldPassword123!" },
+    });
+    fireEvent.change(screen.getByLabelText(/^New Password/i), {
+      target: { value: "NewSecurePass123!" },
+    });
+    fireEvent.change(screen.getByLabelText(/Confirm New Password/i), {
+      target: { value: "NewSecurePass123!" },
+    });
+
+    const updateBtn = screen.getByRole("button", { name: /^Update Password$/i });
+    expect(updateBtn).toBeEnabled();
+    fireEvent.click(updateBtn);
+
+    await waitFor(() => expect(passwordUpdated).toBe(true));
+  });
+});
+

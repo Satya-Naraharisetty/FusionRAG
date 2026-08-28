@@ -55,9 +55,16 @@ const handlers = [
       email: "test@example.com",
       role: "admin",
       is_active: true,
+      is_verified: true,
+      oauth_provider: null,
+      has_password: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
+  }),
+
+  http.post("*/api/v1/auth/password", () => {
+    return HttpResponse.json({ message: "Password updated successfully" });
   }),
 
   http.get("*/api/v1/conversations", () => {

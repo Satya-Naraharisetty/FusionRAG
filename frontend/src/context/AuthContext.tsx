@@ -29,7 +29,8 @@ export interface AuthContextType {
   }) => Promise<void>;
   resendVerification: (email: string) => Promise<{ message: string }>;
   logout: () => Promise<void>;
-  deleteAccount: (password: string) => Promise<void>;
+  updatePassword: (newPassword: string, currentPassword?: string) => Promise<void>;
+  deleteAccount: (password?: string) => Promise<void>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -150,7 +151,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [clearRefreshTimer]);
 
-  const deleteAccount = useCallback(async (password: string) => {
+  const updatePassword = useCallback(
+    async (newPassword: string, currentPassword?: string) => {
+      setIsLoading(true);
+      try {
+        await authApi.updatePassword(newPassword, currentPassword);
+        const updatedUser = await authApi.getMe();
+        setUser(updatedUser);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const deleteAccount = useCallback(async (password?: string) => {
     setIsLoading(true);
     try {
       await authApi.deleteAccount(password);
@@ -279,6 +294,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     verifyEmail,
     resendVerification,
     logout,
+    updatePassword,
     deleteAccount,
   };
 

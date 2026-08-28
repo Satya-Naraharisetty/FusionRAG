@@ -172,4 +172,22 @@ describe("ReauthDialog", () => {
     expect(screen.getByLabelText(/Type your email to confirm/i)).toHaveValue("");
     expect(screen.getByLabelText(/Re-enter your password/i)).toHaveValue("");
   });
+
+  it("skips the password input and gates on email only when requirePassword is false", async () => {
+    const onConfirm = vi.fn().mockResolvedValue(undefined);
+    renderDialog({ requirePassword: false, onConfirm });
+
+    expect(screen.queryByLabelText(/Re-enter your password/i)).toBeNull();
+
+    const confirm = screen.getByRole("button", { name: /^Confirm$/i });
+    expect(confirm).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/Type your email to confirm/i), {
+      target: { value: "test@example.com" },
+    });
+    expect(confirm).toBeEnabled();
+
+    fireEvent.click(confirm);
+    await vi.waitFor(() => expect(onConfirm).toHaveBeenCalledWith(undefined));
+  });
 });

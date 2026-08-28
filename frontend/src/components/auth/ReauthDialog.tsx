@@ -40,14 +40,16 @@ export interface ReauthDialogProps {
   accountEmail?: string;
   /** Require typing the account email in addition to the password. */
   requireEmail?: boolean;
+  /** Require typing the account password. Default is true. Set to false for OAuth-only users without a password. */
+  requirePassword?: boolean;
   /** Label of the confirm (destructive) button. */
   confirmLabel?: string;
   /** Label of the confirm button while the action is in flight. */
   submittingLabel?: string;
   /** Success toast shown after the action resolves. Omit for no toast. */
   successMessage?: string;
-  /** Runs with the re-entered password; reject to keep the dialog open. */
-  onConfirm: (password: string) => Promise<void>;
+  /** Runs with the re-entered password (or undefined if requirePassword is false); reject to keep the dialog open. */
+  onConfirm: (password?: string) => Promise<void>;
   /** Extra behavior after a successful confirmation (e.g. navigation). */
   onSuccess?: () => void;
   /** Per-error-code toast message overrides. */
@@ -73,6 +75,7 @@ const ReauthDialog: React.FC<ReauthDialogProps> = ({
   icon,
   accountEmail,
   requireEmail = true,
+  requirePassword = true,
   confirmLabel = "Confirm",
   submittingLabel = "Submitting…",
   successMessage,
@@ -95,19 +98,22 @@ const ReauthDialog: React.FC<ReauthDialogProps> = ({
   // sensitive action.
   useEffect(() => {
     if (open) {
-      const target = requireEmail ? emailRef.current : passwordRef.current;
+      const target = requireEmail ? emailRef.current : (requirePassword ? passwordRef.current : null);
       target?.focus();
     } else {
       setConfirmEmail("");
       setPassword("");
     }
-  }, [open, requireEmail]);
+  }, [open, requireEmail, requirePassword]);
 
   const emailMatches =
     !requireEmail ||
     Boolean(accountEmail && confirmEmail.trim().toLowerCase() === accountEmail.toLowerCase());
 
-  const canConfirm = !isSubmitting && password.length > 0 && emailMatches;
+  const canConfirm =
+    !isSubmitting &&
+    emailMatches &&
+    (!requirePassword || password.length > 0);
 
   const handleClose = () => {
     if (!isSubmitting) onOpenChange(false);
@@ -117,7 +123,7 @@ const ReauthDialog: React.FC<ReauthDialogProps> = ({
     if (!canConfirm) return;
     setIsSubmitting(true);
     try {
-      await onConfirm(password);
+      await onConfirm(requirePassword ? password : undefined);
       setConfirmEmail("");
       setPassword("");
       onOpenChange(false);
@@ -168,16 +174,18 @@ const ReauthDialog: React.FC<ReauthDialogProps> = ({
               className="mt-1"
             />
           )}
-          <Input
-            id={passwordInputId}
-            ref={passwordRef}
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            label="Re-enter your password"
-            autoComplete="current-password"
-            className="mt-1"
-          />
+          {requirePassword && (
+            <Input
+              id={passwordInputId}
+              ref={passwordRef}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              label="Re-enter your password"
+              autoComplete="current-password"
+              className="mt-1"
+            />
+          )}
           <DialogFooter className="gap-2">
             <Button
               type="button"

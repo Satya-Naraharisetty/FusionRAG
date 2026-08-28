@@ -9,6 +9,7 @@ export interface UserResponse {
   created_at: string;
   updated_at: string;
   oauth_provider: string | null;
+  has_password: boolean;
 }
 
 export interface TokenResponse {
@@ -68,11 +69,18 @@ export const authApi = {
     return api.get<UserResponse>("/auth/me");
   },
 
-  deleteAccount(password: string): Promise<void> {
-    // The backend requires the password to be re-entered (account-takeover
-    // protection). `api.delete` passes the body through raw, so stringify here.
+  updatePassword(newPassword: string, currentPassword?: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>("/auth/password", {
+      new_password: newPassword,
+      ...(currentPassword ? { current_password: currentPassword } : {}),
+    });
+  },
+
+  deleteAccount(password?: string): Promise<void> {
+    // The backend requires the password to be re-entered if the user has one.
+    // `api.delete` passes the body through raw, so stringify here.
     return api.delete("/auth/account", {
-      body: JSON.stringify({ password }),
+      body: JSON.stringify(password ? { password } : {}),
     });
   },
 

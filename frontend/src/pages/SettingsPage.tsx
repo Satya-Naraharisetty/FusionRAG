@@ -25,6 +25,7 @@ import {
   Languages,
   Globe,
   Sparkles,
+  KeyRound,
 } from "lucide-react";
 import {
   useLocale,
@@ -32,7 +33,9 @@ import {
   type LanguageOption,
 } from "../lib/messages";
 import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
 import { Avatar, AvatarFallback } from "../components/ui/Avatar";
+import { checkPasswordStrength } from "../lib/passwordStrength";
 import ReauthDialog from "../components/auth/ReauthDialog";
 import {
   Dialog,
@@ -134,7 +137,7 @@ const ToggleCheckbox: React.FC<{
 );
 
 const SettingsPage: React.FC = () => {
-  const { user, deleteAccount } = useAuth();
+  const { user, deleteAccount, updatePassword } = useAuth();
   const { theme, setTheme, fontSize, setFontSize, density, setDensity } = useTheme();
   const { locale, setLocale, t } = useLocale();
   const { data: conversationsData } = useConversations();
@@ -143,6 +146,48 @@ const SettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>("profile");
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(() => getNotificationPrefs());
   const [isClearingHistory, setIsClearingHistory] = useState(false);
+
+  // Password management state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+
+  const passwordStrength = useMemo(() => checkPasswordStrength(newPassword), [newPassword]);
+  const isNewPasswordValid = newPassword.length >= 8;
+  const doPasswordsMatch = newPassword === confirmPassword;
+  const canSubmitPassword =
+    !isUpdatingPassword &&
+    isNewPasswordValid &&
+    doPasswordsMatch &&
+    (!user?.has_password || currentPassword.length > 0);
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmitPassword) return;
+
+    if (newPassword !== confirmPassword) {
+      toast.error("New passwords do not match.");
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    try {
+      await updatePassword(newPassword, user?.has_password ? currentPassword : undefined);
+      toast.success(user?.has_password ? "Password updated successfully!" : "Password created successfully!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowPasswordForm(false);
+    } catch (err: unknown) {
+      const e = err as { data?: { error?: { message?: string } }; message?: string };
+      const detail = e?.data?.error?.message || e?.message || "Failed to update password.";
+      toast.error(detail);
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
 
   const navTabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
     { id: "profile", label: t("settings.tab.profile"), icon: <User size={14} /> },
@@ -312,11 +357,147 @@ const SettingsPage: React.FC = () => {
                       <span className="inline-flex items-center rounded-pill border border-(--accent-success)/20 bg-(--accent-success)/10 px-2 py-0.5 text-[10px] font-medium text-(--accent-success)">
                         Active
                       </span>
+                      {user?.oauth_provider && (
+                        <span className="inline-flex items-center rounded-pill border border-(--border-default) bg-(--bg-secondary) px-2 py-0.5 text-[10px] font-medium text-(--text-muted) capitalize">
+                          {user.oauth_provider}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
-                <div className="pt-4 text-xs text-(--text-muted)">
-                  To change your email or password, contact your administrator.
+
+                {/* Password / Security Management */}
+                <div className="border-b border-(--border-subtle) py-[calc(var(--space-factor,1)*20px)]">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <KeyRound size={15} className="text-(--text-muted)" />
+                        <h4 className="text-sm font-semibold text-(--text-primary)">
+                          {user?.has_password ? "Account Password" : "Set Account Password"}
+                        </h4>
+                      </div>
+                      <p className="mt-1 text-xs text-(--text-secondary)">
+                        {user?.has_password
+                          ? "Change your password to keep your account secure."
+                          : user?.oauth_provider
+                          ? `You signed in via ${user.oauth_provider.charAt(0).toUpperCase() + user.oauth_provider.slice(1)}. Set a password to also log in with email and password.`
+                          : "Set a password to enable email/password authentication."}
+                      </p>
+                    </div>
+                    {!showPasswordForm && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setShowPasswordForm(true)}
+                        className="shrink-0"
+                      >
+                        {user?.has_password ? "Change Password" : "Set Password"}
+                      </Button>
+                    )}
+                  </div>
+
+                  {showPasswordForm && (
+                    <form
+                      onSubmit={handlePasswordSubmit}
+                      className="mt-4 rounded-xl border border-(--border-default) bg-(--bg-secondary) p-4 space-y-3"
+                    >
+                      {user?.has_password && (
+                        <div>
+                          <Input
+                            id="settings-current-password"
+                            type="password"
+                            label="Current Password"
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            placeholder="••••••••"
+                            autoComplete="current-password"
+                            required
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <Input
+                          id="settings-new-password"
+                          type="password"
+                          label={user?.has_password ? "New Password" : "Password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="••••••••"
+                          autoComplete="new-password"
+                          required
+                        />
+                        {newPassword.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-(--text-muted)">Strength:</span>
+                              <span className="font-medium text-(--text-primary)">{passwordStrength.label}</span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-(--bg-tertiary)">
+                              <div
+                                className={`h-full transition-all duration-300 ${
+                                  passwordStrength.score <= 1
+                                    ? "bg-red-500 w-1/4"
+                                    : passwordStrength.score === 2
+                                    ? "bg-amber-500 w-2/4"
+                                    : passwordStrength.score === 3
+                                    ? "bg-blue-500 w-3/4"
+                                    : "bg-emerald-500 w-full"
+                                }`}
+                              />
+                            </div>
+                            {passwordStrength.feedback && (
+                              <p className="text-[10px] text-(--text-muted)">{passwordStrength.feedback}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <Input
+                          id="settings-confirm-password"
+                          type="password"
+                          label="Confirm New Password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="••••••••"
+                          autoComplete="new-password"
+                          required
+                          error={
+                            confirmPassword.length > 0 && newPassword !== confirmPassword
+                              ? "Passwords do not match"
+                              : undefined
+                          }
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={isUpdatingPassword}
+                          onClick={() => {
+                            setShowPasswordForm(false);
+                            setCurrentPassword("");
+                            setNewPassword("");
+                            setConfirmPassword("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="submit"
+                          variant="default"
+                          size="sm"
+                          loading={isUpdatingPassword}
+                          disabled={!canSubmitPassword}
+                        >
+                          {user?.has_password ? "Update Password" : "Set Password"}
+                        </Button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               </div>
             )}
@@ -721,14 +902,22 @@ const SettingsPage: React.FC = () => {
         title="Delete Account?"
         icon={<UserX size={15} className="text-(--accent-error)" />}
         description={
-          <>
-            This permanently deletes your account, all conversations, and documents. Type{" "}
-            <span className="font-mono text-(--text-primary)">{user?.email}</span> and your
-            password to confirm.
-          </>
+          user?.has_password ? (
+            <>
+              This permanently deletes your account, all conversations, and documents. Type{" "}
+              <span className="font-mono text-(--text-primary)">{user?.email}</span> and your
+              password to confirm.
+            </>
+          ) : (
+            <>
+              This permanently deletes your account, all conversations, and documents. Type{" "}
+              <span className="font-mono text-(--text-primary)">{user?.email}</span> to confirm.
+            </>
+          )
         }
         accountEmail={user?.email}
         requireEmail
+        requirePassword={user?.has_password ?? true}
         confirmLabel="Delete Account"
         submittingLabel="Deleting…"
         successMessage="Your account has been deleted."

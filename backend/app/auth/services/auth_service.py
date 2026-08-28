@@ -425,20 +425,61 @@ class AuthService:
             await self._uow.rollback()
             raise
 
-    async def verify_user_password(self, user_id: UUID, password: str) -> None:
+    async def update_password(
+        self,
+        user_id: UUID,
+        new_password: str,
+        current_password: str | None = None,
+    ) -> None:
+        """
+        Update or set a user's password.
+
+        If the user already has a password set, current_password is required and verified.
+        If the user is an OAuth-only user (no password set), current_password is not required.
+        """
+        try:
+            user = await self._user_repo.get_by_id(user_id)
+            if not user:
+                raise UserNotFoundException("User account no longer exists.")
+
+            if user.hashed_password:
+                if not current_password:
+                    raise InvalidCredentialsException("Current password is required.")
+                if not self._hasher.verify(current_password, user.hashed_password):
+                    raise InvalidCredentialsException("Current password is incorrect.")
+
+            new_hash = self._hasher.hash(new_password)
+            now = self._time_provider.get_now()
+            updated = UserDomain(
+                **{
+                    **user.model_dump(),
+                    "hashed_password": new_hash,
+                    "updated_at": now,
+                }
+            )
+            await self._user_repo.save(updated)
+            await self._uow.commit()
+        except Exception:
+            await self._uow.rollback()
+            raise
+
+    async def verify_user_password(
+        self, user_id: UUID, password: str | None = None
+    ) -> None:
         """
         Re-verify a user's password before a destructive action (account deletion).
+        If the account has no password set (OAuth-only), verification passes directly.
         """
         user = await self._user_repo.get_by_id(user_id)
         if not user:
             raise UserNotFoundException("User account no longer exists.")
-        if not user.hashed_password:
-            raise InvalidCredentialsException(
-                "This account uses Google Sign-In and has no password set. "
-                "Delete is not supported via password re-entry for OAuth accounts."
-            )
-        if not self._hasher.verify(password, user.hashed_password):
-            raise InvalidCredentialsException("Invalid email or password.")
+        if user.hashed_password:
+            if not password:
+                raise InvalidCredentialsException(
+                    "Password is required to delete account."
+                )
+            if not self._hasher.verify(password, user.hashed_password):
+                raise InvalidCredentialsException("Invalid email or password.")
 
     async def delete_user(self, user_id: UUID) -> None:
         """
