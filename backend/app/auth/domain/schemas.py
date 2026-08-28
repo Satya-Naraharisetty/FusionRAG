@@ -2,7 +2,14 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    computed_field,
+    field_validator,
+)
 
 # Banned common weak passwords as per modern NIST recommendations
 BANNED_PASSWORDS = {
@@ -112,7 +119,6 @@ class UserDomain(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     @computed_field
-    @property
     def has_password(self) -> bool:
         return bool(self.hashed_password)
 

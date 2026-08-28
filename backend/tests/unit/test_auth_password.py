@@ -4,7 +4,9 @@ from uuid import uuid4
 
 import pytest
 
-from app.auth.domain.exceptions import InvalidCredentialsException, UserNotFoundException
+from app.auth.domain.exceptions import (
+    InvalidCredentialsException,
+)
 from app.auth.domain.schemas import (
     UpdatePasswordSchema,
     UserDomain,
@@ -168,7 +170,9 @@ async def test_update_password_requires_current_password_if_set(mock_auth_deps):
     )
     user_repo.get_by_id.return_value = local_user
 
-    with pytest.raises(InvalidCredentialsException, match="Current password is required"):
+    with pytest.raises(
+        InvalidCredentialsException, match="Current password is required"
+    ):
         await service.update_password(
             user_id=user_id,
             new_password="NewSecurePassword123!",
@@ -194,7 +198,9 @@ async def test_update_password_wrong_current_password_fails(mock_auth_deps):
     )
     user_repo.get_by_id.return_value = local_user
 
-    with pytest.raises(InvalidCredentialsException, match="Current password is incorrect"):
+    with pytest.raises(
+        InvalidCredentialsException, match="Current password is incorrect"
+    ):
         await service.update_password(
             user_id=user_id,
             new_password="NewSecurePassword123!",
@@ -247,7 +253,9 @@ async def test_verify_user_password_requires_password_if_user_has_one(mock_auth_
         await service.verify_user_password(user_id=user_id, password=None)
 
     with pytest.raises(InvalidCredentialsException, match="Invalid email or password"):
-        await service.verify_user_password(user_id=user_id, password="WrongPassword123!")
+        await service.verify_user_password(
+            user_id=user_id, password="WrongPassword123!"
+        )
 
     # Correct password succeeds
     await service.verify_user_password(user_id=user_id, password="MyPassword123!")
