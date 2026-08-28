@@ -20,6 +20,7 @@ import {
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { cn } from "@/lib/utils";
+import { useLocale } from "../../lib/messages";
 
 interface SidebarFoldersProps {
   folders: Folder[];
@@ -60,6 +61,7 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
   keyboardSelectIdx,
   flatVisibleConversations,
 }) => {
+  const { t } = useLocale();
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
     "folder-general":  true,
     "folder-research": true,
@@ -99,13 +101,13 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
         {/* Section header */}
         <div className="flex items-center justify-between px-1 py-1.5">
           <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-            Folders
+            {t("nav.folders")}
           </span>
           <button
             onClick={() => { setRenamingFolderId(null); setNewFolderName(""); setShowFolderModal(true); }}
             className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-0.5 rounded cursor-pointer transition-colors"
-            title="New folder"
-            aria-label="Create new folder"
+            title={t("nav.createFolder")}
+            aria-label={t("nav.createFolder")}
           >
             <FolderPlus size={13} />
           </button>
@@ -162,16 +164,16 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
                         setShowFolderModal(true);
                       }}
                       className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] cursor-pointer transition-colors"
-                      title="Rename folder"
-                      aria-label={`Rename ${folder.name}`}
+                      title={t("nav.rename")}
+                      aria-label={`${t("nav.rename")} ${folder.name}`}
                     >
                       <Edit size={11} />
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }}
                       className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent-error)] hover:bg-red-500/10 cursor-pointer transition-colors"
-                      title="Delete folder"
-                      aria-label={`Delete ${folder.name}`}
+                      title={t("nav.delete")}
+                      aria-label={`${t("nav.delete")} ${folder.name}`}
                     >
                       <Trash2 size={11} />
                     </button>
@@ -183,7 +185,7 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
                   <div className="ml-5 pl-2.5 border-l border-[var(--border-subtle)] mt-0.5 mb-1 flex flex-col gap-0.5">
                     {nested.length === 0 ? (
                       <p className="py-2 px-2 text-[11px] text-[var(--text-muted)] italic">
-                        No conversations yet
+                        {t("nav.noConversations")}
                       </p>
                     ) : (
                       nested.map((c) => {

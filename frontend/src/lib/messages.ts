@@ -1,50 +1,60 @@
-/**
- * Centralized user-facing copy, keyed by stable message id so components never
- * embed strings. This is the i18n seam: every locale is a dict with the same
- * keys (enforced by the `Record<MessageKey, string>` type — a locale missing a
- * key or adding an unknown one fails to compile), and `t` resolves against the
- * active locale. `setLocale` switches it at runtime; components call `t` with
- * no locale argument, so translating never touches component code.
- *
- * The active locale is resolved once at module load: a persisted choice in
- * localStorage wins, otherwise the browser language is auto-detected
- * (English fallback). `setLocale` switches it at runtime and persists the
- * choice. The app ships English and French.
- */
-
-export type Locale = "en" | "fr";
+import { useSyncExternalStore } from "react";
 
 const en = {
-  // Chat-scoped attachment chips strip (ConversationDocumentChips) and the
-  // composer's in-flight upload tray (ChatInput).
+  // Navigation & Sidebar
+  "nav.newChat": "New Chat",
+  "nav.documents": "Documents",
+  "nav.conversations": "Conversations",
+  "nav.searchPlaceholder": "Search conversations...",
+  "nav.folders": "Folders",
+  "nav.pinned": "Pinned",
+  "nav.settings": "Settings",
+  "nav.logout": "Log out",
+  "nav.admin": "Admin Dashboard",
+  "nav.today": "Today",
+  "nav.yesterday": "Yesterday",
+  "nav.last7Days": "Previous 7 days",
+  "nav.older": "Older",
+  "nav.noConversations": "No conversations yet",
+  "nav.createFolder": "New folder",
+  "nav.rename": "Rename",
+  "nav.delete": "Delete",
+  "nav.pin": "Pin conversation",
+  "nav.unpin": "Unpin conversation",
+  "nav.moveToFolder": "Move to folder",
+
+  // Chat-scoped attachment chips strip & composer
   "chatFiles.header": "Chat files — only this conversation can use them",
-  "chatFiles.caption":
-    "Only usable in this chat — deleted with the conversation.",
+  "chatFiles.caption": "Only usable in this chat — deleted with the conversation.",
   "chatFiles.tooltip": "Only this chat can use this file",
   "chatFiles.removeAria": "Remove {filename} from this chat",
 
-  // Composer copy (ChatInput).
+  // Composer copy
   "chat.offlineWarning": "Sending disabled — you are offline.",
-  "chat.documentMode":
-    "Document mode — answers will prioritize your uploaded documents",
+  "chat.documentMode": "Document mode — answers will prioritize your uploaded documents",
   "chat.uploadLimit": "You can attach up to {max} files per message.",
-  "chat.uploadRoomOne":
-    "Only {room} more attachment can be added (max {max}).",
-  "chat.uploadRoomOther":
-    "Only {room} more attachments can be added (max {max}).",
+  "chat.uploadRoomOne": "Only {room} more attachment can be added (max {max}).",
+  "chat.uploadRoomOther": "Only {room} more attachments can be added (max {max}).",
   "chat.uploadFailed": "Upload failed",
-
-  // Settings page (SettingsPage).
-  "settings.language": "Language",
-  "settings.languageDescription": "Interface language for the app.",
-
-  // Composer placeholders + slash command palette (ChatInput).
   "chat.placeholderDefault": "Message Hybrid RAG...",
   "chat.placeholderStreaming": "AI is responding...",
   "chat.placeholderDrop": "Drop files here to attach...",
   "chat.commandSearchPlaceholder": "Search commands…",
   "chat.commandEmpty": "No commands found.",
 
+  // Empty chat view
+  "chat.emptyHeading": "How can I help you today?",
+  "chat.emptySub": "Upload PDF, TXT, DOCX, MD, or image files to your library, then ask questions to retrieve grounded insights.",
+  "chat.example1": "Summarize my documents",
+  "chat.example1Prompt": "Can you provide a comprehensive summary of my uploaded documents?",
+  "chat.example2": "Explain this concept",
+  "chat.example2Prompt": "Explain how our retrieval pipeline merges vector and sparse results.",
+  "chat.example3": "Search my knowledge base",
+  "chat.example3Prompt": "Find all key references to security policies inside the documents.",
+  "chat.example4": "Compare these documents",
+  "chat.example4Prompt": "Compare the architecture guidelines in file A and file B.",
+
+  // Commands
   "commands.documents.label": "Documents priority",
   "commands.documents.description": "Prioritize your uploaded documents",
   "commands.search.label": "Search documents",
@@ -59,100 +69,131 @@ const en = {
   "commands.code.description": "Generate or explain code",
   "commands.settings.label": "Settings",
   "commands.settings.description": "Open settings panel",
+
+  // Settings page
+  "settings.title": "Settings",
+  "settings.subtitle": "Manage your preferences, appearance, and account.",
+  "settings.tab.profile": "Profile",
+  "settings.tab.appearance": "Appearance",
+  "settings.tab.notifications": "Notifications",
+  "settings.tab.conversation": "Conversation",
+  "settings.tab.data": "Data & Privacy",
+
+  "settings.profile.title": "Profile",
+  "settings.profile.desc": "Manage your account identity and credentials.",
+  "settings.profile.email": "Email Address",
+  "settings.profile.role": "Role",
+  "settings.profile.id": "Account ID",
+  "settings.profile.joined": "Joined",
+  "settings.profile.dangerZone": "Danger Zone",
+  "settings.profile.deleteAccount": "Delete Account",
+  "settings.profile.deleteAccountDesc": "Permanently remove your account and all associated data.",
+
+  "settings.appearance.title": "Appearance",
+  "settings.appearance.desc": "Customize the visual presentation of the application.",
+  "settings.appearance.theme": "Theme",
+  "settings.appearance.themeDark": "Dark",
+  "settings.appearance.themeLight": "Light",
+  "settings.appearance.themeSystem": "System",
+  "settings.appearance.themeHighContrast": "High Contrast",
+  "settings.appearance.density": "Interface Density",
+  "settings.appearance.densityComfortable": "Comfortable",
+  "settings.appearance.densityCozy": "Cozy",
+  "settings.appearance.densityCompact": "Compact",
+  "settings.language": "Language",
+  "settings.languageDescription": "Interface language for the app.",
+
+  "settings.notifications.title": "Notifications",
+  "settings.notifications.desc": "Control how and when you receive alerts.",
+  "settings.notifications.desktop": "Desktop Notifications",
+  "settings.notifications.desktopDesc": "Show browser push notifications when responses complete.",
+  "settings.notifications.sound": "Sound Alerts",
+  "settings.notifications.soundDesc": "Play an audio chime when an AI response completes.",
+
+  "settings.conversation.title": "Conversation Defaults",
+  "settings.conversation.desc": "Adjust how models and retrieval algorithms behave.",
+  "settings.conversation.temperature": "Temperature",
+  "settings.conversation.temperatureDesc": "Controls randomness: lower is deterministic, higher is creative.",
+  "settings.conversation.strict": "Strict",
+  "settings.conversation.creative": "Creative",
+  "settings.conversation.topK": "Retrieval Top K",
+  "settings.conversation.topKDesc": "Maximum chunks retrieved for context.",
+  "settings.conversation.mode": "Retrieval Mode",
+  "settings.conversation.modeDesc": "The search strategy used to ground responses.",
+  "settings.conversation.stream": "Stream Responses",
+  "settings.conversation.streamDesc": "Render responses token by token as they generate.",
+  "settings.conversation.hybrid": "Hybrid Search",
+  "settings.conversation.hybridDesc": "Combine dense embeddings and BM25 sparse lexical search.",
+  "settings.conversation.reset": "Reset Defaults",
+
+  "settings.data.title": "Data & Privacy",
+  "settings.data.desc": "Manage your local data, exports, and history.",
+  "settings.data.clearHistory": "Clear Conversation History",
+  "settings.data.clearHistoryDesc": "Permanently delete all your chat conversations.",
+  "settings.data.export": "Export Configuration",
+  "settings.data.exportDesc": "Download a JSON backup of your application settings.",
+  "settings.data.import": "Import Configuration",
+  "settings.data.importDesc": "Restore settings from a previously exported JSON backup.",
+
+  // Documents Page
+  "docs.title": "Documents",
+  "docs.subtitle": "Upload and manage reference documents for grounded AI search.",
+  "docs.upload": "Upload Documents",
+  "docs.searchPlaceholder": "Search documents by title...",
+  "docs.dropzoneText": "Drag & drop files here or click to browse",
+  "docs.empty": "No documents uploaded yet",
+  "docs.emptySub": "Upload PDF, TXT, MD, or DOCX files to get started.",
 } as const;
 
 export type MessageKey = keyof typeof en;
 
+export type Locale = "en";
+
+export interface LanguageOption {
+  code: string;
+  name: string;
+  nativeName: string;
+  flag: string;
+  status: "available" | "coming-soon";
+}
+
+export const LANGUAGE_OPTIONS: LanguageOption[] = [
+  { code: "en", name: "English", nativeName: "English", flag: "🇬🇧", status: "available" },
+  { code: "es", name: "Spanish", nativeName: "Español", flag: "🇪🇸", status: "coming-soon" },
+  { code: "fr", name: "French", nativeName: "Français", flag: "🇫🇷", status: "coming-soon" },
+  { code: "de", name: "German", nativeName: "Deutsch", flag: "🇩🇪", status: "coming-soon" },
+  { code: "hi", name: "Hindi", nativeName: "हिन्दी", flag: "🇮🇳", status: "coming-soon" },
+  { code: "te", name: "Telugu", nativeName: "తెలుగు", flag: "🇮🇳", status: "coming-soon" },
+  { code: "ja", name: "Japanese", nativeName: "日本語", flag: "🇯🇵", status: "coming-soon" },
+  { code: "zh", name: "Chinese", nativeName: "简体中文", flag: "🇨🇳", status: "coming-soon" },
+];
+
+export const SUPPORTED_LOCALES: { value: Locale; label: string }[] = [
+  { value: "en", label: "English" },
+];
+
 const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
   en,
-  fr: {
-    "chatFiles.header":
-      "Fichiers de conversation — seule cette conversation peut les utiliser",
-    "chatFiles.caption":
-      "Utilisables uniquement dans cette conversation — supprimés avec la conversation.",
-    "chatFiles.tooltip": "Seule cette conversation peut utiliser ce fichier",
-    "chatFiles.removeAria": "Retirer {filename} de cette conversation",
-    "chat.offlineWarning": "Envoi désactivé — vous êtes hors ligne.",
-    "chat.documentMode":
-      "Mode documents — les réponses privilégieront vos documents téléversés",
-    "chat.uploadLimit":
-      "Vous pouvez joindre jusqu'à {max} fichiers par message.",
-    "chat.uploadRoomOne":
-      "Vous pouvez encore ajouter {room} pièce jointe (max {max}).",
-    "chat.uploadRoomOther":
-      "Vous pouvez encore ajouter {room} pièces jointes (max {max}).",
-    "chat.uploadFailed": "Échec du téléversement",
-    "settings.language": "Langue",
-    "settings.languageDescription": "Langue de l'interface de l'application.",
-    "chat.placeholderDefault": "Écrivez votre message…",
-    "chat.placeholderStreaming": "L'IA répond…",
-    "chat.placeholderDrop": "Déposez des fichiers pour les joindre…",
-    "chat.commandSearchPlaceholder": "Rechercher des commandes…",
-    "chat.commandEmpty": "Aucune commande trouvée.",
-
-    "commands.documents.label": "Priorité documents",
-    "commands.documents.description": "Priorise vos documents téléversés",
-    "commands.search.label": "Rechercher dans les documents",
-    "commands.search.description": "Interroger votre base de connaissances",
-    "commands.summarize.label": "Résumer",
-    "commands.summarize.description": "Résumer les documents sélectionnés",
-    "commands.explain.label": "Expliquer un concept",
-    "commands.explain.description": "Obtenir une explication détaillée",
-    "commands.compare.label": "Comparer",
-    "commands.compare.description": "Comparer deux documents",
-    "commands.code.label": "Assistant code",
-    "commands.code.description": "Générer ou expliquer du code",
-    "commands.settings.label": "Paramètres",
-    "commands.settings.description": "Ouvrir le panneau des paramètres",
-  },
 };
 
-/**
- * Map a BCP-47 language tag (e.g. "fr-FR") to the closest supported locale,
- * falling back to English for unknown tags and missing input.
- */
-export function detectLocale(language: string | undefined): Locale {
-  if (!language) return "en";
-  const base = language.toLowerCase().split("-")[0];
-  return base === "fr" ? "fr" : "en";
+export function detectLocale(_language: string | undefined): Locale {
+  return "en";
 }
 
-function readNavigatorLanguage(): string | undefined {
-  if (typeof navigator === "undefined") return undefined;
-  return navigator.languages?.[0] ?? navigator.language;
-}
-
-// Where the chosen locale is persisted so it survives reloads.
 export const LOCALE_STORAGE_KEY = "locale";
 
-function readStoredLocale(): Locale | undefined {
-  if (typeof localStorage === "undefined") return undefined;
-  const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
-  return stored === "en" || stored === "fr" ? stored : undefined;
-}
+let activeLocale: Locale = "en";
 
-// Seed the active locale once, at module load: a persisted choice wins,
-// otherwise auto-detect from the browser language.
-let activeLocale: Locale =
-  readStoredLocale() ?? detectLocale(readNavigatorLanguage());
+const listeners = new Set<() => void>();
 
-// Self-named labels per locale; keyed by Locale so adding a locale to the
-// union forces a label here (and in the switcher below).
-const LOCALE_LABELS: Record<Locale, string> = {
-  en: "English",
-  fr: "Français",
-};
-
-/** Locales offered in the UI, labeled in their own language. */
-export const SUPPORTED_LOCALES: { value: Locale; label: string }[] = (
-  Object.keys(LOCALE_LABELS) as Locale[]
-).map((value) => ({ value, label: LOCALE_LABELS[value] }));
-
-/** Switch the active locale for all future `t` calls (and persist it). */
 export function setLocale(locale: Locale): void {
   activeLocale = locale;
   if (typeof localStorage !== "undefined") {
     localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+  }
+  listeners.forEach((listener) => listener());
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("localechange", { detail: locale }));
   }
 }
 
@@ -160,14 +201,29 @@ export function getLocale(): Locale {
   return activeLocale;
 }
 
+export function subscribeLocale(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function useLocale(): {
+  locale: Locale;
+  setLocale: (locale: Locale) => void;
+  t: typeof t;
+} {
+  const locale = useSyncExternalStore(subscribeLocale, getLocale, getLocale);
+  return { locale, setLocale, t };
+}
+
 export function t(
   key: MessageKey,
   params?: Record<string, string | number>
 ): string {
-  let str = MESSAGES[activeLocale][key];
+  let str = MESSAGES[activeLocale]?.[key] ?? MESSAGES.en[key] ?? String(key);
   if (params) {
     for (const [name, value] of Object.entries(params)) {
-      // split/join instead of replaceAll to stay safe across TS lib targets.
       str = str.split(`{${name}}`).join(String(value));
     }
   }

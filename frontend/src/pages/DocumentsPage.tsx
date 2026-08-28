@@ -27,6 +27,7 @@ import {
   DialogFooter,
 } from "../components/ui/Modal";
 import toast from "react-hot-toast";
+import { useLocale } from "../lib/messages";
 
 interface DocFolder {
   id: string;
@@ -34,6 +35,7 @@ interface DocFolder {
 }
 
 const DocumentsPage: React.FC = () => {
+  const { t } = useLocale();
   const { data: documents = [], isLoading, error } = useDocuments();
   const embeddingStatus     = useEmbeddingStatus();
   const deleteMutation       = useDeleteDocument();
@@ -212,10 +214,10 @@ const DocumentsPage: React.FC = () => {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-(--text-primary)">
-              Documents
+              {t("docs.title")}
             </h1>
             <p className="mt-1 text-sm text-(--text-secondary)">
-              Manage your knowledge base. Upload documents to query them in chat.
+              {t("docs.subtitle")}
             </p>
           </div>
 

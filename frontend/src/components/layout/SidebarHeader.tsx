@@ -13,6 +13,8 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 
+import { useLocale } from "../../lib/messages";
+
 interface SidebarHeaderProps {
   conversations: Conversation[];
   searchQuery: string;
@@ -28,6 +30,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   onNewChat,
   collapsed,
 }) => {
+  const { t } = useLocale();
   const navigate = useNavigate();
   const location = useLocation();
   const isDocumentsActive = location.pathname === "/documents";
@@ -38,7 +41,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
 
   const documentsTooltip = busy
     ? `${pipeline.detail ?? "Documents are processing…"} · ${pipeline.progress}%`
-    : `Documents — ${documents.length} file${documents.length === 1 ? "" : "s"}`;
+    : `${t("nav.documents")} — ${documents.length} file${documents.length === 1 ? "" : "s"}`;
 
   if (collapsed) {
     return (
@@ -99,7 +102,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
         )}
       >
         <Plus size={16} className="flex-shrink-0 text-[var(--text-secondary)]" />
-        <span>New Chat</span>
+        <span>{t("nav.newChat")}</span>
       </button>
 
       {/* Documents Button */}
@@ -125,7 +128,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
                     </span>
                   )}
                 </span>
-                <span>Documents</span>
+                <span>{t("nav.documents")}</span>
               </div>
               <span className="text-[11px] font-mono font-medium text-[var(--text-muted)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] px-1.5 py-0.5 rounded-[var(--radius-sm)] flex-shrink-0">
                 {documents.length}
@@ -141,7 +144,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
 
       {/* Section label */}
       <div className="flex items-center justify-between px-1 pt-1 text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
-        <span>Conversations</span>
+        <span>{t("nav.conversations")}</span>
         <span className="font-mono text-[10px]">{conversations.length}</span>
       </div>
 
@@ -159,7 +162,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
           onKeyDown={(e) => {
             if (e.key === "Escape") setSearchQuery("");
           }}
-          placeholder="Search conversations..."
+          placeholder={t("nav.searchPlaceholder")}
           className="w-full h-9 bg-[var(--bg-input)] border border-[var(--border-default)] hover:border-[var(--border-hover)] rounded-[var(--radius-lg)] pl-8 pr-12 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent-primary)]/50 focus:ring-2 focus:ring-[var(--accent-primary)]/20 transition-all"
         />
         {/* Keyboard shortcut hint */}

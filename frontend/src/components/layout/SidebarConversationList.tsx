@@ -5,6 +5,7 @@ import { ConversationItem } from "../sidebar/ConversationItem";
 import { Folder, Tag } from "../../hooks/useLocalConversationMetadata";
 import { isToday, isYesterday, subDays, isAfter } from "../../lib/utils";
 import { SidebarFolders } from "./SidebarFolders";
+import { useLocale } from "../../lib/messages";
 
 interface SidebarConversationListProps {
   conversations: Conversation[];
@@ -25,13 +26,6 @@ interface SidebarConversationListProps {
   removeTag: (conversationId: string, name: string) => void;
 }
 
-const GROUP_LABELS: Record<string, string> = {
-  today:    "Today",
-  yesterday:"Yesterday",
-  last7Days:"Previous 7 Days",
-  older:    "Older",
-};
-
 export const SidebarConversationList: React.FC<SidebarConversationListProps> = ({
   conversations,
   activeId,
@@ -50,6 +44,14 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
   addTag,
   removeTag,
 }) => {
+  const { t } = useLocale();
+
+  const groupLabels: Record<string, string> = {
+    today: t("nav.today"),
+    yesterday: t("nav.yesterday"),
+    last7Days: t("nav.last7Days"),
+    older: t("nav.older"),
+  };
   const [expandedFolders] = useState<Record<string, boolean>>({
     "folder-general":  true,
     "folder-research": true,
@@ -170,7 +172,7 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-1.5 px-1 pb-1 text-[10px] font-semibold text-amber-500 uppercase tracking-wider">
             <Pin size={9} className="fill-current flex-shrink-0" />
-            <span>Pinned</span>
+            <span>{t("nav.pinned")}</span>
           </div>
           {pinned.map((c, i) => (
             <ConversationItem
@@ -222,7 +224,7 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
           return (
             <div key={key} className="flex flex-col gap-0.5">
               <div className="px-1 pb-1 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                {GROUP_LABELS[key]}
+                {groupLabels[key]}
               </div>
               {group.map((c) => {
                 const globalIdx = flatVisible.findIndex((v) => v.id === c.id);

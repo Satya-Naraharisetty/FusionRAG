@@ -1,18 +1,21 @@
 import React from "react";
 import { ArrowRight } from "lucide-react";
+import { useLocale } from "../../lib/messages";
 
 interface EmptyChatProps {
   onSelectPrompt: (prompt: string) => void;
 }
 
-const EXAMPLES = [
-  { label: "Summarize my documents",    prompt: "Can you provide a comprehensive summary of my uploaded documents?",            icon: "📄" },
-  { label: "Explain this concept",      prompt: "Explain how our retrieval pipeline merges vector and sparse results.",          icon: "💡" },
-  { label: "Search my knowledge base",  prompt: "Find all key references to security policies inside the documents.",            icon: "🔍" },
-  { label: "Compare these documents",   prompt: "Compare the architecture guidelines in file A and file B.",                     icon: "⚖️" },
-];
-
 export const EmptyChat: React.FC<EmptyChatProps> = ({ onSelectPrompt }) => {
+  const { t } = useLocale();
+
+  const examples = [
+    { label: t("chat.example1"), prompt: t("chat.example1Prompt"), icon: "📄" },
+    { label: t("chat.example2"), prompt: t("chat.example2Prompt"), icon: "💡" },
+    { label: t("chat.example3"), prompt: t("chat.example3Prompt"), icon: "🔍" },
+    { label: t("chat.example4"), prompt: t("chat.example4Prompt"), icon: "⚖️" },
+  ];
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8 select-none">
       <div className="w-full max-w-[580px] flex flex-col items-center text-center">
@@ -24,21 +27,17 @@ export const EmptyChat: React.FC<EmptyChatProps> = ({ onSelectPrompt }) => {
 
         {/* Heading with gradient accent */}
         <h2 className="animate-fade-in-up stagger-1 text-[28px] font-semibold tracking-tight text-[var(--text-primary)] font-title leading-tight mb-3">
-          How can I{" "}
-          <span className="bg-[image:var(--gradient-main)] bg-clip-text text-transparent">
-            help you
-          </span>{" "}
-          today?
+          {t("chat.emptyHeading")}
         </h2>
 
         {/* Supporting text */}
         <p className="animate-fade-in-up stagger-2 text-[15px] leading-relaxed text-[var(--text-secondary)] max-w-[440px] mb-8">
-          Upload PDF, TXT, DOCX, MD, or image files to your library, then ask questions to retrieve grounded insights.
+          {t("chat.emptySub")}
         </p>
 
         {/* Prompt grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full">
-          {EXAMPLES.map((item, idx) => (
+          {examples.map((item, idx) => (
             <button
               key={idx}
               onClick={() => onSelectPrompt(item.prompt)}

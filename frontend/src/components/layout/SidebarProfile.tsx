@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/Dropdown";
 import { cn } from "../../lib/utils";
+import { useLocale } from "../../lib/messages";
 
 interface SidebarProfileProps {
   user: { email: string; role: string } | null;
@@ -18,6 +19,7 @@ interface SidebarProfileProps {
 }
 
 export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, collapsed }) => {
+  const { t } = useLocale();
   const navigate = useNavigate();
   const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : "US";
 
@@ -66,7 +68,7 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, co
             className="gap-2 cursor-pointer"
           >
             <Settings size={13} />
-            <span>Settings</span>
+            <span>{t("nav.settings")}</span>
           </DropdownMenuItem>
 
           {user?.role === "admin" && (
@@ -75,7 +77,7 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, co
               className="gap-2 cursor-pointer"
             >
               <Activity size={13} className="text-[var(--accent-primary)]" />
-              <span>Admin Console</span>
+              <span>{t("nav.admin")}</span>
             </DropdownMenuItem>
           )}
 
@@ -86,7 +88,7 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, co
             className="gap-2 text-[var(--accent-error)] focus:bg-red-500/10 focus:text-red-400 cursor-pointer"
           >
             <LogOut size={13} />
-            <span>Sign out</span>
+            <span>{t("nav.logout")}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

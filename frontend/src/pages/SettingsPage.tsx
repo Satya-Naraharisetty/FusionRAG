@@ -23,13 +23,13 @@ import {
   Download,
   Upload,
   Languages,
+  Globe,
+  Sparkles,
 } from "lucide-react";
 import {
-  getLocale,
-  setLocale,
-  SUPPORTED_LOCALES,
-  t,
-  type Locale,
+  useLocale,
+  LANGUAGE_OPTIONS,
+  type LanguageOption,
 } from "../lib/messages";
 import { Button } from "../components/ui/Button";
 import { Avatar, AvatarFallback } from "../components/ui/Avatar";
@@ -61,14 +61,6 @@ const DEFAULT_VALUES: ConversationDefaults = {
 };
 
 type TabId = "profile" | "appearance" | "notifications" | "advanced" | "data";
-
-const NAV_TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
-  { id: "profile",       label: "Profile",       icon: <User size={14} /> },
-  { id: "appearance",    label: "Appearance",     icon: <Palette size={14} /> },
-  { id: "notifications", label: "Notifications",  icon: <Bell size={14} /> },
-  { id: "advanced",      label: "Conversation",   icon: <Sliders size={14} /> },
-  { id: "data",          label: "Data & Privacy", icon: <Database size={14} /> },
-];
 
 /* ── Shared section header ── */
 const SectionHeader: React.FC<{
@@ -112,20 +104,18 @@ const SettingRow: React.FC<{
 /* ── Checkbox toggle styled to tokens ── */
 const ToggleCheckbox: React.FC<{
   checked: boolean;
-  onChange: (val: boolean) => void;
-  label: string;
+  onChange: (checked: boolean) => void;
   disabled?: boolean;
-}> = ({ checked, onChange, label, disabled = false }) => (
-  <label
-    className={`relative inline-flex items-center cursor-pointer select-none ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
-    aria-label={label}
-  >
+  label: string;
+}> = ({ checked, onChange, disabled = false, label }) => (
+  <label className="relative inline-flex items-center cursor-pointer select-none">
     <input
       type="checkbox"
+      className="sr-only peer"
       checked={checked}
       onChange={(e) => onChange(e.target.checked)}
       disabled={disabled}
-      className="sr-only"
+      aria-label={label}
     />
     <div
       className={`w-9 h-5 rounded-full transition-colors duration-200 ${
@@ -144,17 +134,21 @@ const ToggleCheckbox: React.FC<{
 const SettingsPage: React.FC = () => {
   const { user, deleteAccount } = useAuth();
   const { theme, setTheme, fontSize, setFontSize, density, setDensity } = useTheme();
+  const { locale, setLocale, t } = useLocale();
   const { data: conversationsData } = useConversations();
   const deleteConversation = useDeleteConversation();
 
   const [activeTab, setActiveTab] = useState<TabId>("profile");
-
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(() => getNotificationPrefs());
   const [isClearingHistory, setIsClearingHistory] = useState(false);
 
-  // Seeded from the module (which already honored a persisted choice or the
-  // browser language); kept in state so the switcher reflects the selection.
-  const [locale, setLocaleUi] = useState<Locale>(() => getLocale());
+  const navTabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
+    { id: "profile",       label: t("settings.tab.profile"),       icon: <User size={14} /> },
+    { id: "appearance",    label: t("settings.tab.appearance"),     icon: <Palette size={14} /> },
+    { id: "notifications", label: t("settings.tab.notifications"),  icon: <Bell size={14} /> },
+    { id: "advanced",      label: t("settings.tab.conversation"),   icon: <Sliders size={14} /> },
+    { id: "data",          label: t("settings.tab.data"),           icon: <Database size={14} /> },
+  ];
 
   const [defaults, setDefaults] = useState<ConversationDefaults>(() => {
     try {
@@ -168,6 +162,7 @@ const SettingsPage: React.FC = () => {
   const [showClearHistoryDialog, setShowClearHistoryDialog]   = useState(false);
   const [showResetConfigDialog,  setShowResetConfigDialog]    = useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
+  const [comingSoonLang, setComingSoonLang]                   = useState<LanguageOption | null>(null);
 
   const updateSetting = <K extends keyof ConversationDefaults>(key: K, value: ConversationDefaults[K]) => {
     const updated = { ...defaults, [key]: value };
@@ -264,9 +259,9 @@ const SettingsPage: React.FC = () => {
 
         {/* ── Page header ── */}
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight text-(--text-primary)">Settings</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-(--text-primary)">{t("settings.title")}</h1>
           <p className="mt-1 text-sm text-(--text-secondary)">
-            Manage your account, appearance, and AI preferences.
+            {t("settings.subtitle")}
           </p>
         </div>
 
@@ -277,7 +272,7 @@ const SettingsPage: React.FC = () => {
             className="w-full shrink-0 flex-row gap-0.5 overflow-x-auto pb-2 md:w-44 md:flex-col md:overflow-x-visible md:pb-0"
             aria-label="Settings navigation"
           >
-            {NAV_TABS.map((tab) => (
+            {navTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
@@ -300,7 +295,7 @@ const SettingsPage: React.FC = () => {
             {/* ─ Profile ─ */}
             {activeTab === "profile" && (
               <div className="space-y-0">
-                <SectionHeader icon={<User size={14} />} title="User Profile" description="Your identity and account details." />
+                <SectionHeader icon={<User size={14} />} title={t("settings.profile.title")} description={t("settings.profile.desc")} />
                 <div className="flex items-center gap-4 border-b border-(--border-subtle) py-[calc(var(--space-factor,1)*24px)]">
                   <Avatar className="h-12 w-12 border border-(--border-default) bg-(--bg-tertiary)">
                     <AvatarFallback className="text-sm font-semibold">{userInitials}</AvatarFallback>
@@ -326,26 +321,36 @@ const SettingsPage: React.FC = () => {
             {/* ─ Appearance ─ */}
             {activeTab === "appearance" && (
               <div className="space-y-0">
-                <SectionHeader icon={<Palette size={14} />} title="Appearance" description="Customize theme, font size, and interface density." />
+                <SectionHeader icon={<Palette size={14} />} title={t("settings.appearance.title")} description={t("settings.appearance.desc")} />
 
                 {/* Theme */}
                 <div className="border-b border-(--border-subtle) py-[calc(var(--space-factor,1)*20px)]">
-                  <p className="mb-3 text-xs font-medium text-(--text-secondary)">Theme Mode</p>
+                  <p className="mb-3 text-xs font-medium text-(--text-secondary)">{t("settings.appearance.theme")}</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {(["dark", "light", "system", "high-contrast"] as Theme[]).map((opt) => (
-                      <button
-                        key={opt}
-                        onClick={() => setTheme(opt)}
-                        className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium capitalize transition-colors ${
-                          theme === opt
-                            ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
-                            : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
-                        }`}
-                        data-active={theme === opt}
-                      >
-                        {opt === "high-contrast" ? "High Contrast" : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                      </button>
-                    ))}
+                    {(["dark", "light", "system", "high-contrast"] as Theme[]).map((opt) => {
+                      const themeLabel =
+                        opt === "dark"
+                          ? t("settings.appearance.themeDark")
+                          : opt === "light"
+                          ? t("settings.appearance.themeLight")
+                          : opt === "system"
+                          ? t("settings.appearance.themeSystem")
+                          : t("settings.appearance.themeHighContrast");
+                      return (
+                        <button
+                          key={opt}
+                          onClick={() => setTheme(opt)}
+                          className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium capitalize transition-colors ${
+                            theme === opt
+                              ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
+                              : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
+                          }`}
+                          data-active={theme === opt}
+                        >
+                          {themeLabel}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -371,50 +376,73 @@ const SettingsPage: React.FC = () => {
 
                 {/* Density */}
                 <div className="border-b border-(--border-subtle) py-[calc(var(--space-factor,1)*20px)]">
-                  <p className="mb-3 text-xs font-medium text-(--text-secondary)">Interface Density</p>
+                  <p className="mb-3 text-xs font-medium text-(--text-secondary)">{t("settings.appearance.density")}</p>
                   <div className="grid grid-cols-3 gap-2">
-                    {(["comfortable", "cozy", "compact"] as Density[]).map((opt) => (
-                      <button
-                        key={opt}
-                        onClick={() => setDensity(opt)}
-                        className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium capitalize transition-colors ${
-                          density === opt
-                            ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
-                            : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
-                        }`}
-                        data-active={density === opt}
-                      >
-                        {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                      </button>
-                    ))}
+                    {(["comfortable", "cozy", "compact"] as Density[]).map((opt) => {
+                      const densityLabel =
+                        opt === "comfortable"
+                          ? t("settings.appearance.densityComfortable")
+                          : opt === "cozy"
+                          ? t("settings.appearance.densityCozy")
+                          : t("settings.appearance.densityCompact");
+                      return (
+                        <button
+                          key={opt}
+                          onClick={() => setDensity(opt)}
+                          className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium capitalize transition-colors ${
+                            density === opt
+                              ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
+                              : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
+                          }`}
+                          data-active={density === opt}
+                        >
+                          {densityLabel}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Language */}
                 <div className="py-[calc(var(--space-factor,1)*20px)]">
                   <p className="mb-3 text-xs font-medium text-(--text-secondary)">{t("settings.language")}</p>
-                  <div className="grid max-w-72 grid-cols-2 gap-2">
-                    {SUPPORTED_LOCALES.map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => {
-                          setLocale(opt.value);
-                          setLocaleUi(opt.value);
-                        }}
-                        className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium transition-colors ${
-                          locale === opt.value
-                            ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
-                            : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
-                        }`}
-                        data-active={locale === opt.value}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {LANGUAGE_OPTIONS.map((opt) => {
+                      const isSelected = opt.code === "en" && locale === "en";
+                      return (
+                        <button
+                          key={opt.code}
+                          onClick={() => {
+                            if (opt.status === "available") {
+                              setLocale("en");
+                            } else {
+                              setComingSoonLang(opt);
+                            }
+                          }}
+                          className={`group relative flex items-center justify-between gap-1.5 cursor-pointer rounded-md border px-3 py-2 text-left text-xs font-medium transition-colors ${
+                            isSelected
+                              ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
+                              : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
+                          }`}
+                          data-active={isSelected}
+                          title={opt.status === "coming-soon" ? `${opt.name} — Coming Soon` : opt.name}
+                        >
+                          <span className="flex items-center gap-1.5 truncate">
+                            <span className="text-sm">{opt.flag}</span>
+                            <span className="truncate">{opt.nativeName}</span>
+                          </span>
+                          {opt.status === "coming-soon" && (
+                            <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider text-amber-500/80 bg-amber-500/10 border border-amber-500/20 rounded px-1 py-0.2">
+                              Soon
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <p className="mt-1.5 flex items-center gap-1 text-[10px] text-(--text-muted)">
-                    <Languages size={11} className="flex-shrink-0" />
-                    {t("settings.languageDescription")}
+                  <p className="mt-2 flex items-center gap-1 text-[11px] text-(--text-muted)">
+                    <Languages size={12} className="flex-shrink-0" />
+                    <span>English is currently active. Click other languages to preview upcoming support.</span>
                   </p>
                 </div>
               </div>
@@ -423,10 +451,10 @@ const SettingsPage: React.FC = () => {
             {/* ─ Notifications ─ */}
             {activeTab === "notifications" && (
               <div className="space-y-0">
-                <SectionHeader icon={<Bell size={14} />} title="Notifications" description="Control how and when you receive alerts." />
+                <SectionHeader icon={<Bell size={14} />} title={t("settings.notifications.title")} description={t("settings.notifications.desc")} />
                 <SettingRow
-                  label="Desktop Notifications"
-                  description="Show browser push notifications when responses complete."
+                  label={t("settings.notifications.desktop")}
+                  description={t("settings.notifications.desktopDesc")}
                   control={
                     <ToggleCheckbox
                       checked={notifPrefs.desktop}
@@ -437,8 +465,8 @@ const SettingsPage: React.FC = () => {
                   }
                 />
                 <SettingRow
-                  label="Sound Alerts"
-                  description="Play a soft chime when the model finishes responding."
+                  label={t("settings.notifications.sound")}
+                  description={t("settings.notifications.soundDesc")}
                   control={
                     <ToggleCheckbox
                       checked={notifPrefs.sound}
@@ -455,8 +483,8 @@ const SettingsPage: React.FC = () => {
               <div className="space-y-0">
                 <SectionHeader
                   icon={<Sliders size={14} />}
-                  title="Conversation Defaults"
-                  description="Default generation and retrieval parameters for new chats."
+                  title={t("settings.conversation.title")}
+                  description={t("settings.conversation.desc")}
                   action={
                     <Button variant="ghost" size="sm" onClick={handleResetDefaults} className="gap-1.5 text-xs">
                       <RotateCcw size={12} />
@@ -731,6 +759,43 @@ const SettingsPage: React.FC = () => {
               }}
             >
               Wipe Everything
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog: Language Coming Soon ── */}
+      <Dialog open={comingSoonLang !== null} onOpenChange={(open) => !open && setComingSoonLang(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] mb-3">
+              <Globe size={24} />
+            </div>
+            <DialogTitle className="text-center text-base font-semibold">
+              {comingSoonLang?.flag} {comingSoonLang?.nativeName} ({comingSoonLang?.name})
+            </DialogTitle>
+            <div className="flex justify-center my-1.5">
+              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-amber-500/10 border border-amber-500/25 text-amber-500 dark:text-amber-400">
+                <Sparkles size={11} />
+                Coming Soon · In Development
+              </span>
+            </div>
+            <DialogDescription className="text-center text-xs leading-relaxed text-[var(--text-secondary)] mt-2">
+              Full localization for {comingSoonLang?.name} ({comingSoonLang?.nativeName}) is currently being translated and formatted. The application currently defaults to English.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center mt-4">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => {
+                const name = comingSoonLang?.name;
+                setComingSoonLang(null);
+                toast.success(`We'll notify you when ${name} is available!`);
+              }}
+              className="w-full sm:w-auto"
+            >
+              Got it
             </Button>
           </DialogFooter>
         </DialogContent>

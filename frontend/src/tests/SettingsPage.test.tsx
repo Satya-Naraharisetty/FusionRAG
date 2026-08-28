@@ -5,7 +5,7 @@ import { http, HttpResponse } from "msw";
 import SettingsPage from "../pages/SettingsPage";
 import { AuthProvider } from "../context/AuthContext";
 import { ThemeProvider } from "../context/ThemeContext";
-import { getLocale, setLocale } from "../lib/messages";
+import { setLocale } from "../lib/messages";
 import { server } from "./handlers";
 
 // The locale module is a process-wide singleton: reset the persisted choice
@@ -109,34 +109,28 @@ describe("SettingsPage — Delete Account", () => {
 });
 
 describe("SettingsPage — Language switcher", () => {
-  it("switches and persists the locale from the Appearance tab", async () => {
+  it("keeps English active and opens Coming Soon dialog when clicking other languages", async () => {
     renderSettings();
 
     fireEvent.click(screen.getByRole("button", { name: /Appearance/i }));
-    // English default label before switching.
     expect(screen.getByText("Language")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /^Français$/i }));
+    // English button is active
+    const englishBtn = screen.getByRole("button", { name: /English/i });
+    expect(englishBtn).toHaveAttribute("data-active", "true");
 
-    // The choice is applied to the i18n module and persisted to localStorage.
-    expect(localStorage.getItem("locale")).toBe("fr");
-    expect(getLocale()).toBe("fr");
-    // The section label flips to the chosen locale immediately.
-    expect(screen.getByText("Langue")).toBeInTheDocument();
-  });
+    // Clicking French opens Coming Soon dialog
+    const frenchBtn = screen.getByRole("button", { name: /Français/i });
+    fireEvent.click(frenchBtn);
 
-  it("reflects the current locale when the page mounts", async () => {
-    // Simulate a persisted French choice (what the module holds after reload).
-    setLocale("fr");
-    renderSettings();
+    expect(screen.getByText(/Coming Soon · In Development/i)).toBeInTheDocument();
+    expect(screen.getByText(/Full localization for French/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Appearance/i }));
-    expect(screen.getByText("Langue")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^Français$/i })
-    ).toHaveAttribute("data-active", "true");
-    expect(
-      screen.getByRole("button", { name: /^English$/i })
-    ).toHaveAttribute("data-active", "false");
+    // Clicking "Got it" dismisses the modal
+    const gotItBtn = screen.getByRole("button", { name: /^Got it$/i });
+    fireEvent.click(gotItBtn);
+
+    expect(screen.queryByText(/Coming Soon · In Development/i)).not.toBeInTheDocument();
+    expect(englishBtn).toHaveAttribute("data-active", "true");
   });
 });
