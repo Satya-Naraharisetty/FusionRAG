@@ -21,11 +21,6 @@ interface SidebarProfileProps {
 export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, collapsed }) => {
   const { t } = useLocale();
   const navigate = useNavigate();
-  const rawName = user?.email ? user.email.split("@")[0].replace(/[._-]/g, " ") : "User";
-  const displayName = rawName
-    .split(" ")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
   const initials = user?.email
     ? user.email
         .split("@")[0]
@@ -55,8 +50,8 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, co
             {!collapsed && user && (
               <>
                 <div className="flex-1 min-w-0 text-left">
-                  <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate leading-tight">
-                    {displayName}
+                  <p className="text-[13px] font-medium text-[var(--text-primary)] truncate leading-tight">
+                    {user.email}
                   </p>
                   <span className="text-[11px] text-[var(--text-muted)] capitalize block leading-tight mt-0.5">
                     {user.role === "admin" ? "Admin" : "Pro"}
