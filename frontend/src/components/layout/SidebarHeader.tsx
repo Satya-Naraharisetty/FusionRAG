@@ -146,7 +146,10 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
           if (onOpenProjects) {
             onOpenProjects();
           } else {
-            navigate("/documents");
+            const el = document.getElementById("sidebar-projects-section");
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
           }
         }}
         className={cn(

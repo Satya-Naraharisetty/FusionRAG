@@ -97,17 +97,17 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
 
   return (
     <>
-      <div className="flex flex-col gap-0.5 select-none">
+      <div id="sidebar-projects-section" className="flex flex-col gap-0.5 select-none scroll-mt-2">
         {/* Section header */}
-        <div className="flex items-center justify-between px-1 py-1.5">
-          <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-            {t("nav.folders")}
+        <div className="flex items-center justify-between px-2 py-1">
+          <span className="text-[11px] font-medium text-[var(--text-muted)] tracking-tight">
+            Projects
           </span>
           <button
             onClick={() => { setRenamingFolderId(null); setNewFolderName(""); setShowFolderModal(true); }}
             className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-0.5 rounded cursor-pointer transition-colors"
-            title={t("nav.createFolder")}
-            aria-label={t("nav.createFolder")}
+            title="New Project / Folder"
+            aria-label="New Project / Folder"
           >
             <FolderPlus size={13} />
           </button>

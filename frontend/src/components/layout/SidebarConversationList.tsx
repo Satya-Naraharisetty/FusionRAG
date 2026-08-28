@@ -76,6 +76,12 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
     });
   }, [filtered]);
 
+  const folderedIds = useMemo(() => {
+    const set = new Set<string>();
+    folders.forEach((f) => f.conversationIds.forEach((id) => set.add(id)));
+    return set;
+  }, [folders]);
+
   const pinned = useMemo(() =>
     pinnedIds
       .map((id) => conversationMap.get(id))
@@ -86,13 +92,21 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
   );
 
   const recents = useMemo(() => {
-    // Show all conversations sorted by latest activity descending (excluding pinned)
-    return sortedConversations.filter((c) => !pinnedIds.includes(c.id));
-  }, [sortedConversations, pinnedIds]);
+    // Show only un-pinned AND un-foldered conversations sorted by latest activity descending
+    return sortedConversations.filter(
+      (c) => !pinnedIds.includes(c.id) && !folderedIds.has(c.id)
+    );
+  }, [sortedConversations, pinnedIds, folderedIds]);
 
   const flatVisible = useMemo(() => {
-    return [...pinned, ...recents];
-  }, [pinned, recents]);
+    const list: Conversation[] = [];
+    pinned.forEach((c) => list.push(c));
+    folders.forEach((f) => {
+      (folderConversations[f.id] || []).forEach((c) => list.push(c));
+    });
+    recents.forEach((c) => list.push(c));
+    return list;
+  }, [pinned, folders, folderConversations, recents]);
 
   // Keyboard navigation
   useEffect(() => {
