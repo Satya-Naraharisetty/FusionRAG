@@ -165,7 +165,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
         {/* Keyboard shortcut hint */}
         <span className="absolute right-2.5 flex items-center">
           <kbd className="text-[10px] font-mono text-[var(--text-muted)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded px-1.5 py-0.5 leading-none">
-            Ctrl+/
+            Ctrl + /
           </kbd>
         </span>
       </div>
