@@ -16,6 +16,7 @@ from app.auth.domain.schemas import (
     UserDomain,
 )
 from app.auth.services.auth_service import AuthService
+from app.core.config import settings
 
 
 @pytest.fixture
@@ -85,7 +86,8 @@ async def test_register_user_creates_unverified_user_and_dispatches_email(mock_d
 
 
 @pytest.mark.asyncio
-async def test_authenticate_unverified_user_raises_exception(mock_deps):
+async def test_authenticate_unverified_user_raises_exception(mock_deps, monkeypatch):
+    monkeypatch.setattr(settings, "REQUIRE_EMAIL_VERIFICATION", True)
     service = mock_deps["service"]
     user_repo = mock_deps["user_repo"]
 

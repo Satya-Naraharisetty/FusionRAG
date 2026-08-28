@@ -360,6 +360,7 @@ class AuthService:
                     user_id = past_session.user_id
                     # Revoke all active sessions for this user to protect the account
                     await self._session_repo.revoke_all_for_user(user_id)
+                    await self._uow.commit()
                     logger.warning(
                         "Refresh token reuse detected",
                         extra={
@@ -407,6 +408,8 @@ class AuthService:
             await self._uow.commit()
 
             return new_access_token, new_refresh_token
+        except (InvalidSessionException, AccountDisabledException):
+            raise
         except Exception:
             await self._uow.rollback()
             raise
