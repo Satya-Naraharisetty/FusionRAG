@@ -99,8 +99,9 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
         created_at: new Date().toISOString(),
       };
 
+      const assistantId = newClientMessageId();
       const assistantMsg: ChatMessage = {
-        id: newClientMessageId(),
+        id: assistantId,
         role: "assistant" as const,
         content: "",
         status: "pending" as const,
@@ -110,6 +111,26 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
       };
 
       setChatMessages((prev) => [...prev, userMsg, assistantMsg]);
+
+      // Safe updater helper that targets the specific assistant message by id
+      // and guarantees that user messages are never mutated or overwritten.
+      const updateAssistant = (updater: (msg: ChatMessage) => ChatMessage) => {
+        setChatMessages((prev) => {
+          const idx = prev.findIndex((m) => m.id === assistantId);
+          if (idx !== -1) {
+            const next = [...prev];
+            next[idx] = updater(next[idx]);
+            return next;
+          }
+          const lastAssistantIdx = prev.map((m) => m.role).lastIndexOf("assistant");
+          if (lastAssistantIdx !== -1) {
+            const next = [...prev];
+            next[lastAssistantIdx] = updater(next[lastAssistantIdx]);
+            return next;
+          }
+          return [...prev, updater(assistantMsg)];
+        });
+      };
 
       abortControllerRef.current = new AbortController();
 
@@ -138,35 +159,19 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
               | { retrieval_skipped?: boolean }
               | undefined;
 
-            setChatMessages((prev) => {
-              if (prev.length === 0) return prev;
-              const last = prev[prev.length - 1];
-              return [
-                ...prev.slice(0, -1),
-                {
-                  ...last,
-                  citations: (data.citations as Citation[]) || [],
-                  // Set up front so the "general knowledge" hint shows while
-                  // the answer streams in.
-                  retrievalSkipped: diagnostics?.retrieval_skipped ?? false,
-                  status: "streaming" as const,
-                },
-              ];
-            });
+            updateAssistant((msg) => ({
+              ...msg,
+              citations: (data.citations as Citation[]) || [],
+              retrievalSkipped: diagnostics?.retrieval_skipped ?? false,
+              status: "streaming" as const,
+            }));
           } else if (eventType === "text") {
             const textDelta = data.text as string;
-            setChatMessages((prev) => {
-              if (prev.length === 0) return prev;
-              const last = prev[prev.length - 1];
-              return [
-                ...prev.slice(0, -1),
-                {
-                  ...last,
-                  content: last.content + textDelta,
-                  status: "streaming" as const,
-                },
-              ];
-            });
+            updateAssistant((msg) => ({
+              ...msg,
+              content: msg.content + textDelta,
+              status: "streaming" as const,
+            }));
           } else if (eventType === "tool_call_started") {
             const tc = {
               id: data.id as string,
@@ -174,31 +179,21 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
               arguments: (data.arguments as Record<string, unknown>) || {},
               status: "running" as const,
             };
-            setChatMessages((prev) => {
-              if (prev.length === 0) return prev;
-              const last = prev[prev.length - 1];
-              const updatedToolCalls = [...(last.toolCalls || []), tc];
-              return [
-                ...prev.slice(0, -1),
-                { ...last, toolCalls: updatedToolCalls },
-              ];
-            });
+            updateAssistant((msg) => ({
+              ...msg,
+              toolCalls: [...(msg.toolCalls || []), tc],
+            }));
           } else if (eventType === "tool_call_completed") {
             const toolCallId = data.id as string;
             const toolResult = data.result;
-            setChatMessages((prev) => {
-              if (prev.length === 0) return prev;
-              const last = prev[prev.length - 1];
-              const updatedToolCalls = (last.toolCalls || []).map((tc) =>
+            updateAssistant((msg) => ({
+              ...msg,
+              toolCalls: (msg.toolCalls || []).map((tc) =>
                 tc.id === toolCallId
                   ? { ...tc, result: toolResult, status: "done" as const }
                   : tc
-              );
-              return [
-                ...prev.slice(0, -1),
-                { ...last, toolCalls: updatedToolCalls },
-              ];
-            });
+              ),
+            }));
           } else if (eventType === "done") {
             const conversation_id = data.conversation_id as string;
             if (!conversationId && conversation_id) {
@@ -219,23 +214,14 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
               | { retrieval_skipped?: boolean }
               | undefined;
 
-            setChatMessages((prev) => {
-              if (prev.length === 0) return prev;
-              const last = prev[prev.length - 1];
-              return [
-                ...prev.slice(0, -1),
-                {
-                  ...last,
-                  content: (data.answer as string) || last.content,
-                  citations: (data.citations as Citation[]) || last.citations,
-                  // Fallback: the done event also carries diagnostics in case
-                  // the metadata event was missed.
-                  retrievalSkipped:
-                    doneDiagnostics?.retrieval_skipped ?? last.retrievalSkipped ?? false,
-                  status: "completed" as const,
-                },
-              ];
-            });
+            updateAssistant((msg) => ({
+              ...msg,
+              content: (data.answer as string) || msg.content,
+              citations: (data.citations as Citation[]) || msg.citations,
+              retrievalSkipped:
+                doneDiagnostics?.retrieval_skipped ?? msg.retrievalSkipped ?? false,
+              status: "completed" as const,
+            }));
 
             // Refresh message history and sidebar list on TanStack Query
             queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.MESSAGES, conversation_id] });
@@ -245,14 +231,11 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
             const errCode = (data.code as string) || "UNKNOWN_ERROR";
             const errMsg = (data.message as string) || "Generation failed";
             setStreamError({ code: errCode, message: errMsg });
-            setChatMessages((prev) => {
-              if (prev.length === 0) return prev;
-              const last = prev[prev.length - 1];
-              return [
-                ...prev.slice(0, -1),
-                { ...last, status: "failed" as const, error: errMsg },
-              ];
-            });
+            updateAssistant((msg) => ({
+              ...msg,
+              status: "failed" as const,
+              error: errMsg,
+            }));
             setIsStreaming(false);
           }
         }
@@ -260,19 +243,11 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
         // The stream ended without a terminal event (done/error) — e.g. the
         // server closed it after detecting a disconnect. Reflect the persisted
         // INTERRUPTED status so the cursor stops instead of spinning forever.
-        setChatMessages((prev) => {
-          if (prev.length === 0) return prev;
-          const last = prev[prev.length - 1];
-          if (
-            last.role === "assistant" &&
-            (last.status === "pending" || last.status === "streaming")
-          ) {
-            return [
-              ...prev.slice(0, -1),
-              { ...last, status: "interrupted" as const },
-            ];
+        updateAssistant((msg) => {
+          if (msg.status === "pending" || msg.status === "streaming") {
+            return { ...msg, status: "interrupted" as const };
           }
-          return prev;
+          return msg;
         });
         setIsStreaming(false);
       } catch (err: unknown) {
@@ -282,14 +257,11 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
 
         // Connection dropped or fetch failed
         setConnectionLost(true);
-        setChatMessages((prev) => {
-          if (prev.length === 0) return prev;
-          const last = prev[prev.length - 1];
-          return [
-            ...prev.slice(0, -1),
-            { ...last, status: "failed" as const, error: "Network stream disconnected." },
-          ];
-        });
+        updateAssistant((msg) => ({
+          ...msg,
+          status: "failed" as const,
+          error: "Network stream disconnected.",
+        }));
       }
     },
     [currentConversationId, isStreaming, queryClient]

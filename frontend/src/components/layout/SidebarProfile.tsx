@@ -21,34 +21,48 @@ interface SidebarProfileProps {
 export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, collapsed }) => {
   const { t } = useLocale();
   const navigate = useNavigate();
-  const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : "US";
+  const rawName = user?.email ? user.email.split("@")[0].replace(/[._-]/g, " ") : "User";
+  const displayName = rawName
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+  const initials = user?.email
+    ? user.email
+        .split("@")[0]
+        .split(/[._-]/)
+        .slice(0, 2)
+        .map((p) => p[0]?.toUpperCase() || "")
+        .join("") || "US"
+    : "US";
 
   return (
-    <div className="p-2 mt-auto">
+    <div className="p-2 mt-auto border-t border-[var(--border-subtle)]/50">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             className={cn(
-              "flex items-center w-full rounded-[var(--radius-md)] px-2 py-2 hover:bg-[var(--bg-tertiary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 cursor-pointer text-left min-h-[44px]",
-              collapsed ? "justify-center" : "gap-2.5"
+              "flex items-center w-full rounded-[var(--radius-lg)] px-2 py-2 hover:bg-[var(--bg-tertiary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 cursor-pointer text-left min-h-[44px]",
+              collapsed ? "justify-center" : "gap-3"
             )}
             aria-label="User profile menu"
           >
-            <Avatar className="h-7 w-7 flex-shrink-0 bg-[var(--bg-tertiary)] border border-[var(--border-default)]">
-              <AvatarFallback className="text-[11px] font-semibold">{initials}</AvatarFallback>
+            <Avatar className="h-8 w-8 flex-shrink-0 bg-[#f97373] text-white border-0 shadow-xs">
+              <AvatarFallback className="text-[11px] font-bold text-white bg-[#f97373]">
+                {initials}
+              </AvatarFallback>
             </Avatar>
 
             {!collapsed && user && (
               <>
                 <div className="flex-1 min-w-0 text-left">
-                  <p className="text-[13px] font-medium text-[var(--text-primary)] truncate leading-snug">
-                    {user.email}
+                  <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate leading-tight">
+                    {displayName}
                   </p>
-                  <span className="text-[11px] text-[var(--text-muted)] capitalize block leading-tight">
-                    {user.role}
+                  <span className="text-[11px] text-[var(--text-muted)] capitalize block leading-tight mt-0.5">
+                    {user.role === "admin" ? "Admin" : "Pro"}
                   </span>
                 </div>
-                <ChevronUp size={13} className="flex-shrink-0 text-[var(--text-muted)]" />
+                <ChevronUp size={14} className="flex-shrink-0 text-[var(--text-muted)] opacity-70" />
               </>
             )}
           </button>

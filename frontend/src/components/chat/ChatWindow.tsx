@@ -69,6 +69,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
 
   // Reconcile messages with SSE chat state
   useEffect(() => {
+    // If a response is actively streaming, keep the in-flight SSE message state
+    if (isStreaming) {
+      return;
+    }
+
     if (messagesData) {
       const flat = messagesData.pages.flatMap((page) => page.messages);
       const mapped = flat.map((m) => {
@@ -103,7 +108,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
     } else if (!conversationId) {
       clearChat();
     }
-  }, [messagesData, conversationId, setChatMessages, clearChat]);
+  }, [messagesData, conversationId, setChatMessages, clearChat, isStreaming]);
 
   const handleSend = (text: string) => {
     send(text, { conversationId });

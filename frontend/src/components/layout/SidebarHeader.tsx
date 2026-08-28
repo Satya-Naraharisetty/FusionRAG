@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Plus, Database, Search } from "lucide-react";
+import { PenSquare, Library, Folder, Search } from "lucide-react";
 import { useDocuments } from "../../hooks/useDocuments";
 import { useDocumentPipelineSummary } from "../../hooks/useDocumentPipelineSummary";
 import { SidebarUploadIndicator } from "./SidebarUploadIndicator";
@@ -24,7 +24,6 @@ interface SidebarHeaderProps {
 }
 
 export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
-  conversations,
   searchQuery,
   setSearchQuery,
   onNewChat,
@@ -56,7 +55,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
           )}
           title="New Chat"
         >
-          <Plus size={16} />
+          <PenSquare size={16} />
         </button>
         <TooltipProvider delayDuration={200}>
           <Tooltip>
@@ -69,9 +68,9 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
                     ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
                     : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
                 )}
-                aria-label="Documents"
+                aria-label="Library"
               >
-                <Database size={16} />
+                <Library size={16} />
                 {busy && (
                   <span className="absolute top-1.5 right-1.5 flex h-2 w-2" aria-hidden="true">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--accent-primary)]/40" />
@@ -83,44 +82,44 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             <TooltipContent side="right">{documentsTooltip}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        {/* Mini upload-queue indicator (collapsed: icon + count badge) */}
+        {/* Mini upload-queue indicator */}
         <SidebarUploadIndicator collapsed />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2 p-3">
-      {/* New Chat Button */}
+    <div className="flex flex-col gap-1 p-2 pb-1">
+      {/* ── New Chat Link ── */}
       <button
         onClick={onNewChat}
         className={cn(
-          "w-full h-10 rounded-[var(--radius-lg)] flex items-center gap-2.5 px-3 cursor-pointer text-xs font-medium transition-colors text-left",
+          "w-full h-9 rounded-[var(--radius-lg)] flex items-center gap-3 px-3 cursor-pointer text-[13px] font-medium transition-colors text-left",
           isNewChatActive
             ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
-            : "bg-transparent hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            : "bg-transparent hover:bg-[var(--bg-tertiary)]/70 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
         )}
       >
-        <Plus size={16} className="flex-shrink-0 text-[var(--text-secondary)]" />
-        <span>{t("nav.newChat")}</span>
+        <PenSquare size={15} className="flex-shrink-0 text-[var(--text-secondary)]" />
+        <span>New chat</span>
       </button>
 
-      {/* Documents Button */}
+      {/* ── Library / Documents Link ── */}
       <TooltipProvider delayDuration={200}>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               onClick={() => navigate("/documents")}
               className={cn(
-                "w-full h-10 rounded-[var(--radius-lg)] flex items-center justify-between px-3 cursor-pointer text-xs font-medium transition-colors text-left",
+                "w-full h-9 rounded-[var(--radius-lg)] flex items-center justify-between px-3 cursor-pointer text-[13px] font-medium transition-colors text-left",
                 isDocumentsActive
                   ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
-                  : "bg-transparent hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  : "bg-transparent hover:bg-[var(--bg-tertiary)]/70 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               )}
             >
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-3">
                 <span className="relative flex-shrink-0">
-                  <Database size={15} className="text-[var(--text-muted)]" />
+                  <Library size={15} className="text-[var(--text-secondary)]" />
                   {busy && (
                     <span className="absolute -top-1 -right-1 flex h-2 w-2" aria-hidden="true">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--accent-primary)]/40" />
@@ -128,9 +127,9 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
                     </span>
                   )}
                 </span>
-                <span>{t("nav.documents")}</span>
+                <span>Library</span>
               </div>
-              <span className="text-[11px] font-mono font-medium text-[var(--text-muted)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] px-1.5 py-0.5 rounded-[var(--radius-sm)] flex-shrink-0">
+              <span className="text-[10px] font-mono font-medium text-[var(--text-muted)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] px-1.5 py-0.2 rounded flex-shrink-0">
                 {documents.length}
               </span>
             </button>
@@ -139,17 +138,22 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
         </Tooltip>
       </TooltipProvider>
 
-      {/* Mini upload-queue indicator — visible from any page while uploads are in flight */}
+      {/* ── Projects Link ── */}
+      <button
+        onClick={() => navigate("/documents")}
+        className={cn(
+          "w-full h-9 rounded-[var(--radius-lg)] flex items-center gap-3 px-3 cursor-pointer text-[13px] font-medium transition-colors text-left bg-transparent hover:bg-[var(--bg-tertiary)]/70 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+        )}
+      >
+        <Folder size={15} className="flex-shrink-0 text-[var(--text-secondary)]" />
+        <span>Projects</span>
+      </button>
+
+      {/* Mini upload-queue indicator */}
       <SidebarUploadIndicator collapsed={false} />
 
-      {/* Section label */}
-      <div className="flex items-center justify-between px-1 pt-1 text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
-        <span>{t("nav.conversations")}</span>
-        <span className="font-mono text-[10px]">{conversations.length}</span>
-      </div>
-
       {/* Search Box */}
-      <div className="relative flex items-center">
+      <div className="relative flex items-center mt-1 mb-1">
         <Search
           size={13}
           className="absolute left-3 text-[var(--text-muted)] pointer-events-none flex-shrink-0"
@@ -163,11 +167,11 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             if (e.key === "Escape") setSearchQuery("");
           }}
           placeholder={t("nav.searchPlaceholder")}
-          className="w-full h-9 bg-[var(--bg-input)] border border-[var(--border-default)] hover:border-[var(--border-hover)] rounded-[var(--radius-lg)] pl-8 pr-12 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent-primary)]/50 focus:ring-2 focus:ring-[var(--accent-primary)]/20 transition-all"
+          className="w-full h-8 bg-[var(--bg-input)] border border-[var(--border-default)] hover:border-[var(--border-hover)] rounded-[var(--radius-lg)] pl-8 pr-12 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent-primary)]/50 focus:ring-2 focus:ring-[var(--accent-primary)]/20 transition-all"
         />
         {/* Keyboard shortcut hint */}
-        <span className="absolute right-2.5 flex items-center">
-          <kbd className="text-[10px] font-mono text-[var(--text-muted)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded px-1.5 py-0.5 leading-none">
+        <span className="absolute right-2 flex items-center">
+          <kbd className="text-[9px] font-mono text-[var(--text-muted)] bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded px-1.2 py-0.5 leading-none">
             Ctrl + /
           </kbd>
         </span>

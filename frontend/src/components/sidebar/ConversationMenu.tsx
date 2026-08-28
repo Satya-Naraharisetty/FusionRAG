@@ -78,19 +78,30 @@ export const ConversationMenu: React.FC<ConversationMenuProps> = ({
           <span>{isPinned ? "Unpin" : "Pin"}</span>
         </DropdownMenuItem>
 
+        {/* Direct Remove from Folder if currently foldered */}
+        {currentFolderId && (
+          <DropdownMenuItem
+            onClick={(e) => { e.stopPropagation(); onMoveToFolder(null); }}
+            className="gap-2 cursor-pointer text-amber-500 dark:text-amber-400"
+          >
+            <FolderOpen size={13} />
+            <span>Remove from Folder</span>
+          </DropdownMenuItem>
+        )}
+
         {/* Move to Folder */}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="gap-2 cursor-pointer">
             <FolderOpen size={13} />
-            <span>Move to Folder</span>
+            <span>Move to Project / Folder</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-44">
+          <DropdownMenuSubContent className="w-48">
             <DropdownMenuItem
               onClick={(e) => { e.stopPropagation(); onMoveToFolder(null); }}
               className="cursor-pointer"
             >
               <span className={!currentFolderId ? "font-semibold text-[var(--accent-primary)]" : ""}>
-                No Folder
+                None (Remove from folder)
               </span>
             </DropdownMenuItem>
             {folders.map((folder) => (

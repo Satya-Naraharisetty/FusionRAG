@@ -1,10 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { Pin } from "lucide-react";
 import { Conversation } from "../../types";
 import { ConversationItem } from "../sidebar/ConversationItem";
 import { Folder, Tag } from "../../hooks/useLocalConversationMetadata";
-import { isToday, isYesterday, subDays, isAfter } from "../../lib/utils";
-import { SidebarFolders } from "./SidebarFolders";
 import { useLocale } from "../../lib/messages";
 
 interface SidebarConversationListProps {
@@ -18,9 +15,9 @@ interface SidebarConversationListProps {
   folders: Folder[];
   tags: Record<string, Tag[]>;
   togglePin: (id: string) => void;
-  createFolder: (name: string) => void;
-  renameFolder: (id: string, name: string) => void;
-  deleteFolder: (id: string) => void;
+  createFolder?: (name: string) => void;
+  renameFolder?: (id: string, name: string) => void;
+  deleteFolder?: (id: string) => void;
   moveConversationToFolder: (conversationId: string, folderId: string | null) => void;
   addTag: (conversationId: string, tag: Tag) => void;
   removeTag: (conversationId: string, name: string) => void;
@@ -37,25 +34,11 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
   folders,
   tags,
   togglePin,
-  createFolder,
-  renameFolder,
-  deleteFolder,
   moveConversationToFolder,
   addTag,
   removeTag,
 }) => {
   const { t } = useLocale();
-
-  const groupLabels: Record<string, string> = {
-    today: t("nav.today"),
-    yesterday: t("nav.yesterday"),
-    last7Days: t("nav.last7Days"),
-    older: t("nav.older"),
-  };
-  const [expandedFolders] = useState<Record<string, boolean>>({
-    "folder-general":  true,
-    "folder-research": true,
-  });
   const [keyboardSelectIdx, setKeyboardSelectIdx] = useState(-1);
 
   const conversationMap = useMemo(
@@ -69,23 +52,13 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
     return conversations.filter((c) => c.title.toLowerCase().includes(q));
   }, [conversations, searchQuery]);
 
-  const folderConversations = useMemo(() => {
-    const map: Record<string, Conversation[]> = {};
-    folders.forEach((f) => {
-      map[f.id] = f.conversationIds
-        .map((id) => conversationMap.get(id))
-        .filter((c): c is Conversation =>
-          !!c && (!searchQuery.trim() || c.title.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
+  const sortedConversations = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const timeA = new Date(a.updated_at || a.last_message_at || a.created_at).getTime();
+      const timeB = new Date(b.updated_at || b.last_message_at || b.created_at).getTime();
+      return timeB - timeA;
     });
-    return map;
-  }, [folders, conversationMap, searchQuery]);
-
-  const folderedIds = useMemo(() => {
-    const set = new Set<string>();
-    folders.forEach((f) => f.conversationIds.forEach((id) => set.add(id)));
-    return set;
-  }, [folders]);
+  }, [filtered]);
 
   const pinned = useMemo(() =>
     pinnedIds
@@ -96,42 +69,14 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
     [pinnedIds, conversationMap, searchQuery]
   );
 
-  const unfoldered = useMemo(
-    () => filtered.filter((c) => !folderedIds.has(c.id)),
-    [filtered, folderedIds]
-  );
-
-  const groups = useMemo(() => {
-    const today: Conversation[]    = [];
-    const yesterday: Conversation[]= [];
-    const last7Days: Conversation[]= [];
-    const older: Conversation[]    = [];
-    const sevenAgo = subDays(new Date(), 7);
-
-    unfoldered.forEach((c) => {
-      const d = new Date(c.updated_at || c.last_message_at || c.created_at);
-      if      (isToday(d))           today.push(c);
-      else if (isYesterday(d))       yesterday.push(c);
-      else if (isAfter(d, sevenAgo)) last7Days.push(c);
-      else                           older.push(c);
-    });
-    return { today, yesterday, last7Days, older };
-  }, [unfoldered]);
+  const recents = useMemo(() => {
+    // Show all conversations sorted by latest activity descending (excluding pinned)
+    return sortedConversations.filter((c) => !pinnedIds.includes(c.id));
+  }, [sortedConversations, pinnedIds]);
 
   const flatVisible = useMemo(() => {
-    const list: Conversation[] = [];
-    pinned.forEach((c) => list.push(c));
-    folders.forEach((folder) => {
-      if (expandedFolders[folder.id]) {
-        (folderConversations[folder.id] || []).forEach((c) => list.push(c));
-      }
-    });
-    const { today, yesterday, last7Days, older } = groups;
-    [...today, ...yesterday, ...last7Days, ...older].forEach((c) => {
-      if (!list.some((e) => e.id === c.id)) list.push(c);
-    });
-    return list;
-  }, [pinned, folders, folderConversations, expandedFolders, groups]);
+    return [...pinned, ...recents];
+  }, [pinned, recents]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -165,14 +110,12 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
   }, [activeId, flatVisible]);
 
   return (
-    <div className="flex-1 overflow-y-auto px-2.5 py-3 flex flex-col gap-4 scrollbar-thin">
-
-      {/* Pinned */}
+    <div className="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-3 scrollbar-thin">
+      {/* ── Pinned Section ── */}
       {pinned.length > 0 && (
         <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-1.5 px-1 pb-1 text-[10px] font-semibold text-amber-500 uppercase tracking-wider">
-            <Pin size={9} className="fill-current flex-shrink-0" />
-            <span>{t("nav.pinned")}</span>
+          <div className="flex items-center gap-1.5 px-2 pb-1 text-[11px] font-medium text-[var(--text-muted)] tracking-tight">
+            <span>Pinned</span>
           </div>
           {pinned.map((c, i) => (
             <ConversationItem
@@ -186,6 +129,7 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
               onTogglePin={() => togglePin(c.id)}
               folders={folders}
               onMoveToFolder={(fId) => moveConversationToFolder(c.id, fId)}
+              currentFolderId={folders.find((f) => f.conversationIds.includes(c.id))?.id}
               tags={tags[c.id] || []}
               onAddTag={(tag) => addTag(c.id, tag)}
               onRemoveTag={(n) => removeTag(c.id, n)}
@@ -195,61 +139,44 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
         </div>
       )}
 
-      {/* Folders */}
-      <SidebarFolders
-        folders={folders}
-        folderConversations={folderConversations}
-        activeId={activeId}
-        onSelect={onSelect}
-        onRename={onRename}
-        onDelete={onDelete}
-        pinnedIds={pinnedIds}
-        tags={tags}
-        togglePin={togglePin}
-        createFolder={createFolder}
-        renameFolder={renameFolder}
-        deleteFolder={deleteFolder}
-        moveConversationToFolder={moveConversationToFolder}
-        addTag={addTag}
-        removeTag={removeTag}
-        keyboardSelectIdx={keyboardSelectIdx}
-        flatVisibleConversations={flatVisible}
-      />
-
-      {/* Date-grouped conversations */}
-      <div className="flex flex-col gap-4">
-        {(["today", "yesterday", "last7Days", "older"] as const).map((key) => {
-          const group = groups[key];
-          if (group.length === 0) return null;
-          return (
-            <div key={key} className="flex flex-col gap-0.5">
-              <div className="px-1 pb-1 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                {groupLabels[key]}
-              </div>
-              {group.map((c) => {
-                const globalIdx = flatVisible.findIndex((v) => v.id === c.id);
-                return (
-                  <ConversationItem
-                    key={`unfoldered-${c.id}`}
-                    conversation={c}
-                    isActive={c.id === activeId}
-                    onSelect={() => onSelect(c.id)}
-                    onRename={onRename}
-                    onDelete={onDelete}
-                    isPinned={pinnedIds.includes(c.id)}
-                    onTogglePin={() => togglePin(c.id)}
-                    folders={folders}
-                    onMoveToFolder={(fId) => moveConversationToFolder(c.id, fId)}
-                    tags={tags[c.id] || []}
-                    onAddTag={(tag) => addTag(c.id, tag)}
-                    onRemoveTag={(n) => removeTag(c.id, n)}
-                    isHighlighted={keyboardSelectIdx === globalIdx}
-                  />
-                );
-              })}
-            </div>
-          );
-        })}
+      {/* ── Recents Section (Latest on top) ── */}
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center justify-between px-2 pb-1 text-[11px] font-medium text-[var(--text-muted)] tracking-tight">
+          <span>Recents</span>
+          {recents.length > 0 && (
+            <span className="text-[10px] text-[var(--text-muted)] opacity-60 font-mono">
+              {recents.length}
+            </span>
+          )}
+        </div>
+        {recents.length === 0 && pinned.length === 0 ? (
+          <p className="py-4 px-2 text-xs text-[var(--text-muted)] text-center italic">
+            {searchQuery ? "No matching conversations" : t("nav.noConversations")}
+          </p>
+        ) : (
+          recents.map((c) => {
+            const globalIdx = flatVisible.findIndex((v) => v.id === c.id);
+            return (
+              <ConversationItem
+                key={`recent-${c.id}`}
+                conversation={c}
+                isActive={c.id === activeId}
+                onSelect={() => onSelect(c.id)}
+                onRename={onRename}
+                onDelete={onDelete}
+                isPinned={pinnedIds.includes(c.id)}
+                onTogglePin={() => togglePin(c.id)}
+                folders={folders}
+                onMoveToFolder={(fId) => moveConversationToFolder(c.id, fId)}
+                currentFolderId={folders.find((f) => f.conversationIds.includes(c.id))?.id}
+                tags={tags[c.id] || []}
+                onAddTag={(tag) => addTag(c.id, tag)}
+                onRemoveTag={(n) => removeTag(c.id, n)}
+                isHighlighted={keyboardSelectIdx === globalIdx}
+              />
+            );
+          })
+        )}
       </div>
     </div>
   );
