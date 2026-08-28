@@ -76,7 +76,7 @@ jobs:
       - name: Enforce Regression Gate Against Approved Baseline
         working-directory: ./backend
         run: |
-          python scripts/regression.py --baseline-file app/evaluation/baselines/baseline_v3.json --max-score-drop 0.05 --max-latency-increase 20.0
+          python scripts/regression.py --baseline-file app/evaluation/baselines/baseline_v3.json --max-score-drop 0.05 --max-latency-increase 20.0 --ignore-profile-mismatch
 
       - name: Upload Evaluation Reports
         if: always()

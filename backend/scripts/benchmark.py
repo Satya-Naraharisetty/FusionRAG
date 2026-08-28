@@ -38,9 +38,15 @@ async def main() -> None:
     )
     parser.add_argument("--dataset", required=True, help="Path to dataset file.")
     parser.add_argument(
-        "--dataset-id", default="golden_rag_dataset", help="Dataset ID."
+        "--dataset-id",
+        default=None,
+        help="Dataset ID (defaults to dataset file metadata or 'golden_rag_dataset').",
     )
-    parser.add_argument("--version", default="1.0.0", help="Dataset version.")
+    parser.add_argument(
+        "--version",
+        default=None,
+        help="Dataset version (defaults to dataset file metadata or '1.0.0').",
+    )
     parser.add_argument(
         "--profile",
         default="fast_deterministic",

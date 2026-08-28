@@ -18,8 +18,8 @@ class DatasetLoader:
     def load_dataset(
         self,
         file_path: str,
-        dataset_id: str,
-        version: str,
+        dataset_id: str | None = None,
+        version: str | None = None,
         description: str | None = None,
     ) -> EvaluationDataset:
         if not os.path.exists(file_path):
@@ -37,6 +37,10 @@ class DatasetLoader:
                     raw_samples = data["samples"]
                     if not description and "description" in data:
                         description = data["description"]
+                    if not dataset_id and "dataset_id" in data:
+                        dataset_id = str(data["dataset_id"])
+                    if not version and "version" in data:
+                        version = str(data["version"])
                 else:
                     raise ValueError(
                         "JSON dataset must be a list of samples or a dict with a 'samples' key."
@@ -57,6 +61,10 @@ class DatasetLoader:
                     raw_samples = data["samples"]
                     if not description and "description" in data:
                         description = data["description"]
+                    if not dataset_id and "dataset_id" in data:
+                        dataset_id = str(data["dataset_id"])
+                    if not version and "version" in data:
+                        version = str(data["version"])
                 else:
                     raise ValueError(
                         "YAML dataset must be a list of samples or a dict with a 'samples' key."
@@ -130,6 +138,10 @@ class DatasetLoader:
             raise ValueError(
                 f"Dataset at '{file_path}' contains no evaluation samples."
             )
+
+        # Ensure fallback dataset_id and version
+        dataset_id = dataset_id or "golden_rag_dataset"
+        version = version or "1.0.0"
 
         # Parse and validate samples
         samples = []

@@ -190,6 +190,26 @@ def test_dataset_loader_rejections():
         loader.validate_dataset(empty_dataset, strict=True)
 
 
+def test_dataset_loader_auto_detects_metadata_from_file():
+    """
+    Tests that DatasetLoader extracts dataset_id, version, and description
+    from YAML/JSON files when not explicitly overridden.
+    """
+    loader = DatasetLoader()
+    golden_v3_path = (
+        Path(__file__).parent.parent
+        / "app"
+        / "evaluation"
+        / "datasets"
+        / "golden"
+        / "golden_v3.yaml"
+    )
+    dataset_v3 = loader.load_dataset(str(golden_v3_path))
+    assert dataset_v3.dataset_id == "golden_rag_dataset"
+    assert dataset_v3.version == "3.0.0"
+    assert "Adaptive / Agentic" in (dataset_v3.description or "")
+
+
 # ==============================================================================
 # 2. Retrieval Metrics Exact Calculations & Negative Control Tests
 # ==============================================================================

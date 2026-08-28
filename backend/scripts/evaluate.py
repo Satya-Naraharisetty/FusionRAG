@@ -17,10 +17,8 @@ async def main() -> None:
         required=True,
         help="Path to dataset file (JSON, JSONL, YAML, CSV).",
     )
-    parser.add_argument(
-        "--dataset-id", default="cli-dataset", help="Dataset ID for versioning."
-    )
-    parser.add_argument("--version", default="1.0.0", help="Dataset version.")
+    parser.add_argument("--dataset-id", default=None, help="Dataset ID for versioning.")
+    parser.add_argument("--version", default=None, help="Dataset version.")
     parser.add_argument(
         "--mock", action="store_true", help="Run in mock/stub mode without LLM calls."
     )
