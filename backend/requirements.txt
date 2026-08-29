@@ -126,6 +126,8 @@ orjson==3.12.0
     # via hybrid-rag-backend
 packaging==26.2
     # via opentelemetry-instrumentation
+pillow==12.3.0
+    # via hybrid-rag-backend
 portalocker==2.10.1
     # via qdrant-client
 prometheus-client==0.26.0

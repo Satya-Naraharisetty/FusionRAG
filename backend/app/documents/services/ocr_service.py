@@ -2,7 +2,11 @@ import base64
 import io
 
 import httpx
-from PIL import Image
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None  # type: ignore[assignment]
 
 from app.core.config import settings
 from app.documents.domain.exceptions import DocumentCorrupted, UnsupportedDocumentType
@@ -32,19 +36,21 @@ def validate_image_bytes(image_bytes: bytes) -> tuple[int, int, str]:
         )
 
     if mime_type.startswith("image/"):
-        try:
-            with Image.open(io.BytesIO(image_bytes)) as img:
-                width, height = img.size
-                num_pixels = width * height
-                if num_pixels > MAX_IMAGE_PIXELS:
-                    raise DocumentCorrupted(
-                        f"Image resolution {width}x{height} ({num_pixels} pixels) exceeds safe limit of {MAX_IMAGE_PIXELS} pixels (decompression bomb protection)."
-                    )
-                return width, height, mime_type
-        except Exception as e:
-            if isinstance(e, (DocumentCorrupted, UnsupportedDocumentType)):
-                raise
-            raise DocumentCorrupted(f"Failed to decode image: {str(e)}")
+        if Image is not None:
+            try:
+                with Image.open(io.BytesIO(image_bytes)) as img:
+                    width, height = img.size
+                    num_pixels = width * height
+                    if num_pixels > MAX_IMAGE_PIXELS:
+                        raise DocumentCorrupted(
+                            f"Image resolution {width}x{height} ({num_pixels} pixels) exceeds safe limit of {MAX_IMAGE_PIXELS} pixels (decompression bomb protection)."
+                        )
+                    return width, height, mime_type
+            except Exception as e:
+                if isinstance(e, (DocumentCorrupted, UnsupportedDocumentType)):
+                    raise
+                raise DocumentCorrupted(f"Failed to decode image: {str(e)}")
+        return 0, 0, mime_type
 
     return 0, 0, mime_type
 
