@@ -53,6 +53,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Generate CI Secrets
+        run: |
+          echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "ENCRYPTION_MASTER_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
