@@ -1,5 +1,8 @@
+import asyncio
 import logging
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 from app.chat.domain.interfaces import LLMProvider, StreamChunk
@@ -9,6 +12,7 @@ from app.chat.domain.multi_agent import (
     AgentType,
     SynthesisRequest,
 )
+from app.documents.domain.models import AuthorizedDocumentScope, EvidenceItem
 
 logger = logging.getLogger(__name__)
 
@@ -200,3 +204,172 @@ class SynthesisAgent:
                 },
             },
         }
+
+
+# =====================================================================
+# Evidence Authorization Guard & NLI Citation Entailment Validator
+# =====================================================================
+
+
+class CitationValidationStatus(str, Enum):
+    ENTAILED = "ENTAILED"
+    CONTRADICTED = "CONTRADICTED"
+    INSUFFICIENT = "INSUFFICIENT"
+
+
+@dataclass(frozen=True)
+class CitationValidationResult:
+    status: CitationValidationStatus
+    is_valid: bool
+    confidence: float
+    reason: str
+
+
+class EvidenceAuthorizationGuard:
+    """
+    Deterministic DB & Provenance Security Guard.
+    Enforces that evidence strictly belongs to the authenticated user and matches active_version.
+    """
+
+    def verify(
+        self, evidence_item: EvidenceItem, scope: AuthorizedDocumentScope
+    ) -> bool:
+        if not scope.authorized_docs:
+            return False
+        if evidence_item.user_id != scope.user_id:
+            return False
+        auth_doc = scope.authorized_docs.get(evidence_item.document_id)
+        if not auth_doc:
+            return False
+        if evidence_item.document_version != auth_doc.active_version:
+            return False
+        return True
+
+
+class CitationValidator:
+    """
+    Probabilistic NLI Entailment Gate.
+    Verifies that cited evidence actually entails the asserted claim text.
+    Fails closed on timeouts, contradictions, or insufficient evidence.
+    """
+
+    def __init__(
+        self,
+        llm_provider: LLMProvider | None = None,
+        entailment_threshold: float = 0.85,
+        contradiction_threshold: float = 0.50,
+        timeout_seconds: float = 2.0,
+    ) -> None:
+        self.llm_provider = llm_provider
+        self.entailment_threshold = entailment_threshold
+        self.contradiction_threshold = contradiction_threshold
+        self.timeout_seconds = timeout_seconds
+
+    async def validate(
+        self,
+        claim_text: str,
+        evidence_item: EvidenceItem,
+        scope: AuthorizedDocumentScope,
+        guard: EvidenceAuthorizationGuard,
+    ) -> CitationValidationResult:
+        # 1. Deterministic structural authorization check
+        if not guard.verify(evidence_item, scope):
+            return CitationValidationResult(
+                status=CitationValidationStatus.INSUFFICIENT,
+                is_valid=False,
+                confidence=0.0,
+                reason="Failed EvidenceAuthorizationGuard: Inactive version or cross-tenant scope violation",
+            )
+
+        if not claim_text.strip() or not evidence_item.content.strip():
+            return CitationValidationResult(
+                status=CitationValidationStatus.INSUFFICIENT,
+                is_valid=False,
+                confidence=0.0,
+                reason="Empty claim or evidence text",
+            )
+
+        # 2. Heuristic check / Mock mode
+        if not self.llm_provider:
+            # Simple containment / overlap heuristic
+            claim_words = set(claim_text.lower().split())
+            evidence_words = set(evidence_item.content.lower().split())
+            overlap = len(claim_words.intersection(evidence_words)) / max(
+                1, len(claim_words)
+            )
+            if overlap >= 0.3:
+                return CitationValidationResult(
+                    status=CitationValidationStatus.ENTAILED,
+                    is_valid=True,
+                    confidence=0.9,
+                    reason="Lexical overlap entailment passed",
+                )
+            else:
+                return CitationValidationResult(
+                    status=CitationValidationStatus.INSUFFICIENT,
+                    is_valid=False,
+                    confidence=0.2,
+                    reason="Insufficient evidence overlap with claim",
+                )
+
+        # 3. LLM NLI Verification
+        prompt = (
+            f"Determine if the premise strictly entails the hypothesis.\n\n"
+            f"Premise: {evidence_item.content}\n\n"
+            f"Hypothesis: {claim_text}\n\n"
+            "Respond strictly in format: VERDICT: ENTAILED | CONTRADICTED | INSUFFICIENT"
+        )
+        messages = [ChatMessage(role=ChatRole.USER, content=prompt)]
+
+        try:
+            response = await asyncio.wait_for(
+                self.llm_provider.generate(
+                    messages=messages,
+                    model="gemini-2.0-flash",
+                    temperature=0.0,
+                    max_tokens=20,
+                ),
+                timeout=self.timeout_seconds,
+            )
+            content_str = (
+                response.content
+                if hasattr(response, "content")
+                else (response[0] if isinstance(response, tuple) else str(response))
+            )
+            upper_resp = content_str.upper()
+
+            if "ENTAILED" in upper_resp and "NOT ENTAILED" not in upper_resp:
+                return CitationValidationResult(
+                    status=CitationValidationStatus.ENTAILED,
+                    is_valid=True,
+                    confidence=0.95,
+                    reason="NLI verification confirmed entailment",
+                )
+            elif "CONTRADICTED" in upper_resp:
+                return CitationValidationResult(
+                    status=CitationValidationStatus.CONTRADICTED,
+                    is_valid=False,
+                    confidence=0.9,
+                    reason="NLI verification identified contradiction",
+                )
+            else:
+                return CitationValidationResult(
+                    status=CitationValidationStatus.INSUFFICIENT,
+                    is_valid=False,
+                    confidence=0.3,
+                    reason="NLI verification found insufficient support",
+                )
+        except TimeoutError:
+            return CitationValidationResult(
+                status=CitationValidationStatus.INSUFFICIENT,
+                is_valid=False,
+                confidence=0.0,
+                reason="NLI validation timed out (fail-closed)",
+            )
+        except Exception as e:
+            return CitationValidationResult(
+                status=CitationValidationStatus.INSUFFICIENT,
+                is_valid=False,
+                confidence=0.0,
+                reason=f"NLI validation error: {str(e)} (fail-closed)",
+            )

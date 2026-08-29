@@ -102,8 +102,7 @@ class Settings(BaseSettings):
     QDRANT_URL: str | None = None
 
     # Embedding Configurations
-    # Default is Jina AI (jina-embeddings-v3) with 768 dimensions (Matryoshka representation).
-    # Gemini (text-embedding-004) is also supported as an alternate provider.
+    # Dense embeddings via Jina AI (jina-embeddings-v3) with 768 dimensions (Matryoshka representation).
     EMBEDDING_PROVIDER: str = "jina"
     EMBEDDING_MODEL: str = "jina-embeddings-v3"
     EMBEDDING_DIMENSION: int = 768

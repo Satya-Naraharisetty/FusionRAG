@@ -110,12 +110,7 @@ class LLMProviderRouter(LLMProvider):
         provider = self._providers[provider_key]
         breaker = self._breakers[provider_key]
 
-        # Use fallback model name for backup if we failed over
-        actual_model = model
-        if provider_key == "openai" and "gemini" in model:
-            actual_model = "gemini-3.5-flash-lite"  # Default backup model
-        elif provider_key == "gemini" and "gpt" in model:
-            actual_model = "gemini-3.5-flash-lite"  # Default backup model
+        actual_model = model or "gemini-3.5-flash-lite"
 
         logger.info(
             f"Routing generate request to provider: {provider_key} (Model: {actual_model})"
@@ -281,11 +276,7 @@ class LLMProviderRouter(LLMProvider):
         provider = self._providers[provider_key]
         breaker = self._breakers[provider_key]
 
-        actual_model = model
-        if provider_key == "openai" and "gemini" in model:
-            actual_model = "gemini-3.5-flash-lite"
-        elif provider_key == "gemini" and "gpt" in model:
-            actual_model = "gemini-3.5-flash-lite"
+        actual_model = model or "gemini-3.5-flash-lite"
 
         logger.info(
             f"Routing stream request to provider: {provider_key} (Model: {actual_model})"

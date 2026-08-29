@@ -9,6 +9,19 @@ interface CitationCardProps {
 export const CitationCard: React.FC<CitationCardProps> = ({ citation, index }) => {
   const [expanded, setExpanded] = useState(false);
 
+  const getElementBadgeColor = (type?: string) => {
+    switch (type) {
+      case "TABLE":
+        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+      case "FIGURE":
+        return "bg-purple-500/10 text-purple-400 border-purple-500/20";
+      case "GRAPH_RELATIONSHIP":
+        return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+      default:
+        return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+    }
+  };
+
   return (
     <div
       onClick={() => setExpanded(!expanded)}
@@ -19,16 +32,31 @@ export const CitationCard: React.FC<CitationCardProps> = ({ citation, index }) =
           {index + 1}
         </span>
         <span className="truncate max-w-[120px]">{citation.document_name}</span>
-        <span className="text-[var(--text-muted)]">·</span>
-        <span className="text-[var(--text-muted)]">Chunk {citation.chunk_index}</span>
+        {citation.version !== undefined && (
+          <span className="px-1 py-0.2 rounded text-[8px] bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]">
+            v{citation.version}
+          </span>
+        )}
+        {citation.element_type && (
+          <span className={`px-1 py-0.2 rounded text-[8px] border ${getElementBadgeColor(citation.element_type)}`}>
+            {citation.element_type === "GRAPH_RELATIONSHIP" ? "GRAPH" : citation.element_type}
+          </span>
+        )}
+        {citation.entailment_status === "ENTAILED" && (
+          <span className="text-emerald-400 text-[9px] font-bold" title="Verified by Citation Entailment Gate">✓</span>
+        )}
       </div>
       {expanded && (
         <div className="mt-0.5 pt-1.5 border-t border-[var(--border-subtle)] text-[9px] text-[var(--text-muted)] flex flex-col gap-0.5 animate-in fade-in duration-150">
           <div><span className="font-semibold text-[var(--text-secondary)]">Doc:</span> {citation.document_name}</div>
+          {citation.version !== undefined && <div><span className="font-semibold text-[var(--text-secondary)]">Version:</span> v{citation.version}</div>}
+          {citation.element_type && <div><span className="font-semibold text-[var(--text-secondary)]">Element Type:</span> {citation.element_type}</div>}
+          {citation.element_id && <div><span className="font-semibold text-[var(--text-secondary)]">Element ID:</span> {citation.element_id}</div>}
           <div><span className="font-semibold text-[var(--text-secondary)]">Chunk ID:</span> {citation.chunk_id}</div>
-          <div><span className="font-semibold text-[var(--text-secondary)]">Index:</span> {citation.chunk_index}</div>
+          {citation.confidence !== undefined && <div><span className="font-semibold text-[var(--text-secondary)]">Confidence:</span> {(citation.confidence * 100).toFixed(1)}%</div>}
         </div>
       )}
     </div>
   );
 };
+

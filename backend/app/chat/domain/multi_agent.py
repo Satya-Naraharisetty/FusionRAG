@@ -14,6 +14,14 @@ class CapabilityType(str, Enum):
     ANALYSIS = "ANALYSIS"
     WEB_SEARCH = "WEB_SEARCH"
     SYNTHESIS = "SYNTHESIS"
+    TABLE = "TABLE"
+    VISION = "VISION"
+    GRAPH = "GRAPH"
+
+
+MAX_REPLAN_ATTEMPTS: int = 2
+MAX_PLAN_ATTEMPTS: int = 3
+MAX_TOTAL_CAPABILITY_CALLS_PER_PLAN: int = 15
 
 
 class CapabilityDescriptor(BaseModel):
@@ -25,6 +33,7 @@ class CapabilityDescriptor(BaseModel):
     estimated_latency_ms: float = 0.0
     estimated_cost_units: float = 0.0
     max_concurrency: int | None = None
+    max_calls_per_plan: int = 5
     enabled: bool = True
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -66,6 +75,9 @@ class AgentType(str, Enum):
     ANALYSIS = "ANALYSIS"
     WEB_SEARCH = "WEB_SEARCH"
     SYNTHESIS = "SYNTHESIS"
+    TABLE = "TABLE"
+    VISION = "VISION"
+    GRAPH = "GRAPH"
 
 
 class AgentTaskStatus(str, Enum):

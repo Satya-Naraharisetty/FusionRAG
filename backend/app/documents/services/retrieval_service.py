@@ -16,7 +16,11 @@ from app.documents.domain.interfaces import (
     SparseRetriever,
 )
 from app.documents.domain.models import (
+    AuthorizedDocumentScope,
+    CanonicalIdentity,
     DocumentRetrievalScope,
+    EvidenceItem,
+    EvidenceType,
     FusionMethod,
     RerankerName,
     RetrievalMode,
@@ -24,6 +28,8 @@ from app.documents.domain.models import (
     SearchResult,
 )
 from app.documents.services.fusion import (
+    FusedRetrievalCandidate,
+    Hybrid4ChannelRRFEngine,
     ReciprocalRankFusionEngine,
     WeightedReciprocalRankFusionEngine,
 )
@@ -188,6 +194,7 @@ class RetrievalService:
         # 1. Chunk Repository & Index Cache
         self._chunk_repo = chunk_repo
         self._index_cache = index_cache
+        self._vector_store = vector_store
         self._dense_retriever: DenseRetriever | None = None
         self._sparse_retriever: SparseRetriever | None = None
 
@@ -1076,4 +1083,162 @@ class RetrievalService:
                 "rerank_latency_ms": rerank_latency * 1000.0,
                 "total_latency_ms": total_latency * 1000.0,
             },
+        )
+
+    async def retrieve_hybrid_multimodal_graph(
+        self,
+        query: str,
+        scope: AuthorizedDocumentScope,
+        document_element_repo: Any | None = None,
+        graph_retriever: Any | None = None,
+        embedding_provider: Any | None = None,
+        vector_store: Any | None = None,
+        top_k: int = 50,
+    ) -> list[FusedRetrievalCandidate]:
+        """
+        Multimodal 4-Channel Weighted Reciprocal Rank Fusion Retrieval across Dense vectors, Sparse lexical search, Visual embeddings, and Knowledge Graph traversal.
+        Strictly enforces tenant isolation, query authorization pre-filtering, and active version scoping.
+        """
+        if not scope.authorized_docs or not query.strip():
+            return []
+
+        authorized_tuples = [
+            (doc_id, auth_ver.active_version)
+            for doc_id, auth_ver in scope.authorized_docs.items()
+            if auth_ver.active_version > 0
+        ]
+        if not authorized_tuples:
+            return []
+
+        # 1. DENSE & VISUAL channels via vector store / embedding
+        dense_candidates: list[tuple[CanonicalIdentity, EvidenceItem]] = []
+        visual_candidates: list[tuple[CanonicalIdentity, EvidenceItem]] = []
+
+        v_store = vector_store or getattr(self, "_vector_store", None)
+        if embedding_provider and v_store:
+            query_vector = await embedding_provider.embed_text(query)
+            # Query vector store with document_id and user_id filters
+            raw_hits = await v_store.search(
+                query_vector=query_vector,
+                top_k=top_k * 2,
+                user_id=scope.user_id,
+                document_ids=list(scope.authorized_docs.keys()),
+            )
+
+            for hit in raw_hits:
+                payload = hit.get("payload", {})
+                doc_id_str = payload.get("document_id")
+                doc_ver = payload.get("document_version")
+                elem_id_str = payload.get("element_id")
+                rep_type = payload.get("representation_type", "TEXT")
+                contract_id = payload.get("embedding_contract_id")
+
+                if not doc_id_str or not elem_id_str or doc_ver is None:
+                    continue
+
+                doc_id = UUID(doc_id_str)
+                elem_id = UUID(elem_id_str)
+
+                # Validate against scope
+                auth_ver = scope.authorized_docs.get(doc_id)
+                if not auth_ver or auth_ver.active_version != doc_ver:
+                    continue
+                if contract_id and auth_ver.active_embedding_contract_id != contract_id:
+                    continue
+
+                dense_canon_id: CanonicalIdentity = (doc_id, doc_ver, elem_id)
+                ev_type = (
+                    EvidenceType.FIGURE
+                    if rep_type == "VISUAL_SEMANTIC"
+                    else (
+                        EvidenceType.TABLE
+                        if rep_type == "TABLE_SEMANTIC"
+                        else EvidenceType.TEXT_CHUNK
+                    )
+                )
+
+                ev_item = EvidenceItem(
+                    evidence_id=elem_id,
+                    evidence_type=ev_type,
+                    user_id=scope.user_id,
+                    document_id=doc_id,
+                    document_version=doc_ver,
+                    element_id=elem_id,
+                    content=payload.get("content", ""),
+                    confidence=float(hit.get("score", 1.0)),
+                    metadata=dict(payload),
+                )
+
+                if rep_type == "VISUAL_SEMANTIC":
+                    visual_candidates.append((dense_canon_id, ev_item))
+                else:
+                    dense_candidates.append((dense_canon_id, ev_item))
+
+        # 2. SPARSE channel via document_element_repo
+        sparse_candidates: list[tuple[CanonicalIdentity, EvidenceItem]] = []
+        if document_element_repo:
+            sparse_hits = await document_element_repo.search_sparse(
+                query=query,
+                user_id=scope.user_id,
+                authorized_tuples=authorized_tuples,
+                top_k=top_k,
+            )
+            for elem, rank_score in sparse_hits:
+                sparse_canon_id: CanonicalIdentity = (
+                    elem.document_id,
+                    elem.document_version,
+                    elem.id,
+                )
+                ev_type = (
+                    EvidenceType.TABLE
+                    if elem.element_type.value == "TABLE"
+                    else (
+                        EvidenceType.FIGURE
+                        if elem.element_type.value == "FIGURE"
+                        else EvidenceType.TEXT_CHUNK
+                    )
+                )
+                ev_item = EvidenceItem(
+                    evidence_id=elem.id,
+                    evidence_type=ev_type,
+                    user_id=elem.user_id,
+                    document_id=elem.document_id,
+                    document_version=elem.document_version,
+                    element_id=elem.id,
+                    content=elem.content,
+                    confidence=rank_score,
+                    metadata=dict(elem.metadata),
+                )
+                sparse_candidates.append((sparse_canon_id, ev_item))
+
+        # 3. GRAPH channel via graph_retriever
+        graph_candidates: list[tuple[CanonicalIdentity, EvidenceItem]] = []
+        if graph_retriever:
+            graph_hits = await graph_retriever.retrieve_candidates(query, scope)
+            for canon_id, _rank, ev, rel in graph_hits:
+                ev_item = EvidenceItem(
+                    evidence_id=ev.id,
+                    evidence_type=EvidenceType.GRAPH_RELATIONSHIP,
+                    user_id=ev.user_id,
+                    document_id=ev.document_id,
+                    document_version=ev.document_version,
+                    element_id=ev.source_element_id,
+                    content=f"Relationship: {rel.relation_type} (source element: {ev.source_element_id})",
+                    confidence=ev.confidence,
+                    metadata={
+                        "relationship_id": str(rel.id),
+                        "relation_type": rel.relation_type,
+                        "source_span": ev.source_span,
+                    },
+                )
+                graph_candidates.append((canon_id, ev_item))
+
+        # 4. Fuse using Hybrid4ChannelRRFEngine
+        engine = Hybrid4ChannelRRFEngine()
+        return engine.fuse_4_channels(
+            dense_candidates=dense_candidates,
+            sparse_candidates=sparse_candidates,
+            visual_candidates=visual_candidates,
+            graph_candidates=graph_candidates,
+            final_top_k=top_k,
         )

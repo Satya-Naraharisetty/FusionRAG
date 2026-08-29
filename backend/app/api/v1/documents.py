@@ -36,6 +36,9 @@ class DocumentResponse(BaseModel):
     file_size: int
     checksum: str
     status: str
+    version: int = 1
+    active_version: int = 0
+    active_processing_config_version_id: UUID | None = None
     extractor_version: str
     failure_reason: str | None = None
     page_count: int | None = None

@@ -89,6 +89,9 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
                 checksum=document.checksum,
                 status=document.status.value,
                 extractor_version=document.extractor_version,
+                version=document.version,
+                active_version=document.active_version,
+                active_processing_config_version_id=document.active_processing_config_version_id,
                 failure_reason=document.failure_reason,
                 page_count=document.page_count,
                 word_count=document.word_count,
@@ -107,6 +110,11 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
             db_doc.checksum = document.checksum
             db_doc.status = document.status.value
             db_doc.extractor_version = document.extractor_version
+            db_doc.version = document.version
+            db_doc.active_version = document.active_version
+            db_doc.active_processing_config_version_id = (
+                document.active_processing_config_version_id
+            )
             db_doc.failure_reason = document.failure_reason
             db_doc.page_count = document.page_count
             db_doc.word_count = document.word_count
@@ -141,6 +149,9 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
             checksum=db_doc.checksum,
             status=DocumentStatus(db_doc.status),
             extractor_version=db_doc.extractor_version,
+            version=db_doc.version,
+            active_version=db_doc.active_version,
+            active_processing_config_version_id=db_doc.active_processing_config_version_id,
             failure_reason=db_doc.failure_reason,
             page_count=db_doc.page_count,
             word_count=db_doc.word_count,

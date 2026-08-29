@@ -38,6 +38,9 @@ ALLOWED_SPECIALIST_TYPES = {
     AgentType.DOCUMENT,
     AgentType.ANALYSIS,
     AgentType.WEB_SEARCH,
+    AgentType.TABLE,
+    AgentType.VISION,
+    AgentType.GRAPH,
 }
 
 

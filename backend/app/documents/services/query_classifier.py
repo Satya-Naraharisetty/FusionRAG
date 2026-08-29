@@ -17,6 +17,9 @@ class QueryType(str, Enum):
     AMBIGUOUS = "AMBIGUOUS"
     CONVERSATIONAL = "CONVERSATIONAL"
     NUMERICAL = "NUMERICAL"
+    TABLE = "TABLE"
+    MULTIMODAL = "MULTIMODAL"
+    GRAPH = "GRAPH"
 
 
 class QueryClassification(BaseModel):
@@ -133,6 +136,38 @@ class DeterministicQueryClassifier(QueryClassifier):
         ),
     ]
 
+    _TABLE_PATTERNS = [
+        re.compile(
+            r"\b(in\s+the\s+table|table\s+\d+|from\s+the\s+table|tabular|spreadsheet|csv|column|row\s+\d+|row-by-row)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b(balance\s+sheet|income\s+statement|financial\s+table)\b", re.IGNORECASE
+        ),
+    ]
+
+    _MULTIMODAL_PATTERNS = [
+        re.compile(
+            r"\b(in\s+the\s+image|in\s+the\s+figure|figure\s+\d+|chart|diagram|plot|graph\s+showing|bar\s+chart|pie\s+chart|trend\s+line|axes|axis)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b(visual|illustration|photo|screenshot|architecture\s+diagram)\b",
+            re.IGNORECASE,
+        ),
+    ]
+
+    _GRAPH_PATTERNS = [
+        re.compile(
+            r"\b(relationship\s+between|connected\s+to|network\s+of|who\s+works\s+for|subsidiary\s+of|parent\s+company)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b(affiliated\s+with|acquired\s+by|entities\s+related\s+to|knowledge\s+graph|organization\s+structure)\b",
+            re.IGNORECASE,
+        ),
+    ]
+
     _AMBIGUOUS_VAGUE_TERMS = {
         "it",
         "that",
@@ -155,6 +190,44 @@ class DeterministicQueryClassifier(QueryClassifier):
         normalized = query.strip()
         lower = normalized.lower()
         words = re.findall(r"\b\w+\b", lower)
+        word_count = len(words)
+
+        # 0a. Table Check
+        for pattern in self._TABLE_PATTERNS:
+            if pattern.search(lower):
+                return QueryClassification(
+                    query_type=QueryType.TABLE,
+                    confidence=0.92,
+                    requires_expansion=False,
+                    requires_decomposition=False,
+                    recommended_top_k=10,
+                    reasons=["Matched tabular/structured data query pattern"],
+                )
+
+        # 0b. Multimodal / Visual Check
+        for pattern in self._MULTIMODAL_PATTERNS:
+            if pattern.search(lower):
+                return QueryClassification(
+                    query_type=QueryType.MULTIMODAL,
+                    confidence=0.90,
+                    requires_expansion=False,
+                    requires_decomposition=False,
+                    recommended_top_k=10,
+                    reasons=["Matched visual/image/chart element pattern"],
+                )
+
+        # 0c. Graph / Entity Network Check
+        for pattern in self._GRAPH_PATTERNS:
+            if pattern.search(lower):
+                return QueryClassification(
+                    query_type=QueryType.GRAPH,
+                    confidence=0.91,
+                    requires_expansion=True,
+                    requires_decomposition=False,
+                    recommended_top_k=15,
+                    reasons=["Matched entity relationship / knowledge graph pattern"],
+                )
+
         word_count = len(words)
 
         # 1. Conversational Check

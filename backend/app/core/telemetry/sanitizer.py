@@ -21,7 +21,6 @@ SENSITIVE_KEYS = set(_AGENT_SENSITIVE_KEYS) | {
     "redis_password",
     "jwt_secret",
     "gemini_api_key",
-    "openai_api_key",
     "qdrant_api_key",
     "jina_api_key",
     "s3_secret_access_key",

@@ -74,7 +74,7 @@ def test_metrics_can_record_without_error():
     # Ingestion
     INGESTION_DOCUMENTS.labels(mime_type="application/pdf", status="success").inc()
     INGESTION_STAGE_DURATION.labels(stage="extraction").observe(0.4)
-    EMBEDDING_CHUNKS.labels(provider="openai", status="success").inc(5)
+    EMBEDDING_CHUNKS.labels(provider="jina", status="success").inc(5)
     QDRANT_OPERATION_DURATION.labels(operation="search").observe(0.015)
 
     # Export

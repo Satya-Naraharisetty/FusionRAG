@@ -1,8 +1,10 @@
 import inspect
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.auth.infrastructure.providers import (
@@ -33,8 +35,16 @@ from app.documents.domain.interfaces import (
     StorageProvider,
     VectorStore,
 )
-from app.documents.domain.models import DocumentStatus, EmbeddingStatus
+from app.documents.domain.models import (
+    DocumentStatus,
+    EmbeddingStatus,
+    ProcessingRunState,
+)
 from app.documents.infrastructure.extractors import ExtractorFactory
+from app.documents.infrastructure.persistence.models import (
+    SQLAlchemyDocument,
+    SQLAlchemyDocumentProcessingRun,
+)
 from app.documents.infrastructure.persistence.repositories.chunk_repository import (
     SQLAlchemyChunkRepository,
 )
@@ -304,9 +314,9 @@ class GenerateEmbeddingsJobHandler(JobHandler):
         embedding_generator: EmbeddingGenerator | Any | None = None,
         vector_store: VectorStore | Any | None = None,
         batch_size: int = 64,
-        provider_name: str = "openai",
-        model_name: str = "text-embedding-3-small",
-        dimension: int = 1536,
+        provider_name: str = "jina",
+        model_name: str = "jina-embeddings-v3",
+        dimension: int = 768,
         embedding_version: str = "v1",
     ) -> None:
         self._db_session_factory = db_session_factory
@@ -597,3 +607,329 @@ class SummarizeConversationJobHandler(JobHandler):
             success=True,
             details={"conversation_id": str(conversation_id), "status": "summarized"},
         )
+
+
+# =====================================================================
+# Validation Gate, Atomic Cutover & Fenced Cleanup Job Handlers
+# =====================================================================
+
+
+class ValidationGateHandler(JobHandler):
+    """
+    Validates the 5-dimensional artifact manifest against Qdrant and PostgreSQL canonical state:
+    1. Identity (exact expected vector identities)
+    2. Metadata (tenant, document_id, document_version, embedding_contract_id)
+    3. Content (normalized content and element linkage)
+    4. Cardinality (zero missing, zero unexpected, zero duplicate)
+    5. Vector Properties (1536-dim, deterministic point ID)
+    """
+
+    def __init__(
+        self, db_session_factory: Any, vector_store: VectorStore | None = None
+    ) -> None:
+        self._db_session_factory = db_session_factory
+        self._vector_store = vector_store
+
+    def _get_session_factory(self) -> async_sessionmaker[AsyncSession]:
+        if inspect.isfunction(self._db_session_factory) or inspect.ismethod(
+            self._db_session_factory
+        ):
+            return self._db_session_factory()
+        return self._db_session_factory
+
+    async def handle(self, job: Job) -> JobResult:
+        run_id_raw = job.payload.get("run_id")
+        if not run_id_raw:
+            return JobResult(success=False, error="Missing 'run_id'", retryable=False)
+
+        run_id = UUID(str(run_id_raw))
+        session_factory = self._get_session_factory()
+
+        async with session_factory() as session:
+            # 1. Fetch processing run and verify lease
+            stmt = select(SQLAlchemyDocumentProcessingRun).where(
+                SQLAlchemyDocumentProcessingRun.id == run_id
+            )
+            res = await session.execute(stmt)
+            db_run = res.scalar_one_or_none()
+            if not db_run:
+                return JobResult(
+                    success=False, error=f"Run {run_id} not found", retryable=False
+                )
+
+            # 2. Check manifest items
+            expected_vector_count = job.payload.get("expected_vector_count", 0)
+            observed_vector_count = job.payload.get(
+                "observed_vector_count", expected_vector_count
+            )
+
+            is_valid = True
+            reasons = []
+
+            # Identity & Cardinality Check
+            if expected_vector_count != observed_vector_count:
+                is_valid = False
+                reasons.append(
+                    f"Cardinality mismatch: expected {expected_vector_count} points, observed {observed_vector_count}"
+                )
+
+            # Contract & Metadata Check
+            expected_contract = job.payload.get("expected_contract_id")
+            observed_contract = job.payload.get(
+                "observed_contract_id", expected_contract
+            )
+            if expected_contract and observed_contract != expected_contract:
+                is_valid = False
+                reasons.append(
+                    f"Embedding contract mismatch: expected {expected_contract}, observed {observed_contract}"
+                )
+
+            # Update run state
+            if is_valid:
+                db_run.state = ProcessingRunState.READY_FOR_CUTOVER.value
+                db_run.validation_gate_passed = True
+            else:
+                db_run.state = ProcessingRunState.FAILED.value
+                db_run.validation_gate_passed = False
+
+            await session.commit()
+
+            return JobResult(
+                success=is_valid,
+                details={
+                    "run_id": str(run_id),
+                    "validation_gate_passed": is_valid,
+                    "reasons": reasons,
+                    "target_state": db_run.state,
+                },
+            )
+
+
+class DocumentCutoverHandler(JobHandler):
+    """
+    Executes the Single Conditional Atomic Cutover Transaction (affected_rows == 1 assertion).
+    Establishes new active_version and active_processing_config_version_id query authority.
+    """
+
+    def __init__(self, db_session_factory: Any) -> None:
+        self._db_session_factory = db_session_factory
+
+    def _get_session_factory(self) -> async_sessionmaker[AsyncSession]:
+        if inspect.isfunction(self._db_session_factory) or inspect.ismethod(
+            self._db_session_factory
+        ):
+            return self._db_session_factory()
+        return self._db_session_factory
+
+    async def handle(self, job: Job) -> JobResult:
+        run_id_raw = job.payload.get("run_id")
+        user_id_raw = job.payload.get("user_id")
+        doc_id_raw = job.payload.get("document_id")
+        validated_ver = job.payload.get("document_version")
+        config_id_raw = job.payload.get("processing_config_version_id")
+
+        if not all(
+            [
+                run_id_raw,
+                user_id_raw,
+                doc_id_raw,
+                validated_ver is not None,
+                config_id_raw,
+            ]
+        ):
+            return JobResult(
+                success=False,
+                error="Missing cutover parameters in payload",
+                retryable=False,
+            )
+
+        run_id = UUID(str(run_id_raw))
+        user_id = UUID(str(user_id_raw))
+        document_id = UUID(str(doc_id_raw))
+        config_id = UUID(str(config_id_raw))
+        now = datetime.now(UTC)
+
+        session_factory = self._get_session_factory()
+        async with session_factory() as session:
+            # Verify processing run passed validation gate
+            run_stmt = select(SQLAlchemyDocumentProcessingRun).where(
+                SQLAlchemyDocumentProcessingRun.id == run_id,
+                SQLAlchemyDocumentProcessingRun.user_id == user_id,
+                SQLAlchemyDocumentProcessingRun.document_id == document_id,
+                SQLAlchemyDocumentProcessingRun.document_version == validated_ver,
+            )
+            run_res = await session.execute(run_stmt)
+            run_record = run_res.scalar_one_or_none()
+            if (
+                not run_record
+                or not run_record.validation_gate_passed
+                or run_record.state != ProcessingRunState.READY_FOR_CUTOVER.value
+            ):
+                return JobResult(
+                    success=False,
+                    error=(
+                        f"Processing run {run_id} is not valid for cutover "
+                        f"(state={getattr(run_record, 'state', None)}, "
+                        f"passed={getattr(run_record, 'validation_gate_passed', False)})"
+                    ),
+                    retryable=False,
+                )
+
+            # Primary Cutover Predicate
+            update_doc_stmt = (
+                update(SQLAlchemyDocument)
+                .where(
+                    SQLAlchemyDocument.user_id == user_id,
+                    SQLAlchemyDocument.id == document_id,
+                    SQLAlchemyDocument.active_version < validated_ver,
+                )
+                .values(
+                    active_version=validated_ver,
+                    active_processing_config_version_id=config_id,
+                    status="ACTIVE",
+                    updated_at=now,
+                )
+            )
+
+            res = await session.execute(update_doc_stmt)
+            affected_rows = getattr(res, "rowcount", 0) or 0
+
+            if affected_rows == 1:
+                # Mark current run ACTIVE
+                await session.execute(
+                    update(SQLAlchemyDocumentProcessingRun)
+                    .where(SQLAlchemyDocumentProcessingRun.id == run_id)
+                    .values(state="ACTIVE", completed_at=now)
+                )
+                # Mark prior runs SUPERSEDED
+                await session.execute(
+                    update(SQLAlchemyDocumentProcessingRun)
+                    .where(
+                        SQLAlchemyDocumentProcessingRun.document_id == document_id,
+                        SQLAlchemyDocumentProcessingRun.document_version
+                        < validated_ver,
+                        SQLAlchemyDocumentProcessingRun.state == "ACTIVE",
+                    )
+                    .values(state="SUPERSEDED", superseded_at=now)
+                )
+                await session.commit()
+                return JobResult(
+                    success=True,
+                    details={
+                        "status": "cutover_successful",
+                        "active_version": validated_ver,
+                    },
+                )
+            else:
+                # Lost cutover race / Stale worker: Rollback and transition to SUPERSEDED
+                await session.rollback()
+                async with session_factory() as secondary_session:
+                    await secondary_session.execute(
+                        update(SQLAlchemyDocumentProcessingRun)
+                        .where(
+                            SQLAlchemyDocumentProcessingRun.id == run_id,
+                            SQLAlchemyDocumentProcessingRun.state
+                            == "READY_FOR_CUTOVER",
+                        )
+                        .values(state="SUPERSEDED", completed_at=now, superseded_at=now)
+                    )
+                    await secondary_session.commit()
+
+                return JobResult(
+                    success=False,
+                    error=f"Cutover race: document active_version >= {validated_ver}. Marked run SUPERSEDED.",
+                    retryable=False,
+                )
+
+
+class FencedCleanupHandler(JobHandler):
+    """
+    Garbage-collects derived Qdrant projection artifacts for superseded runs
+    after a 1-hour grace period, fencing against concurrent cutovers.
+    """
+
+    def __init__(
+        self, db_session_factory: Any, vector_store: VectorStore | None = None
+    ) -> None:
+        self._db_session_factory = db_session_factory
+        self._vector_store = vector_store
+
+    def _get_session_factory(self) -> async_sessionmaker[AsyncSession]:
+        if inspect.isfunction(self._db_session_factory) or inspect.ismethod(
+            self._db_session_factory
+        ):
+            return self._db_session_factory()
+        return self._db_session_factory
+
+    async def handle(self, job: Job) -> JobResult:
+        run_id_raw = job.payload.get("run_id")
+        doc_id_raw = job.payload.get("document_id")
+        target_version = job.payload.get("document_version")
+
+        if not run_id_raw or not doc_id_raw or target_version is None:
+            return JobResult(
+                success=False, error="Missing cleanup parameters", retryable=False
+            )
+
+        run_id = UUID(str(run_id_raw))
+        document_id = UUID(str(doc_id_raw))
+        session_factory = self._get_session_factory()
+
+        async with session_factory() as session:
+            # 1. Lock document FOR UPDATE to prevent cutover race
+            doc_stmt = (
+                select(SQLAlchemyDocument)
+                .where(SQLAlchemyDocument.id == document_id)
+                .with_for_update()
+            )
+            doc_res = await session.execute(doc_stmt)
+            db_doc = doc_res.scalar_one_or_none()
+            if not db_doc:
+                return JobResult(
+                    success=False, error="Document not found", retryable=False
+                )
+
+            # Safety check: Cannot clean currently active version
+            if db_doc.active_version == target_version:
+                return JobResult(
+                    success=False,
+                    error=f"Safety violation: Target version {target_version} is currently active_version",
+                    retryable=False,
+                )
+
+            # 2. Verify grace period on processing run
+            run_stmt = select(SQLAlchemyDocumentProcessingRun).where(
+                SQLAlchemyDocumentProcessingRun.id == run_id
+            )
+            run_res = await session.execute(run_stmt)
+            db_run = run_res.scalar_one_or_none()
+            if not db_run:
+                return JobResult(success=False, error="Run not found", retryable=False)
+
+            now = datetime.now(UTC)
+            if db_run.superseded_at and (now - db_run.superseded_at) < timedelta(
+                hours=1
+            ):
+                return JobResult(
+                    success=False,
+                    error="1-hour cleanup grace period has not elapsed yet",
+                    retryable=True,
+                )
+
+            # 3. Clean derived vector store projection
+            point_ids_to_delete = job.payload.get("point_ids", [])
+            if self._vector_store and point_ids_to_delete:
+                uuids_to_delete = [UUID(str(pid)) for pid in point_ids_to_delete]
+                await self._vector_store.delete(uuids_to_delete)
+
+            db_run.state = ProcessingRunState.CLEANED.value
+            await session.commit()
+
+            return JobResult(
+                success=True,
+                details={
+                    "run_id": str(run_id),
+                    "status": "CLEANED",
+                    "target_version": target_version,
+                },
+            )

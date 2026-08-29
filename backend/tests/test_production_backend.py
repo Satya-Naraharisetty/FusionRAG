@@ -368,7 +368,9 @@ async def test_llm_provider_router_failover():
 
     # Mock backup provider (succeeds)
     usage = Usage(prompt_tokens=10, completion_tokens=5, total_tokens=15)
-    backup_response = ProviderResponse(content="Hello from OpenAI", usage=usage)
+    backup_response = ProviderResponse(
+        content="Hello from Fallback Gemini Provider", usage=usage
+    )
     backup = AsyncMock(spec=LLMProvider)
     backup.generate.return_value = backup_response
 
@@ -387,7 +389,7 @@ async def test_llm_provider_router_failover():
         messages, model="gemini-3.5-flash-lite", temperature=0.0, max_tokens=100
     )
 
-    assert response.content == "Hello from OpenAI"
+    assert response.content == "Hello from Fallback Gemini Provider"
     # Ensure primary was attempted
     primary.generate.assert_called_once()
     # Ensure backup was attempted

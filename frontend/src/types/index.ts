@@ -58,6 +58,11 @@ export interface Citation {
   document_name: string;
   chunk_id: string;
   chunk_index: number;
+  version?: number;
+  element_id?: string;
+  element_type?: "TEXT" | "TABLE" | "FIGURE" | "GRAPH_RELATIONSHIP";
+  confidence?: number;
+  entailment_status?: "ENTAILED" | "CONTRADICTED" | "INSUFFICIENT";
 }
 
 // Documents
@@ -73,6 +78,9 @@ export interface Document {
   file_size: number;
   checksum: string;
   status: DocumentStatus;
+  version?: number;
+  active_version?: number;
+  active_processing_config_version_id?: string | null;
   extractor_version: string;
   failure_reason: string | null;
   page_count: number | null;
@@ -82,6 +90,35 @@ export interface Document {
   updated_at: string;
   processing_started_at: string | null;
   processing_completed_at: string | null;
+}
+
+export interface GraphEntity {
+  id: string;
+  name: string;
+  normalized_name: string;
+  entity_type: string;
+  description?: string;
+}
+
+export interface GraphRelationship {
+  id: string;
+  source_entity_id: string;
+  target_entity_id: string;
+  relation_type: string;
+  weight: number;
+}
+
+export interface TableDimension {
+  row_count: number;
+  col_count: number;
+}
+
+export interface StructuredTable {
+  element_id: string;
+  title?: string;
+  headers: string[];
+  dimensions: TableDimension;
+  summary?: string;
 }
 
 export interface EmbeddingStatus {

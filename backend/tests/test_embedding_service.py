@@ -85,8 +85,8 @@ async def test_embedding_service_batch_success(mocker):
         time_provider=time_provider,
         uuid_generator=uuid_generator,
         batch_size=2,
-        provider_name="gemini",
-        model_name="text-embedding-004",
+        provider_name="jina",
+        model_name="jina-embeddings-v3",
         dimension=768,
         embedding_version="v1",
     )
@@ -166,8 +166,8 @@ async def test_embedding_service_batch_failure_isolation(mocker):
         time_provider=time_provider,
         uuid_generator=uuid_generator,
         batch_size=2,
-        provider_name="gemini",
-        model_name="text-embedding-004",
+        provider_name="jina",
+        model_name="jina-embeddings-v3",
         dimension=768,
         embedding_version="v1",
     )
@@ -260,8 +260,8 @@ async def test_embedding_service_batch_no_n_plus_1(mocker):
         time_provider=time_provider,
         uuid_generator=uuid_generator,
         batch_size=2,
-        provider_name="gemini",
-        model_name="text-embedding-004",
+        provider_name="jina",
+        model_name="jina-embeddings-v3",
         dimension=768,
         embedding_version="v1",
     )

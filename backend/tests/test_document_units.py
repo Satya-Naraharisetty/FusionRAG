@@ -279,7 +279,6 @@ async def test_image_extractor_gemini(mock_client_class):
 
     with patch("app.documents.infrastructure.extractors.settings") as mock_settings:
         mock_settings.GEMINI_API_KEY = "mock-gemini-key"
-        mock_settings.OPENAI_API_KEY = "mock-openai-key"
         mock_settings.get_gemini_llm_api_key.return_value = "mock-gemini-key"
 
         extractor = ImageExtractor("image/png")

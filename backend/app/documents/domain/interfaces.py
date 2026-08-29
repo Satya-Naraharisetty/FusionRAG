@@ -5,13 +5,22 @@ from typing import Any
 from uuid import UUID
 
 from app.documents.domain.models import (
+    AuthorizedDocumentScope,
     Chunk,
     CleanupJob,
     Document,
+    DocumentElement,
     DocumentRetrievalScope,
     Embedding,
+    EntityMention,
     ExtractionResult,
+    GraphEntity,
+    GraphRelationship,
     ProcessedQuery,
+    ProcessingConfigVersion,
+    ProcessingJob,
+    ProcessingRun,
+    RelationshipEvidence,
     RetrievedChunk,
 )
 
@@ -516,4 +525,185 @@ class CleanupJobRepository(ABC):
         """
         Lists all jobs that are in PENDING or FAILED status.
         """
+        pass
+
+
+# =====================================================================
+# Multimodal, Structured & Knowledge Graph Domain Interfaces
+# =====================================================================
+
+
+class TextEmbeddingProvider(ABC):
+    @abstractmethod
+    async def embed_text(self, text: str, model: str | None = None) -> list[float]:
+        """Generates embedding vector for text content."""
+        pass
+
+    @abstractmethod
+    async def embed_batch(
+        self, texts: list[str], model: str | None = None
+    ) -> list[list[float]]:
+        """Generates embedding vectors for a batch of text contents."""
+        pass
+
+
+class OCRProvider(ABC):
+    @abstractmethod
+    async def extract_text_from_image(self, image_bytes: bytes) -> str:
+        """Extracts text from image bytes using OCR."""
+        pass
+
+
+class VisionProvider(ABC):
+    @abstractmethod
+    async def describe_visual_element(
+        self,
+        image_bytes: bytes,
+        element_type: str = "FIGURE",
+        prompt: str | None = None,
+    ) -> str:
+        """Generates rich visual description, trends, or structured transcription for image/chart/figure."""
+        pass
+
+
+class DocumentElementRepository(ABC):
+    @abstractmethod
+    async def save_bulk(self, elements: list[DocumentElement]) -> None:
+        """Persists a list of document elements in a bulk transaction."""
+        pass
+
+    @abstractmethod
+    async def get_by_id(
+        self, user_id: UUID, document_id: UUID, document_version: int, element_id: UUID
+    ) -> DocumentElement | None:
+        """Fetches a specific document element by its composite tenant identity."""
+        pass
+
+    @abstractmethod
+    async def list_by_version(
+        self, user_id: UUID, document_id: UUID, document_version: int
+    ) -> list[DocumentElement]:
+        """Lists all elements belonging to a specific document version."""
+        pass
+
+    @abstractmethod
+    async def search_sparse(
+        self,
+        query: str,
+        user_id: UUID,
+        authorized_tuples: list[tuple[UUID, int]],
+        top_k: int = 50,
+    ) -> list[tuple[DocumentElement, float]]:
+        """Performs lexical search using PostgreSQL GIN search_vector pre-filtered by tenant and authorized versions."""
+        pass
+
+
+class GraphRepository(ABC):
+    @abstractmethod
+    async def upsert_entities(self, entities: list[GraphEntity]) -> list[GraphEntity]:
+        """Upserts canonical tenant-global entities."""
+        pass
+
+    @abstractmethod
+    async def get_entity_by_id(
+        self, user_id: UUID, entity_id: UUID
+    ) -> GraphEntity | None:
+        """Fetches a canonical graph entity by tenant-scoped ID."""
+        pass
+
+    @abstractmethod
+    async def save_mentions(self, mentions: list[EntityMention]) -> None:
+        """Persists version-scoped entity mentions."""
+        pass
+
+    @abstractmethod
+    async def upsert_relationships(
+        self, relationships: list[GraphRelationship]
+    ) -> list[GraphRelationship]:
+        """Upserts canonical tenant-global relationships."""
+        pass
+
+    @abstractmethod
+    async def save_relationship_evidence(
+        self, evidence_list: list[RelationshipEvidence]
+    ) -> None:
+        """Persists version-scoped relationship evidence records."""
+        pass
+
+    @abstractmethod
+    async def traverse_active_subgraph(
+        self,
+        seed_entity_ids: list[UUID],
+        scope: AuthorizedDocumentScope,
+        max_hops: int = 2,
+        max_expansions: int = 20,
+        statement_timeout_ms: int = 1000,
+    ) -> list[tuple[GraphRelationship, RelationshipEvidence, int]]:
+        """Traverses knowledge graph from seed entities, returning relationships and active-version evidence with hop distance."""
+        pass
+
+
+class ProcessingRunRepository(ABC):
+    @abstractmethod
+    async def create_run(self, run: ProcessingRun) -> ProcessingRun:
+        """Creates a new processing run."""
+        pass
+
+    @abstractmethod
+    async def get_run_by_id(self, run_id: UUID) -> ProcessingRun | None:
+        """Fetches a processing run by ID."""
+        pass
+
+    @abstractmethod
+    async def get_active_run_for_document(
+        self, document_id: UUID
+    ) -> ProcessingRun | None:
+        """Fetches the active processing run for a document."""
+        pass
+
+    @abstractmethod
+    async def update_run_state(
+        self,
+        run_id: UUID,
+        state: str,
+        validation_gate_passed: bool | None = None,
+    ) -> None:
+        """Updates run state and validation status."""
+        pass
+
+    @abstractmethod
+    async def create_jobs(self, jobs: list[ProcessingJob]) -> None:
+        """Creates processing jobs for a run."""
+        pass
+
+    @abstractmethod
+    async def lease_job(
+        self, job_type: str, worker_id: str, lease_duration_seconds: int = 60
+    ) -> ProcessingJob | None:
+        """Acquires a lease on a pending job."""
+        pass
+
+    @abstractmethod
+    async def update_job_fenced(
+        self,
+        job_id: UUID,
+        lease_token: str,
+        status: str,
+        last_error: str | None = None,
+    ) -> bool:
+        """Fenced job completion/failure update requiring matching unexpired lease token."""
+        pass
+
+
+class ProcessingConfigRepository(ABC):
+    @abstractmethod
+    async def get_or_create_config(
+        self, config: ProcessingConfigVersion
+    ) -> tuple[UUID, ProcessingConfigVersion]:
+        """Gets or creates an immutable processing configuration version row."""
+        pass
+
+    @abstractmethod
+    async def get_config_by_id(self, config_id: UUID) -> ProcessingConfigVersion | None:
+        """Fetches a processing configuration by ID."""
         pass

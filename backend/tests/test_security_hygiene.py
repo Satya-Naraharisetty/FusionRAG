@@ -25,10 +25,6 @@ def test_env_example_not_ignored():
         assert not re.search(r"GEMINI_API_KEY=AIzaSy", content), (
             "backend/.env.example contains a real-looking Gemini key"
         )
-        # Verify no actual OpenAI key
-        assert not re.search(r"OPENAI_API_KEY=sk-", content), (
-            "backend/.env.example contains a real-looking OpenAI key"
-        )
         # Verify standard secret placeholders are safe
         assert "super_secure_random" not in content, (
             "backend/.env.example contains development signing key string"
@@ -48,7 +44,6 @@ def test_frontend_source_contains_no_private_credentials():
     # Common secret patterns
     secret_patterns = [
         re.compile(r"AIzaSy[A-Za-z0-9_-]{35}"),  # Google/Gemini API Key
-        re.compile(r"sk-proj-[A-Za-z0-9_-]{40,}"),  # OpenAI API Key
         re.compile(r"ghp_[A-Za-z0-9]{36,40}"),  # GitHub Personal Access Token
     ]
 
@@ -83,7 +78,6 @@ def test_secret_values_not_emitted_by_config_logging_or_errors():
         QDRANT_HOST="localhost",
         JWT_SECRET=secret_value,
         GEMINI_API_KEY=secret_value,
-        OPENAI_API_KEY=secret_value,
     )
 
     repr_str = repr(settings)

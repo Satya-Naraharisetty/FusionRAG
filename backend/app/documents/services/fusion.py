@@ -1,8 +1,10 @@
 import logging
+from dataclasses import dataclass, field
 from typing import Any
+from uuid import UUID
 
 from app.documents.domain.interfaces import FusionEngine
-from app.documents.domain.models import RetrievedChunk
+from app.documents.domain.models import CanonicalIdentity, EvidenceItem, RetrievedChunk
 
 logger = logging.getLogger(__name__)
 
@@ -159,3 +161,129 @@ class WeightedReciprocalRankFusionEngine(FusionEngine):
             )
 
         return fused_chunks
+
+
+# =====================================================================
+# Hybrid 4-Channel Weighted Reciprocal Rank Fusion Engine
+# =====================================================================
+
+
+@dataclass
+class FusedRetrievalCandidate:
+    document_id: UUID
+    document_version: int
+    element_id: UUID
+    fused_score: float
+    channel_ranks: dict[str, int] = field(default_factory=dict)
+    evidence_items: list[EvidenceItem] = field(default_factory=list)
+    primary_content: str = ""
+    element_type: str = "TEXT"
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def canonical_identity(self) -> CanonicalIdentity:
+        return (self.document_id, self.document_version, self.element_id)
+
+
+class Hybrid4ChannelRRFEngine:
+    """
+    4-Channel Weighted Reciprocal Rank Fusion (RRF) Engine across Dense, Sparse, Visual, and Graph modalities.
+    Formula: RRF(c) = sum_i (w_i / (k + rank_i(c))) with k=60, 1-indexed ranks.
+    Channel weights: DENSE=1.0, SPARSE=0.8, VISUAL_SEMANTIC=1.0, GRAPH=1.2.
+    Missing channel contribution is strictly 0.0.
+    Tie-breaking: (-fused_score, str(document_id), document_version, str(element_id)).
+    """
+
+    DENSE_WEIGHT: float = 1.0
+    SPARSE_WEIGHT: float = 0.8
+    VISUAL_WEIGHT: float = 1.0
+    GRAPH_WEIGHT: float = 1.2
+    RRF_K: int = 60
+
+    TOP_K_LIMITS: dict[str, int] = {
+        "DENSE": 50,
+        "SPARSE": 50,
+        "VISUAL_SEMANTIC": 50,
+        "GRAPH": 50,
+    }
+
+    def fuse_4_channels(
+        self,
+        dense_candidates: list[tuple[CanonicalIdentity, EvidenceItem]],
+        sparse_candidates: list[tuple[CanonicalIdentity, EvidenceItem]],
+        visual_candidates: list[tuple[CanonicalIdentity, EvidenceItem]],
+        graph_candidates: list[tuple[CanonicalIdentity, EvidenceItem]],
+        final_top_k: int = 50,
+    ) -> list[FusedRetrievalCandidate]:
+        channel_data = [
+            (
+                "DENSE",
+                dense_candidates[: self.TOP_K_LIMITS["DENSE"]],
+                self.DENSE_WEIGHT,
+            ),
+            (
+                "SPARSE",
+                sparse_candidates[: self.TOP_K_LIMITS["SPARSE"]],
+                self.SPARSE_WEIGHT,
+            ),
+            (
+                "VISUAL_SEMANTIC",
+                visual_candidates[: self.TOP_K_LIMITS["VISUAL_SEMANTIC"]],
+                self.VISUAL_WEIGHT,
+            ),
+            (
+                "GRAPH",
+                graph_candidates[: self.TOP_K_LIMITS["GRAPH"]],
+                self.GRAPH_WEIGHT,
+            ),
+        ]
+
+        candidate_map: dict[CanonicalIdentity, FusedRetrievalCandidate] = {}
+        channel_min_ranks: dict[CanonicalIdentity, dict[str, int]] = {}
+
+        for channel_name, items, weight in channel_data:
+            seen_in_channel: set[CanonicalIdentity] = set()
+            for rank_0, (canon_id, ev_item) in enumerate(items):
+                # Channel-local minimum rank deduplication
+                if canon_id in seen_in_channel:
+                    continue
+                seen_in_channel.add(canon_id)
+                rank_1 = rank_0 + 1
+
+                if canon_id not in candidate_map:
+                    doc_id, doc_ver, elem_id = canon_id
+                    candidate_map[canon_id] = FusedRetrievalCandidate(
+                        document_id=doc_id,
+                        document_version=doc_ver,
+                        element_id=elem_id,
+                        fused_score=0.0,
+                        channel_ranks={},
+                        evidence_items=[],
+                        primary_content=ev_item.content,
+                        element_type=ev_item.evidence_type.value
+                        if hasattr(ev_item.evidence_type, "value")
+                        else str(ev_item.evidence_type),
+                        metadata=dict(ev_item.metadata),
+                    )
+                    channel_min_ranks[canon_id] = {}
+
+                candidate_map[canon_id].evidence_items.append(ev_item)
+                channel_min_ranks[canon_id][channel_name] = rank_1
+                candidate_map[canon_id].channel_ranks[channel_name] = rank_1
+                candidate_map[canon_id].fused_score += weight / (rank_1 + self.RRF_K)
+
+        if not candidate_map:
+            return []
+
+        # Deterministic tie-breaking: (-fused_score, str(document_id), document_version, str(element_id))
+        sorted_candidates = sorted(
+            candidate_map.values(),
+            key=lambda c: (
+                -c.fused_score,
+                str(c.document_id),
+                c.document_version,
+                str(c.element_id),
+            ),
+        )
+
+        return sorted_candidates[:final_top_k]
