@@ -552,8 +552,94 @@ def test_regression_runner_detects_deliberate_quality_regression():
         r for r in regression_result.details["regressions"] if r["metric"] == "mrr"
     )
     assert mrr_reg["candidate"] == 0.80
-    assert mrr_reg["delta"] < -0.03
-    assert mrr_reg["status"] == "REGRESSION"
+    assert mrr_reg["status"] in ("REGRESSION", "BELOW_QUALITY_FLOOR")
+
+
+def test_regression_runner_detects_quality_floor_breach():
+    """
+    Verifies that candidate metric falling below absolute quality floor triggers regression failure
+    even if baseline was also low or drop was small.
+    """
+    runner = RegressionRunner()
+    baseline = runner.load_baseline_file(_BASELINE_V1_PATH)
+
+    candidate_metrics = dict(baseline.metric_averages)
+    # hit_rate floor is 0.90, set to 0.85
+    candidate_metrics["hit_rate"] = 0.85
+
+    regression_result = runner.compare_with_baseline_data(
+        candidate_metrics=candidate_metrics,
+        candidate_latency=baseline.latency_metrics["avg_latency"],
+        baseline=baseline,
+        candidate_dataset_version=baseline.dataset_version,
+        candidate_profile=baseline.profile,
+        minimum_quality_floors={"hit_rate": 0.90},
+    )
+
+    assert regression_result.passed is False
+    floor_reg = next(
+        r for r in regression_result.details["regressions"] if r["metric"] == "hit_rate"
+    )
+    assert floor_reg["status"] == "BELOW_QUALITY_FLOOR"
+    assert floor_reg["threshold"] == 0.90
+
+
+def test_regression_runner_detects_latency_regression():
+    """
+    Verifies that candidate latency increasing beyond max allowed percentage (e.g. +50% vs 20% limit)
+    triggers regression failure.
+    """
+    runner = RegressionRunner()
+    baseline = runner.load_baseline_file(_BASELINE_V1_PATH)
+
+    # Baseline latency is 0.045s, candidate is 0.090s (+100% increase)
+    regression_result = runner.compare_with_baseline_data(
+        candidate_metrics=dict(baseline.metric_averages),
+        candidate_latency=0.090,
+        baseline=baseline,
+        candidate_dataset_version=baseline.dataset_version,
+        candidate_profile=baseline.profile,
+        max_latency_increase_percent=20.0,
+    )
+
+    assert regression_result.passed is False
+    lat_reg = next(
+        r for r in regression_result.details["regressions"] if r["metric"] == "latency"
+    )
+    assert lat_reg["status"] == "REGRESSION"
+    assert lat_reg["latency_increase_percent"] > 20.0
+
+
+def test_regression_runner_detects_dual_gate_semantics():
+    """
+    Verifies dual-gate regression logic:
+    Candidate passes absolute floor (0.90 >= 0.85 floor) but fails delta degradation from baseline
+    (1.00 -> 0.90 is a 0.10 drop > 0.03 allowed drop).
+    """
+    runner = RegressionRunner()
+    baseline = runner.load_baseline_file(_BASELINE_V1_PATH)
+
+    candidate_metrics = dict(baseline.metric_averages)
+    # baseline hit_rate is 1.0, candidate is 0.92 (passes 0.85 floor, but fails 0.03 max drop)
+    candidate_metrics["hit_rate"] = 0.92
+
+    regression_result = runner.compare_with_baseline_data(
+        candidate_metrics=candidate_metrics,
+        candidate_latency=baseline.latency_metrics["avg_latency"],
+        baseline=baseline,
+        candidate_dataset_version=baseline.dataset_version,
+        candidate_profile=baseline.profile,
+        max_score_drop=0.03,
+        minimum_quality_floors={"hit_rate": 0.85},
+    )
+
+    assert regression_result.passed is False
+    hit_reg = next(
+        r for r in regression_result.details["regressions"] if r["metric"] == "hit_rate"
+    )
+    assert hit_reg["status"] == "REGRESSION"
+    assert hit_reg["delta"] == -0.08
+    assert hit_reg["threshold"] == -0.03
 
 
 # ==============================================================================

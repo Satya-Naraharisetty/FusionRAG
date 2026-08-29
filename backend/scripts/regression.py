@@ -53,6 +53,16 @@ async def main() -> None:
         help="Custom delta thresholds as key=value comma-separated list (e.g. mrr=-0.02,hit_rate=0.0).",
     )
     parser.add_argument(
+        "--quality-floors",
+        help="Custom absolute quality floors as key=value comma-separated list (e.g. hit_rate=0.90,mrr=0.90).",
+    )
+    parser.add_argument(
+        "--disable-quality-floors",
+        action="store_true",
+        default=False,
+        help="Disable absolute minimum quality floors check.",
+    )
+    parser.add_argument(
         "--ignore-profile-mismatch",
         action="store_true",
         default=False,
@@ -75,6 +85,17 @@ async def main() -> None:
             if "=" in item:
                 k, v = item.split("=", 1)
                 thresholds_dict[k.strip()] = float(v.strip())
+
+    # Parse custom quality floors
+    quality_floors_dict: dict[str, float] | None = None
+    if args.disable_quality_floors:
+        quality_floors_dict = {}
+    elif args.quality_floors:
+        quality_floors_dict = dict(runner.DEFAULT_MINIMUM_QUALITY_FLOORS)
+        for item in args.quality_floors.split(","):
+            if "=" in item:
+                k, v = item.split("=", 1)
+                quality_floors_dict[k.strip()] = float(v.strip())
 
     # Case A: Comparing directly against a static Baseline JSON file
     if args.baseline_file:
@@ -138,6 +159,7 @@ async def main() -> None:
             max_latency_increase_percent=args.max_latency_increase,
             ignore_profile_mismatch=args.ignore_profile_mismatch,
             ignore_dataset_mismatch=args.ignore_dataset_mismatch,
+            minimum_quality_floors=quality_floors_dict,
         )
 
     # Case B: Comparing two DB runs
@@ -193,6 +215,7 @@ async def main() -> None:
                 delta_thresholds=thresholds_dict if thresholds_dict else None,
                 max_score_drop=args.max_score_drop,
                 max_latency_increase_percent=args.max_latency_increase,
+                minimum_quality_floors=quality_floors_dict,
             )
         finally:
             await db.close()
@@ -212,9 +235,9 @@ async def main() -> None:
 
     details = regression_result.details
     print(
-        f"{'Metric':<30} | {'Baseline':>10} | {'Candidate':>10} | {'Delta':>10} | {'Status'}"
+        f"{'Metric':<35} | {'Baseline':>10} | {'Candidate':>10} | {'Delta':>10} | {'Status'}"
     )
-    print("-" * 75)
+    print("-" * 80)
 
     for metric, delta in regression_result.metric_deltas.items():
         b_val = details.get("baseline_metrics", {}).get(metric, 0.0)
@@ -225,7 +248,7 @@ async def main() -> None:
             else ("IMPROVEMENT [+]" if delta > 0.01 else "UNCHANGED [=]")
         )
         print(
-            f"{metric:<30} | {b_val:>10.3f} | {c_val:>10.3f} | {delta:>+10.3f} | {m_status}"
+            f"{metric:<35} | {b_val:>10.3f} | {c_val:>10.3f} | {delta:>+10.3f} | {m_status}"
         )
 
     # Latency summary
@@ -236,7 +259,7 @@ async def main() -> None:
         "REGRESSION [-]" if lat_pct > args.max_latency_increase else "STABLE [=]"
     )
     print(
-        f"{'Average Latency (s)':<30} | {b_lat:>10.3f} | {c_lat:>10.3f} | {lat_pct:>+9.1f}% | {lat_status}"
+        f"{'Average Latency (s)':<35} | {b_lat:>10.3f} | {c_lat:>10.3f} | {lat_pct:>+9.1f}% | {lat_status}"
     )
 
     # List any specific regressions
@@ -246,7 +269,11 @@ async def main() -> None:
         print("DETECTED REGRESSION DETAILS")
         print("=" * 60)
         for r in regressions:
-            if r.get("metric") == "latency":
+            if r.get("status") == "BELOW_QUALITY_FLOOR":
+                print(
+                    f"  - {r.get('metric')}: score {r.get('candidate')} is BELOW absolute minimum floor of {r.get('threshold')}"
+                )
+            elif r.get("metric") == "latency":
                 print(
                     f"  - Latency increased by +{r.get('latency_increase_percent')}% (Threshold: +{r.get('threshold')}%)"
                 )
@@ -260,7 +287,7 @@ async def main() -> None:
     # Fail loudly with exit code 1 if regression detected for CI gates
     if not regression_result.passed:
         print(
-            "\n[FAIL] CI GATE FAILED: Quality regression exceeds configured threshold."
+            "\n[FAIL] CI GATE FAILED: Quality regression or quality floor breach detected."
         )
         sys.exit(1)
     else:

@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi import status
 from sqlalchemy import create_engine, text
@@ -13,6 +15,28 @@ from app.core.config import settings
 from app.core.security.rate_limiter import LoginAttemptTracker, RateLimiter
 from app.db.models import Base
 from tests.db import TEST_DATABASE_URL
+
+
+@pytest.fixture(autouse=True)
+def hermetic_email_isolation(monkeypatch):
+    """
+    Guarantees auth tests are 100% hermetic and never attempt outbound network calls to Resend.
+    Sets mock API key and mocks email sending methods to record dispatches in memory.
+    """
+    monkeypatch.setattr(settings, "RESEND_API_KEY", "mock_test_resend_key")
+    with (
+        patch(
+            "app.core.email.resend_service.ResendEmailService.send_verification_email",
+            new_callable=AsyncMock,
+        ) as mock_verify,
+        patch(
+            "app.core.email.resend_service.ResendEmailService.send_magic_link",
+            new_callable=AsyncMock,
+        ) as mock_magic,
+    ):
+        mock_verify.return_value = True
+        mock_magic.return_value = True
+        yield {"verify": mock_verify, "magic": mock_magic}
 
 
 def _truncate_auth_tables(session) -> None:

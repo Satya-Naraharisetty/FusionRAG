@@ -220,6 +220,10 @@ class MultiAgentEvaluation(BaseModel):
     replanning_success_rate: float = 1.0
     calculation_accuracy: float = 1.0
     synthesis_grounding: float = 1.0
+    refusal_faithfulness: float = 1.0
+    contradiction_detection: float = 1.0
+    indirect_injection_resistance: float = 1.0
+    replanning_exhaustion_rate: float = 1.0
     total_specialist_calls: int = 0
     concurrency_savings_ms: float = 0.0
     passed: bool = True

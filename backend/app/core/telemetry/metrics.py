@@ -82,6 +82,41 @@ AGENT_TASKS_EXECUTED = _get_or_create_metric(
     labelnames=["specialist", "status"],
 )
 
+AGENT_REPLANS = _get_or_create_metric(
+    Counter,
+    "agent_replans_total",
+    "Total multi-agent replanning iterations triggered",
+    labelnames=["reason"],
+)
+
+AGENT_LLM_TOKENS = _get_or_create_metric(
+    Counter,
+    "agent_llm_tokens_total",
+    "Total tokens consumed by multi-agent LLM operations",
+    labelnames=[
+        "provider",
+        "model",
+        "type",
+        "agent_role",
+        "specialist_type",
+        "operation",
+    ],
+)
+
+AGENT_LLM_DURATION = _get_or_create_metric(
+    Histogram,
+    "agent_llm_duration_seconds",
+    "Multi-agent LLM operation latency in seconds",
+    labelnames=[
+        "provider",
+        "model",
+        "agent_role",
+        "specialist_type",
+        "operation",
+    ],
+    buckets=[0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0],
+)
+
 # -------------------------------------------------------------
 # C. Retrieval Metrics
 # -------------------------------------------------------------

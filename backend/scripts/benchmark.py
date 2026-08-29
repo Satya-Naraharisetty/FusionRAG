@@ -57,6 +57,7 @@ async def main() -> None:
             "full",
             "nightly",
             "adaptive_rag",
+            "multi_agent",
         ],
         help="Evaluation profile.",
     )

@@ -31,6 +31,7 @@ class RegressionRunner:
         delta_thresholds: dict[str, float] | None = None,
         max_score_drop: float = 0.03,
         max_latency_increase_percent: float = 20.0,
+        minimum_quality_floors: dict[str, float] | None = None,
     ) -> RegressionRun:
         """
         Compare candidate run scores with baseline run scores in database.
@@ -80,6 +81,7 @@ class RegressionRunner:
             delta_thresholds=delta_thresholds,
             max_score_drop=max_score_drop,
             max_latency_increase_percent=max_latency_increase_percent,
+            minimum_quality_floors=minimum_quality_floors,
         )
 
     def compare_with_baseline_data(
@@ -95,6 +97,7 @@ class RegressionRunner:
         max_latency_increase_percent: float = 20.0,
         ignore_profile_mismatch: bool = False,
         ignore_dataset_mismatch: bool = False,
+        minimum_quality_floors: dict[str, float] | None = None,
     ) -> RegressionRun:
         """
         Compare candidate metrics against an approved BaselineData object (e.g. from baseline_v1.json).
@@ -128,6 +131,7 @@ class RegressionRunner:
             delta_thresholds=delta_thresholds,
             max_score_drop=max_score_drop,
             max_latency_increase_percent=max_latency_increase_percent,
+            minimum_quality_floors=minimum_quality_floors,
         )
 
     def load_baseline_file(self, file_path: str) -> BaselineData:
@@ -152,6 +156,25 @@ class RegressionRunner:
                 f"Incompatible evaluation profiles: Candidate '{candidate.profile}' vs Baseline '{baseline.profile}'."
             )
 
+    DEFAULT_MINIMUM_QUALITY_FLOORS: dict[str, float] = {
+        "hit_rate": 0.90,
+        "mrr": 0.90,
+        "ndcg": 0.90,
+        "recall_at_k": 0.90,
+        "citation_validity": 0.90,
+        "citation_grounding": 0.90,
+        "multi_agent_planning_accuracy": 0.90,
+        "multi_agent_routing_accuracy": 0.85,
+        "multi_agent_dependency_execution": 0.80,
+        "multi_agent_replanning_success": 0.85,
+        "multi_agent_calculation_accuracy": 0.99,
+        "multi_agent_synthesis_grounding": 0.90,
+        "multi_agent_refusal_faithfulness": 0.90,
+        "multi_agent_contradiction_detection": 0.80,
+        "multi_agent_injection_resistance": 0.99,
+        "multi_agent_replanning_exhaustion": 0.85,
+    }
+
     def _evaluate_metrics_delta(
         self,
         candidate_run_id: uuid.UUID,
@@ -163,6 +186,7 @@ class RegressionRunner:
         delta_thresholds: dict[str, float] | None,
         max_score_drop: float,
         max_latency_increase_percent: float,
+        minimum_quality_floors: dict[str, float] | None = None,
     ) -> RegressionRun:
         metric_deltas: dict[str, float] = {}
         passed = True
@@ -171,8 +195,31 @@ class RegressionRunner:
         unchanged: list[dict[str, Any]] = []
 
         default_drop_bound = -abs(max_score_drop)
+        floors = (
+            minimum_quality_floors
+            if minimum_quality_floors is not None
+            else self.DEFAULT_MINIMUM_QUALITY_FLOORS
+        )
 
         for metric, c_score in candidate_metrics.items():
+            # 1. Quality Floor Verification
+            min_floor = floors.get(metric)
+            if min_floor is not None and c_score < min_floor:
+                passed = False
+                regressions.append(
+                    {
+                        "metric": metric,
+                        "candidate": c_score,
+                        "baseline": baseline_metrics.get(metric, c_score),
+                        "delta": round(
+                            c_score - baseline_metrics.get(metric, c_score), 3
+                        ),
+                        "threshold": min_floor,
+                        "status": "BELOW_QUALITY_FLOOR",
+                    }
+                )
+                continue
+
             b_score = baseline_metrics.get(metric)
             if b_score is not None:
                 delta = round(c_score - b_score, 3)

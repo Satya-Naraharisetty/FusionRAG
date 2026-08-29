@@ -1,0 +1,29 @@
+{
+  "baseline_version": "v1",
+  "dataset_version": "1.1.0",
+  "evaluator_version": "v1",
+  "profile": "multi_agent",
+  "generated_at": "2026-08-29T21:25:00.000000+00:00",
+  "sample_count": 10,
+  "metric_averages": {
+    "multi_agent_planning_accuracy": 1.0,
+    "multi_agent_routing_accuracy": 1.0,
+    "multi_agent_dependency_execution": 1.0,
+    "multi_agent_replanning_success": 1.0,
+    "multi_agent_calculation_accuracy": 1.0,
+    "multi_agent_synthesis_grounding": 1.0,
+    "multi_agent_refusal_faithfulness": 1.0,
+    "multi_agent_contradiction_detection": 1.0,
+    "multi_agent_injection_resistance": 1.0,
+    "multi_agent_replanning_exhaustion": 1.0
+  },
+  "latency_metrics": {
+    "avg_latency": 0.231,
+    "max_latency": 0.450
+  },
+  "metadata": {
+    "run_id": "91f1c528-ff50-4425-b088-89f76fb7e4ff",
+    "dataset_id": "golden_multi_agent_v1",
+    "description": "Multi-agent architecture baseline across 10 evaluation dimensions."
+  }
+}

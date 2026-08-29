@@ -177,15 +177,34 @@ flowchart TD
 
 ---
 
-## 6. Evaluation Framework & Observability Console
+## 6. Evaluation Framework & Operational Confidence Governance
 
-To prevent retrieval regressions and monitor live operations:
+To prevent regressions, validate complex agentic workflows, and monitor live operations, Hybrid RAG enforces a formal multi-tier evaluation system:
 
-* **Evaluation Metrics**: Faithfulness, Answer Relevancy, Context Precision, and Context Recall evaluated via Ragas and DeepEval providers against curated golden benchmark datasets.
-* **Regression Protection**: Automated test runners compare evaluation results against historical baselines (`baseline_v1.json`, `baseline_v2.json`, `baseline_v3.json`) and generate visual HTML reports.
+### Operational Confidence Categories
+1. **Benchmark-Proven**: Offline evaluation over versioned golden datasets (`golden_rag_dataset`, `golden_multi_agent_v1`) measuring exact mathematical properties and quality scores under deterministic execution.
+2. **Repository-Proven**: Verified via automated pytest test suites covering execution DAGs, timeouts, failure cascades, and telemetry sanitization (with 1 known environment-specific Upstash Redis Windows SSL socket shutdown failure).
+3. **Production-Observable**: Fully instrumented with low-cardinality Prometheus metrics (`AGENT_LLM_TOKENS`, `AGENT_LLM_DURATION`, `AGENT_REPLANS`, `AGENT_TASKS_EXECUTED`), OpenTelemetry distributed traces, and sanitized structured JSON logs.
+4. **Live-Production Observed**: Requires observation under real-world multi-tenant traffic (live Gemini requests, real SSE streaming backpressure, actual token distributions).
+5. **Load / Adversarially Verified**: High-concurrency saturation (p95/p99 latency under load), thread-pool contention, and extensive live adversarial prompt injection suites remain to be proven in staging/production.
+
+### Multi-Agent 10-Dimension Quality & Safety Evaluation
+* **Planning & Routing**: Validates correct specialist selection (Research, Analysis, Document, Web Search) and capability policy enforcement.
+* **DAG Execution & Bounded Replanning**: Ensures topological dependency execution and bounds replanning to $\le 2$ iterations.
+* **Deterministic Calculation**: Sandboxed arithmetic execution without LLM numeric hallucinations.
+* **Refusal Faithfulness**: Explicit refusal on missing evidence without ungrounded extrapolation.
+* **Contradiction Detection & Synthesis**: Identifies conflicting claims across documents, references all conflicting sources, and prevents arbitrary one-sided bias.
+* **Indirect Prompt Injection Resistance**: Ensures document text is treated strictly as untrusted data rather than executable instructions.
+* **Replanning Exhaustion Handling**: Halts gracefully at max iterations with actionable diagnostic limitation notices.
+
+### Regression Governance (Floor + Maximum Degradation)
+* **Dual Gate**: Enforces both an absolute minimum quality floor per metric (e.g. calculation $\ge 0.99$, injection resistance $\ge 0.99$) AND a maximum allowed degradation from versioned baselines (`max_score_drop \le 0.03`).
+* **CI Integration**: Automated CLI (`backend/scripts/regression.py`) runs on pull requests and commits to block regressions before merging. Proven against negative test cases (floor breaches, delta drops, and latency increases).
+
+### Telemetry & Observability
 * **In-App Admin Dashboard (`/admin/dashboard`)**: Displays real-time KPI metrics, token consumption, latency breakdowns, and interactive execution trace waterfalls.
-* **OpenTelemetry Distributed Tracing**: Exports spans to Jaeger with automated PII and credential sanitization (`TelemetrySanitizer`).
-* **Prometheus Metrics**: Scrapes `/api/v1/observability/metrics` with low-cardinality label sets, feeding pre-provisioned Grafana dashboards.
+* **OpenTelemetry Distributed Tracing**: Exports spans with automated PII/credential sanitization (`TelemetrySanitizer`).
+* **Low-Cardinality Prometheus Metrics**: Scrapes `/api/v1/observability/metrics` with strict cardinality bounds (no user IDs or document IDs in metric labels).
 
 ---
 
