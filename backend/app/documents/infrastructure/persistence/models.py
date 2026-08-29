@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     FetchedValue,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -22,6 +23,10 @@ from app.db.session import Base
 
 class SQLAlchemyDocument(Base):
     __tablename__ = "documents"
+    __table_args__ = (
+        Index("ix_documents_user_id_scope", "user_id", "scope"),
+        Index("ix_documents_user_id_conversation_id", "user_id", "conversation_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(

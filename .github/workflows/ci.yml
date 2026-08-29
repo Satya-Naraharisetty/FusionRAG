@@ -79,6 +79,12 @@ jobs:
         working-directory: ./backend
         run: mypy app
 
+      - name: Run Alembic Migrations
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hybrid_rag_test
+        run: alembic upgrade head
+
       - name: Run Pytest Tests
         working-directory: ./backend
         env:

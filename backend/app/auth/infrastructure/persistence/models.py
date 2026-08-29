@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     String,
     Text,
     UniqueConstraint,
@@ -77,6 +78,7 @@ class SQLAlchemyUser(Base):
 
 class SQLAlchemySession(Base):
     __tablename__ = "refresh_sessions"
+    __table_args__ = (Index("ix_refresh_sessions_user_id", "user_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     token_hash: Mapped[str] = mapped_column(
