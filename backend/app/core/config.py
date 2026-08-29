@@ -311,6 +311,9 @@ class Settings(BaseSettings):
     SYSTEM_PROMPT_TOKENS: int = 1000
     RESERVED_COMPLETION_TOKENS: int = 500
     ENABLE_STREAMING: bool = True
+    CONCISE_MODE_DEFAULT: bool = True
+    ADAPTIVE_TOKEN_LIMITS_ENABLED: bool = True
+    DEFAULT_STOP_SEQUENCES: list[str] = ["\n\nUser:", "\n\nHuman:"]
     GEMINI_API_KEY: str = ""
     GEMINI_FALLBACK_API_KEY: str = ""
     GEMINI_PLANNER_API_KEY: str = ""

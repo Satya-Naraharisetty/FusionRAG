@@ -31,6 +31,9 @@ class GeminiProvider(LLMProvider):
         max_tokens: int,
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
+        stop_sequences: list[str] | None = None,
+        response_schema: dict[str, Any] | None = None,
+        response_mime_type: str | None = None,
     ) -> dict[str, Any]:
         contents: list[dict[str, Any]] = []
         system_instruction_content: str = ""
@@ -80,12 +83,23 @@ class GeminiProvider(LLMProvider):
 
             contents.append({"role": role, "parts": parts})
 
-        payload = {
+        generation_config: dict[str, Any] = {
+            "temperature": temperature,
+            "maxOutputTokens": max_tokens,
+        }
+
+        if stop_sequences:
+            generation_config["stopSequences"] = stop_sequences
+
+        if response_schema is not None:
+            generation_config["responseMimeType"] = "application/json"
+            generation_config["responseSchema"] = response_schema
+        elif response_mime_type:
+            generation_config["responseMimeType"] = response_mime_type
+
+        payload: dict[str, Any] = {
             "contents": contents,
-            "generationConfig": {
-                "temperature": temperature,
-                "maxOutputTokens": max_tokens,
-            },
+            "generationConfig": generation_config,
         }
 
         if system_instruction_content:
@@ -123,13 +137,23 @@ class GeminiProvider(LLMProvider):
         max_tokens: int,
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
+        stop_sequences: list[str] | None = None,
+        response_schema: dict[str, Any] | None = None,
+        response_mime_type: str | None = None,
     ) -> ProviderResponse:
         if not self.api_key:
             raise LLMProviderError("Gemini API key is missing or not configured.")
 
         url = self._get_url(model, stream=False)
         payload = self._build_payload(
-            messages, temperature, max_tokens, tools, tool_choice
+            messages,
+            temperature,
+            max_tokens,
+            tools,
+            tool_choice,
+            stop_sequences=stop_sequences,
+            response_schema=response_schema,
+            response_mime_type=response_mime_type,
         )
         headers = {"Content-Type": "application/json"}
 
@@ -193,13 +217,23 @@ class GeminiProvider(LLMProvider):
         max_tokens: int,
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
+        stop_sequences: list[str] | None = None,
+        response_schema: dict[str, Any] | None = None,
+        response_mime_type: str | None = None,
     ) -> AsyncIterator[StreamChunk]:
         if not self.api_key:
             raise LLMProviderError("Gemini API key is missing or not configured.")
 
         url = self._get_url(model, stream=True)
         payload = self._build_payload(
-            messages, temperature, max_tokens, tools, tool_choice
+            messages,
+            temperature,
+            max_tokens,
+            tools,
+            tool_choice,
+            stop_sequences=stop_sequences,
+            response_schema=response_schema,
+            response_mime_type=response_mime_type,
         )
         headers = {"Content-Type": "application/json"}
 

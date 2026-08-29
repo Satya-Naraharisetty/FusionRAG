@@ -2,6 +2,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
+from typing import Any
 
 from app.chat.domain.agents import ToolDefinition
 from app.chat.domain.interfaces import (
@@ -89,6 +90,9 @@ class LLMProviderRouter(LLMProvider):
         max_tokens: int,
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
+        stop_sequences: list[str] | None = None,
+        response_schema: dict[str, Any] | None = None,
+        response_mime_type: str | None = None,
     ) -> ProviderResponse:
         from app.core.telemetry import (
             LLM_CIRCUIT_BREAKER_STATE,
@@ -141,6 +145,9 @@ class LLMProviderRouter(LLMProvider):
                     max_tokens=max_tokens,
                     tools=tools,
                     tool_choice=tool_choice,
+                    stop_sequences=stop_sequences,
+                    response_schema=response_schema,
+                    response_mime_type=response_mime_type,
                 )
                 dur = time.perf_counter() - t0
                 try:
@@ -175,7 +182,7 @@ class LLMProviderRouter(LLMProvider):
                 span.record_exception(e)
                 logger.error(f"Generation failed on provider {provider_key}: {e}")
 
-                # If failover is possible, try the other provider once
+                # If failover is possible, try the other provider once (total attempts strictly bounded to 2-3)
                 fallback_key = (
                     getattr(self._policy, "backup", None)
                     if provider_key == getattr(self._policy, "primary", None)
@@ -199,6 +206,9 @@ class LLMProviderRouter(LLMProvider):
                                 max_tokens=max_tokens,
                                 tools=tools,
                                 tool_choice=tool_choice,
+                                stop_sequences=stop_sequences,
+                                response_schema=response_schema,
+                                response_mime_type=response_mime_type,
                             )
                             fb_dur = time.perf_counter() - t_fb
                             try:
@@ -250,6 +260,9 @@ class LLMProviderRouter(LLMProvider):
         max_tokens: int,
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
+        stop_sequences: list[str] | None = None,
+        response_schema: dict[str, Any] | None = None,
+        response_mime_type: str | None = None,
     ) -> AsyncIterator[StreamChunk]:
         from app.core.telemetry import (
             LLM_CIRCUIT_BREAKER_STATE,
@@ -306,6 +319,9 @@ class LLMProviderRouter(LLMProvider):
                     max_tokens=max_tokens,
                     tools=tools,
                     tool_choice=tool_choice,
+                    stop_sequences=stop_sequences,
+                    response_schema=response_schema,
+                    response_mime_type=response_mime_type,
                 ):
                     if not first_token_recorded and (
                         chunk.text_delta or chunk.tool_calls

@@ -558,11 +558,27 @@ class ChatOrchestrator:
                             + agent_resp.total_completion_tokens,
                         )
                     else:
+                        from app.core.config import settings
+
+                        query_type = (
+                            getattr(rewrite_result, "query_type", None) or "FACTUAL"
+                        )
+                        effective_max_tokens = (
+                            self.prompt_builder.get_adaptive_max_tokens(
+                                query_type=query_type,
+                                base_max_tokens=self.max_response_tokens,
+                            )
+                            if getattr(settings, "ADAPTIVE_TOKEN_LIMITS_ENABLED", True)
+                            else self.max_response_tokens
+                        )
+                        default_stop = getattr(settings, "DEFAULT_STOP_SEQUENCES", None)
+
                         response = await self.llm_generation_service.generate(
                             messages=messages,
                             model=self.model,
                             temperature=self.temperature,
-                            max_tokens=self.max_response_tokens,
+                            max_tokens=effective_max_tokens,
+                            stop_sequences=default_stop,
                         )
                         from app.chat.domain.interfaces import ProviderResponse
 
@@ -1087,11 +1103,27 @@ class ChatOrchestrator:
                                 total_tokens=event["data"]["usage"]["total_tokens"],
                             )
                 else:
+                    from app.core.config import settings
+
+                    query_type = (
+                        getattr(rewrite_result, "query_type", None) or "FACTUAL"
+                    )
+                    effective_max_tokens = (
+                        self.prompt_builder.get_adaptive_max_tokens(
+                            query_type=query_type,
+                            base_max_tokens=self.max_response_tokens,
+                        )
+                        if getattr(settings, "ADAPTIVE_TOKEN_LIMITS_ENABLED", True)
+                        else self.max_response_tokens
+                    )
+                    default_stop = getattr(settings, "DEFAULT_STOP_SEQUENCES", None)
+
                     async for chunk in self.llm_generation_service.stream(
                         messages=messages,
                         model=self.model,
                         temperature=self.temperature,
-                        max_tokens=self.max_response_tokens,
+                        max_tokens=effective_max_tokens,
+                        stop_sequences=default_stop,
                     ):
                         from app.chat.domain.interfaces import StreamChunk
 

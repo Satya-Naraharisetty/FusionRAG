@@ -32,6 +32,7 @@ class PromptBuilder:
         self.system_prompt_path = system_prompt_path
         self._default_system_prompt = (
             "You are a helpful and precise AI assistant. When document context is provided, answer factual questions using ONLY the provided context.\n"
+            "Provide direct, concise answers without conversational filler, preamble, or unrequested meta-explanations.\n"
             'If a factual question cannot be answered from the provided context, say "I cannot answer this question based on the provided context."\n'
             "For conversational greetings, pleasantries, or general acknowledgments, respond naturally and helpfully without stating that document context is missing.\n"
             "Do not invent any facts, make assumptions, or extrapolate beyond the provided text. Support factual statements with citations to the source chunks (e.g. [Chunk 1], [Chunk 2]) when context is used.\n"
@@ -40,6 +41,29 @@ class PromptBuilder:
         self._default_user_template = "Context:\n<retrieved_context>\n{context}\n</retrieved_context>\n\nQuestion: {question}\n\nAnswer:"
         # Load and cache system prompt at initialization
         self._system_prompt = self._load_system_prompt()
+
+    @staticmethod
+    def get_adaptive_max_tokens(
+        query_type: str | None = None,
+        base_max_tokens: int = 1000,
+    ) -> int:
+        """
+        Dynamically calculate max response tokens based on the classified query intent
+        to minimize latency, prevent runaway responses, and reduce token consumption.
+        """
+        if not query_type:
+            return base_max_tokens
+
+        qt = str(query_type).upper()
+        if "CONVERSATIONAL" in qt or "GREETING" in qt:
+            return min(150, base_max_tokens)
+        elif "FACTUAL" in qt or "NUMERICAL" in qt:
+            return min(350, base_max_tokens)
+        elif "COMPARISON" in qt or "MULTI_HOP" in qt:
+            return min(800, base_max_tokens)
+        elif "EXPLANATION" in qt or "MULTI_DOCUMENT" in qt:
+            return base_max_tokens
+        return base_max_tokens
 
     def _load_system_prompt(self) -> str:
         if self.system_prompt_path and os.path.exists(self.system_prompt_path):

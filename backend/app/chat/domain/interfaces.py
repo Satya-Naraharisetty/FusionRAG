@@ -71,9 +71,12 @@ class LLMProvider(ABC):
         max_tokens: int,
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
+        stop_sequences: list[str] | None = None,
+        response_schema: dict[str, Any] | None = None,
+        response_mime_type: str | None = None,
     ) -> ProviderResponse:
         """
-        Generate a response from the LLM, optionally utilizing tool calling.
+        Generate a response from the LLM, optionally utilizing tool calling, stop sequences, and structured output.
         """
         pass
 
@@ -86,9 +89,12 @@ class LLMProvider(ABC):
         max_tokens: int,
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
+        stop_sequences: list[str] | None = None,
+        response_schema: dict[str, Any] | None = None,
+        response_mime_type: str | None = None,
     ) -> AsyncIterator[StreamChunk]:
         """
-        Stream the LLM response, yielding text chunks and tool calls.
+        Stream the LLM response, yielding text chunks, tool calls, and honoring stop sequences.
         """
         pass
 
