@@ -76,10 +76,16 @@ async def pg_session():
     async_session = async_sessionmaker(
         bind=engine, class_=AsyncSession, expire_on_commit=False
     )
-    async with async_session() as session:
-        yield session
-        await session.rollback()
-    await engine.dispose()
+    try:
+        async with async_session() as session:
+            try:
+                await session.execute(text("SELECT 1"))
+            except Exception as conn_err:
+                pytest.skip(f"Live PostgreSQL database not reachable: {conn_err}")
+            yield session
+            await session.rollback()
+    finally:
+        await engine.dispose()
 
 
 @pytest.mark.asyncio
