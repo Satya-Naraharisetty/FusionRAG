@@ -120,6 +120,100 @@ async def test_jina_reranker_timeout_fallback():
     assert result == chunks
 
 
+@pytest.mark.asyncio
+async def test_jina_reranker_retry_429_then_success():
+    chunk1 = _create_dummy_chunk("1", "Text 1")
+    chunk2 = _create_dummy_chunk("2", "Text 2")
+    chunks = [chunk1, chunk2]
+
+    resp_429 = httpx.Response(
+        status_code=429,
+        text="Rate limited",
+        request=httpx.Request("POST", "https://api.jina.ai/v1/rerank"),
+    )
+    resp_200 = httpx.Response(
+        status_code=200,
+        json={
+            "results": [
+                {"index": 1, "document": {"text": "Text 2"}, "relevance_score": 0.95},
+                {"index": 0, "document": {"text": "Text 1"}, "relevance_score": 0.30},
+            ]
+        },
+        request=httpx.Request("POST", "https://api.jina.ai/v1/rerank"),
+    )
+
+    reranker = JinaReranker(api_key="test_jina_key", max_retries=2)
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            mock_post.side_effect = [
+                httpx.HTTPStatusError(
+                    "Rate limited", request=resp_429.request, response=resp_429
+                ),
+                resp_200,
+            ]
+            result = await reranker.rerank("query", chunks)
+
+            assert mock_post.call_count == 2
+            mock_sleep.assert_called_once_with(1.0)
+            assert len(result) == 2
+            assert result[0].text == "Text 2"
+            assert result[0].rerank_score == 0.95
+            assert result[1].text == "Text 1"
+            assert result[1].rerank_score == 0.30
+
+
+@pytest.mark.asyncio
+async def test_jina_reranker_partial_results_appends_unranked_candidates():
+    chunk1 = _create_dummy_chunk("1", "Text 1")
+    chunk2 = _create_dummy_chunk("2", "Text 2")
+    chunk3 = _create_dummy_chunk("3", "Text 3")
+    chunks = [chunk1, chunk2, chunk3]
+
+    resp_200 = httpx.Response(
+        status_code=200,
+        json={
+            "results": [
+                {"index": 2, "document": {"text": "Text 3"}, "relevance_score": 0.98},
+            ]
+        },
+        request=httpx.Request("POST", "https://api.jina.ai/v1/rerank"),
+    )
+
+    reranker = JinaReranker(api_key="test_jina_key", max_retries=0)
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = resp_200
+        result = await reranker.rerank("query", chunks)
+
+        assert len(result) == 3
+        assert result[0].text == "Text 3"
+        assert result[0].rerank_score == 0.98
+        # Unranked candidates should be preserved in incoming order
+        assert result[1].text == "Text 1"
+        assert result[2].text == "Text 2"
+
+
+@pytest.mark.asyncio
+async def test_jina_reranker_malformed_response_fallback():
+    chunk1 = _create_dummy_chunk("1", "Text 1")
+    chunks = [chunk1]
+
+    resp_malformed = httpx.Response(
+        status_code=200,
+        text="not valid json",
+        request=httpx.Request("POST", "https://api.jina.ai/v1/rerank"),
+    )
+
+    reranker = JinaReranker(api_key="test_jina_key", max_retries=0)
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = resp_malformed
+        result = await reranker.rerank("query", chunks)
+
+        assert result == chunks
+
+
 def test_dual_gemini_api_key_resolution():
     # Test case 1: Dedicated keys provided
     settings = Settings(

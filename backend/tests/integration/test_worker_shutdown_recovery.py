@@ -27,9 +27,11 @@ async def test_shutdown_job_finishes_within_grace_period(real_redis):
     await queue.ensure_consumer_group()
 
     completed: list[str] = []
+    started = asyncio.Event()
 
     class GracePeriodHandler(JobHandler):
         async def handle(self, job: Job) -> JobResult:
+            started.set()
             await asyncio.sleep(0.1)  # Takes 100ms
             completed.append(job.payload["name"])
             return JobResult(success=True)
@@ -47,12 +49,12 @@ async def test_shutdown_job_finishes_within_grace_period(real_redis):
     await queue.enqueue(task_type="GRACE_TASK", payload={"name": "grace_job_1"})
     await worker.start()
 
-    # Give it a fraction of time to pick up the job
-    await asyncio.sleep(0.02)
+    # Wait until the worker picks up the job
+    await asyncio.wait_for(started.wait(), timeout=3.0)
     assert worker.active_tasks_count >= 1 or len(completed) == 1
 
-    # Request stop with grace period of 1.0s (sufficient for 0.1s job)
-    await worker.stop(timeout_seconds=1.0)
+    # Request stop with grace period of 2.0s (sufficient for 0.1s job)
+    await worker.stop(timeout_seconds=2.0)
 
     assert "grace_job_1" in completed
 

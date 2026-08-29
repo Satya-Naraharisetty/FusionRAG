@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -178,10 +179,33 @@ class RedisStreamTaskQueue(DurableTaskQueue):
 
     async def acknowledge(self, stream_message_id: str | UUID) -> None:
         """
-        Acknowledges a message in the consumer group (XACK).
+        Acknowledges a message in the consumer group (XACK) with resilient retry for transient network disconnects.
         """
         msg_id_str = str(stream_message_id)
-        await self._redis.xack(self._stream_name, self._consumer_group, msg_id_str)
+        max_attempts = 3
+        for attempt in range(1, max_attempts + 1):
+            try:
+                await self._redis.xack(
+                    self._stream_name, self._consumer_group, msg_id_str
+                )
+                return
+            except (
+                ConnectionError,
+                async_redis.ConnectionError,
+                async_redis.TimeoutError,
+            ) as e:
+                if attempt == max_attempts:
+                    logger.error(
+                        f"queue.ack_failed: permanent connection failure acknowledging message {msg_id_str} "
+                        f"on stream {self._stream_name} after {max_attempts} attempts: {e}"
+                    )
+                    raise
+                backoff = 0.05 * (2 ** (attempt - 1))
+                logger.warning(
+                    f"queue.ack_retry: transient connection error on XACK for {msg_id_str} "
+                    f"(attempt {attempt}/{max_attempts}), retrying in {backoff:.2f}s: {e}"
+                )
+                await asyncio.sleep(backoff)
 
     async def reject(self, job_id: UUID, error: str, retryable: bool = True) -> None:
         """
