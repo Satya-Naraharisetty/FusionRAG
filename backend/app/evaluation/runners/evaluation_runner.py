@@ -18,6 +18,7 @@ from app.evaluation.runners.ragas_provider import RagasProvider
 from app.evaluation.services.agent_evaluator import AgentEvaluator
 from app.evaluation.services.citation_evaluator import CitationEvaluator
 from app.evaluation.services.conversation_evaluator import ConversationEvaluator
+from app.evaluation.services.multi_agent_evaluator import MultiAgentEvaluator
 from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
 from app.evaluation.services.tool_evaluator import ToolEvaluator
 
@@ -34,7 +35,7 @@ async def _safe_commit(db: Any) -> None:
 class EvaluationRunner:
     """
     Evaluation Runner is responsible for executing a single evaluation run on a dataset,
-    running independent pipelines (Retrieval, Generation, Agent, Conversation, Citation), and persisting to database.
+    running independent pipelines (Retrieval, Generation, Agent, MultiAgent, Conversation, Citation), and persisting to database.
     """
 
     def __init__(
@@ -46,6 +47,7 @@ class EvaluationRunner:
         ragas_provider: RagasProvider,
         deepeval_provider: DeepEvalProvider,
         citation_evaluator: CitationEvaluator | None = None,
+        multi_agent_evaluator: MultiAgentEvaluator | None = None,
     ) -> None:
         self.retrieval_evaluator = retrieval_evaluator
         self.agent_evaluator = agent_evaluator
@@ -54,6 +56,7 @@ class EvaluationRunner:
         self.ragas_provider = ragas_provider
         self.deepeval_provider = deepeval_provider
         self.citation_evaluator = citation_evaluator or CitationEvaluator()
+        self.multi_agent_evaluator = multi_agent_evaluator or MultiAgentEvaluator()
 
     async def run_evaluation(
         self,
@@ -180,6 +183,14 @@ class EvaluationRunner:
                     )
                 )
 
+            # --- Pipeline F: Multi-Agent Benchmark ---
+            multi_agent_results = []
+            if "multi_agent" in pipelines:
+                logger.info("Starting Multi-Agent Architecture Pipeline...")
+                multi_agent_results = await self.multi_agent_evaluator.evaluate_samples(
+                    samples, mock=mock
+                )
+
             # 2. Consolidate results for each sample
             total_in = 0
             total_out = 0
@@ -203,6 +214,7 @@ class EvaluationRunner:
                     citation_results,
                     agent_results,
                     conversation_results,
+                    multi_agent_results,
                 ]:
                     if idx < len(pipeline_res):
                         res = pipeline_res[idx]

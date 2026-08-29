@@ -211,3 +211,16 @@ class ToolEvaluation(BaseModel):
     correct_tool_chosen: bool = True
     passed: bool = True
     reason: str | None = None
+
+
+class MultiAgentEvaluation(BaseModel):
+    planning_accuracy: float = 1.0
+    routing_accuracy: float = 1.0
+    dependency_execution_success: float = 1.0
+    replanning_success_rate: float = 1.0
+    calculation_accuracy: float = 1.0
+    synthesis_grounding: float = 1.0
+    total_specialist_calls: int = 0
+    concurrency_savings_ms: float = 0.0
+    passed: bool = True
+    reason: str | None = None

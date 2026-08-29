@@ -402,11 +402,24 @@ class ChatOrchestrator:
                         for cit in citations
                     ]
 
+                    from app.chat.domain.multi_agent import (
+                        format_sanitized_agent_diagnostics,
+                    )
+
+                    sanitized_agent_diagnostics = format_sanitized_agent_diagnostics(
+                        diagnostics=multi_resp.diagnostics,
+                        plan=multi_resp.plan,
+                        specialist_results=multi_resp.specialist_results,
+                        total_time_ms=multi_resp.total_time_ms,
+                        citation_count=len(citations),
+                    )
+
                     total_time_ms = (time.perf_counter() - start_time) * 1000
                     metadata = {
                         "retrieval_time_ms": research_latency,
                         "generation_time_ms": generation_time_ms,
                         "total_time_ms": total_time_ms,
+                        "agent_diagnostics": sanitized_agent_diagnostics,
                     }
 
                     await self.conversation_manager.finalize_message(
@@ -834,6 +847,7 @@ class ChatOrchestrator:
                 full_answer_list = []
                 final_usage = None
                 stream_citations = []
+                stream_agent_diagnostics = None
 
                 async for event in self.master_agent.execute_request_stream(
                     request=question,
@@ -860,6 +874,8 @@ class ChatOrchestrator:
                             )
                         if "citations" in event.get("data", {}):
                             stream_citations = event["data"]["citations"]
+                    elif event.get("event") == "multi_agent_diagnostics":
+                        stream_agent_diagnostics = event.get("data")
                     yield event
 
                 total_time_ms = (time.perf_counter() - start_time) * 1000
@@ -892,6 +908,7 @@ class ChatOrchestrator:
                     "retrieval_time_ms": 0.0,
                     "generation_time_ms": gen_time_ms,
                     "total_time_ms": total_time_ms,
+                    "agent_diagnostics": stream_agent_diagnostics,
                 }
 
                 await self.conversation_manager.finalize_message(
@@ -905,24 +922,28 @@ class ChatOrchestrator:
                 )
                 message_finalized = True
 
+                done_payload: dict[str, Any] = {
+                    "assistant_message_id": str(assistant_message_id),
+                    "conversation_id": str(conversation_id),
+                    "total_time_ms": round(total_time_ms, 2),
+                    "citations": citations_data,
+                    "answer": full_answer_text,
+                    "diagnostics": {
+                        "retrieval_skipped": skip_retrieval,
+                        "dense_count": len(citations_data),
+                        "sparse_count": 0,
+                        "fusion_count": len(citations_data),
+                        "rerank_count": len(citations_data),
+                        "rewritten": rewrite_result.rewrite_applied,
+                        "latencies": {},
+                    },
+                }
+                if stream_agent_diagnostics is not None:
+                    done_payload["agent_diagnostics"] = stream_agent_diagnostics
+
                 yield {
                     "event": "done",
-                    "data": {
-                        "assistant_message_id": str(assistant_message_id),
-                        "conversation_id": str(conversation_id),
-                        "total_time_ms": round(total_time_ms, 2),
-                        "citations": citations_data,
-                        "answer": full_answer_text,
-                        "diagnostics": {
-                            "retrieval_skipped": skip_retrieval,
-                            "dense_count": len(citations_data),
-                            "sparse_count": 0,
-                            "fusion_count": len(citations_data),
-                            "rerank_count": len(citations_data),
-                            "rewritten": rewrite_result.rewrite_applied,
-                            "latencies": {},
-                        },
-                    },
+                    "data": done_payload,
                 }
                 return
             except Exception as e:

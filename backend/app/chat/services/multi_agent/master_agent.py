@@ -1096,3 +1096,113 @@ class MasterAgent:
             max_tokens=max_tokens,
         ):
             yield synth_event
+
+        # Emit canonical sanitized diagnostics event at completion of multi-agent streaming
+        all_results_list = list(accumulated_results.values())
+        failed_tasks = [r.task_id for r in all_results_list if not r.success]
+        research_results = [
+            r
+            for r in all_results_list
+            if r.agent_type == AgentType.RESEARCH and r.metadata
+        ]
+        research_plans_created = len(research_results)
+        research_subqueries_generated = sum(
+            len(r.metadata.get("research_plan", {}).get("subqueries", []))
+            for r in research_results
+        )
+        research_subqueries_executed = sum(
+            r.metadata.get("queries_executed", 0) for r in research_results
+        )
+        research_empty_queries = sum(
+            len(r.metadata.get("empty_queries", [])) for r in research_results
+        )
+        research_duplicate_evidence_removed = sum(
+            r.metadata.get("duplicate_evidence_removed", 0) for r in research_results
+        )
+        research_evidence_count = sum(
+            len(r.evidence) for r in research_results if r.success
+        )
+        research_planning_latency_ms = sum(
+            r.metadata.get("research_planning_latency_ms", 0.0)
+            for r in research_results
+        )
+        research_retrieval_latency_ms = sum(
+            r.metadata.get("research_retrieval_latency_ms", 0.0)
+            for r in research_results
+        )
+        research_total_latency_ms = sum(r.execution_time_ms for r in research_results)
+
+        total_est_cost = sum(
+            r.metadata.get("estimated_cost_units", 0.0) for r in all_results_list
+        )
+        total_est_latency = sum(
+            r.metadata.get("estimated_latency_ms", 0.0) for r in all_results_list
+        )
+
+        stream_diagnostics = MultiAgentDiagnostics(
+            plan_iterations=iteration,
+            total_specialist_calls=total_calls,
+            task_latencies={r.task_id: r.execution_time_ms for r in all_results_list},
+            failed_tasks=failed_tasks,
+            limits_reached=[],
+            evaluation_count=iteration,
+            replans=iteration - 1 if iteration > 1 else 0,
+            initial_task_count=len(current_plan.tasks) if current_plan else 0,
+            final_task_count=len(all_results_list),
+            avoided_duplicate_tasks=0,
+            retry_count=0,
+            evaluation_latency_ms=0.0,
+            planning_latency_ms=0.0,
+            execution_latency_ms=0.0,
+            synthesis_latency_ms=0.0,
+            research_plans_created=research_plans_created,
+            research_subqueries_generated=research_subqueries_generated,
+            research_subqueries_executed=research_subqueries_executed,
+            research_retrieval_calls=research_subqueries_executed,
+            research_empty_queries=research_empty_queries,
+            research_duplicate_evidence_removed=research_duplicate_evidence_removed,
+            research_evidence_count=research_evidence_count,
+            research_planning_latency_ms=round(research_planning_latency_ms, 2),
+            research_retrieval_latency_ms=round(research_retrieval_latency_ms, 2),
+            research_total_latency_ms=round(research_total_latency_ms, 2),
+            routing_decisions=len(all_results_list),
+            capability_rejections=sum(
+                1
+                for r in all_results_list
+                if r.metadata.get("routing_reason_code")
+                in (
+                    "BUDGET_EXCEEDED",
+                    "CONTEXT_MISSING",
+                    "POLICY_REJECTED",
+                    "CAPABILITY_MISMATCH",
+                )
+            ),
+            fallback_routes=sum(
+                1
+                for r in all_results_list
+                if r.metadata.get("routing_reason_code") == "FALLBACK_CAPABILITY"
+            ),
+            unavailable_capabilities=sum(
+                1
+                for r in all_results_list
+                if r.metadata.get("routing_reason_code")
+                in ("NO_CAPABILITY_AVAILABLE", "CAPABILITY_DISABLED")
+            ),
+            routing_latency_ms=0.0,
+            estimated_cost_units=round(total_est_cost, 4),
+            estimated_latency_ms=round(total_est_latency, 2),
+        )
+
+        from app.chat.domain.multi_agent import format_sanitized_agent_diagnostics
+
+        sanitized_diag = format_sanitized_agent_diagnostics(
+            diagnostics=stream_diagnostics,
+            plan=current_plan,
+            specialist_results=all_results_list,
+            latest_evaluation=latest_evaluation,
+        )
+
+        yield {
+            "event": "multi_agent_diagnostics",
+            "data": sanitized_diag,
+        }

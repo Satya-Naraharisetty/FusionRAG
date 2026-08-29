@@ -1,0 +1,139 @@
+dataset_id: golden_multi_agent_v1
+version: 1.0.0
+description: Representative multi-agent architecture golden benchmark dataset measuring planning, routing, dependency execution, replanning, calculation, and synthesis grounding.
+samples:
+  - id: ma_sample_1_doc_rag
+    question: "What is the company refund policy duration?"
+    expected_answer: "The refund policy duration is 30 days from purchase."
+    expected_specialists:
+      - RESEARCH
+    expected_routes:
+      t1: research.hybrid_rag
+    retrieval_required: true
+    trigger_replan: false
+    metadata:
+      expected_specialists: ["RESEARCH"]
+      expected_routes:
+        t1: "research.hybrid_rag"
+      actual_tasks:
+        - task_id: "t1"
+          agent_type: "RESEARCH"
+          routed_capability: "research.hybrid_rag"
+          success: true
+          dependencies: []
+      agent_diagnostics:
+        multi_agent_execution: true
+        total_specialist_calls: 1
+        plan_iterations: 1
+        evidence_count: 2
+        concurrency_savings_ms: 0.0
+        total_time_ms: 150.0
+      citations:
+        - document_name: "policy.pdf"
+          chunk_id: "chk-1"
+
+  - id: ma_sample_2_doc_calculation
+    question: "What was the revenue growth from 2022 ($10M) to 2023 ($15M)?"
+    expected_answer: "The revenue growth rate was 50.00%."
+    expected_specialists:
+      - RESEARCH
+      - ANALYSIS
+    expected_numeric_output: 50.0
+    retrieval_required: true
+    trigger_replan: false
+    metadata:
+      expected_specialists: ["RESEARCH", "ANALYSIS"]
+      expected_routes:
+        t1: "research.hybrid_rag"
+        t2: "analysis.safe_calculator"
+      expected_numeric_output: 50.0
+      actual_numeric_output: 50.0
+      actual_tasks:
+        - task_id: "t1"
+          agent_type: "RESEARCH"
+          routed_capability: "research.hybrid_rag"
+          success: true
+          dependencies: []
+        - task_id: "t2"
+          agent_type: "ANALYSIS"
+          routed_capability: "analysis.safe_calculator"
+          success: true
+          dependencies: ["t1"]
+      agent_diagnostics:
+        multi_agent_execution: true
+        total_specialist_calls: 2
+        plan_iterations: 1
+        evidence_count: 1
+        concurrency_savings_ms: 25.0
+        total_time_ms: 220.0
+      citations:
+        - document_name: "earnings.pdf"
+          chunk_id: "chk-2"
+
+  - id: ma_sample_3_web_search
+    question: "What are the latest updates on Python 3.14?"
+    expected_answer: "Python 3.14 includes new JIT compiler and tail call optimizations."
+    expected_specialists:
+      - WEB_SEARCH
+    retrieval_required: false
+    trigger_replan: false
+    metadata:
+      expected_specialists: ["WEB_SEARCH"]
+      expected_routes:
+        t1: "web.search"
+      actual_tasks:
+        - task_id: "t1"
+          agent_type: "WEB_SEARCH"
+          routed_capability: "web.search"
+          success: true
+          dependencies: []
+      agent_diagnostics:
+        multi_agent_execution: true
+        total_specialist_calls: 1
+        plan_iterations: 1
+        evidence_count: 3
+        concurrency_savings_ms: 0.0
+        total_time_ms: 310.0
+      citations:
+        - document_name: "https://python.org/news"
+          chunk_id: "web-chk-1"
+
+  - id: ma_sample_4_replan_incomplete_evidence
+    question: "Compare the gross margins of Product A and Product B across Q1 and Q2."
+    expected_answer: "Product A margin was 45% and Product B margin was 60%."
+    expected_specialists:
+      - RESEARCH
+      - ANALYSIS
+    retrieval_required: true
+    trigger_replan: true
+    metadata:
+      expected_specialists: ["RESEARCH", "ANALYSIS"]
+      trigger_replan: true
+      actual_tasks:
+        - task_id: "t1_q1"
+          agent_type: "RESEARCH"
+          routed_capability: "research.hybrid_rag"
+          success: true
+          dependencies: []
+        - task_id: "t1_q2_replan"
+          agent_type: "RESEARCH"
+          routed_capability: "research.hybrid_rag"
+          success: true
+          dependencies: []
+        - task_id: "t2_compare"
+          agent_type: "ANALYSIS"
+          routed_capability: "analysis.safe_calculator"
+          success: true
+          dependencies: ["t1_q1", "t1_q2_replan"]
+      agent_diagnostics:
+        multi_agent_execution: true
+        total_specialist_calls: 3
+        plan_iterations: 2
+        evidence_count: 4
+        concurrency_savings_ms: 60.0
+        total_time_ms: 450.0
+      citations:
+        - document_name: "margins_q1.pdf"
+          chunk_id: "chk-m1"
+        - document_name: "margins_q2.pdf"
+          chunk_id: "chk-m2"

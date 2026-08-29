@@ -1,7 +1,8 @@
 import asyncio
+import json
 import time
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -16,8 +17,10 @@ from app.chat.domain.multi_agent import (
     AgentType,
     EvidenceItem,
     ExecutionPlan,
+    MultiAgentDiagnostics,
     SynthesisRequest,
 )
+from app.chat.services.chat_orchestrator import ChatOrchestrator
 from app.chat.services.multi_agent.analysis_agent import AnalysisAgent
 from app.chat.services.multi_agent.document_agent import DocumentAgent
 from app.chat.services.multi_agent.execution_engine import (
@@ -1056,3 +1059,220 @@ async def test_chat_orchestrator_multi_agent_eliminates_duplicate_retrieval():
     mock_master.execute_request.assert_called_once()
     assert resp.answer == "The refund policy allows 30 days."
     assert resp.retrieval_time_ms == 45.0
+
+    # Verify agent diagnostics were persisted in finalize_message metadata
+    mock_conv_mgr.finalize_message.assert_called_once()
+    _, kwargs = mock_conv_mgr.finalize_message.call_args
+    meta = kwargs.get("metadata", {})
+    assert "agent_diagnostics" in meta
+    assert meta["agent_diagnostics"]["multi_agent_execution"] is True
+    assert meta["agent_diagnostics"]["evidence_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_sanitized_diagnostics_formatting_and_boundaries():
+    """Verify format_sanitized_agent_diagnostics produces clean, bounded, JSON-serializable operational data without sensitive context."""
+    from app.chat.domain.multi_agent import (
+        EvaluationDecision,
+        ResultEvaluation,
+        format_sanitized_agent_diagnostics,
+    )
+
+    plan = ExecutionPlan(
+        request_id="req-123",
+        tasks=[
+            AgentTask(
+                task_id="t1",
+                request="Research Q2 revenue",
+                agent_type=AgentType.RESEARCH,
+                dependencies=[],
+            ),
+            AgentTask(
+                task_id="t2",
+                request="Calculate growth",
+                agent_type=AgentType.ANALYSIS,
+                dependencies=["t1"],
+            ),
+        ],
+        reasoning_summary="Two-step financial analysis",
+    )
+
+    results = [
+        AgentResult(
+            task_id="t1",
+            agent_type=AgentType.RESEARCH,
+            status=AgentTaskStatus.COMPLETED,
+            success=True,
+            output="Found $10M",
+            evidence=[
+                EvidenceItem(
+                    chunk_id=uuid4(),
+                    document_id=uuid4(),
+                    document_name="10k.pdf",
+                    content="Confidential raw text that should not leak in diagnostics",
+                )
+            ],
+            execution_time_ms=120.5,
+            metadata={"routed_capability": "research.hybrid_rag"},
+        ),
+        AgentResult(
+            task_id="t2",
+            agent_type=AgentType.ANALYSIS,
+            status=AgentTaskStatus.COMPLETED,
+            success=True,
+            output="50% growth",
+            evidence=[],
+            execution_time_ms=15.2,
+            metadata={"routed_capability": "analysis.safe_calculator"},
+        ),
+    ]
+
+    diagnostics = MultiAgentDiagnostics(
+        plan_iterations=1,
+        total_specialist_calls=2,
+        research_evidence_count=1,
+        concurrency_savings_ms=45.0,
+        planning_latency_ms=10.0,
+        execution_latency_ms=135.7,
+        synthesis_latency_ms=25.0,
+    )
+
+    eval_result = ResultEvaluation(
+        decision=EvaluationDecision.SUFFICIENT,
+        confidence=0.98,
+        evidence_count=1,
+        successful_tasks=["t1", "t2"],
+        should_replan=False,
+    )
+
+    sanitized = format_sanitized_agent_diagnostics(
+        diagnostics=diagnostics,
+        plan=plan,
+        specialist_results=results,
+        total_time_ms=180.0,
+        citation_count=1,
+        latest_evaluation=eval_result,
+    )
+
+    # 1. Structure assertions
+    assert sanitized["multi_agent_execution"] is True
+    assert sanitized["plan_reasoning"] == "Two-step financial analysis"
+    assert sanitized["total_specialist_calls"] == 2
+    assert sanitized["total_time_ms"] == 180.0
+    assert len(sanitized["tasks"]) == 2
+
+    t1_diag = sanitized["tasks"][0]
+    assert t1_diag["task_id"] == "t1"
+    assert t1_diag["agent_type"] == "RESEARCH"
+    assert t1_diag["status"] == "COMPLETED"
+    assert t1_diag["success"] is True
+    assert t1_diag["routed_capability"] == "research.hybrid_rag"
+
+    t2_diag = sanitized["tasks"][1]
+    assert t2_diag["task_id"] == "t2"
+    assert t2_diag["dependencies"] == ["t1"]
+
+    assert sanitized["evaluation"]["decision"] == "SUFFICIENT"
+    assert sanitized["evaluation"]["confidence"] == 0.98
+    assert sanitized["concurrency_savings_ms"] == 45.0
+    assert sanitized["evidence_count"] == 1
+    assert sanitized["citation_count"] == 1
+
+    # 2. Strict Security Boundaries: No raw text, prompts, tokens, or CoT in dump
+    dump_str = json.dumps(sanitized)
+    assert "Confidential raw text" not in dump_str
+    assert "thought" not in dump_str
+    assert "prompt" not in dump_str.lower() or "plan_reasoning" in dump_str
+
+
+@pytest.mark.asyncio
+async def test_chat_orchestrator_streaming_emits_and_persists_agent_diagnostics():
+    """Verify generate_answer_stream emits agent_diagnostics in done event and persists in message metadata."""
+    mock_conv_mgr = MagicMock()
+    mock_conv_mgr._conversation_repo = None
+    mock_conv_mgr._message_repo = AsyncMock()
+    mock_conv = MagicMock()
+    mock_conv.id = uuid4()
+    mock_conv_mgr.get_or_create_conversation = AsyncMock(return_value=mock_conv)
+    mock_conv_mgr.create_user_message = AsyncMock(return_value=MagicMock(id=uuid4()))
+    mock_conv_mgr.create_assistant_message = AsyncMock(
+        return_value=MagicMock(id=uuid4())
+    )
+    mock_conv_mgr.finalize_message = AsyncMock()
+
+    mock_ctx = MagicMock()
+    mock_ctx.recent_messages = []
+    mock_ctx.summary = None
+    mock_rewrite = MagicMock()
+    mock_rewrite.rewritten_query = "Calculate metrics"
+    mock_rewrite.rewrite_applied = False
+    mock_conv_mgr.prepare_context = AsyncMock(return_value=(mock_ctx, mock_rewrite))
+
+    doc_service = AsyncMock()
+    doc_service.list_documents.return_value = []
+    mock_conv_mgr._document_service = doc_service
+
+    # Mock master agent stream
+    async def fake_stream(*args, **kwargs):
+        yield {"event": "plan_created", "data": {"task_count": 1}}
+        yield {"event": "text", "data": {"text": "Calculation result: 42"}}
+        yield {
+            "event": "synthesis_done",
+            "data": {
+                "citations": [],
+                "usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 5,
+                    "total_tokens": 15,
+                },
+            },
+        }
+        yield {
+            "event": "multi_agent_diagnostics",
+            "data": {
+                "multi_agent_execution": True,
+                "total_specialist_calls": 1,
+                "tasks": [{"task_id": "t1", "status": "COMPLETED", "success": True}],
+            },
+        }
+
+    mock_master = MagicMock()
+    mock_master.execute_request_stream = fake_stream
+
+    orchestrator = ChatOrchestrator(
+        conversation_manager=mock_conv_mgr,
+        retrieval_service=AsyncMock(),
+        prompt_builder=MagicMock(),
+        context_builder=MagicMock(),
+        token_estimator=MagicMock(estimate=MagicMock(return_value=10)),
+        llm_generation_service=AsyncMock(),
+        agent_executor=AsyncMock(),
+        master_agent=mock_master,
+        model="gemini-3.5-flash-lite",
+        enable_conversation_memory=True,
+        enable_multi_agent=True,
+    )
+
+    events = []
+    async for ev in orchestrator.generate_answer_stream(
+        conversation_id=mock_conv.id,
+        user_id=uuid4(),
+        question="Calculate metrics",
+        top_k=5,
+    ):
+        events.append(ev)
+
+    done_events = [e for e in events if e.get("event") == "done"]
+    assert len(done_events) == 1
+    done_data = done_events[0]["data"]
+    assert done_data["answer"] == "Calculation result: 42"
+    assert "agent_diagnostics" in done_data
+    assert done_data["agent_diagnostics"]["multi_agent_execution"] is True
+    assert done_data["agent_diagnostics"]["total_specialist_calls"] == 1
+
+    # Verify finalized message received agent_diagnostics in metadata
+    mock_conv_mgr.finalize_message.assert_called_once()
+    _, kwargs = mock_conv_mgr.finalize_message.call_args
+    meta = kwargs.get("metadata", {})
+    assert "agent_diagnostics" in meta
+    assert meta["agent_diagnostics"]["multi_agent_execution"] is True

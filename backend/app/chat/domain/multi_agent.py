@@ -279,3 +279,163 @@ class MultiAgentResponse(BaseModel):
     usage: Usage
     total_time_ms: float
     diagnostics: MultiAgentDiagnostics
+
+
+# ==========================================
+# Canonical Sanitized Diagnostics Models (P0)
+# ==========================================
+
+
+class SanitizedAgentTaskDiagnostic(BaseModel):
+    task_id: str
+    agent_type: str
+    dependencies: list[str] = Field(default_factory=list)
+    status: str
+    success: bool
+    execution_time_ms: float = 0.0
+    routed_capability: str | None = None
+    failure_reason: str | None = None
+    error: str | None = None
+
+
+class SanitizedAgentEvaluationDiagnostic(BaseModel):
+    decision: str
+    confidence: float = 1.0
+    replan_count: int = 0
+    should_replan: bool = False
+    missing_requirements_count: int = 0
+    contradictions_count: int = 0
+
+
+class SanitizedAgentDiagnostics(BaseModel):
+    multi_agent_execution: bool = True
+    plan_reasoning: str | None = None
+    plan_iterations: int = 1
+    total_specialist_calls: int = 0
+    total_time_ms: float = 0.0
+    tasks: list[SanitizedAgentTaskDiagnostic] = Field(default_factory=list)
+    evaluation: SanitizedAgentEvaluationDiagnostic | None = None
+    concurrency_savings_ms: float = 0.0
+    limits_reached: list[str] = Field(default_factory=list)
+    evidence_count: int = 0
+    citation_count: int = 0
+    avoided_duplicate_tasks: int = 0
+    latencies: dict[str, float] = Field(default_factory=dict)
+
+
+def format_sanitized_agent_diagnostics(
+    diagnostics: MultiAgentDiagnostics | None = None,
+    plan: ExecutionPlan | None = None,
+    specialist_results: list[AgentResult] | None = None,
+    total_time_ms: float = 0.0,
+    citation_count: int = 0,
+    latest_evaluation: ResultEvaluation | None = None,
+) -> dict[str, Any]:
+    """
+    Constructs a bounded, JSON-serializable canonical diagnostic payload for multi-agent execution.
+    Strictly excludes CoT, hidden thoughts, prompts, auth tokens, and raw document contents.
+    """
+    tasks_sanitized: list[dict[str, Any]] = []
+    plan_tasks_map = {t.task_id: t for t in plan.tasks} if plan else {}
+
+    results = specialist_results or []
+    for r in results:
+        t_plan = plan_tasks_map.get(r.task_id)
+        routed_cap = r.metadata.get("routed_capability") if r.metadata else None
+        safe_err = str(r.error)[:200] if r.error else None
+        tasks_sanitized.append(
+            SanitizedAgentTaskDiagnostic(
+                task_id=str(r.task_id),
+                agent_type=r.agent_type.value
+                if hasattr(r.agent_type, "value")
+                else str(r.agent_type),
+                dependencies=list(t_plan.dependencies) if t_plan else [],
+                status=r.status.value if hasattr(r.status, "value") else str(r.status),
+                success=bool(r.success),
+                execution_time_ms=round(float(r.execution_time_ms), 2),
+                routed_capability=str(routed_cap) if routed_cap else None,
+                failure_reason=r.failure_reason.value
+                if hasattr(r.failure_reason, "value") and r.failure_reason
+                else (str(r.failure_reason) if r.failure_reason else None),
+                error=safe_err,
+            ).model_dump()
+        )
+
+    eval_diag: dict[str, Any] | None = None
+    if latest_evaluation:
+        eval_diag = SanitizedAgentEvaluationDiagnostic(
+            decision=latest_evaluation.decision.value
+            if hasattr(latest_evaluation.decision, "value")
+            else str(latest_evaluation.decision),
+            confidence=round(float(latest_evaluation.confidence), 2),
+            replan_count=diagnostics.replans if diagnostics else 0,
+            should_replan=bool(latest_evaluation.should_replan),
+            missing_requirements_count=len(latest_evaluation.missing_requirements),
+            contradictions_count=len(latest_evaluation.contradictions),
+        ).model_dump()
+    elif diagnostics and diagnostics.evaluation_count > 0:
+        eval_diag = SanitizedAgentEvaluationDiagnostic(
+            decision="SUFFICIENT"
+            if not diagnostics.failed_tasks
+            else "PARTIAL_OR_FAILED",
+            confidence=1.0,
+            replan_count=diagnostics.replans,
+            should_replan=False,
+            missing_requirements_count=0,
+            contradictions_count=0,
+        ).model_dump()
+
+    evidence_count = (
+        diagnostics.research_evidence_count
+        if diagnostics
+        else sum(len(r.evidence) for r in results if r.success)
+    )
+    plan_reasoning = (
+        str(plan.reasoning_summary)[:200] if plan and plan.reasoning_summary else None
+    )
+
+    latencies = {
+        "planning_latency_ms": round(diagnostics.planning_latency_ms, 2)
+        if diagnostics
+        else 0.0,
+        "routing_latency_ms": round(diagnostics.routing_latency_ms, 2)
+        if diagnostics
+        else 0.0,
+        "execution_latency_ms": round(diagnostics.execution_latency_ms, 2)
+        if diagnostics
+        else 0.0,
+        "evaluation_latency_ms": round(diagnostics.evaluation_latency_ms, 2)
+        if diagnostics
+        else 0.0,
+        "synthesis_latency_ms": round(diagnostics.synthesis_latency_ms, 2)
+        if diagnostics
+        else 0.0,
+    }
+
+    sanitized = SanitizedAgentDiagnostics(
+        multi_agent_execution=True,
+        plan_reasoning=plan_reasoning,
+        plan_iterations=diagnostics.plan_iterations
+        if diagnostics
+        else (plan.iteration if plan else 1),
+        total_specialist_calls=diagnostics.total_specialist_calls
+        if diagnostics
+        else len(results),
+        total_time_ms=round(total_time_ms, 2),
+        tasks=[SanitizedAgentTaskDiagnostic(**t) for t in tasks_sanitized],
+        evaluation=SanitizedAgentEvaluationDiagnostic(**eval_diag)
+        if eval_diag
+        else None,
+        concurrency_savings_ms=round(diagnostics.concurrency_savings_ms, 2)
+        if diagnostics
+        else 0.0,
+        limits_reached=list(diagnostics.limits_reached) if diagnostics else [],
+        evidence_count=evidence_count,
+        citation_count=citation_count,
+        avoided_duplicate_tasks=diagnostics.avoided_duplicate_tasks
+        if diagnostics
+        else 0,
+        latencies=latencies,
+    )
+
+    return sanitized.model_dump()

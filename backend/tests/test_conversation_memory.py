@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -1490,11 +1491,14 @@ async def test_answer_generation_skips_rewrite_and_retrieval_without_documents(
 
 
 def _override_empty_retrieval(client):
-    from app.api.dependencies import get_retrieval_service
+    from app.api.dependencies import get_retrieval_service, get_web_search_service
 
     client.app.dependency_overrides[get_retrieval_service] = lambda: (
         MockRetrievalService([])
     )
+    mock_web = AsyncMock()
+    mock_web.search = AsyncMock(return_value=[])
+    client.app.dependency_overrides[get_web_search_service] = lambda: mock_web
 
 
 @pytest.mark.asyncio
