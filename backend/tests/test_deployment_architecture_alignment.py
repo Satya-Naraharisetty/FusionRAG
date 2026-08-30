@@ -367,7 +367,9 @@ async def test_qdrant_search_requires_user_id_filter() -> None:
     """Negative enforcement: asserts search(user_id=None) is rejected and user_id=A builds filter."""
     mock_client = AsyncMock()
     mock_client.collection_exists.return_value = True
-    mock_client.search.return_value = []
+    mock_response = MagicMock()
+    mock_response.points = []
+    mock_client.query_points.return_value = mock_response
 
     store = QdrantVectorStore(client=mock_client, collection_name="docs", dimension=768)
 
@@ -387,8 +389,8 @@ async def test_qdrant_search_requires_user_id_filter() -> None:
         user_id=user_a,
     )
 
-    mock_client.search.assert_called_once()
-    call_filter = mock_client.search.call_args[1]["query_filter"]
+    mock_client.query_points.assert_called_once()
+    call_filter = mock_client.query_points.call_args[1]["query_filter"]
     must_keys = [cond.key for cond in call_filter.must if hasattr(cond, "key")]
     assert "user_id" in must_keys
     user_match = [
@@ -402,14 +404,16 @@ async def test_cross_tenant_qdrant_dense_retrieval_isolation() -> None:
     """User A cannot retrieve User B's vectors under direct or filtered search."""
     mock_client = AsyncMock()
     mock_client.collection_exists.return_value = True
-    mock_client.search.return_value = []
+    mock_response = MagicMock()
+    mock_response.points = []
+    mock_client.query_points.return_value = mock_response
 
     store = QdrantVectorStore(client=mock_client, collection_name="docs", dimension=768)
     user_a = uuid4()
     user_b = uuid4()
 
     await store.search(query_vector=[0.1] * 768, top_k=5, user_id=user_a)
-    call_filter_a = mock_client.search.call_args[1]["query_filter"]
+    call_filter_a = mock_client.query_points.call_args[1]["query_filter"]
     user_cond = [c for c in call_filter_a.must if getattr(c, "key", None) == "user_id"][
         0
     ]
