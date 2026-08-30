@@ -10,8 +10,8 @@ export const LandingPage: React.FC = () => {
     <div className="min-h-screen bg-[var(--bg-primary,#0b0e14)] text-[var(--text-primary,#f1f5f9)] selection:bg-[var(--accent-primary,#3b82f6)] selection:text-white">
       <SEOHead
         title="Unified Enterprise Hybrid Retrieval & QA"
-        description="NexusRAG is a production-ready Fusion RAG platform combining dense vector search, BM25 sparse retrieval, and cross-encoder reranking for verifiable, hallucination-free document QA."
-        keywords="NexusRAG, Fusion RAG, Dense Vector Search, BM25, Cross-Encoder Reranking, Qdrant, FastAPI, AI Document QA, DeepEval"
+        description="FusionRAG is a production-ready Hybrid RAG platform combining dense vector search, BM25 sparse retrieval, and cross-encoder reranking for verifiable, hallucination-free document QA."
+        keywords="FusionRAG, Hybrid RAG, Dense Vector Search, BM25, Cross-Encoder Reranking, Qdrant, FastAPI, AI Document QA, DeepEval"
       />
 
       {/* Navigation Header */}
@@ -24,7 +24,7 @@ export const LandingPage: React.FC = () => {
               </svg>
             </div>
             <span className="font-outfit text-xl font-bold tracking-tight text-white">
-              Nexus<span className="text-blue-500">RAG</span>
+              Fusion<span className="text-blue-500">RAG</span>
             </span>
           </div>
 
@@ -173,7 +173,7 @@ export const LandingPage: React.FC = () => {
       {/* Footer */}
       <footer className="border-t border-[var(--border-default,#1e293b)] px-6 py-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row text-xs text-[var(--text-secondary,#94a3b8)]">
-          <p>&copy; {new Date().getFullYear()} NexusRAG. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} FusionRAG. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <Link to="/login" className="hover:text-white transition">Sign In</Link>
             <Link to="/register" className="hover:text-white transition">Register</Link>

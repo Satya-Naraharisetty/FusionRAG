@@ -267,7 +267,7 @@ export const VerifyEmailPage: React.FC = () => {
       <SEOHead
         title="Verify Email"
         description="Verify your email address to activate your Fusion RAG account."
-        canonicalUrl="https://fusion-rag-gilt.vercel.app/verify-email"
+        canonicalUrl="https://fusionrag.vercel.app/verify-email"
         robots="noindex, follow"
       />
       <div

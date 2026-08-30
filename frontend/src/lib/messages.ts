@@ -36,7 +36,7 @@ const en = {
   "chat.uploadRoomOne": "Only {room} more attachment can be added (max {max}).",
   "chat.uploadRoomOther": "Only {room} more attachments can be added (max {max}).",
   "chat.uploadFailed": "Upload failed",
-  "chat.placeholderDefault": "Message NexusRAG...",
+  "chat.placeholderDefault": "Message FusionRAG...",
   "chat.placeholderStreaming": "AI is responding...",
   "chat.placeholderDrop": "Drop files here to attach...",
   "chat.commandSearchPlaceholder": "Search commands…",

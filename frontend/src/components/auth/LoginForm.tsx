@@ -137,7 +137,7 @@ export const LoginForm: React.FC = () => {
       <SEOHead
         title="Sign In"
         description="Sign in to your Fusion RAG account to access your AI document chat studio, indexed knowledge bases, and custom RAG evaluations."
-        canonicalUrl="https://fusion-rag-gilt.vercel.app/login"
+        canonicalUrl="https://fusionrag.vercel.app/login"
       />
       <LoginCard
         email={email}

@@ -15,7 +15,7 @@ class ConfigurationError(RuntimeError):
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "NexusRAG"
+    PROJECT_NAME: str = "FusionRAG"
     API_V1_STR: str = "/api/v1"
 
     # PostgreSQL Configurations
@@ -346,7 +346,7 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
     # Base URL of the backend used to build OAuth callback URIs.
-    # Local: http://localhost:8000 | Production: https://fusion-rag-gilt.vercel.app
+    # Local: http://localhost:8000 | Production: https://fusionrag-yzvt.onrender.com
     OAUTH_REDIRECT_BASE_URL: str = "http://localhost:8000"
     # Base URL of the frontend used to redirect after OAuth success/failure.
     # Local: http://localhost:5173 | Production: https://fusionrag.vercel.app

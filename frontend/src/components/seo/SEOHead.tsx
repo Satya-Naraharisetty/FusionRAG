@@ -9,11 +9,11 @@ export interface SEOHeadProps {
   robots?: string;
 }
 
-const DEFAULT_TITLE = "NexusRAG — Unified Enterprise Hybrid Retrieval & Document QA";
+const DEFAULT_TITLE = "FusionRAG — Unified Enterprise Hybrid Retrieval & Document QA";
 const DEFAULT_DESCRIPTION =
-  "NexusRAG is a production-ready Fusion RAG platform combining dense vector search, BM25 sparse retrieval, neural cross-encoder reranking, and citation-grounded generation.";
-const DEFAULT_CANONICAL = "https://fusion-rag-gilt.vercel.app/";
-const DEFAULT_OG_IMAGE = "https://fusion-rag-gilt.vercel.app/og-image.png";
+  "FusionRAG is a production-ready Hybrid RAG platform combining dense vector search, BM25 sparse retrieval, neural cross-encoder reranking, and citation-grounded generation.";
+const DEFAULT_CANONICAL = "https://fusionrag.vercel.app/";
+const DEFAULT_OG_IMAGE = "https://fusionrag.vercel.app/og-image.png";
 
 export const SEOHead: React.FC<SEOHeadProps> = ({
   title,
@@ -26,7 +26,7 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   useEffect(() => {
     // 1. Update Document Title
     const fullTitle = title
-      ? `${title} | NexusRAG`
+      ? `${title} | FusionRAG`
       : DEFAULT_TITLE;
     document.title = fullTitle;
 

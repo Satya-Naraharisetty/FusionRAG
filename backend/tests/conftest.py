@@ -7,6 +7,7 @@ from sqlalchemy.pool import NullPool
 
 # 1. Set environment variables
 os.environ["ENV"] = "testing"
+os.environ["PROJECT_NAME"] = "FusionRAG"
 os.environ["POSTGRES_SERVER"] = "mock_db"
 os.environ["POSTGRES_USER"] = "mock_user"
 os.environ["POSTGRES_PASSWORD"] = "mock_password"

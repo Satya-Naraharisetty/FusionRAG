@@ -16,7 +16,7 @@ def test_settings_parsing():
         QDRANT_HOST="localhost",
         DATABASE_URL=None,
     )
-    assert settings.PROJECT_NAME == "NexusRAG"
+    assert settings.PROJECT_NAME == "FusionRAG"
     assert (
         settings.DATABASE_URL
         == "postgresql://test_user:test_password@localhost:5432/test_database"

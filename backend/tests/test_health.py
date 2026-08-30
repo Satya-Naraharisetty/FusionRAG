@@ -9,7 +9,7 @@ async def test_root_route(client):
     """Asserts root route returns service information."""
     response = client.get("/")
     assert response.status_code == status.HTTP_200_OK
-    assert "NexusRAG" in response.json()["message"]
+    assert "FusionRAG" in response.json()["message"]
 
 
 @pytest.mark.asyncio

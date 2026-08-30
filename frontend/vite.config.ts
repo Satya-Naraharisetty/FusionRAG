@@ -5,17 +5,19 @@ import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
+  const rootDir = path.resolve(import.meta.dirname)
+  const env = loadEnv(mode, rootDir, '')
   const apiUrl = env.VITE_API_URL || 'http://localhost:8000'
 
   return {
+    root: rootDir,
     plugins: [
       react(),
       tailwindcss(),
     ],
     resolve: {
       alias: {
-        '@': path.resolve(import.meta.dirname, './src')
+        '@': path.resolve(rootDir, './src')
       }
     },
     server: {

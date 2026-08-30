@@ -309,9 +309,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    summary="NexusRAG (Enterprise Hybrid Retrieval-Augmented Generation) API backend combining dense vectors and BM25 sparse search with cross-encoder reranking.",
+    summary="FusionRAG (Enterprise Hybrid Retrieval-Augmented Generation) API backend combining dense vectors and BM25 sparse search with cross-encoder reranking.",
     description="""
-# NexusRAG API
+# FusionRAG API
 
 Production-ready, highly observable, verifiable AI Document QA and retrieval platform.
 

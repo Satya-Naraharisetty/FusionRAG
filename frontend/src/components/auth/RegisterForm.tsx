@@ -65,7 +65,7 @@ export const RegisterForm: React.FC = () => {
       <SEOHead
         title="Create an Account"
         description="Create your free Fusion RAG account to begin indexing documents with dense and sparse search, cross-encoder reranking, and citation-backed QA."
-        canonicalUrl="https://fusion-rag-gilt.vercel.app/register"
+        canonicalUrl="https://fusionrag.vercel.app/register"
       />
       <RegisterCard
         email={email}

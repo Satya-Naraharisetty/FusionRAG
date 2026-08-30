@@ -54,7 +54,7 @@ function App() {
                 <div className="flex h-dvh w-dvw items-center justify-center bg-[var(--bg-primary)] text-[var(--text-primary)]">
                   <div className="flex flex-col items-center gap-3">
                     <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent-primary)] border-t-transparent"></div>
-                    <p className="text-xs text-[var(--text-secondary)] font-medium">Loading NexusRAG...</p>
+                    <p className="text-xs text-[var(--text-secondary)] font-medium">Loading FusionRAG...</p>
                   </div>
                 </div>
               }

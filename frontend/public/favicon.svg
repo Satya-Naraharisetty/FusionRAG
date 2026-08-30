@@ -1,14 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#6C51F0"/>
-      <stop offset="1" stop-color="#BB43EF"/>
+    <linearGradient id="fusion-brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="60%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
     </linearGradient>
   </defs>
   <!-- Brand tile -->
-  <rect width="64" height="64" rx="15" fill="url(#brand)"/>
-  <!-- Subtle inner highlight (top-left sheen) -->
-  <rect x="2.5" y="2.5" width="59" height="59" rx="13" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
-  <!-- H monogram (Outfit-style geometric) -->
-  <text x="32" y="32.5" font-family="Outfit, 'Segoe UI', Arial, sans-serif" font-size="33" font-weight="800" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">H</text>
+  <rect width="64" height="64" rx="16" fill="url(#fusion-brand)"/>
+  <!-- Subtle inner highlight -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+  <!-- F monogram (Outfit geometric) -->
+  <text x="32" y="32.5" font-family="Outfit, 'Segoe UI', Arial, sans-serif" font-size="34" font-weight="800" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">F</text>
 </svg>

@@ -20,7 +20,7 @@ describe("messages i18n", () => {
     expect(t("chatFiles.removeAria", { filename: "a.pdf" })).toBe(
       "Remove a.pdf from this chat"
     );
-    expect(t("chat.placeholderDefault")).toBe("Message NexusRAG...");
+    expect(t("chat.placeholderDefault")).toBe("Message FusionRAG...");
     expect(t("chat.placeholderStreaming")).toBe("AI is responding...");
     expect(t("chat.placeholderDrop")).toBe("Drop files here to attach...");
     expect(t("commands.documents.label")).toBe("Documents priority");
