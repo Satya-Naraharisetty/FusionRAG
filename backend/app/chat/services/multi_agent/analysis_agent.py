@@ -241,7 +241,9 @@ class AnalysisAgent(BaseSpecialistAgent):
             return sym_match.group(0).strip()
 
         # 2. Check for equations with variables (e.g. 2*x + 5 = 15 or y'' + 4*y = 0)
-        eq_match = re.search(r"[a-zA-Z0-9_\^\*\+\-\/\(\)\s\.\=]+=[a-zA-Z0-9_\^\*\+\-\/\(\)\s\.]+", text)
+        eq_match = re.search(
+            r"[a-zA-Z0-9_\^\*\+\-\/\(\)\s\.\=]+=[a-zA-Z0-9_\^\*\+\-\/\(\)\s\.]+", text
+        )
         if eq_match and any(c in eq_match.group(0) for c in "+-*/^="):
             cand = eq_match.group(0).strip()
             if any(c.isdigit() or c.isalpha() for c in cand):
@@ -281,19 +283,60 @@ class AnalysisAgent(BaseSpecialistAgent):
 
             # 2. Check for domain operations handled by MathEngine
             domain_operations = {
-                "solve", "solve_equation", "equation", "solve_system", "system_of_equations",
-                "diff", "derivative", "differentiate", "integrate", "integral", "limit", "lim",
-                "series", "taylor_series", "ode", "solve_ode", "differential_equation",
-                "laplace", "laplace_transform", "inv_laplace", "inverse_laplace", "inverse_laplace_transform",
-                "matrix", "matrix_operation", "matrix_operations", "unit_convert", "convert_units", "units",
-                "cagr", "npv", "net_present_value", "irr", "internal_rate_of_return", "amortization", "loan", "pmt",
-                "wacc", "cost_of_capital", "stats", "descriptive_stats", "statistics", "ttest", "hypothesis_test",
-                "correlation", "corr", "curve_fit", "regression",
+                "solve",
+                "solve_equation",
+                "equation",
+                "solve_system",
+                "system_of_equations",
+                "diff",
+                "derivative",
+                "differentiate",
+                "integrate",
+                "integral",
+                "limit",
+                "lim",
+                "series",
+                "taylor_series",
+                "ode",
+                "solve_ode",
+                "differential_equation",
+                "laplace",
+                "laplace_transform",
+                "inv_laplace",
+                "inverse_laplace",
+                "inverse_laplace_transform",
+                "matrix",
+                "matrix_operation",
+                "matrix_operations",
+                "unit_convert",
+                "convert_units",
+                "units",
+                "cagr",
+                "npv",
+                "net_present_value",
+                "irr",
+                "internal_rate_of_return",
+                "amortization",
+                "loan",
+                "pmt",
+                "wacc",
+                "cost_of_capital",
+                "stats",
+                "descriptive_stats",
+                "statistics",
+                "ttest",
+                "hypothesis_test",
+                "correlation",
+                "corr",
+                "curve_fit",
+                "regression",
             }
 
             if operation and operation.lower() in domain_operations:
                 math_res = self.math_engine.execute_operation(operation, params)
-                output_str = math_res.get("formatted_markdown", str(math_res.get("result", math_res)))
+                output_str = math_res.get(
+                    "formatted_markdown", str(math_res.get("result", math_res))
+                )
                 structured = math_res
 
             elif operation == "growth_rate":
@@ -358,7 +401,9 @@ class AnalysisAgent(BaseSpecialistAgent):
                         "Values list cannot be empty for average calculation."
                     )
                 avg = sum(values) / len(values)
-                output_str = f"Average of {values}: {avg:.4f}\n\n$$\\bar{{x}} = {avg:.4f}$$"
+                output_str = (
+                    f"Average of {values}: {avg:.4f}\n\n$$\\bar{{x}} = {avg:.4f}$$"
+                )
                 structured = {"operation": "average", "values": values, "average": avg}
 
             elif operation == "difference":
@@ -377,11 +422,16 @@ class AnalysisAgent(BaseSpecialistAgent):
             elif expression:
                 try:
                     math_res = self.math_engine.calculate(expression)
-                    output_str = math_res.get("formatted_markdown", str(math_res.get("exact", math_res.get("numeric"))))
+                    output_str = math_res.get(
+                        "formatted_markdown",
+                        str(math_res.get("exact", math_res.get("numeric"))),
+                    )
                     structured = math_res
                 except Exception:
                     val = self.calculator.evaluate(expression)
-                    output_str = f"Calculation result: {val}\n\n$${expression} = {val}$$"
+                    output_str = (
+                        f"Calculation result: {val}\n\n$${expression} = {val}$$"
+                    )
                     structured = {"expression": expression, "result": val}
 
             else:
@@ -390,7 +440,10 @@ class AnalysisAgent(BaseSpecialistAgent):
                 if extracted:
                     try:
                         math_res = self.math_engine.calculate(extracted)
-                        output_str = math_res.get("formatted_markdown", str(math_res.get("exact", math_res.get("numeric"))))
+                        output_str = math_res.get(
+                            "formatted_markdown",
+                            str(math_res.get("exact", math_res.get("numeric"))),
+                        )
                         structured = math_res
                     except Exception:
                         val = self.calculator.evaluate(extracted)

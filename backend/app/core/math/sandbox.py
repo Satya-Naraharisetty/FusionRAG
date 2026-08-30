@@ -1,7 +1,8 @@
 import ast
 import asyncio
 import concurrent.futures
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 # Blacklisted identifiers and attributes that must never be evaluated
 BLOCKED_IDENTIFIERS: frozenset[str] = frozenset(
@@ -154,7 +155,7 @@ async def run_with_math_timeout(
         future = loop.run_in_executor(pool, lambda: func(*args, **kwargs))
         try:
             return await asyncio.wait_for(future, timeout=timeout_seconds)
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             raise MathTimeoutError(
                 f"Computation timed out after {timeout_seconds} seconds."
             ) from err

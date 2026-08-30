@@ -1,5 +1,6 @@
-import pytest
 from uuid import uuid4
+
+import pytest
 
 from app.chat.domain.multi_agent import (
     AgentExecutionContext,
@@ -17,7 +18,11 @@ async def test_analysis_agent_solves_algebraic_task():
         task_id="task_alg_1",
         request="Solve the equation 3*x + 9 = 24 for x",
         agent_type=AgentType.ANALYSIS,
-        parameters={"operation": "solve_equation", "equation": "3*x + 9 = 24", "variable": "x"},
+        parameters={
+            "operation": "solve_equation",
+            "equation": "3*x + 9 = 24",
+            "variable": "x",
+        },
     )
     context = AgentExecutionContext(
         request_id=str(uuid4()),
@@ -60,7 +65,12 @@ async def test_analysis_agent_computes_cagr_task():
         task_id="task_cagr_1",
         request="Calculate CAGR from $50,000 to $120,000 over 4 years",
         agent_type=AgentType.ANALYSIS,
-        parameters={"operation": "cagr", "beginning_value": 50000, "ending_value": 120000, "periods": 4},
+        parameters={
+            "operation": "cagr",
+            "beginning_value": 50000,
+            "ending_value": 120000,
+            "periods": 4,
+        },
     )
     context = AgentExecutionContext(
         request_id=str(uuid4()),

@@ -81,7 +81,9 @@ class CalculatorTool(BuiltinTool):
             # Try MathEngine first for rich symbolic & numerical math
             try:
                 res = self.math_engine.calculate(expression)
-                content = res.get("formatted_markdown", str(res.get("exact", res.get("numeric"))))
+                content = res.get(
+                    "formatted_markdown", str(res.get("exact", res.get("numeric")))
+                )
                 return ToolResult(
                     tool_call_id="",
                     name=self.definition.name,

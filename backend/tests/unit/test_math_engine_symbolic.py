@@ -1,5 +1,6 @@
 import pytest
-from app.core.math.engine import MathEngine, SymbolicMathSubsystem
+
+from app.core.math.engine import SymbolicMathSubsystem
 
 
 def test_symbolic_evaluate_expression():
@@ -31,7 +32,9 @@ def test_solve_system_of_equations():
 
 
 def test_calculus_derivative():
-    res = SymbolicMathSubsystem.differentiate("x**3 + 2*x**2 - 5*x + 7", variable="x", order=1)
+    res = SymbolicMathSubsystem.differentiate(
+        "x**3 + 2*x**2 - 5*x + 7", variable="x", order=1
+    )
     assert "3*x**2 + 4*x - 5" in res["result"]
 
 
@@ -51,13 +54,17 @@ def test_calculus_limit():
 
 
 def test_taylor_series_expansion():
-    res = SymbolicMathSubsystem.series_expansion("exp(x)", variable="x", point=0, order=4)
+    res = SymbolicMathSubsystem.series_expansion(
+        "exp(x)", variable="x", point=0, order=4
+    )
     assert "1 + x + x**2/2 + x**3/6" in res["result"]
 
 
 def test_engineering_ode_harmonic_oscillator():
     # y'' + 9y = 0
-    res = SymbolicMathSubsystem.solve_ode("Derivative(y(x), x, 2) + 9*y(x)", function_name="y", variable="x")
+    res = SymbolicMathSubsystem.solve_ode(
+        "Derivative(y(x), x, 2) + 9*y(x)", function_name="y", variable="x"
+    )
     assert "sin(3*x)" in res["solution"] and "cos(3*x)" in res["solution"]
 
 
@@ -67,7 +74,9 @@ def test_engineering_laplace_and_inverse_laplace():
     assert "1/(s + 2)" in res_lap["laplace_transform"]
 
     # Inverse Laplace transform of 1/(s + 2)
-    res_inv = SymbolicMathSubsystem.inverse_laplace_transform("1/(s + 2)", s_var="s", t_var="t")
+    res_inv = SymbolicMathSubsystem.inverse_laplace_transform(
+        "1/(s + 2)", s_var="s", t_var="t"
+    )
     assert "exp(-2*t)" in res_inv["inverse_laplace_transform"]
 
 

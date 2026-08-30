@@ -1,10 +1,7 @@
 import logging
-import math
-from decimal import Decimal
 from typing import Any
 
 from app.core.math.sandbox import (
-    MathSecurityError,
     validate_math_expression_ast,
 )
 
@@ -68,14 +65,13 @@ class SymbolicMathSubsystem:
                 title="Mathematical Evaluation",
                 problem_latex=sp.latex(sp.sympify(expr_str)),
                 steps=[f"Evaluated exact symbolic expression to: `${latex_str}$`"],
-                result_latex=f"{latex_str}" + (f" \\approx {float_val:.6g}" if float_val is not None else ""),
+                result_latex=f"{latex_str}"
+                + (f" \\approx {float_val:.6g}" if float_val is not None else ""),
             ),
         }
 
     @classmethod
-    def solve_equation(
-        cls, equation_str: str, variable: str = "x"
-    ) -> dict[str, Any]:
+    def solve_equation(cls, equation_str: str, variable: str = "x") -> dict[str, Any]:
         sp = cls._get_sympy()
         var_sym = sp.Symbol(variable)
 
@@ -92,7 +88,9 @@ class SymbolicMathSubsystem:
             eq = sp.Eq(sp.sympify(equation_str.strip()), 0)
 
         solutions = sp.solve(eq, var_sym)
-        sol_latex = ", ".join(sp.latex(s) for s in solutions) if solutions else "\\emptyset"
+        sol_latex = (
+            ", ".join(sp.latex(s) for s in solutions) if solutions else "\\emptyset"
+        )
         eq_latex = sp.latex(eq)
 
         steps = [
@@ -115,9 +113,7 @@ class SymbolicMathSubsystem:
         }
 
     @classmethod
-    def solve_system(
-        cls, equations: list[str], variables: list[str]
-    ) -> dict[str, Any]:
+    def solve_system(cls, equations: list[str], variables: list[str]) -> dict[str, Any]:
         sp = cls._get_sympy()
         sym_vars = [sp.Symbol(v) for v in variables]
         sp_eqs = []
@@ -133,14 +129,22 @@ class SymbolicMathSubsystem:
                 sp_eqs.append(sp.Eq(sp.sympify(eq_str), 0))
 
         sol_dict = sp.solve(sp_eqs, sym_vars, dict=True)
-        eqs_latex = "\\begin{cases} " + " \\\\ ".join(sp.latex(e) for e in sp_eqs) + " \\end{cases}"
+        eqs_latex = (
+            "\\begin{cases} "
+            + " \\\\ ".join(sp.latex(e) for e in sp_eqs)
+            + " \\end{cases}"
+        )
 
         result_lines = []
         if sol_dict and isinstance(sol_dict, list):
             for s in sol_dict:
                 line = ", ".join(f"{sp.latex(k)} = {sp.latex(v)}" for k, v in s.items())
                 result_lines.append(line)
-        res_latex = " \\quad \\text{or} \\quad ".join(result_lines) if result_lines else "\\text{No solution}"
+        res_latex = (
+            " \\quad \\text{or} \\quad ".join(result_lines)
+            if result_lines
+            else "\\text{No solution}"
+        )
 
         steps = [
             "Formulated system of simultaneous equations.",
@@ -151,7 +155,9 @@ class SymbolicMathSubsystem:
         return {
             "equations": equations,
             "variables": variables,
-            "solutions": [{str(k): str(v) for k, v in s.items()} for s in (sol_dict or [])],
+            "solutions": [
+                {str(k): str(v) for k, v in s.items()} for s in (sol_dict or [])
+            ],
             "latex": res_latex,
             "formatted_markdown": LaTeXStepFormatter.format_solution(
                 title="System of Equations Solution",
@@ -171,7 +177,11 @@ class SymbolicMathSubsystem:
         expr = sp.sympify(expression)
         derivative = sp.diff(expr, var_sym, order)
 
-        d_symbol = f"\\frac{{d^{order}}}{{d{variable}^{order}}}" if order > 1 else f"\\frac{{d}}{{d{variable}}}"
+        d_symbol = (
+            f"\\frac{{d^{order}}}{{d{variable}^{order}}}"
+            if order > 1
+            else f"\\frac{{d}}{{d{variable}}}"
+        )
         prob_latex = f"{d_symbol} \\left( {sp.latex(expr)} \\right)"
         res_latex = sp.latex(derivative)
 
@@ -226,10 +236,14 @@ class SymbolicMathSubsystem:
             steps = [
                 f"Integrand: $f({variable}) = {sp.latex(expr)}$",
                 "Applied integration techniques (symbolic antiderivative calculation).",
-                f"Added integration constant $C$.",
+                "Added integration constant $C$.",
             ]
 
-        float_val = float(integral.evalf()) if hasattr(integral, "is_number") and integral.is_number else None
+        float_val = (
+            float(integral.evalf())
+            if hasattr(integral, "is_number") and integral.is_number
+            else None
+        )
 
         return {
             "expression": expression,
@@ -243,7 +257,8 @@ class SymbolicMathSubsystem:
                 title="Integral Calculation",
                 problem_latex=prob_latex,
                 steps=steps,
-                result_latex=res_latex + (f" \\approx {float_val:.6g}" if float_val is not None else ""),
+                result_latex=res_latex
+                + (f" \\approx {float_val:.6g}" if float_val is not None else ""),
             ),
         }
 
@@ -274,7 +289,9 @@ class SymbolicMathSubsystem:
             "formatted_markdown": LaTeXStepFormatter.format_solution(
                 title="Limit Evaluation",
                 problem_latex=prob_latex,
-                steps=[f"Computed asymptotic expansion as ${variable} \\to {sp.latex(target_sym)}$."],
+                steps=[
+                    f"Computed asymptotic expansion as ${variable} \\to {sp.latex(target_sym)}$."
+                ],
                 result_latex=res_latex,
             ),
         }
@@ -307,7 +324,9 @@ class SymbolicMathSubsystem:
             "formatted_markdown": LaTeXStepFormatter.format_solution(
                 title=f"Taylor Series Expansion (Order {order})",
                 problem_latex=prob_latex,
-                steps=[f"Expanded around point ${variable} = {sp.latex(pt_sym)}$ up to $\\mathcal{{O}}({variable}^{{{order}}})$. "],
+                steps=[
+                    f"Expanded around point ${variable} = {sp.latex(pt_sym)}$ up to $\\mathcal{{O}}({variable}^{{{order}}})$. "
+                ],
                 result_latex=res_latex,
             ),
         }
@@ -330,7 +349,10 @@ class SymbolicMathSubsystem:
         y = sp.Function(function_name)(x)
 
         # Parse ODE
-        parsed_ode = sp.sympify(ode_expression, locals={function_name: sp.Function(function_name), variable: x})
+        parsed_ode = sp.sympify(
+            ode_expression,
+            locals={function_name: sp.Function(function_name), variable: x},
+        )
         if isinstance(parsed_ode, sp.Equality):
             eq = parsed_ode
         else:
@@ -340,7 +362,12 @@ class SymbolicMathSubsystem:
         if initial_conditions:
             ics = {}
             for k, v in initial_conditions.items():
-                ics[sp.sympify(k, locals={function_name: sp.Function(function_name), variable: x})] = sp.sympify(v)
+                ics[
+                    sp.sympify(
+                        k,
+                        locals={function_name: sp.Function(function_name), variable: x},
+                    )
+                ] = sp.sympify(v)
 
         sol = sp.dsolve(eq, y, ics=ics)
         prob_latex = sp.latex(eq)
@@ -349,7 +376,9 @@ class SymbolicMathSubsystem:
         steps = [
             f"Classified differential equation: `${prob_latex}$`",
             "Determined characteristic equation / integrating factor / homogeneous & particular solutions.",
-            f"Applied initial conditions: {ics}" if ics else "Retained arbitrary constants $C_1, C_2, \\dots$",
+            f"Applied initial conditions: {ics}"
+            if ics
+            else "Retained arbitrary constants $C_1, C_2, \\dots$",
             f"General solution: `${res_latex}$`",
         ]
 
@@ -429,17 +458,19 @@ class SymbolicMathSubsystem:
         matrix_b: list[list[Any]] | None = None,
     ) -> dict[str, Any]:
         sp = cls._get_sympy()
-        A = sp.Matrix(matrix_a)
+        mat_a = sp.Matrix(matrix_a)
         op_lower = operation.lower().strip()
-        mat_latex = sp.latex(A)
+        mat_latex = sp.latex(mat_a)
 
         if op_lower in ("det", "determinant"):
-            det_val = A.det()
+            det_val = mat_a.det()
             res_latex = sp.latex(det_val)
             return {
                 "operation": "determinant",
                 "result": str(det_val),
-                "numeric": float(det_val) if hasattr(det_val, "is_number") and det_val.is_number else None,
+                "numeric": float(det_val)
+                if hasattr(det_val, "is_number") and det_val.is_number
+                else None,
                 "latex": f"\\det({mat_latex}) = {res_latex}",
                 "formatted_markdown": LaTeXStepFormatter.format_solution(
                     title="Matrix Determinant",
@@ -450,7 +481,7 @@ class SymbolicMathSubsystem:
             }
 
         elif op_lower in ("inv", "inverse"):
-            inv_mat = A.inv()
+            inv_mat = mat_a.inv()
             res_latex = sp.latex(inv_mat)
             return {
                 "operation": "inverse",
@@ -459,16 +490,25 @@ class SymbolicMathSubsystem:
                 "formatted_markdown": LaTeXStepFormatter.format_solution(
                     title="Matrix Inverse",
                     problem_latex=f"A = {mat_latex}",
-                    steps=["Checked non-zero determinant $\\det(A) \\neq 0$", "Calculated adjugate matrix and inverted."],
+                    steps=[
+                        "Checked non-zero determinant $\\det(A) \\neq 0$",
+                        "Calculated adjugate matrix and inverted.",
+                    ],
                     result_latex=f"A^{{-1}} = {res_latex}",
                 ),
             }
 
         elif op_lower in ("eigen", "eigenvalues", "eigenvectors"):
-            eigenvals = A.eigenvals()
-            eigenvects = A.eigenvects()
-            vals_latex = ", ".join(f"\\lambda = {sp.latex(k)} \\text{{ (mult: {v})}}" for k, v in eigenvals.items())
-            vects_str = [f"λ={sp.latex(v[0])}: {[sp.latex(vec) for vec in v[2]]}" for v in eigenvects]
+            eigenvals = mat_a.eigenvals()
+            eigenvects = mat_a.eigenvects()
+            vals_latex = ", ".join(
+                f"\\lambda = {sp.latex(k)} \\text{{ (mult: {v})}}"
+                for k, v in eigenvals.items()
+            )
+            vects_str = [
+                f"λ={sp.latex(v[0])}: {[sp.latex(vec) for vec in v[2]]}"
+                for v in eigenvects
+            ]
 
             return {
                 "operation": "eigenvalues_and_eigenvectors",
@@ -479,9 +519,9 @@ class SymbolicMathSubsystem:
                     title="Matrix Eigenvalues & Eigenvectors",
                     problem_latex=f"A = {mat_latex}",
                     steps=[
-                        f"Solved characteristic polynomial $\\det(A - \\lambda I) = 0$.",
+                        "Solved characteristic polynomial $\\det(A - \\lambda I) = 0$.",
                         f"Eigenvalues: ${vals_latex}$",
-                        f"Computed null space $(A - \\lambda I)\\mathbf{{v}} = 0$ for each eigenvector.",
+                        "Computed null space $(A - \\lambda I)\\mathbf{v} = 0$ for each eigenvector.",
                     ],
                     result_latex=vals_latex,
                     notes=f"Eigenspaces: {'; '.join(vects_str)}",
@@ -489,17 +529,19 @@ class SymbolicMathSubsystem:
             }
 
         elif op_lower in ("mul", "multiply", "matmul") and matrix_b:
-            B = sp.Matrix(matrix_b)
-            prod = A * B
+            mat_b = sp.Matrix(matrix_b)
+            prod = mat_a * mat_b
             res_latex = sp.latex(prod)
             return {
                 "operation": "multiplication",
                 "result": str(prod),
-                "latex": f"{mat_latex} \\times {sp.latex(B)} = {res_latex}",
+                "latex": f"{mat_latex} \\times {sp.latex(mat_b)} = {res_latex}",
                 "formatted_markdown": LaTeXStepFormatter.format_solution(
                     title="Matrix Multiplication",
-                    problem_latex=f"{mat_latex} \\times {sp.latex(B)}",
-                    steps=["Computed inner dot products of row vectors and column vectors."],
+                    problem_latex=f"{mat_latex} \\times {sp.latex(mat_b)}",
+                    steps=[
+                        "Computed inner dot products of row vectors and column vectors."
+                    ],
                     result_latex=res_latex,
                 ),
             }
@@ -511,7 +553,7 @@ class SymbolicMathSubsystem:
         cls, quantity: float, from_unit_str: str, to_unit_str: str
     ) -> dict[str, Any]:
         """Converts engineering and physics units using SymPy's physics unit framework."""
-        sp = cls._get_sympy()
+        cls._get_sympy()
         from sympy.physics import units
 
         def _resolve_unit(u_name: str) -> Any:
@@ -610,7 +652,7 @@ class SymbolicMathSubsystem:
                 title="Physical Unit Conversion",
                 problem_latex=prob_latex,
                 steps=[
-                    f"Identified dimensional basis and scale factors.",
+                    "Identified dimensional basis and scale factors.",
                     f"Converted ${from_unit_str}$ to target unit ${to_unit_str}$.",
                 ],
                 result_latex=res_latex,
@@ -630,7 +672,9 @@ class FinancialMathSubsystem:
         beginning_value: float, ending_value: float, periods: float
     ) -> dict[str, Any]:
         if beginning_value <= 0 or ending_value <= 0 or periods <= 0:
-            raise ValueError("Beginning value, ending value, and periods must be positive for CAGR.")
+            raise ValueError(
+                "Beginning value, ending value, and periods must be positive for CAGR."
+            )
         cagr_rate = ((ending_value / beginning_value) ** (1.0 / periods)) - 1.0
         cagr_pct = cagr_rate * 100.0
 
@@ -640,7 +684,7 @@ class FinancialMathSubsystem:
         steps = [
             f"Beginning Value: `${beginning_value:,.2f}$`",
             f"Ending Value: `${ending_value:,.2f}$` over `{periods}` periods.",
-            f"Formula: $\\text{{CAGR}} = (V_f / V_0)^{{1/t}} - 1$",
+            "Formula: $\\text{CAGR} = (V_f / V_0)^{1/t} - 1$",
         ]
 
         return {
@@ -669,10 +713,15 @@ class FinancialMathSubsystem:
         if discount_rate <= -1.0:
             raise ValueError("Discount rate must be greater than -100%.")
 
-        npv_val = sum(cf / ((1.0 + discount_rate) ** t) for t, cf in enumerate(cash_flows))
+        npv_val = sum(
+            cf / ((1.0 + discount_rate) ** t) for t, cf in enumerate(cash_flows)
+        )
 
-        terms = [f"\\frac{{{cf:,.2f}}}{{(1 + {discount_rate})^{{{t}}}}}" for t, cf in enumerate(cash_flows)]
-        prob_latex = f"\\text{{NPV}} = " + " + ".join(terms)
+        terms = [
+            f"\\frac{{{cf:,.2f}}}{{(1 + {discount_rate})^{{{t}}}}}"
+            for t, cf in enumerate(cash_flows)
+        ]
+        prob_latex = "\\text{NPV} = " + " + ".join(terms)
         res_latex = f"\\${npv_val:,.2f}"
 
         steps = [
@@ -700,13 +749,17 @@ class FinancialMathSubsystem:
     ) -> dict[str, Any]:
         """Calculates IRR via Newton-Raphson numerical root finding."""
         if not cash_flows or len(cash_flows) < 2:
-            raise ValueError("IRR requires at least 2 cash flows (an outflow and inflow).")
+            raise ValueError(
+                "IRR requires at least 2 cash flows (an outflow and inflow)."
+            )
 
         # Check for sign change
         has_pos = any(cf > 0 for cf in cash_flows)
         has_neg = any(cf < 0 for cf in cash_flows)
         if not (has_pos and has_neg):
-            raise ValueError("IRR requires at least one positive and one negative cash flow.")
+            raise ValueError(
+                "IRR requires at least one positive and one negative cash flow."
+            )
 
         def _npv_and_deriv(r: float) -> tuple[float, float]:
             val = 0.0
@@ -730,7 +783,7 @@ class FinancialMathSubsystem:
             rate = rate - (val / deriv)
 
         irr_pct = rate * 100.0
-        prob_latex = f"\\sum_{{t=0}}^{{{len(cash_flows)-1}}} \\frac{{\\text{{CF}}_t}}{{(1 + \\text{{IRR}})^t}} = 0"
+        prob_latex = f"\\sum_{{t=0}}^{{{len(cash_flows) - 1}}} \\frac{{\\text{{CF}}_t}}{{(1 + \\text{{IRR}})^t}} = 0"
         res_latex = f"{irr_pct:.2f}\\% \\quad (\\text{{decimal: }} {rate:.6f})"
 
         steps = [
@@ -769,21 +822,25 @@ class FinancialMathSubsystem:
         if r_period == 0:
             pmt = principal / n_payments
         else:
-            pmt = principal * (r_period * (1 + r_period) ** n_payments) / (((1 + r_period) ** n_payments) - 1)
+            pmt = (
+                principal
+                * (r_period * (1 + r_period) ** n_payments)
+                / (((1 + r_period) ** n_payments) - 1)
+            )
 
         total_paid = pmt * n_payments
         total_interest = total_paid - principal
 
         prob_latex = (
             f"\\text{{PMT}} = P \\cdot \\frac{{r(1+r)^n}}{{(1+r)^n - 1}} \\quad "
-            f"(P=\\${principal:,.2f}, r={annual_rate*100:.2f}\\%/\\text{{yr}}, n={n_payments})"
+            f"(P=\\${principal:,.2f}, r={annual_rate * 100:.2f}\\%/\\text{{yr}}, n={n_payments})"
         )
         res_latex = f"\\text{{Periodic Payment: }} \\${pmt:,.2f} \\quad (\\text{{Total Interest: }} \\${total_interest:,.2f})"
 
         steps = [
             f"Loan Principal: `${principal:,.2f}`",
             f"Periodic Interest Rate: `{r_period * 100:.4f}%` across `{n_payments}` payments.",
-            f"Calculated standard amortization formula.",
+            "Calculated standard amortization formula.",
             f"Total Interest Paid: `${total_interest:,.2f}` on total payment `${total_paid:,.2f}`.",
         ]
 
@@ -820,16 +877,18 @@ class FinancialMathSubsystem:
 
         weight_e = equity / total_val
         weight_d = debt / total_val
-        wacc_rate = (weight_e * cost_of_equity) + (weight_d * cost_of_debt * (1.0 - tax_rate))
+        wacc_rate = (weight_e * cost_of_equity) + (
+            weight_d * cost_of_debt * (1.0 - tax_rate)
+        )
         wacc_pct = wacc_rate * 100.0
 
-        prob_latex = f"\\text{{WACC}} = \\left(\\frac{{E}}{{V}} \\cdot r_e\\right) + \\left(\\frac{{D}}{{V}} \\cdot r_d \\cdot (1 - t)\\right)"
+        prob_latex = "\\text{WACC} = \\left(\\frac{E}{V} \\cdot r_e\\right) + \\left(\\frac{D}{V} \\cdot r_d \\cdot (1 - t)\\right)"
         res_latex = f"{wacc_pct:.2f}\\% \\quad (\\text{{decimal: }} {wacc_rate:.6f})"
 
         steps = [
-            f"Total Capital Value: $V = \\${total_val:,.2f}$ ($E/V = {weight_e*100:.1f}\\%$, $D/V = {weight_d*100:.1f}\\%$)",
-            f"Cost of Equity: `{cost_of_equity*100:.2f}%`, After-tax Cost of Debt: `{cost_of_debt * (1 - tax_rate)*100:.2f}%`",
-            f"Calculated weighted sum.",
+            f"Total Capital Value: $V = \\${total_val:,.2f}$ ($E/V = {weight_e * 100:.1f}\\%$, $D/V = {weight_d * 100:.1f}\\%$)",
+            f"Cost of Equity: `{cost_of_equity * 100:.2f}%`, After-tax Cost of Debt: `{cost_of_debt * (1 - tax_rate) * 100:.2f}%`",
+            "Calculated weighted sum.",
         ]
 
         return {
@@ -941,7 +1000,9 @@ class StatisticalNumericalSubsystem:
                 f"Evaluated sample of $N = {len(sample1)}$ against null hypothesized mean $\\mu_0 = {pop_mean}$.",
                 f"Calculated Student's $t$-statistic: $t = {float(t_stat):.4f}$",
                 f"Computed two-tailed $p$-value: $p = {float(p_val):.4e}$",
-                "Statistically significant at $\\alpha = 0.05$" if p_val < 0.05 else "Fail to reject $H_0$ at $\\alpha = 0.05$.",
+                "Statistically significant at $\\alpha = 0.05$"
+                if p_val < 0.05
+                else "Fail to reject $H_0$ at $\\alpha = 0.05$.",
             ]
             return {
                 "test": "one_sample_ttest",
@@ -961,13 +1022,15 @@ class StatisticalNumericalSubsystem:
             if not sample2:
                 raise ValueError("Two-sample t-test requires both sample1 and sample2.")
             t_stat, p_val = stats.ttest_ind(sample1, sample2, equal_var=False)
-            prob_latex = f"H_0: \\mu_1 = \\mu_2 \\quad \\text{{vs.}} \\quad H_1: \\mu_1 \\neq \\mu_2 \\quad (\\text{{Welch's }} t\\text{{-test}})"
+            prob_latex = "H_0: \\mu_1 = \\mu_2 \\quad \\text{vs.} \\quad H_1: \\mu_1 \\neq \\mu_2 \\quad (\\text{Welch's } t\\text{-test})"
             res_latex = f"t = {float(t_stat):.4f}, \\quad p = {float(p_val):.4e}"
             steps = [
                 f"Sample 1 ($N_1 = {len(sample1)}$) vs Sample 2 ($N_2 = {len(sample2)}$).",
                 f"Calculated Welch's $t$-statistic: $t = {float(t_stat):.4f}$",
                 f"Two-tailed $p$-value: $p = {float(p_val):.4e}$",
-                "Statistically significant difference at $\\alpha = 0.05$" if p_val < 0.05 else "No statistically significant difference at $\\alpha = 0.05$.",
+                "Statistically significant difference at $\\alpha = 0.05$"
+                if p_val < 0.05
+                else "No statistically significant difference at $\\alpha = 0.05$.",
             ]
             return {
                 "test": "two_sample_ttest",
@@ -990,7 +1053,9 @@ class StatisticalNumericalSubsystem:
         cls, x: list[float], y: list[float], method: str = "pearson"
     ) -> dict[str, Any]:
         if len(x) != len(y) or len(x) < 2:
-            raise ValueError("Arrays x and y must have equal length >= 2 for correlation.")
+            raise ValueError(
+                "Arrays x and y must have equal length >= 2 for correlation."
+            )
 
         stats = cls._get_scipy_stats()
         if method.lower() == "spearman":
@@ -1052,7 +1117,7 @@ class StatisticalNumericalSubsystem:
             res_latex = f"y = {slope:.4f}x + {intercept:.4f} \\quad (R^2 = {r2:.4f})"
 
             steps = [
-                f"Performed ordinary least squares linear regression.",
+                "Performed ordinary least squares linear regression.",
                 f"Calculated slope: $m = {slope:.4f}$",
                 f"Calculated intercept: $c = {intercept:.4f}$",
                 f"Coefficient of determination: $R^2 = {r2:.4f}$",
@@ -1090,7 +1155,10 @@ class StatisticalNumericalSubsystem:
                 "formatted_markdown": LaTeXStepFormatter.format_solution(
                     title="Quadratic Polynomial Fit",
                     problem_latex=prob_latex,
-                    steps=["Fitted 2nd degree polynomial via least squares.", f"Obtained coefficients: $a={a:.4f}, b={b:.4f}, c={c:.4f}$."],
+                    steps=[
+                        "Fitted 2nd degree polynomial via least squares.",
+                        f"Obtained coefficients: $a={a:.4f}, b={b:.4f}, c={c:.4f}$.",
+                    ],
                     result_latex=res_latex,
                 ),
             }
@@ -1114,7 +1182,9 @@ class MathEngine:
         """Evaluates arbitrary algebraic, calculus, or arithmetic expressions symbolically and numerically."""
         return self.symbolic.evaluate_expression(expression)
 
-    def execute_operation(self, operation: str, params: dict[str, Any]) -> dict[str, Any]:
+    def execute_operation(
+        self, operation: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
         """Dynamic dispatch for structured multi-agent and tool tasks."""
         op = operation.lower().strip()
 
@@ -1191,13 +1261,19 @@ class MathEngine:
         # 2. Financial & Business Models
         elif op in ("cagr", "growth_rate"):
             return self.financial.cagr(
-                beginning_value=float(params.get("beginning_value", params.get("old_value", 0))),
-                ending_value=float(params.get("ending_value", params.get("new_value", 0))),
+                beginning_value=float(
+                    params.get("beginning_value", params.get("old_value", 0))
+                ),
+                ending_value=float(
+                    params.get("ending_value", params.get("new_value", 0))
+                ),
                 periods=float(params.get("periods", params.get("years", 1))),
             )
         elif op in ("npv", "net_present_value"):
             return self.financial.net_present_value(
-                discount_rate=float(params.get("discount_rate", params.get("rate", 0.1))),
+                discount_rate=float(
+                    params.get("discount_rate", params.get("rate", 0.1))
+                ),
                 cash_flows=[float(x) for x in params.get("cash_flows", [])],
             )
         elif op in ("irr", "internal_rate_of_return"):
@@ -1228,8 +1304,12 @@ class MathEngine:
         elif op in ("ttest", "hypothesis_test"):
             return self.stats.hypothesis_test(
                 test_type=params.get("test_type", "1samp_ttest"),
-                sample1=[float(x) for x in params.get("sample1", params.get("data", []))],
-                sample2=[float(x) for x in params.get("sample2", [])] if params.get("sample2") else None,
+                sample1=[
+                    float(x) for x in params.get("sample1", params.get("data", []))
+                ],
+                sample2=[float(x) for x in params.get("sample2", [])]
+                if params.get("sample2")
+                else None,
                 pop_mean=float(params.get("pop_mean", 0.0)),
             )
         elif op in ("correlation", "corr"):
