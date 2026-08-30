@@ -246,13 +246,16 @@ async def list_evaluation_runs(
 
 
 @router.get("/reports/{run_id}", response_model=None)
-def get_evaluation_report(
+async def get_evaluation_report(
     run_id: UUID,
     format: str = "markdown",
+    db: AsyncSession = Depends(get_db),
+    report_gen: ReportGenerator = Depends(get_report_generator),
     _admin: dict[str, Any] = Depends(check_admin_user),
 ) -> FileResponse:
     """
     Retrieve generated Markdown, JSON, HTML, or CSV report files for a run.
+    If the file is missing from disk, regenerates it on-demand from the database record.
     """
     ext = "md"
     content_type = "text/markdown"
@@ -270,6 +273,24 @@ def get_evaluation_report(
     report_path = os.path.join(
         settings.EVALUATION_RESULTS_DIR, f"report_{run_id}.{ext}"
     )
+
+    if not os.path.exists(report_path):
+        # Attempt on-demand regeneration from DB run record
+        stmt = (
+            select(SQLAlchemyEvaluationRun)
+            .options(selectinload(SQLAlchemyEvaluationRun.results))
+            .where(SQLAlchemyEvaluationRun.id == run_id)
+        )
+        res = await db.execute(stmt)
+        run_record = res.scalar_one_or_none()
+
+        if not run_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Report file not found for run {run_id} in {format} format.",
+            )
+
+        report_gen.generate_all_reports(run_record)
 
     if not os.path.exists(report_path):
         raise HTTPException(
