@@ -66,12 +66,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
     if (previous === null && conversationId !== null) {
       discardQueuedNewChatRows();
     }
-    // When switching between different conversations while not streaming,
+    // When switching to new chat or between different conversations while not streaming,
     // clear the previous conversation's messages so we don't flash old chat content
-    if (previous !== null && conversationId !== null && previous !== conversationId && !isStreaming) {
+    if (conversationId === null && !isStreaming) {
+      clearChat();
+    } else if (previous !== null && conversationId !== null && previous !== conversationId && !isStreaming) {
       setChatMessages([]);
     }
-  }, [conversationId, discardQueuedNewChatRows, isStreaming, setChatMessages]);
+  }, [conversationId, discardQueuedNewChatRows, isStreaming, setChatMessages, clearChat]);
 
   // Keep hook conversationId in sync with props
   useEffect(() => {

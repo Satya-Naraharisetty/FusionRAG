@@ -122,6 +122,10 @@ export const useDeleteConversation = () => {
         }
       );
 
+      // Remove deleted conversation and its messages from single-conversation query caches
+      queryClient.removeQueries({ queryKey: [QUERY_KEYS.CONVERSATIONS, id] });
+      queryClient.removeQueries({ queryKey: [QUERY_KEYS.MESSAGES, id] });
+
       return { previousLists };
     },
     onError: (_err, _id, context) => {
@@ -132,8 +136,12 @@ export const useDeleteConversation = () => {
       }
       toast.error("Failed to delete conversation.");
     },
-    onSettled: () => {
+    onSettled: (_data, _error, id) => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CONVERSATIONS] });
+      if (id) {
+        queryClient.removeQueries({ queryKey: [QUERY_KEYS.CONVERSATIONS, id] });
+        queryClient.removeQueries({ queryKey: [QUERY_KEYS.MESSAGES, id] });
+      }
     },
   });
 };

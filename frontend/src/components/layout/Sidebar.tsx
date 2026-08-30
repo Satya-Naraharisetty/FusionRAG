@@ -146,7 +146,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           activeId={conversationId || null}
           onSelect={handleSelectConversation}
           onRename={async (id, title) => renameMutation.mutateAsync({ id, title })}
-          onDelete={async (id) => deleteMutation.mutateAsync(id)}
+          onDelete={async (id) => {
+            await deleteMutation.mutateAsync(id);
+            if (conversationId === id) {
+              navigate("/chat", { replace: true });
+            }
+          }}
           searchQuery={searchQuery}
           pinnedIds={pinnedIds}
           folders={folders}

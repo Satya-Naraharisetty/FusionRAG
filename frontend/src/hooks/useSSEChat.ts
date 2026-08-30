@@ -273,9 +273,7 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
           }
           return msg;
         });
-        setIsStreaming(false);
       } catch (err: unknown) {
-        setIsStreaming(false);
         const isAbort = err instanceof DOMException && err.name === "AbortError";
         if (isAbort) return;
 
@@ -286,6 +284,8 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
           status: "failed" as const,
           error: "Network stream disconnected.",
         }));
+      } finally {
+        setIsStreaming(false);
       }
     },
     [currentConversationId, isStreaming, queryClient]
