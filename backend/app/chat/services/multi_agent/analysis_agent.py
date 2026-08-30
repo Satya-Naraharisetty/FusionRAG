@@ -453,6 +453,22 @@ class AnalysisAgent(BaseSpecialistAgent):
                     output_str = f"Analysis completed on available context ({len(combined_context)} characters examined)."
                     structured = {"context_length": len(combined_context)}
 
+            if isinstance(structured, dict) and "result" not in structured:
+                if "numeric" in structured and structured["numeric"] is not None:
+                    num_val = structured["numeric"]
+                    structured["result"] = (
+                        int(num_val)
+                        if isinstance(num_val, (int, float))
+                        and float(num_val).is_integer()
+                        else num_val
+                    )
+                elif "exact" in structured and structured["exact"] is not None:
+                    try:
+                        val = float(structured["exact"])
+                        structured["result"] = int(val) if val.is_integer() else val
+                    except (ValueError, TypeError):
+                        structured["result"] = structured["exact"]
+
             elapsed_ms = (time.perf_counter() - start_time) * 1000
             return AgentResult(
                 task_id=task.task_id,

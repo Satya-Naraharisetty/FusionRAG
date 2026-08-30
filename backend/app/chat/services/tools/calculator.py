@@ -69,7 +69,12 @@ class CalculatorTool(BuiltinTool):
                 if "expression" not in params and expression:
                     params["expression"] = expression
                 res = self.math_engine.execute_operation(operation, params)
-                content = res.get("formatted_markdown", str(res.get("result", res)))
+                content_val = res.get("exact", res.get("numeric", res.get("result")))
+                content = (
+                    str(content_val)
+                    if content_val is not None
+                    else res.get("formatted_markdown", str(res))
+                )
                 return ToolResult(
                     tool_call_id="",
                     name=self.definition.name,
@@ -81,8 +86,11 @@ class CalculatorTool(BuiltinTool):
             # Try MathEngine first for rich symbolic & numerical math
             try:
                 res = self.math_engine.calculate(expression)
-                content = res.get(
-                    "formatted_markdown", str(res.get("exact", res.get("numeric")))
+                content_val = res.get("exact", res.get("numeric", res.get("result")))
+                content = (
+                    str(content_val)
+                    if content_val is not None
+                    else res.get("formatted_markdown", "")
                 )
                 return ToolResult(
                     tool_call_id="",

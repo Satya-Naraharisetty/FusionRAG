@@ -62,6 +62,11 @@ class CapabilityRegistry:
 
     def get(self, capability_id: str) -> CapabilityDescriptor | None:
         """Retrieves a capability descriptor by ID."""
+        if (
+            capability_id == "analysis.math_engine"
+            and "analysis.math_engine" not in self._capabilities
+        ):
+            return self._capabilities.get("analysis.safe_calculator")
         return self._capabilities.get(capability_id)
 
     def list_enabled(self) -> list[CapabilityDescriptor]:
@@ -112,7 +117,7 @@ def create_default_capability_registry() -> CapabilityRegistry:
             metadata={"specialist": "DocumentAgent"},
         ),
         CapabilityDescriptor(
-            capability_id="analysis.math_engine",
+            capability_id="analysis.safe_calculator",
             capability_type=CapabilityType.ANALYSIS,
             description="AST-sandboxed scientific, engineering, financial, and symbolic mathematics engine (calculus, ODEs, transforms, matrices, CAGR, NPV, stats).",
             supported_operations=[
