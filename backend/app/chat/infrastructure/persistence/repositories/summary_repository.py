@@ -1,6 +1,7 @@
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat.domain.interfaces import SummaryRepository
@@ -50,3 +51,14 @@ class SQLAlchemySummaryRepository(SummaryRepository):
         if not orm:
             return None
         return self._to_domain(orm)
+
+    async def delete_summaries_from(
+        self, conversation_id: UUID, created_at: datetime
+    ) -> int:
+        delete_stmt = delete(ConversationSummaryORM).where(
+            ConversationSummaryORM.conversation_id == conversation_id,
+            ConversationSummaryORM.created_at >= created_at,
+        )
+        result = await self._db.execute(delete_stmt)
+        await self._db.flush()
+        return int(getattr(result, "rowcount", 0) or 0)

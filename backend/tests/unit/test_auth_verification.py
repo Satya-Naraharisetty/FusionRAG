@@ -349,7 +349,6 @@ async def test_cleanup_expired_unverified_users(mock_deps):
 
 @pytest.mark.asyncio
 async def test_register_stale_unverified_user_purges_and_proceeds(mock_deps):
-    from app.auth.domain.exceptions import DuplicateAccountException
 
     service = mock_deps["service"]
     user_repo = mock_deps["user_repo"]
@@ -401,4 +400,3 @@ async def test_register_recent_unverified_user_raises_duplicate(mock_deps):
         await service.register_user("recent@example.com", "NewPassword123!")
 
     user_repo.delete.assert_not_called()
-

@@ -39,6 +39,7 @@ def get_oauth_http_client() -> httpx.AsyncClient:
         )
     return _oauth_http_client
 
+
 # ─── Google OAuth endpoints ────────────────────────────────────────────────────
 _GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"

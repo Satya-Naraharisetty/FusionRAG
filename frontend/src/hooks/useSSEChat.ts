@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback } from "react";
 import { chatApi, ChatRequest } from "../api/chat";
+import { conversationsApi, MessagesListResponse } from "../api/conversations";
 import { ChatMessage, Citation } from "../types";
-import { useQueryClient } from "@tanstack/react-query";
+import { InfiniteData, useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "../lib/constants";
 import { maybeNotifyStreamComplete } from "../lib/notifications";
 
@@ -327,18 +328,52 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
   }, []);
 
   const editAndResend = useCallback(
-    (messageId: string, newText: string) => {
+    async (messageId: string, newText: string) => {
       if (isStreaming || !newText.trim()) return;
+
+      const convId = currentConversationId;
+
+      // 1. Truncate local chat messages state immediately (ChatGPT behavior)
       setChatMessages((prev) => {
         const targetIdx = prev.findIndex((m) => m.id === messageId);
         if (targetIdx === -1) return prev;
         // Keep everything strictly before this user message
         return prev.slice(0, targetIdx);
       });
-      // Send the updated prompt
-      send(newText.trim(), { conversationId: currentConversationId });
+
+      // 2. If this conversation is persisted, prune target message and following from React Query cache
+      // and call backend to permanently delete them.
+      if (convId) {
+        queryClient.setQueryData<InfiniteData<MessagesListResponse>>(
+          [QUERY_KEYS.MESSAGES, convId],
+          (oldData) => {
+            if (!oldData?.pages) return oldData;
+            return {
+              ...oldData,
+              pages: oldData.pages.map((page) => {
+                const msgs = page.messages || [];
+                const targetIdx = msgs.findIndex((m) => m.id === messageId);
+                if (targetIdx === -1) return page;
+                return {
+                  ...page,
+                  messages: msgs.slice(0, targetIdx),
+                };
+              }),
+            };
+          }
+        );
+
+        try {
+          await conversationsApi.deleteMessagesFrom(convId, messageId);
+        } catch (err) {
+          console.error("Failed to delete subsequent messages on edit:", err);
+        }
+      }
+
+      // 3. Send the updated prompt
+      send(newText.trim(), { conversationId: convId });
     },
-    [isStreaming, send, currentConversationId]
+    [isStreaming, send, currentConversationId, queryClient]
   );
 
   const regenerate = useCallback(

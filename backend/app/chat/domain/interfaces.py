@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -201,6 +202,16 @@ class MessageRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    async def delete_messages_from(
+        self, conversation_id: UUID, message_id: UUID
+    ) -> int:
+        """
+        Delete the message with message_id and all messages created at or after it
+        in the specified conversation. Returns the count of deleted messages.
+        """
+        pass
+
 
 class SummaryRepository(ABC):
     @abstractmethod
@@ -211,6 +222,13 @@ class SummaryRepository(ABC):
     @abstractmethod
     async def latest_summary(self, conversation_id: UUID) -> ConversationSummary | None:
         """Retrieve the latest summary for a conversation."""
+        pass
+
+    @abstractmethod
+    async def delete_summaries_from(
+        self, conversation_id: UUID, created_at: datetime
+    ) -> int:
+        """Delete summaries in a conversation created at or after the given datetime."""
         pass
 
 

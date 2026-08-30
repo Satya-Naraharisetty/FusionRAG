@@ -255,4 +255,3 @@ async def cleanup_stale_unverified_signups(session_factory) -> int:
             logger.warning("Startup cleanup of unverified users failed: %s", e)
             await db_session.rollback()
             return 0
-

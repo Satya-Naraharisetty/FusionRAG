@@ -48,6 +48,10 @@ class MessagesListResponse(BaseModel):
     offset: int
 
 
+class DeleteMessagesResponse(BaseModel):
+    deleted_count: int
+
+
 @router.get(
     "", response_model=ConversationsListResponse, status_code=status.HTTP_200_OK
 )
@@ -177,6 +181,38 @@ async def list_messages(
             limit=limit,
             offset=offset,
         )
+    except ConversationNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except UnauthorizedConversationAccessException as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        )
+
+
+@router.delete(
+    "/{id}/messages/{message_id}",
+    response_model=DeleteMessagesResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def delete_messages_from(
+    id: UUID,
+    message_id: UUID,
+    user_context: dict[str, Any] = Depends(get_current_user_context),
+    manager: ConversationManager = Depends(get_conversation_manager),
+) -> DeleteMessagesResponse:
+    """
+    Delete a message and all subsequent messages in the conversation (ChatGPT-style edit truncation).
+    """
+    user_id = UUID(user_context["user_id"])
+    try:
+        count = await manager.delete_messages_from(
+            conversation_id=id, user_id=user_id, message_id=message_id
+        )
+        return DeleteMessagesResponse(deleted_count=count)
     except ConversationNotFoundException as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

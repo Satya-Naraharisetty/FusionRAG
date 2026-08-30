@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat.domain.interfaces import MessageRepository
@@ -263,3 +263,30 @@ class SQLAlchemyMessageRepository(MessageRepository):
         await self._db.flush()
         await self._db.refresh(orm)
         return self._to_domain(orm)
+
+    async def delete_messages_from(
+        self, conversation_id: UUID, message_id: UUID
+    ) -> int:
+        """
+        Delete the message with message_id and all messages created at or after it
+        in the specified conversation. Returns the count of deleted messages.
+        """
+        result = await self._db.execute(
+            select(ConversationMessageORM).where(
+                ConversationMessageORM.id == message_id,
+                ConversationMessageORM.conversation_id == conversation_id,
+            )
+        )
+        target_orm = result.scalar_one_or_none()
+        if not target_orm:
+            return 0
+
+        target_created_at = target_orm.created_at
+
+        delete_stmt = delete(ConversationMessageORM).where(
+            ConversationMessageORM.conversation_id == conversation_id,
+            ConversationMessageORM.created_at >= target_created_at,
+        )
+        del_result = await self._db.execute(delete_stmt)
+        await self._db.flush()
+        return int(getattr(del_result, "rowcount", 0) or 0)

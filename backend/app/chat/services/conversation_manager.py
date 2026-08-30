@@ -331,6 +331,33 @@ class ConversationManager:
             conversation_id=conversation_id, limit=limit, offset=offset
         )
 
+    async def delete_messages_from(
+        self, conversation_id: UUID, user_id: UUID, message_id: UUID
+    ) -> int:
+        """
+        Delete the message with message_id and all subsequent messages in the conversation,
+        verifying conversation ownership. Updates conversation metadata accordingly.
+        """
+        await self._access_service.verify_owner(conversation_id, user_id)
+        deleted_count = await self._message_repo.delete_messages_from(
+            conversation_id=conversation_id, message_id=message_id
+        )
+        if deleted_count > 0:
+            conv = await self._conversation_repo.get_conversation(conversation_id)
+            if conv:
+                conv.metadata.message_count = await self._message_repo.count_messages(
+                    conversation_id
+                )
+                recent = await self._message_repo.get_recent_messages(
+                    conversation_id, limit=1
+                )
+                if recent:
+                    conv.last_message_at = recent[-1].created_at
+                await self._conversation_repo.update_conversation(conv)
+            if self._db:
+                await self._db.commit()
+        return deleted_count
+
     async def delete_conversation(self, conversation_id: UUID, user_id: UUID) -> int:
         """
         Deletes a conversation and all associated documents durably.

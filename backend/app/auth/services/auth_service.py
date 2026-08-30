@@ -546,9 +546,7 @@ class AuthService:
             await self._uow.rollback()
             raise
 
-    async def cleanup_expired_unverified_users(
-        self, days: int | None = None
-    ) -> int:
+    async def cleanup_expired_unverified_users(self, days: int | None = None) -> int:
         """
         Purge all unverified user accounts created older than `days` days ago.
         """
@@ -570,4 +568,3 @@ class AuthService:
         except Exception:
             await self._uow.rollback()
             raise
-

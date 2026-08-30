@@ -40,4 +40,14 @@ export const conversationsApi = {
       params: { limit, offset },
     });
   },
+
+  deleteMessagesFrom(
+    id: string,
+    messageId: string
+  ): Promise<{ deleted_count: number }> {
+    return api.delete<{ deleted_count: number }>(
+      `/conversations/${id}/messages/${messageId}`
+    );
+  },
 };
+

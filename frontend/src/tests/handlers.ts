@@ -126,6 +126,12 @@ const handlers = [
     });
   }),
 
+  http.delete("*/api/v1/conversations/:id/messages/:messageId", () => {
+    return HttpResponse.json({
+      deleted_count: 2,
+    });
+  }),
+
   http.get("*/api/v1/documents", () => {
     return HttpResponse.json([
       {
