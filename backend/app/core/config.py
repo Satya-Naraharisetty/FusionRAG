@@ -300,7 +300,7 @@ class Settings(BaseSettings):
     GEMINI_CHAT_MODEL: str = "gemini-3.5-flash-lite"
     TEMPERATURE: float = 0.0
     MAX_CONTEXT_TOKENS: int = 4000
-    MAX_RESPONSE_TOKENS: int = 1000
+    MAX_RESPONSE_TOKENS: int = 2048
     SYSTEM_PROMPT_PATH: str = "app/core/prompts/system_prompt.txt"
     SYSTEM_PROMPT_TOKENS: int = 1000
     RESERVED_COMPLETION_TOKENS: int = 500

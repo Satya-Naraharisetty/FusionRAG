@@ -13,9 +13,12 @@ class LLMConversationTitleGenerator(ConversationTitleGenerator):
 
     def _fallback_title(self, user_msg: str) -> str:
         trimmed = user_msg.strip()
-        if len(trimmed) > 40:
-            return trimmed[:37] + "..."
-        return trimmed or "New Conversation"
+        if not trimmed:
+            return "New Conversation"
+        clean = trimmed[0].upper() + trimmed[1:]
+        if len(clean) > 40:
+            return clean[:37] + "..."
+        return clean
 
     async def generate_title(
         self, first_user_message: str, assistant_answer: str | None = None
@@ -79,6 +82,9 @@ class FallbackConversationTitleGenerator(ConversationTitleGenerator):
         self, first_user_message: str, assistant_answer: str | None = None
     ) -> str:
         trimmed = first_user_message.strip()
-        if len(trimmed) > 40:
-            return trimmed[:37] + "..."
-        return trimmed or "New Conversation"
+        if not trimmed:
+            return "New Conversation"
+        clean = trimmed[0].upper() + trimmed[1:]
+        if len(clean) > 40:
+            return clean[:37] + "..."
+        return clean

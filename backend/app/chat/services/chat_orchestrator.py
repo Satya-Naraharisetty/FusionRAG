@@ -573,9 +573,7 @@ class ChatOrchestrator:
                     else:
                         from app.core.config import settings
 
-                        query_type = (
-                            getattr(rewrite_result, "query_type", None) or "FACTUAL"
-                        )
+                        query_type = getattr(rewrite_result, "query_type", None)
                         effective_max_tokens = (
                             self.prompt_builder.get_adaptive_max_tokens(
                                 query_type=query_type,
@@ -1126,9 +1124,7 @@ class ChatOrchestrator:
                 else:
                     from app.core.config import settings
 
-                    query_type = (
-                        getattr(rewrite_result, "query_type", None) or "FACTUAL"
-                    )
+                    query_type = getattr(rewrite_result, "query_type", None)
                     effective_max_tokens = (
                         self.prompt_builder.get_adaptive_max_tokens(
                             query_type=query_type,

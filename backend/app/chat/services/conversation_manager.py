@@ -165,11 +165,14 @@ class ConversationManager:
             "Untitled",
         ):
             trimmed_q = question.strip()
-            conversation.title = (
-                (trimmed_q[:40] + "...")
-                if len(trimmed_q) > 40
-                else (trimmed_q or "New Conversation")
-            )
+            if trimmed_q:
+                # Capitalize first character for clean presentation in toolbar/sidebar
+                clean_q = trimmed_q[0].upper() + trimmed_q[1:]
+                conversation.title = (
+                    (clean_q[:37] + "...") if len(clean_q) > 40 else clean_q
+                )
+            else:
+                conversation.title = "New Conversation"
 
         await self._conversation_repo.update_conversation(conversation)
 

@@ -60,7 +60,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
     if (previous === null && conversationId !== null) {
       discardQueuedNewChatRows();
     }
-  }, [conversationId, discardQueuedNewChatRows]);
+    // When switching between different conversations while not streaming,
+    // clear the previous conversation's messages so we don't flash old chat content
+    if (previous !== null && conversationId !== null && previous !== conversationId && !isStreaming) {
+      setChatMessages([]);
+    }
+  }, [conversationId, discardQueuedNewChatRows, isStreaming, setChatMessages]);
 
   // Keep hook conversationId in sync with props
   useEffect(() => {
@@ -104,7 +109,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
 
       // Sort chronological ascending
       mapped.sort((a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime());
-      setChatMessages(mapped);
+      
+      setChatMessages((prev) => {
+        // Prevent stale server cache from temporarily wiping out freshly completed in-memory messages
+        // while the background query refetch is in-flight.
+        if (mapped.length < prev.length) {
+          return prev;
+        }
+        return mapped;
+      });
     } else if (!conversationId) {
       clearChat();
     }
@@ -172,7 +185,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
 
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-hidden flex flex-col h-full w-full">
-        {isLoading ? (
+        {isLoading && chatMessages.length === 0 && !isStreaming ? (
           <div className="flex-1 flex flex-col gap-6 p-8 max-w-[860px] mx-auto w-full pt-16 select-none">
             <div className="flex items-center gap-3">
               <Skeleton className="h-8 w-8 rounded-full bg-[var(--bg-tertiary)]" />
@@ -189,7 +202,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
               </div>
             </div>
           </div>
-        ) : error ? (
+        ) : error && chatMessages.length === 0 && !isStreaming ? (
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-red-500 select-none">
             <AlertCircle size={24} className="mb-2" />
             <p className="text-xs font-semibold">Failed to load message history.</p>
