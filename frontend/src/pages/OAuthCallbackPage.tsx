@@ -56,16 +56,7 @@ export default function OAuthCallbackPage() {
     // ── Direct Token Sign-In (Cross-Origin SPA) ──────────────────────────────
     if (token) {
       setAccessToken(token);
-      authApi
-        .getMe()
-        .then(() => {
-          navigate("/chat", { replace: true });
-        })
-        .catch((err) => {
-          console.error("Failed to fetch user profile with OAuth token:", err);
-          setAccessToken(null);
-          navigate("/login?oauth_error=session_failed", { replace: true });
-        });
+      navigate("/chat", { replace: true });
       return;
     }
 

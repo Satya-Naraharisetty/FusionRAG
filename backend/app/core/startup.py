@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, text, update
 
@@ -223,3 +223,36 @@ async def seed_admin_user(session_factory) -> None:
         except Exception as e:
             logger.error(f"Failed to seed/enforce default admin account: {e}")
             await db_session.rollback()
+
+
+async def cleanup_stale_unverified_signups(session_factory) -> int:
+    """
+    Purges unverified user accounts created older than UNVERIFIED_USER_CLEANUP_DAYS.
+    """
+    if settings.is_testing:
+        return 0
+
+    async with session_factory() as db_session:
+        try:
+            from app.auth.infrastructure.persistence.repositories.user_repository import (
+                SQLAlchemyUserRepository,
+            )
+
+            user_repo = SQLAlchemyUserRepository(db_session)
+            cutoff = datetime.now(UTC) - timedelta(
+                days=settings.UNVERIFIED_USER_CLEANUP_DAYS
+            )
+            count = await user_repo.delete_unverified_older_than(cutoff)
+            await db_session.commit()
+            if count > 0:
+                logger.info(
+                    "Startup cleanup: purged %d unverified user account(s) older than %d days.",
+                    count,
+                    settings.UNVERIFIED_USER_CLEANUP_DAYS,
+                )
+            return count
+        except Exception as e:
+            logger.warning("Startup cleanup of unverified users failed: %s", e)
+            await db_session.rollback()
+            return 0
+

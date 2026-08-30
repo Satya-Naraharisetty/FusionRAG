@@ -86,6 +86,14 @@ class UserRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    async def delete_unverified_older_than(self, cutoff: datetime) -> int:
+        """
+        Permanently delete unverified accounts created before the cutoff datetime.
+        Returns the count of deleted accounts.
+        """
+        pass
+
 
 class SessionRepository(ABC):
     @abstractmethod

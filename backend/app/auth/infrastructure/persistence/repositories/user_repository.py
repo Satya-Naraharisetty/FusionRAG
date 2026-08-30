@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import delete, select
@@ -101,3 +102,18 @@ class SQLAlchemyUserRepository(UserRepository):
             delete(SQLAlchemyUser).where(SQLAlchemyUser.id == user_id)
         )
         await self._db.flush()
+
+    async def delete_unverified_older_than(self, cutoff: datetime) -> int:
+        """
+        Permanently delete unverified users created before the cutoff datetime.
+        Returns the count of deleted users.
+        """
+        result = await self._db.execute(
+            delete(SQLAlchemyUser).where(
+                SQLAlchemyUser.is_verified == False,  # noqa: E712
+                SQLAlchemyUser.created_at < cutoff,
+            )
+        )
+        await self._db.flush()
+        return int(result.rowcount or 0)
+

@@ -328,3 +328,77 @@ async def test_resend_verification_email(mock_deps):
     verification_repo.invalidate_all_for_user.assert_called_once_with(user_id)
     verification_repo.create.assert_called_once()
     email_service.send_verification_email.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_cleanup_expired_unverified_users(mock_deps):
+    service = mock_deps["service"]
+    user_repo = mock_deps["user_repo"]
+    uow = mock_deps["uow"]
+    now = mock_deps["now"]
+
+    user_repo.delete_unverified_older_than.return_value = 3
+
+    deleted_count = await service.cleanup_expired_unverified_users(days=7)
+
+    expected_cutoff = now - timedelta(days=7)
+    user_repo.delete_unverified_older_than.assert_called_once_with(expected_cutoff)
+    uow.commit.assert_called_once()
+    assert deleted_count == 3
+
+
+@pytest.mark.asyncio
+async def test_register_stale_unverified_user_purges_and_proceeds(mock_deps):
+    from app.auth.domain.exceptions import DuplicateAccountException
+
+    service = mock_deps["service"]
+    user_repo = mock_deps["user_repo"]
+    now = mock_deps["now"]
+
+    # User created 10 days ago and never verified
+    stale_user = UserDomain(
+        id=uuid4(),
+        email="stale@example.com",
+        hashed_password="hashed_pw_old",
+        role="user",
+        is_active=True,
+        is_verified=False,
+        created_at=now - timedelta(days=10),
+        updated_at=now - timedelta(days=10),
+    )
+    user_repo.get_by_email.return_value = stale_user
+    user_repo.save.side_effect = lambda u: u
+
+    result = await service.register_user("stale@example.com", "NewPassword123!")
+
+    user_repo.delete.assert_called_once_with(stale_user.id)
+    assert result.email == "stale@example.com"
+    assert result.is_verified is False
+
+
+@pytest.mark.asyncio
+async def test_register_recent_unverified_user_raises_duplicate(mock_deps):
+    from app.auth.domain.exceptions import DuplicateAccountException
+
+    service = mock_deps["service"]
+    user_repo = mock_deps["user_repo"]
+    now = mock_deps["now"]
+
+    # User created 2 days ago and unverified
+    recent_user = UserDomain(
+        id=uuid4(),
+        email="recent@example.com",
+        hashed_password="hashed_pw_old",
+        role="user",
+        is_active=True,
+        is_verified=False,
+        created_at=now - timedelta(days=2),
+        updated_at=now - timedelta(days=2),
+    )
+    user_repo.get_by_email.return_value = recent_user
+
+    with pytest.raises(DuplicateAccountException):
+        await service.register_user("recent@example.com", "NewPassword123!")
+
+    user_repo.delete.assert_not_called()
+

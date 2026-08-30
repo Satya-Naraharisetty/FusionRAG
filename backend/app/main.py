@@ -35,6 +35,7 @@ from app.core.logger import (
     setup_logging,
 )
 from app.core.startup import (
+    cleanup_stale_unverified_signups,
     run_startup_validations,
     seed_admin_user,
     verify_alembic_migrations,
@@ -88,6 +89,9 @@ async def lifespan(app: FastAPI):
 
         # Seed and enforce single default admin user from environment settings if configured
         await seed_admin_user(app.state.db_session_factory)
+
+        # Cleanup unverified user signups older than UNVERIFIED_USER_CLEANUP_DAYS
+        await cleanup_stale_unverified_signups(app.state.db_session_factory)
 
         app.state.redis = init_redis_client(
             host=settings.REDIS_HOST,

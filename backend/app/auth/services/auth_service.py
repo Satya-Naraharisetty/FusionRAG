@@ -65,13 +65,22 @@ class AuthService:
         """
         try:
             normalized_email = email.strip().lower()
+            now = self._time_provider.get_now()
             existing = await self._user_repo.get_by_email(normalized_email)
             if existing:
-                # Return a duplicate account error to prevent registration conflicts
-                raise DuplicateAccountException("Email is already registered.")
+                cutoff = now - timedelta(days=settings.UNVERIFIED_USER_CLEANUP_DAYS)
+                if not existing.is_verified and existing.created_at < cutoff:
+                    logger.info(
+                        "Purging stale unverified user account for %s created at %s",
+                        normalized_email,
+                        existing.created_at,
+                    )
+                    await self._user_repo.delete(existing.id)
+                else:
+                    # Return a duplicate account error to prevent registration conflicts
+                    raise DuplicateAccountException("Email is already registered.")
 
             hashed_password = self._hasher.hash(password)
-            now = self._time_provider.get_now()
             user = UserDomain(
                 id=self._uuid_generator.generate(),
                 email=normalized_email,
@@ -536,3 +545,29 @@ class AuthService:
         except Exception:
             await self._uow.rollback()
             raise
+
+    async def cleanup_expired_unverified_users(
+        self, days: int | None = None
+    ) -> int:
+        """
+        Purge all unverified user accounts created older than `days` days ago.
+        """
+        cleanup_days = (
+            days if days is not None else settings.UNVERIFIED_USER_CLEANUP_DAYS
+        )
+        try:
+            now = self._time_provider.get_now()
+            cutoff = now - timedelta(days=cleanup_days)
+            count = await self._user_repo.delete_unverified_older_than(cutoff)
+            await self._uow.commit()
+            if count > 0:
+                logger.info(
+                    "Cleaned up %d expired unverified user account(s) older than %d days",
+                    count,
+                    cleanup_days,
+                )
+            return count
+        except Exception:
+            await self._uow.rollback()
+            raise
+

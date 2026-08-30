@@ -358,6 +358,7 @@ class Settings(BaseSettings):
     MAGIC_LINK_EXPIRE_MINUTES: int = 10
     EMAIL_VERIFICATION_EXPIRE_MINUTES: int = 15
     REQUIRE_EMAIL_VERIFICATION: bool = True
+    UNVERIFIED_USER_CLEANUP_DAYS: int = 7
 
     # Conversation Memory & History-Aware Retrieval Configurations
     ENABLE_CONVERSATION_MEMORY: bool = True
