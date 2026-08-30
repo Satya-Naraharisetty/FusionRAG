@@ -120,6 +120,8 @@ class WebSearchAgent(BaseSpecialistAgent):
                         document_name=doc_name,
                         chunk_id=chunk_uuid,
                         chunk_index=idx,
+                        url=r.url,
+                        content=r.snippet,
                     )
                 )
                 summary_lines.append(f"{idx}. {r.title} ({r.url}):\n   {r.snippet}")

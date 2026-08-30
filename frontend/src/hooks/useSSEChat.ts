@@ -67,6 +67,8 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
         documentIds?: string[] | null;
         topK?: number | null;
         filters?: Record<string, unknown> | null;
+        truncateFromMessageId?: string | null;
+        deleteBeforeStreamMessageId?: string | null;
       }
     ) => {
       if (isStreaming) return;
@@ -75,6 +77,8 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
       const documentIds = opts?.documentIds ?? null;
       const topK = opts?.topK ?? null;
       const filters = opts?.filters ?? null;
+      const truncateFromMessageId = opts?.truncateFromMessageId ?? null;
+      const deleteBeforeStreamMessageId = opts?.deleteBeforeStreamMessageId ?? null;
 
       // Save parameters for retry
       lastQuestionRef.current = question;
@@ -111,7 +115,16 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
         created_at: new Date().toISOString(),
       };
 
-      setChatMessages((prev) => [...prev, userMsg, assistantMsg]);
+      setChatMessages((prev) => {
+        let base = prev;
+        if (truncateFromMessageId) {
+          const targetIdx = prev.findIndex((m) => m.id === truncateFromMessageId);
+          if (targetIdx !== -1) {
+            base = prev.slice(0, targetIdx);
+          }
+        }
+        return [...base, userMsg, assistantMsg];
+      });
 
       // Safe updater helper that targets the specific assistant message by id
       // and guarantees that user messages are never mutated or overwritten.
@@ -132,6 +145,16 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
           return [...prev, updater(assistantMsg)];
         });
       };
+
+      // If this is an edit resend, delete old messages on the backend before opening the stream
+      // to guarantee Postgres doesn't delete the newly created message in a race condition.
+      if (deleteBeforeStreamMessageId && conversationId) {
+        try {
+          await conversationsApi.deleteMessagesFrom(conversationId, deleteBeforeStreamMessageId);
+        } catch (err) {
+          console.error("Failed to delete messages before stream:", err);
+        }
+      }
 
       abortControllerRef.current = new AbortController();
 
@@ -328,21 +351,12 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
   }, []);
 
   const editAndResend = useCallback(
-    async (messageId: string, newText: string) => {
+    (messageId: string, newText: string) => {
       if (isStreaming || !newText.trim()) return;
 
       const convId = currentConversationId;
 
-      // 1. Truncate local chat messages state immediately (ChatGPT behavior)
-      setChatMessages((prev) => {
-        const targetIdx = prev.findIndex((m) => m.id === messageId);
-        if (targetIdx === -1) return prev;
-        // Keep everything strictly before this user message
-        return prev.slice(0, targetIdx);
-      });
-
-      // 2. If this conversation is persisted, prune target message and following from React Query cache
-      // and call backend to permanently delete them.
+      // 1. Immediately prune the query cache so any background query refetch won't have stale messages
       if (convId) {
         queryClient.setQueryData<InfiniteData<MessagesListResponse>>(
           [QUERY_KEYS.MESSAGES, convId],
@@ -362,16 +376,14 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
             };
           }
         );
-
-        try {
-          await conversationsApi.deleteMessagesFrom(convId, messageId);
-        } catch (err) {
-          console.error("Failed to delete subsequent messages on edit:", err);
-        }
       }
 
-      // 3. Send the updated prompt
-      send(newText.trim(), { conversationId: convId });
+      // 2. Atomically truncate and start streaming the new message (backend delete completes before stream request)
+      send(newText.trim(), {
+        conversationId: convId,
+        truncateFromMessageId: messageId,
+        deleteBeforeStreamMessageId: messageId,
+      });
     },
     [isStreaming, send, currentConversationId, queryClient]
   );

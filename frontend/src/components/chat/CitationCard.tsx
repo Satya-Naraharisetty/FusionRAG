@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Globe, FileText } from "lucide-react";
 import { Citation } from "../../types";
 
 interface CitationCardProps {
@@ -9,6 +10,14 @@ interface CitationCardProps {
 
 export const CitationCard: React.FC<CitationCardProps> = ({ citation, index, onSelect }) => {
   const [expanded, setExpanded] = useState(false);
+
+  const isWeb = Boolean(
+    citation.url ||
+    citation.document_name.startsWith("[Web]") ||
+    citation.document_name.toLowerCase().startsWith("http")
+  );
+
+  const cleanDocName = citation.document_name.replace(/^\[Web\]\s*/i, "");
 
   const handleClick = (e: React.MouseEvent) => {
     if (onSelect) {
@@ -41,8 +50,18 @@ export const CitationCard: React.FC<CitationCardProps> = ({ citation, index, onS
         <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--bg-elevated)] text-[8px] font-bold text-[var(--text-muted)] border border-[var(--border-subtle)]">
           {index + 1}
         </span>
-        <span className="truncate max-w-[120px]">{citation.document_name}</span>
-        {citation.version !== undefined && (
+        {isWeb ? (
+          <Globe size={11} className="text-sky-400 flex-shrink-0" />
+        ) : (
+          <FileText size={11} className="text-[var(--accent-primary)] flex-shrink-0" />
+        )}
+        <span className="truncate max-w-[130px]">{cleanDocName}</span>
+        {citation.page_number && (
+          <span className="px-1 py-0.2 rounded text-[8px] bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]">
+            p.{citation.page_number}
+          </span>
+        )}
+        {citation.version !== undefined && !citation.page_number && (
           <span className="px-1 py-0.2 rounded text-[8px] bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]">
             v{citation.version}
           </span>
@@ -58,11 +77,12 @@ export const CitationCard: React.FC<CitationCardProps> = ({ citation, index, onS
       </div>
       {expanded && (
         <div className="mt-0.5 pt-1.5 border-t border-[var(--border-subtle)] text-[9px] text-[var(--text-muted)] flex flex-col gap-0.5 animate-in fade-in duration-150">
-          <div><span className="font-semibold text-[var(--text-secondary)]">Doc:</span> {citation.document_name}</div>
+          <div><span className="font-semibold text-[var(--text-secondary)]">Source:</span> {cleanDocName}</div>
+          {citation.url && <div><span className="font-semibold text-[var(--text-secondary)]">URL:</span> {citation.url}</div>}
+          {citation.page_number && <div><span className="font-semibold text-[var(--text-secondary)]">Page:</span> {citation.page_number}</div>}
+          {citation.line_number && <div><span className="font-semibold text-[var(--text-secondary)]">Line:</span> {citation.line_number}</div>}
           {citation.version !== undefined && <div><span className="font-semibold text-[var(--text-secondary)]">Version:</span> v{citation.version}</div>}
           {citation.element_type && <div><span className="font-semibold text-[var(--text-secondary)]">Element Type:</span> {citation.element_type}</div>}
-          {citation.element_id && <div><span className="font-semibold text-[var(--text-secondary)]">Element ID:</span> {citation.element_id}</div>}
-          <div><span className="font-semibold text-[var(--text-secondary)]">Chunk ID:</span> {citation.chunk_id}</div>
           {citation.confidence !== undefined && <div><span className="font-semibold text-[var(--text-secondary)]">Confidence:</span> {(citation.confidence * 100).toFixed(1)}%</div>}
         </div>
       )}
@@ -70,3 +90,4 @@ export const CitationCard: React.FC<CitationCardProps> = ({ citation, index, onS
   );
 };
 
+export default CitationCard;

@@ -936,6 +936,102 @@ http = [
 ]
 
 [[package]]
+name = "fusion-rag-backend"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "alembic" },
+    { name = "argon2-cffi" },
+    { name = "asyncpg" },
+    { name = "cryptography" },
+    { name = "email-validator" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "langdetect" },
+    { name = "numpy" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc" },
+    { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-sdk" },
+    { name = "orjson" },
+    { name = "pillow" },
+    { name = "prometheus-client" },
+    { name = "psycopg2-binary" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pyjwt" },
+    { name = "pypdf" },
+    { name = "pypdfium2" },
+    { name = "python-docx" },
+    { name = "python-multipart" },
+    { name = "qdrant-client" },
+    { name = "redis" },
+    { name = "scipy" },
+    { name = "sqlalchemy" },
+    { name = "sympy" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-mock" },
+    { name = "pytest-timeout" },
+    { name = "ruff" },
+]
+eval = [
+    { name = "deepeval" },
+    { name = "ragas" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = ">=1.13.0" },
+    { name = "argon2-cffi", specifier = ">=23.1.0" },
+    { name = "asyncpg", specifier = ">=0.29.0" },
+    { name = "cryptography", specifier = "==44.0.1" },
+    { name = "deepeval", marker = "extra == 'eval'", specifier = ">=4.1.8" },
+    { name = "email-validator", specifier = ">=2.0.0" },
+    { name = "fastapi", specifier = ">=0.110.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "langdetect", specifier = ">=1.0.9" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = "==2.3.1" },
+    { name = "numpy", specifier = ">=1.26.0" },
+    { name = "opentelemetry-api", specifier = ">=1.24.0" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.24.0" },
+    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.45b0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.24.0" },
+    { name = "orjson", specifier = ">=3.12.0" },
+    { name = "pillow", specifier = ">=10.2.0" },
+    { name = "prometheus-client", specifier = ">=0.20.0" },
+    { name = "psycopg2-binary", specifier = ">=2.9.9" },
+    { name = "pydantic", specifier = ">=2.6.0" },
+    { name = "pydantic-settings", specifier = ">=2.2.0" },
+    { name = "pyjwt", specifier = ">=2.8.0" },
+    { name = "pypdf", specifier = ">=4.0.0" },
+    { name = "pypdfium2", specifier = ">=4.30.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1.1" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.4.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
+    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.15.1" },
+    { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.4.0" },
+    { name = "python-docx", specifier = ">=1.1.0" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
+    { name = "qdrant-client", specifier = ">=1.19.0,<2.0.0" },
+    { name = "ragas", marker = "extra == 'eval'", specifier = ">=0.4.3" },
+    { name = "redis", specifier = ">=5.0.3" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.16.0" },
+    { name = "scipy", specifier = ">=1.13.0" },
+    { name = "sqlalchemy", specifier = ">=2.0.28" },
+    { name = "sympy", specifier = ">=1.13.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.28.0" },
+]
+provides-extras = ["dev", "eval"]
+
+[[package]]
 name = "googleapis-common-protos"
 version = "1.75.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1195,102 +1291,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/48/0f/ed994dbade67a5440
 wheels = [
     { url = "https://files.pythonhosted.org/packages/49/79/621a7dbb80c70974f73a597275351ebe03ce5bc65cb5f8f4acb5859252bc/huggingface_hub-1.16.1-py3-none-any.whl", hash = "sha256:64340de934b9ce37857ef85a82de72f5629e8a270f9119eabb12bf495eb53c22", size = 668176, upload-time = "2026-05-21T18:39:58.596Z" },
 ]
-
-[[package]]
-name = "fusion-rag-backend"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "alembic" },
-    { name = "argon2-cffi" },
-    { name = "asyncpg" },
-    { name = "cryptography" },
-    { name = "email-validator" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "langdetect" },
-    { name = "numpy" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-otlp-proto-grpc" },
-    { name = "opentelemetry-instrumentation-fastapi" },
-    { name = "opentelemetry-sdk" },
-    { name = "orjson" },
-    { name = "pillow" },
-    { name = "prometheus-client" },
-    { name = "psycopg2-binary" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "pyjwt" },
-    { name = "pypdf" },
-    { name = "pypdfium2" },
-    { name = "python-docx" },
-    { name = "python-multipart" },
-    { name = "qdrant-client" },
-    { name = "redis" },
-    { name = "scipy" },
-    { name = "sqlalchemy" },
-    { name = "sympy" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-mock" },
-    { name = "pytest-timeout" },
-    { name = "ruff" },
-]
-eval = [
-    { name = "deepeval" },
-    { name = "ragas" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "alembic", specifier = ">=1.13.0" },
-    { name = "argon2-cffi", specifier = ">=23.1.0" },
-    { name = "asyncpg", specifier = ">=0.29.0" },
-    { name = "cryptography", specifier = "==44.0.1" },
-    { name = "deepeval", marker = "extra == 'eval'", specifier = ">=4.1.8" },
-    { name = "email-validator", specifier = ">=2.0.0" },
-    { name = "fastapi", specifier = ">=0.110.0" },
-    { name = "httpx", specifier = ">=0.27.0" },
-    { name = "langdetect", specifier = ">=1.0.9" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = "==2.3.1" },
-    { name = "numpy", specifier = ">=1.26.0" },
-    { name = "opentelemetry-api", specifier = ">=1.24.0" },
-    { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.24.0" },
-    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.45b0" },
-    { name = "opentelemetry-sdk", specifier = ">=1.24.0" },
-    { name = "orjson", specifier = ">=3.12.0" },
-    { name = "pillow", specifier = ">=10.2.0" },
-    { name = "prometheus-client", specifier = ">=0.20.0" },
-    { name = "psycopg2-binary", specifier = ">=2.9.9" },
-    { name = "pydantic", specifier = ">=2.6.0" },
-    { name = "pydantic-settings", specifier = ">=2.2.0" },
-    { name = "pyjwt", specifier = ">=2.8.0" },
-    { name = "pypdf", specifier = ">=4.0.0" },
-    { name = "pypdfium2", specifier = ">=4.30.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1.1" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.4.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.15.1" },
-    { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.4.0" },
-    { name = "python-docx", specifier = ">=1.1.0" },
-    { name = "python-multipart", specifier = ">=0.0.9" },
-    { name = "qdrant-client", specifier = ">=1.19.0,<2.0.0" },
-    { name = "ragas", marker = "extra == 'eval'", specifier = ">=0.4.3" },
-    { name = "redis", specifier = ">=5.0.3" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.16.0" },
-    { name = "scipy", specifier = ">=1.13.0" },
-    { name = "sqlalchemy", specifier = ">=2.0.28" },
-    { name = "sympy", specifier = ">=1.13.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.28.0" },
-]
-provides-extras = ["dev", "eval"]
 
 [[package]]
 name = "hyperframe"

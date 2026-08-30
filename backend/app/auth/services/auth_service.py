@@ -296,11 +296,14 @@ class AuthService:
             verify_url = (
                 f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={raw_token}"
             )
-            await self._email_service.send_verification_email(
-                to_email=user.email,
-                verify_url=verify_url,
-                otp_code=otp_code,
-            )
+            try:
+                await self._email_service.send_verification_email(
+                    to_email=user.email,
+                    verify_url=verify_url,
+                    otp_code=otp_code,
+                )
+            except Exception as e:
+                logger.warning("Failed to dispatch verification email on resend: %s", e)
             await self._uow.commit()
         except Exception:
             await self._uow.rollback()

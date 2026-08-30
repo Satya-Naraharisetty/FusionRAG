@@ -42,6 +42,13 @@ class Citation(BaseModel):
     document_name: str
     chunk_id: UUID
     chunk_index: int
+    url: str | None = None
+    page_number: int | None = None
+    line_number: int | None = None
+    content: str | None = None
+    element_type: str | None = None
+    confidence: float | None = None
+    entailment_status: str | None = None
 
 
 class GroundedContext(BaseModel):

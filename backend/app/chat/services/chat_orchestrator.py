@@ -615,6 +615,25 @@ class ChatOrchestrator:
                         document_name=chunk.document_name,
                         chunk_id=chunk.chunk_id,
                         chunk_index=chunk.chunk_index,
+                        url=chunk.metadata.get("url")
+                        if isinstance(chunk.metadata, dict)
+                        else None,
+                        page_number=(
+                            chunk.metadata.get("page_number")
+                            or chunk.metadata.get("page")
+                        )
+                        if isinstance(chunk.metadata, dict)
+                        else None,
+                        line_number=(
+                            chunk.metadata.get("line_number")
+                            or chunk.metadata.get("line")
+                        )
+                        if isinstance(chunk.metadata, dict)
+                        else None,
+                        content=chunk.text,
+                        element_type=chunk.metadata.get("element_type")
+                        if isinstance(chunk.metadata, dict)
+                        else None,
                     )
                     for chunk in final_chunks
                 ]
@@ -624,6 +643,11 @@ class ChatOrchestrator:
                         "document_name": cit.document_name,
                         "chunk_id": str(cit.chunk_id),
                         "chunk_index": cit.chunk_index,
+                        "url": cit.url,
+                        "page_number": cit.page_number,
+                        "line_number": cit.line_number,
+                        "content": cit.content,
+                        "element_type": cit.element_type,
                     }
                     for cit in citations
                 ]
@@ -1054,6 +1078,23 @@ class ChatOrchestrator:
                 document_name=chunk.document_name,
                 chunk_id=chunk.chunk_id,
                 chunk_index=chunk.chunk_index,
+                url=chunk.metadata.get("url")
+                if isinstance(chunk.metadata, dict)
+                else None,
+                page_number=(
+                    chunk.metadata.get("page_number") or chunk.metadata.get("page")
+                )
+                if isinstance(chunk.metadata, dict)
+                else None,
+                line_number=(
+                    chunk.metadata.get("line_number") or chunk.metadata.get("line")
+                )
+                if isinstance(chunk.metadata, dict)
+                else None,
+                content=chunk.text,
+                element_type=chunk.metadata.get("element_type")
+                if isinstance(chunk.metadata, dict)
+                else None,
             )
             for chunk in final_chunks
         ]
@@ -1063,6 +1104,11 @@ class ChatOrchestrator:
                 "document_name": cit.document_name,
                 "chunk_id": str(cit.chunk_id),
                 "chunk_index": cit.chunk_index,
+                "url": cit.url,
+                "page_number": cit.page_number,
+                "line_number": cit.line_number,
+                "content": cit.content,
+                "element_type": cit.element_type,
             }
             for cit in citations
         ]

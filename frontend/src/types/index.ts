@@ -58,9 +58,13 @@ export interface Citation {
   document_name: string;
   chunk_id: string;
   chunk_index: number;
+  url?: string | null;
+  page_number?: number | null;
+  line_number?: number | null;
+  content?: string | null;
   version?: number;
   element_id?: string;
-  element_type?: "TEXT" | "TABLE" | "FIGURE" | "GRAPH_RELATIONSHIP";
+  element_type?: "TEXT" | "TABLE" | "FIGURE" | "GRAPH_RELATIONSHIP" | string;
   confidence?: number;
   entailment_status?: "ENTAILED" | "CONTRADICTED" | "INSUFFICIENT";
 }

@@ -179,6 +179,25 @@ class ResearchAgent(BaseSpecialistAgent):
                         document_name=chunk.document_name,
                         chunk_id=chunk.chunk_id,
                         chunk_index=chunk.chunk_index,
+                        url=chunk.metadata.get("url")
+                        if isinstance(chunk.metadata, dict)
+                        else None,
+                        page_number=(
+                            chunk.metadata.get("page_number")
+                            or chunk.metadata.get("page")
+                        )
+                        if isinstance(chunk.metadata, dict)
+                        else None,
+                        line_number=(
+                            chunk.metadata.get("line_number")
+                            or chunk.metadata.get("line")
+                        )
+                        if isinstance(chunk.metadata, dict)
+                        else None,
+                        content=chunk.text,
+                        element_type=chunk.metadata.get("element_type")
+                        if isinstance(chunk.metadata, dict)
+                        else None,
                     )
                 )
 
