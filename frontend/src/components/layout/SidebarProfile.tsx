@@ -57,7 +57,7 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, co
                     {user.email}
                   </p>
                   <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] mt-0.5 leading-tight">
-                    <span className="capitalize">{user.role === "admin" ? "Admin" : "Pro"}</span>
+                    <span className="capitalize">{user.role === "admin" ? "Admin" : "User"}</span>
                     <span>•</span>
                     <span className={cn(
                       "flex items-center gap-0.5 text-[10px]",

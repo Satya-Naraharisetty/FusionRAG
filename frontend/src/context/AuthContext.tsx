@@ -194,6 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           if (active) {
             setUser(userProfile);
             setAccessTokenState(storedToken);
+            setIsLoading(false);
           }
           // Asynchronously attempt session refresh in background to rotate token
           try {
