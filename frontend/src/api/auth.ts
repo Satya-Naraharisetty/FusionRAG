@@ -89,7 +89,8 @@ export const authApi = {
   },
 
   openOAuthPopup(provider: "google" | "github"): Window | null {
-    const rawBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+    const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
+    const rawBase = (envUrl !== undefined && envUrl !== "" ? envUrl : (import.meta.env.DEV ? "http://localhost:8000" : "")).replace(/\/$/, "");
     const apiBase = rawBase.endsWith("/api/v1") ? rawBase.replace(/\/api\/v1$/, "") : rawBase;
     const width = 500;
     const height = 620;
@@ -105,7 +106,8 @@ export const authApi = {
   loginWithGoogle(): void {
     const popup = this.openOAuthPopup("google");
     if (!popup || popup.closed || typeof popup.closed === "undefined") {
-      const rawBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+      const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
+      const rawBase = (envUrl !== undefined && envUrl !== "" ? envUrl : (import.meta.env.DEV ? "http://localhost:8000" : "")).replace(/\/$/, "");
       const apiBase = rawBase.endsWith("/api/v1") ? rawBase.replace(/\/api\/v1$/, "") : rawBase;
       window.location.href = `${apiBase}/api/v1/auth/oauth/google`;
     }
@@ -114,7 +116,8 @@ export const authApi = {
   loginWithGithub(): void {
     const popup = this.openOAuthPopup("github");
     if (!popup || popup.closed || typeof popup.closed === "undefined") {
-      const rawBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+      const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
+      const rawBase = (envUrl !== undefined && envUrl !== "" ? envUrl : (import.meta.env.DEV ? "http://localhost:8000" : "")).replace(/\/$/, "");
       const apiBase = rawBase.endsWith("/api/v1") ? rawBase.replace(/\/api\/v1$/, "") : rawBase;
       window.location.href = `${apiBase}/api/v1/auth/oauth/github`;
     }

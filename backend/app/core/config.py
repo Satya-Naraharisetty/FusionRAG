@@ -164,7 +164,7 @@ class Settings(BaseSettings):
             val = v.strip().lower()
             if val in ("lax", "strict", "none"):
                 return val
-        return "lax"
+        return "none"
 
     # JWT & Cookie Configurations
     JWT_SECRET: str
@@ -178,7 +178,7 @@ class Settings(BaseSettings):
     COOKIE_DOMAIN: str | None = None
     COOKIE_PATH: str = "/api/v1/auth"
     COOKIE_SECURE: bool = True
-    COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
+    COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "none"
     COOKIE_MAX_AGE: int = 7 * 24 * 60 * 60
 
     # Encryption Configuration

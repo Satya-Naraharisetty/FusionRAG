@@ -186,6 +186,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     let active = true;
 
     const initAuth = async () => {
+      const storedToken = getAccessToken();
+      if (storedToken) {
+        try {
+          // Token is already available in storage: immediately restore profile
+          const userProfile = await authApi.getMe();
+          if (active) {
+            setUser(userProfile);
+            setAccessTokenState(storedToken);
+          }
+          // Asynchronously attempt session refresh in background to rotate token
+          try {
+            const refreshRes = await authApi.refresh();
+            if (active) {
+              setAccessToken(refreshRes.access_token);
+              setAccessTokenState(refreshRes.access_token);
+              scheduleRefresh(refreshRes.expires_in);
+            }
+          } catch {
+            // If background cookie refresh is unavailable, user remains logged in with valid token
+          }
+          return;
+        } catch {
+          // Stored token was expired/invalid; fall through to cookie refresh
+        }
+      }
+
       try {
         const response = await authApi.refresh();
         if (active) {
@@ -196,19 +222,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           scheduleRefresh(response.expires_in);
         }
       } catch (_err) {
-        // Silent refresh failed (no session cookie or expired)
-        try {
-          // Attempt direct getMe if access token cookie is already present
-          const userProfile = await authApi.getMe();
-          if (active) {
-            setUser(userProfile);
-          }
-        } catch (_meErr) {
-          if (active) {
-            setUser(null);
-            setAccessTokenState(null);
-            setAccessToken(null);
-          }
+        if (active) {
+          setUser(null);
+          setAccessTokenState(null);
+          setAccessToken(null);
         }
       } finally {
         if (active) {

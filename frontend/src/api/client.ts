@@ -1,7 +1,8 @@
 import { SSEEvent, SSEEventType } from "../types";
 
 // Base API configuration
-const rawBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
+const rawBase = (envUrl !== undefined && envUrl !== "" ? envUrl : (import.meta.env.DEV ? "http://localhost:8000" : "")).replace(/\/$/, "");
 const BASE_URL = rawBase.endsWith("/api/v1") ? rawBase : `${rawBase}/api/v1`;
 
 export interface TokenResponse {
@@ -9,7 +10,10 @@ export interface TokenResponse {
   expires_in: number;
 }
 
-let accessToken: string | null = null;
+const TOKEN_KEY = "fusionrag_access_token";
+
+let accessToken: string | null =
+  typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
 
 let onTokenRefreshed: ((token: string) => void) | null = null;
 let onAuthFailure: (() => void) | null = null;
@@ -17,9 +21,29 @@ let activeRefreshPromise: Promise<TokenResponse> | null = null;
 
 export const setAccessToken = (token: string | null) => {
   accessToken = token;
+  if (typeof window !== "undefined") {
+    try {
+      if (token) {
+        localStorage.setItem(TOKEN_KEY, token);
+      } else {
+        localStorage.removeItem(TOKEN_KEY);
+      }
+    } catch {
+      // Ignore storage errors in restricted contexts
+    }
+  }
 };
 
-export const getAccessToken = () => accessToken;
+export const getAccessToken = () => {
+  if (!accessToken && typeof window !== "undefined") {
+    try {
+      accessToken = localStorage.getItem(TOKEN_KEY);
+    } catch {
+      // Ignore
+    }
+  }
+  return accessToken;
+};
 
 export const registerTokenRefreshHandler = (handler: (token: string) => void) => {
   onTokenRefreshed = handler;

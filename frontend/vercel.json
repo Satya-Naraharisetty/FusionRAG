@@ -31,6 +31,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "https://fusionrag-yzvt.onrender.com/api/$1"
+    },
+    {
       "source": "/((?!.*\\.(?:js|css|png|svg|ico|woff2|woff|ttf|webmanifest|txt|xml)$).*)",
       "destination": "/index.html"
     }
