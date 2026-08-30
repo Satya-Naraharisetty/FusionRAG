@@ -196,17 +196,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             setAccessTokenState(storedToken);
             setIsLoading(false);
           }
-          // Asynchronously attempt session refresh in background to rotate token
-          try {
-            const refreshRes = await authApi.refresh();
-            if (active) {
-              setAccessToken(refreshRes.access_token);
-              setAccessTokenState(refreshRes.access_token);
-              scheduleRefresh(refreshRes.expires_in);
-            }
-          } catch {
-            // If background cookie refresh is unavailable, user remains logged in with valid token
-          }
           return;
         } catch {
           // Stored token was expired/invalid; fall through to cookie refresh
