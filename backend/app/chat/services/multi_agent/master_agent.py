@@ -38,7 +38,7 @@ Decompose the user's request into a structured execution plan containing special
 Available Specialist Agents:
 - RESEARCH: Performs Hybrid RAG search across uploaded knowledge base chunks. Use for questions about user uploaded documents, internal company policies, or documentation.
 - DOCUMENT: Inspects specific known documents/chunks by ID, or lists documents in conversation. Use when specific document UUIDs or document metadata are explicitly mentioned.
-- ANALYSIS: Performs deterministic mathematical calculations, growth rates, sums, averages, or structured data comparisons via SafeCalculator.
+- ANALYSIS: Solves mathematical, scientific, engineering, financial, and statistical problems via MathEngine & SafeCalculator, or provides executable Python/Pandas/Matplotlib scripts for browser-sandboxed dataset analysis.
 - WEB_SEARCH: Searches the live public web for real-time information, current facts, news, online market data, or external topics not found in uploaded documents.
 
 Planning Rules:

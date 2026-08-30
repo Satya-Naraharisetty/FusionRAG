@@ -12,6 +12,7 @@ from app.chat.domain.multi_agent import (
     AgentType,
 )
 from app.chat.services.multi_agent.base import BaseSpecialistAgent
+from app.core.math.engine import MathEngine
 from app.core.security.sandboxing import SafeCalculator
 
 logger = logging.getLogger(__name__)
@@ -19,14 +20,16 @@ logger = logging.getLogger(__name__)
 
 class AnalysisAgent(BaseSpecialistAgent):
     """
-    Analysis specialist agent.
+    Analysis and Mathematical specialist agent.
     Performs deterministic calculations, structured reasoning, comparisons,
-    aggregations, and numerical transformations using SafeCalculator.
+    aggregations, and advanced scientific, engineering, financial, and symbolic
+    evaluations via MathEngine and SafeCalculator.
     Does NOT have access to database, filesystem, network, or arbitrary tools.
     """
 
     def __init__(self) -> None:
         self.calculator = SafeCalculator()
+        self.math_engine = MathEngine()
 
     @property
     def agent_type(self) -> AgentType:
@@ -227,12 +230,29 @@ class AnalysisAgent(BaseSpecialistAgent):
         )
 
     def _extract_expression(self, text: str) -> str | None:
-        """Extract basic arithmetic expressions from natural language text if present."""
-        match = re.search(r"[\d\.\s\+\-\*\/\(\)\%]+", text)
+        """Extract basic or symbolic arithmetic expressions from natural language text if present."""
+        # 1. Check for explicit symbolic math expressions (e.g. diff(...), integrate(...), solve(...), sin(...))
+        sym_match = re.search(
+            r"\b(?:diff|integrate|limit|series|solve|dsolve|laplace_transform|inverse_laplace_transform|sin|cos|tan|exp|log|sqrt)\s*\([^)]+\)",
+            text,
+            re.IGNORECASE,
+        )
+        if sym_match:
+            return sym_match.group(0).strip()
+
+        # 2. Check for equations with variables (e.g. 2*x + 5 = 15 or y'' + 4*y = 0)
+        eq_match = re.search(r"[a-zA-Z0-9_\^\*\+\-\/\(\)\s\.\=]+=[a-zA-Z0-9_\^\*\+\-\/\(\)\s\.]+", text)
+        if eq_match and any(c in eq_match.group(0) for c in "+-*/^="):
+            cand = eq_match.group(0).strip()
+            if any(c.isdigit() or c.isalpha() for c in cand):
+                return cand
+
+        # 3. Standard numeric arithmetic
+        match = re.search(r"[\d\.\s\+\-\*\/\(\)\%\^]+", text)
         if match:
             candidate = match.group(0).strip()
             if any(c.isdigit() for c in candidate) and any(
-                c in "+-*/%" for c in candidate
+                c in "+-*/%^" for c in candidate
             ):
                 return candidate
         return None
@@ -243,7 +263,7 @@ class AnalysisAgent(BaseSpecialistAgent):
         context: AgentExecutionContext,
     ) -> AgentResult:
         start_time = time.perf_counter()
-        params = task.parameters
+        params = dict(task.parameters)
         expression = params.get("expression")
         operation = params.get("operation")
 
@@ -259,8 +279,24 @@ class AnalysisAgent(BaseSpecialistAgent):
 
             combined_context = "\n".join(dep_evidence_text)
 
-            # 2. Structured Operation dispatch with dynamic numeric extraction fallback
-            if operation == "growth_rate":
+            # 2. Check for domain operations handled by MathEngine
+            domain_operations = {
+                "solve", "solve_equation", "equation", "solve_system", "system_of_equations",
+                "diff", "derivative", "differentiate", "integrate", "integral", "limit", "lim",
+                "series", "taylor_series", "ode", "solve_ode", "differential_equation",
+                "laplace", "laplace_transform", "inv_laplace", "inverse_laplace", "inverse_laplace_transform",
+                "matrix", "matrix_operation", "matrix_operations", "unit_convert", "convert_units", "units",
+                "cagr", "npv", "net_present_value", "irr", "internal_rate_of_return", "amortization", "loan", "pmt",
+                "wacc", "cost_of_capital", "stats", "descriptive_stats", "statistics", "ttest", "hypothesis_test",
+                "correlation", "corr", "curve_fit", "regression",
+            }
+
+            if operation and operation.lower() in domain_operations:
+                math_res = self.math_engine.execute_operation(operation, params)
+                output_str = math_res.get("formatted_markdown", str(math_res.get("result", math_res)))
+                structured = math_res
+
+            elif operation == "growth_rate":
                 old_val, new_val = self._resolve_pairwise_operands(
                     params, combined_context, ("old_value", "new_value"), task.request
                 )
@@ -271,7 +307,8 @@ class AnalysisAgent(BaseSpecialistAgent):
                 rate = ((new_val - old_val) / abs(old_val)) * 100
                 result_val = round(rate, 4)
                 output_str = (
-                    f"Growth rate from {old_val} to {new_val}: {result_val:.2f}%"
+                    f"Growth rate from {old_val} to {new_val}: {result_val:.2f}%\n\n"
+                    f"$$\\text{{Growth Rate}} = \\frac{{{new_val:g} - {old_val:g}}}{{|{old_val:g}|}} \\times 100\\% = {result_val:.2f}\\%$$"
                 )
                 structured = {
                     "operation": "growth_rate",
@@ -293,7 +330,10 @@ class AnalysisAgent(BaseSpecialistAgent):
                     )
                 pct = ((target_val - base_val) / base_val) * 100
                 result_val = round(pct, 4)
-                output_str = f"Percentage change from {base_val} to {target_val}: {result_val:.2f}%"
+                output_str = (
+                    f"Percentage change from {base_val} to {target_val}: {result_val:.2f}%\n\n"
+                    f"$$\\Delta\\% = \\frac{{{target_val:g} - {base_val:g}}}{{{base_val:g}}} \\times 100\\% = {result_val:.2f}\\%$$"
+                )
                 structured = {
                     "operation": "percentage_change",
                     "base_value": base_val,
@@ -306,7 +346,7 @@ class AnalysisAgent(BaseSpecialistAgent):
                     params, combined_context, task.request
                 )
                 total = sum(values)
-                output_str = f"Sum of {values}: {total}"
+                output_str = f"Sum of {values}: {total}\n\n$$\\sum x_i = {total:g}$$"
                 structured = {"operation": "sum", "values": values, "total": total}
 
             elif operation == "average":
@@ -318,7 +358,7 @@ class AnalysisAgent(BaseSpecialistAgent):
                         "Values list cannot be empty for average calculation."
                     )
                 avg = sum(values) / len(values)
-                output_str = f"Average of {values}: {avg:.4f}"
+                output_str = f"Average of {values}: {avg:.4f}\n\n$$\\bar{{x}} = {avg:.4f}$$"
                 structured = {"operation": "average", "values": values, "average": avg}
 
             elif operation == "difference":
@@ -326,7 +366,7 @@ class AnalysisAgent(BaseSpecialistAgent):
                     params, combined_context, ("val1", "val2"), task.request
                 )
                 diff = val1 - val2
-                output_str = f"Difference between {val1} and {val2}: {diff}"
+                output_str = f"Difference between {val1} and {val2}: {diff}\n\n$${val1:g} - {val2:g} = {diff:g}$$"
                 structured = {
                     "operation": "difference",
                     "val1": val1,
@@ -335,17 +375,27 @@ class AnalysisAgent(BaseSpecialistAgent):
                 }
 
             elif expression:
-                val = self.calculator.evaluate(expression)
-                output_str = f"Calculation result: {val}"
-                structured = {"expression": expression, "result": val}
+                try:
+                    math_res = self.math_engine.calculate(expression)
+                    output_str = math_res.get("formatted_markdown", str(math_res.get("exact", math_res.get("numeric"))))
+                    structured = math_res
+                except Exception:
+                    val = self.calculator.evaluate(expression)
+                    output_str = f"Calculation result: {val}\n\n$${expression} = {val}$$"
+                    structured = {"expression": expression, "result": val}
 
             else:
                 # Attempt to extract expression from task request
                 extracted = self._extract_expression(task.request)
                 if extracted:
-                    val = self.calculator.evaluate(extracted)
-                    output_str = f"Calculation result for '{extracted}': {val}"
-                    structured = {"expression": extracted, "result": val}
+                    try:
+                        math_res = self.math_engine.calculate(extracted)
+                        output_str = math_res.get("formatted_markdown", str(math_res.get("exact", math_res.get("numeric"))))
+                        structured = math_res
+                    except Exception:
+                        val = self.calculator.evaluate(extracted)
+                        output_str = f"Calculation result for '{extracted}': {val}\n\n$${extracted} = {val}$$"
+                        structured = {"expression": extracted, "result": val}
                 else:
                     output_str = f"Analysis completed on available context ({len(combined_context)} characters examined)."
                     structured = {"context_length": len(combined_context)}
