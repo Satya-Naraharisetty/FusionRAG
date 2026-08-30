@@ -245,9 +245,9 @@ class QdrantVectorStore(VectorStore):
             if scope_conditions:
                 must_conditions.append(Filter(should=scope_conditions))
 
-        results = await self._client.search(
+        results = await self._client.query_points(
             collection_name=self._collection_name,
-            query_vector=query_vector,
+            query=query_vector,
             query_filter=Filter(must=must_conditions),
             limit=top_k,
             timeout=int(timeout) if timeout is not None else None,
@@ -259,5 +259,5 @@ class QdrantVectorStore(VectorStore):
                 "score": r.score,
                 "payload": r.payload or {},
             }
-            for r in results
+            for r in results.points
         ]

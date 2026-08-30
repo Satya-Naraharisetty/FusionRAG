@@ -85,3 +85,34 @@ async def test_qdrant_vector_store_health_dimension_mismatch():
 
     store = QdrantVectorStore(mock_client, "test_collection", 1536)
     assert await store.health() is False
+
+
+@pytest.mark.asyncio
+async def test_qdrant_vector_store_search():
+    mock_client = AsyncMock()
+    mock_client.get_collection.return_value = MagicMock()
+
+    point_id = uuid4()
+    mock_point = MagicMock()
+    mock_point.id = str(point_id)
+    mock_point.score = 0.95
+    mock_point.payload = {"document_id": str(uuid4()), "text": "sample text"}
+
+    mock_response = MagicMock()
+    mock_response.points = [mock_point]
+    mock_client.query_points.return_value = mock_response
+
+    store = QdrantVectorStore(mock_client, "test_collection", 1536)
+    user_id = uuid4()
+
+    results = await store.search(
+        query_vector=[0.1] * 1536,
+        top_k=5,
+        user_id=user_id,
+    )
+
+    mock_client.query_points.assert_called_once()
+    assert len(results) == 1
+    assert results[0]["id"] == point_id
+    assert results[0]["score"] == 0.95
+    assert results[0]["payload"] == mock_point.payload
