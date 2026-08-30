@@ -28,6 +28,7 @@ from app.evaluation.runners.ragas_provider import RagasProvider
 from app.evaluation.services.agent_evaluator import AgentEvaluator
 from app.evaluation.services.citation_evaluator import CitationEvaluator
 from app.evaluation.services.conversation_evaluator import ConversationEvaluator
+from app.evaluation.services.multi_agent_evaluator import MultiAgentEvaluator
 from app.evaluation.services.retrieval_evaluator import RetrievalEvaluator
 from app.evaluation.services.tool_evaluator import ToolEvaluator
 
@@ -70,6 +71,11 @@ async def main() -> None:
         "--pipelines",
         default=None,
         help="Comma-separated pipelines (e.g. retrieval,citation,generation,agent).",
+    )
+    parser.add_argument(
+        "--output-json",
+        default=None,
+        help="Path to save the benchmark JSON report for CI/CD regression gates.",
     )
     parser.add_argument(
         "--generate-baseline",
@@ -266,6 +272,7 @@ async def main() -> None:
         tool_eval = ToolEvaluator()
         conversation_eval = ConversationEvaluator()
         citation_eval = CitationEvaluator()
+        multi_agent_eval = MultiAgentEvaluator()
 
         ragas_prov = RagasProvider()
         deepeval_prov = DeepEvalProvider()
@@ -276,6 +283,7 @@ async def main() -> None:
             tool_evaluator=tool_eval,
             conversation_evaluator=conversation_eval,
             citation_evaluator=citation_eval,
+            multi_agent_evaluator=multi_agent_eval,
             ragas_provider=ragas_prov,
             deepeval_provider=deepeval_prov,
         )
@@ -312,6 +320,14 @@ async def main() -> None:
         with open(json_report_path, encoding="utf-8") as f:
             report_json = json.load(f)
 
+        if args.output_json:
+            os.makedirs(
+                os.path.dirname(os.path.abspath(args.output_json)), exist_ok=True
+            )
+            with open(args.output_json, "w", encoding="utf-8") as f:
+                json.dump(report_json, f, indent=2, default=str)
+            print(f"[REPORT] Saved designated CI output JSON to: {args.output_json}")
+
         metric_averages = report_json.get("metric_averages", {})
         sample_meta = run_record.results[0].metadata_json if run_record.results else {}
         reranker_tradeoff = sample_meta.get("reranker_tradeoff", {})
@@ -321,6 +337,10 @@ async def main() -> None:
         print("=" * 60)
         print(f"Run ID: {run_record.id}")
         print(f"Total Samples: {run_record.total_samples}")
+        print(f"Total Cost: ${run_record.total_cost:.5f}")
+        print(
+            f"Tokens Used: {run_record.total_input_tokens} Input / {run_record.total_output_tokens} Output"
+        )
         print(
             f"Average Latency: {run_record.avg_latency:.3f}s (Max: {run_record.max_latency:.3f}s)"
         )

@@ -58,16 +58,38 @@ class BenchmarkRunner:
 
         # Fallback default configuration if manifest cannot be loaded
         return {
-            "quick": {"max_samples": 5, "pipelines": ["retrieval"]},
-            "standard": {"max_samples": 20, "pipelines": ["retrieval", "generation"]},
-            "full": {
+            "fast_deterministic": {
                 "max_samples": 100,
-                "pipelines": ["retrieval", "generation", "agent", "conversation"],
+                "pipelines": ["retrieval", "citation"],
+            },
+            "quick": {"max_samples": 5, "pipelines": ["retrieval", "citation"]},
+            "standard": {
+                "max_samples": 50,
+                "pipelines": ["retrieval", "generation", "citation"],
+            },
+            "full": {
+                "max_samples": 200,
+                "pipelines": [
+                    "retrieval",
+                    "generation",
+                    "citation",
+                    "agent",
+                    "conversation",
+                    "multi_agent",
+                ],
             },
             "nightly": {
-                "max_samples": 500,
-                "pipelines": ["retrieval", "generation", "agent", "conversation"],
+                "max_samples": 1000,
+                "pipelines": [
+                    "retrieval",
+                    "generation",
+                    "citation",
+                    "agent",
+                    "conversation",
+                    "multi_agent",
+                ],
             },
+            "multi_agent": {"max_samples": 100, "pipelines": ["multi_agent"]},
         }
 
     def register_before_hook(self, hook: Callable[[], Any]) -> None:

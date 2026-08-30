@@ -364,6 +364,10 @@ class MultiAgentEvaluator:
             sample_metadata = dict(meta)
             sample_metadata["multi_agent_evaluation"] = eval_details.model_dump()
 
+            in_tok = max(20, int(len(sample.question) / 3.8))
+            out_tok = max(15, int(len(str(actual_output)) / 3.8))
+            sample_cost = round((in_tok * 0.000000075) + (out_tok * 0.0000003), 6)
+
             results.append(
                 EvaluationResult(
                     sample_id=sample.id,
@@ -372,6 +376,9 @@ class MultiAgentEvaluator:
                     actual_answer=str(actual_output),
                     latency=float(actual_diagnostics.get("total_time_ms", 0.0))
                     / 1000.0,
+                    input_tokens=in_tok,
+                    output_tokens=out_tok,
+                    cost=sample_cost,
                     error_category="None" if all_passed else "MultiAgent Failure",
                     metrics=metrics,
                     metadata=sample_metadata,

@@ -228,6 +228,22 @@ class EvaluationRunner:
                         if res.error_category != "None":
                             error_cat = res.error_category
 
+                # Deduce / estimate token usage and cost if not directly metered by pipeline evaluators
+                if in_tokens == 0 and out_tokens == 0:
+                    context_strs = [
+                        c.text if hasattr(c, "text") else str(c)
+                        for c in sample_contexts
+                    ] or sample.metadata.get("retrieved_contexts", [])
+                    prompt_str = f"{sample.question} " + " ".join(context_strs)
+                    answer_str = actual_answer or sample.expected_answer or ""
+                    in_tokens = max(15, int(len(prompt_str) / 3.8))
+                    out_tokens = max(10, int(len(answer_str) / 3.8))
+
+                if cost == 0.0:
+                    cost = round(
+                        (in_tokens * 0.000000075) + (out_tokens * 0.0000003), 6
+                    )
+
                 total_in += in_tokens
                 total_out += out_tokens
                 total_cost += cost

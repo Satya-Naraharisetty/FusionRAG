@@ -139,12 +139,19 @@ class RetrievalEvaluator:
             sample_metadata["latency"] = latency
             sample_metadata["error_category"] = error_category
 
+            in_tok = max(15, int(len(sample.question) / 3.8))
+            out_tok = max(10, sum(int(len(c.text) / 3.8) for c in retrieved_contexts))
+            sample_cost = round((in_tok * 0.000000075) + (out_tok * 0.0000003), 6)
+
             results.append(
                 EvaluationResult(
                     sample_id=sample.id,
                     question=sample.question,
                     expected_answer=sample.expected_answer,
                     latency=latency,
+                    input_tokens=in_tok,
+                    output_tokens=out_tok,
+                    cost=sample_cost,
                     error_category=error_category,
                     metrics=metric_results,
                     retrieved_contexts=retrieved_contexts,

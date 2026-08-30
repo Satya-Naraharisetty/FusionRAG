@@ -70,7 +70,7 @@ jobs:
           uv pip install --system .
           uv pip install --system -e ".[dev,eval]"
 
-      - name: Run Full Golden Benchmark Suite
+      - name: Run Nightly Golden Benchmark Suite
         working-directory: ./backend
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -82,17 +82,25 @@ jobs:
         run: |
           alembic upgrade head
           if [ -z "$GEMINI_API_KEY" ] && [ -z "$GEMINI_FALLBACK_API_KEY" ] && [ -z "$GEMINI_LLM_API_KEY" ] && [ -z "$OPENAI_API_KEY" ]; then
-            echo "No external API keys found. Executing full profile in MOCK mode."
-            python scripts/benchmark.py --dataset app/evaluation/datasets/golden/golden_v3.yaml --profile full --mock
+            echo "No external API keys found. Executing nightly profile in MOCK mode."
+            python scripts/benchmark.py --dataset app/evaluation/datasets/golden/golden_v3.yaml --profile nightly --mock --output-json data/evaluation/nightly_golden_v3.json
           else
-            echo "API keys found. Executing full benchmark suite."
-            python scripts/benchmark.py --dataset app/evaluation/datasets/golden/golden_v3.yaml --profile full
+            echo "API keys found. Executing nightly benchmark suite."
+            python scripts/benchmark.py --dataset app/evaluation/datasets/golden/golden_v3.yaml --profile nightly --output-json data/evaluation/nightly_golden_v3.json
           fi
 
-      - name: Run Regression Analysis Against Approved Baseline
+      - name: Run Multi-Agent Architecture Benchmark
         working-directory: ./backend
         run: |
-          python scripts/regression.py --baseline-file app/evaluation/baselines/baseline_v3.json --max-score-drop 0.05 --ignore-profile-mismatch
+          python scripts/benchmark.py --dataset app/evaluation/datasets/golden/golden_multi_agent.yaml --profile multi_agent --mock --output-json data/evaluation/nightly_multi_agent.json
+
+      - name: Run Regression Analysis Against Approved Baselines
+        working-directory: ./backend
+        run: |
+          echo "=== Enforcing Baseline v3 Regression Gate ==="
+          python scripts/regression.py --candidate-json data/evaluation/nightly_golden_v3.json --baseline-file app/evaluation/baselines/baseline_v3.json --max-score-drop 0.05 --ignore-profile-mismatch
+          echo "=== Enforcing Multi-Agent Baseline Gate ==="
+          python scripts/regression.py --candidate-json data/evaluation/nightly_multi_agent.json --baseline-file app/evaluation/baselines/baseline_multi_agent_v1.json --max-score-drop 0.05 --ignore-profile-mismatch
 
       - name: Upload Benchmark Reports
         if: always()
