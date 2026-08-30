@@ -36,6 +36,7 @@ jobs:
           cat > backend/.env <<EOF
           JWT_SECRET=$JWT_SECRET
           COOKIE_SECURE=False
+          COOKIE_SAMESITE=lax
           REQUIRE_EMAIL_VERIFICATION=False
           DATABASE_URL=postgresql://postgres:postgres@postgres:5432/fusion_rag
           POSTGRES_SERVER=postgres

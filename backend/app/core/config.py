@@ -159,12 +159,15 @@ class Settings(BaseSettings):
 
     @field_validator("COOKIE_SAMESITE", mode="before")
     @classmethod
-    def assemble_cookie_samesite(cls, v: Any) -> str:
+    def assemble_cookie_samesite(cls, v: Any, info: ValidationInfo) -> str:
+        samesite = "none"
         if isinstance(v, str):
             val = v.strip().lower()
             if val in ("lax", "strict", "none"):
-                return val
-        return "none"
+                samesite = val
+        if info.data.get("COOKIE_SECURE") is False and samesite == "none":
+            return "lax"
+        return samesite
 
     # JWT & Cookie Configurations
     JWT_SECRET: str

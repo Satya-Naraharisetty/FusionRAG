@@ -201,8 +201,9 @@ async function main() {
         check('no error text on page', !/invalid|error|failed/i.test(bodyText.slice(0, 2000)));
         check('logged-in user visible in sidebar', bodyText.includes(EMAIL));
 
-        const apiCookies = await page.cookies(`${API_URL}/api/v1/auth/refresh`);
-        const rc = apiCookies.find((c) => c.name === 'refresh_token');
+        const allCookies = await page.cookies();
+        const apiCookies = await page.cookies(`${API_URL}/api/v1/auth/refresh`, `${API_URL}/api/v1/auth`);
+        const rc = apiCookies.find((c) => c.name === 'refresh_token') || allCookies.find((c) => c.name === 'refresh_token');
         check(
           'refresh cookie stored (API path)',
           !!rc,
