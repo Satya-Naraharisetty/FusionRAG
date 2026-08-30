@@ -4,10 +4,20 @@ import { Citation } from "../../types";
 interface CitationCardProps {
   citation: Citation;
   index: number;
+  onSelect?: (citation: Citation) => void;
 }
 
-export const CitationCard: React.FC<CitationCardProps> = ({ citation, index }) => {
+export const CitationCard: React.FC<CitationCardProps> = ({ citation, index, onSelect }) => {
   const [expanded, setExpanded] = useState(false);
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (onSelect) {
+      e.stopPropagation();
+      onSelect(citation);
+    } else {
+      setExpanded(!expanded);
+    }
+  };
 
   const getElementBadgeColor = (type?: string) => {
     switch (type) {
@@ -24,8 +34,8 @@ export const CitationCard: React.FC<CitationCardProps> = ({ citation, index }) =
 
   return (
     <div
-      onClick={() => setExpanded(!expanded)}
-      className="inline-flex flex-col gap-1 px-2.5 py-1.5 bg-[var(--bg-tertiary)]/50 hover:bg-[var(--bg-tertiary)] border border-[var(--border-default)] hover:border-[var(--border-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-[var(--radius-lg)] text-[10px] transition-all duration-150 cursor-pointer select-none"
+      onClick={handleClick}
+      className="inline-flex flex-col gap-1 px-2.5 py-1.5 bg-[var(--bg-tertiary)]/50 hover:bg-[var(--bg-tertiary)] border border-[var(--border-default)] hover:border-[var(--accent-primary)]/40 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-[var(--radius-lg)] text-[10px] transition-all duration-150 cursor-pointer select-none group"
     >
       <div className="flex items-center gap-1.5 font-medium">
         <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--bg-elevated)] text-[8px] font-bold text-[var(--text-muted)] border border-[var(--border-subtle)]">

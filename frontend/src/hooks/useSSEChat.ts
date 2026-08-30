@@ -326,6 +326,58 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
     });
   }, []);
 
+  const editAndResend = useCallback(
+    (messageId: string, newText: string) => {
+      if (isStreaming || !newText.trim()) return;
+      setChatMessages((prev) => {
+        const targetIdx = prev.findIndex((m) => m.id === messageId);
+        if (targetIdx === -1) return prev;
+        // Keep everything strictly before this user message
+        return prev.slice(0, targetIdx);
+      });
+      // Send the updated prompt
+      send(newText.trim(), { conversationId: currentConversationId });
+    },
+    [isStreaming, send, currentConversationId]
+  );
+
+  const regenerate = useCallback(
+    (assistantMessageId?: string) => {
+      if (isStreaming) return;
+      let promptText = lastQuestionRef.current;
+
+      setChatMessages((prev) => {
+        if (prev.length === 0) return prev;
+        let idx = -1;
+        if (assistantMessageId) {
+          idx = prev.findIndex((m) => m.id === assistantMessageId);
+        }
+        if (idx === -1) {
+          idx = prev.map((m) => m.role).lastIndexOf("assistant");
+        }
+        if (idx > 0 && prev[idx - 1]?.role === "user") {
+          promptText = prev[idx - 1].content;
+          // Remove the assistant message and subsequent items, keeping up to user message
+          return prev.slice(0, idx);
+        }
+        if (prev.length >= 2) {
+          return prev.slice(0, -1);
+        }
+        return prev;
+      });
+
+      if (promptText) {
+        send(promptText, {
+          conversationId: currentConversationId,
+          documentIds: lastDocIdsRef.current,
+          topK: lastTopKRef.current,
+          filters: lastFiltersRef.current,
+        });
+      }
+    },
+    [isStreaming, send, currentConversationId]
+  );
+
   const clearChat = useCallback(() => {
     setChatMessages([]);
     setCurrentConversationId(null);
@@ -344,8 +396,11 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
     send,
     stop,
     retry,
+    editAndResend,
+    regenerate,
     continueFromPartial,
     cancel,
     clearChat,
   };
 };
+

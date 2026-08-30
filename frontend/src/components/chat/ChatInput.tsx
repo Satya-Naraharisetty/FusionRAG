@@ -67,6 +67,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<unknown>(null);
 
   // The queue (app-level) owns the uploads — progress, the processing→done
   // flip, and persistence across navigation — so this tray is a scoped view
@@ -217,6 +218,91 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     adjustHeight();
   };
 
+  const toggleSpeechRecognition = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    interface IWindowWithSpeech extends Window {
+      SpeechRecognition?: new () => ISpeechRecognition;
+      webkitSpeechRecognition?: new () => ISpeechRecognition;
+    }
+
+    interface ISpeechRecognitionEvent {
+      results?: Array<Array<{ transcript?: string }>>;
+    }
+
+    interface ISpeechRecognition {
+      continuous: boolean;
+      interimResults: boolean;
+      lang: string;
+      onstart: () => void;
+      onresult: (event: ISpeechRecognitionEvent) => void;
+      onerror: () => void;
+      onend: () => void;
+      start: () => void;
+      stop: () => void;
+    }
+
+    const win = window as unknown as IWindowWithSpeech;
+    const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionClass) {
+      toast("Voice dictation is supported in Chrome, Edge, and Safari.", { icon: "🎙️" });
+      return;
+    }
+
+    if (isRecording) {
+      if (recognitionRef.current && typeof (recognitionRef.current as ISpeechRecognition).stop === "function") {
+        (recognitionRef.current as ISpeechRecognition).stop();
+      }
+      setIsRecording(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognitionClass();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "en-US";
+
+      recognition.onstart = () => {
+        setIsRecording(true);
+      };
+
+      recognition.onresult = (event: ISpeechRecognitionEvent) => {
+        const transcript = event.results?.[0]?.[0]?.transcript;
+        if (transcript) {
+          setText((prev) => (prev ? `${prev} ${transcript.trim()}` : transcript.trim()));
+          adjustHeight();
+        }
+      };
+
+      recognition.onerror = () => {
+        setIsRecording(false);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch {
+      setIsRecording(false);
+    }
+  }, [isRecording, adjustHeight]);
+
+  // Global keyboard shortcuts (Esc to stop streaming, Ctrl+Shift+O for new chat)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isStreaming) {
+        e.preventDefault();
+        onStop();
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [isStreaming, onStop]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -229,6 +315,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
     if (e.key === "Escape") {
       setShowCommands(false);
+      if (isStreaming) {
+        onStop();
+      }
     }
   };
 
@@ -549,25 +638,26 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           {/* Right Action buttons: Voice & Send */}
           <div className="flex items-center gap-1.5 px-3 pl-1 pb-2.5 pt-2.5">
             {/* Voice Input */}
-            {onVoiceInput && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => { onVoiceInput(); setIsRecording(!isRecording); }}
-                disabled={isStreaming}
-                className={cn(
-                  "h-10 w-10 shrink-0 rounded-full border transition-colors",
-                  isRecording
-                    ? "border-[var(--accent-error)]/20 bg-[var(--accent-error)]/12 text-[var(--accent-error)] animate-pulse"
-                    : "border-transparent text-[var(--text-muted)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
-                )}
-                aria-label={isRecording ? "Stop recording" : "Record voice"}
-                data-pressed={isRecording}
-              >
-                <Mic size={18} />
-              </Button>
-            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                if (onVoiceInput) onVoiceInput();
+                toggleSpeechRecognition();
+              }}
+              disabled={isStreaming}
+              className={cn(
+                "h-10 w-10 shrink-0 rounded-full border transition-colors cursor-pointer",
+                isRecording
+                  ? "border-[var(--accent-error)]/20 bg-[var(--accent-error)]/12 text-[var(--accent-error)] animate-pulse"
+                  : "border-transparent text-[var(--text-muted)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+              )}
+              aria-label={isRecording ? "Stop recording" : "Record voice"}
+              data-pressed={isRecording}
+            >
+              <Mic size={18} />
+            </Button>
 
             {/* Send / Stop Button */}
             {isStreaming ? (

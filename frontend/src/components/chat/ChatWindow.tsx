@@ -9,9 +9,11 @@ import { ChatInput } from "./ChatInput";
 import { ChatToolbar } from "./ChatToolbar";
 import { ConversationDocumentChips } from "./ConversationDocumentChips";
 import { StreamingRecovery } from "./StreamingRecovery";
+import { CitationDrawer } from "./CitationDrawer";
 import { useUploadQueue } from "../../context/UploadQueueContext";
 import { Skeleton } from "../ui/skeleton";
 import { AlertCircle, Upload } from "lucide-react";
+import { Citation } from "../../types";
 
 interface ChatWindowProps {
   conversationId: string | null;
@@ -23,6 +25,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
   const { data: activeConv } = useConversation(conversationId);
   const [isDraggingWindow, setIsDraggingWindow] = useState(false);
   const [windowDroppedFiles, setWindowDroppedFiles] = useState<File[]>([]);
+  const [activeCitation, setActiveCitation] = useState<Citation | null>(null);
+  const [isCitationDrawerOpen, setIsCitationDrawerOpen] = useState(false);
   const { uploadQueuedChatRows, discardQueuedNewChatRows } = useUploadQueue();
 
   const handleConversationCreated = React.useCallback(
@@ -42,6 +46,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
     send,
     stop,
     retry,
+    editAndResend,
+    regenerate,
     continueFromPartial,
     cancel,
     clearChat,
@@ -214,9 +220,22 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
             messages={chatMessages}
             onRetry={retry}
             isStreaming={isStreaming}
+            onEditPrompt={editAndResend}
+            onRegenerate={regenerate}
+            onSelectCitation={(citation) => {
+              setActiveCitation(citation);
+              setIsCitationDrawerOpen(true);
+            }}
           />
         )}
       </div>
+
+      {/* Slide-over Citation Details Drawer */}
+      <CitationDrawer
+        citation={activeCitation}
+        isOpen={isCitationDrawerOpen}
+        onClose={() => setIsCitationDrawerOpen(false)}
+      />
 
       {/* Connection recovery popup */}
       {connectionLost && (

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ChatMessage as ChatMessageType } from "../../types";
+import { ChatMessage as ChatMessageType, Citation } from "../../types";
 import { ChatMessage } from "./ChatMessage";
 import { Button } from "../ui/Button";
 
@@ -9,6 +9,9 @@ interface MessageListProps {
   messages: ChatMessageType[];
   onRetry: () => void;
   isStreaming: boolean;
+  onEditPrompt?: (messageId: string, newText: string) => void;
+  onRegenerate?: (messageId: string) => void;
+  onSelectCitation?: (citation: Citation) => void;
 }
 
 const MESSAGE_HEIGHT_ESTIMATE = 180;
@@ -18,6 +21,9 @@ export const MessageList: React.FC<MessageListProps> = ({
   messages,
   onRetry,
   isStreaming,
+  onEditPrompt,
+  onRegenerate,
+  onSelectCitation,
 }) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -134,6 +140,9 @@ export const MessageList: React.FC<MessageListProps> = ({
                 <ChatMessage
                   message={msg}
                   onRetry={isLast ? onRetry : undefined}
+                  onEditPrompt={onEditPrompt}
+                  onRegenerate={onRegenerate}
+                  onSelectCitation={onSelectCitation}
                 />
               </div>
             );
