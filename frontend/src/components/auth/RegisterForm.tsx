@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { RegisterCard } from "./RegisterCard";
+import { SEOHead } from "../seo/SEOHead";
 import { checkPasswordStrength } from "../../lib/passwordStrength";
 import toast from "react-hot-toast";
 
@@ -61,6 +62,11 @@ export const RegisterForm: React.FC = () => {
 
   return (
     <div className="auth-page">
+      <SEOHead
+        title="Create an Account"
+        description="Create your free Hybrid RAG account to begin indexing documents with dense and sparse search, cross-encoder reranking, and citation-backed QA."
+        canonicalUrl="https://hybrid-rag-gilt.vercel.app/register"
+      />
       <RegisterCard
         email={email}
         setEmail={setEmail}

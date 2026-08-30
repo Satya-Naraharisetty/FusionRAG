@@ -5,6 +5,23 @@ from fastapi import status
 
 
 @pytest.mark.asyncio
+async def test_root_route(client):
+    """Asserts root route returns service information."""
+    response = client.get("/")
+    assert response.status_code == status.HTTP_200_OK
+    assert "Hybrid RAG" in response.json()["message"]
+
+
+@pytest.mark.asyncio
+async def test_backend_robots_txt(client):
+    """Asserts GET /robots.txt returns crawler policy."""
+    response = client.get("/robots.txt")
+    assert response.status_code == status.HTTP_200_OK
+    assert "User-agent: *" in response.text
+    assert "Allow: /docs" in response.text
+
+
+@pytest.mark.asyncio
 async def test_liveness_check(client):
     """
     Asserts GET /api/v1/health/liveness returns HTTP 200 and 'alive' status.

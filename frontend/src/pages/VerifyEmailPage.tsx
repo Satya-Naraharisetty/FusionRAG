@@ -13,6 +13,7 @@ import {
 import toast from "react-hot-toast";
 import { useAuth } from "../hooks/useAuth";
 import { Button } from "../components/ui/Button";
+import { SEOHead } from "../components/seo/SEOHead";
 
 const COOLDOWN_SECONDS = 60;
 
@@ -263,6 +264,12 @@ export const VerifyEmailPage: React.FC = () => {
 
   return (
     <div className="auth-page flex min-h-dvh w-full items-center justify-center p-4 bg-[var(--bg-primary)]">
+      <SEOHead
+        title="Verify Email"
+        description="Verify your email address to activate your Hybrid RAG account."
+        canonicalUrl="https://hybrid-rag-gilt.vercel.app/verify-email"
+        robots="noindex, follow"
+      />
       <div
         className="relative z-10 flex w-full max-w-[460px] flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-8 sm:p-10 shadow-2xl animate-in fade-in zoom-in-95 duration-300"
         aria-label="Email Verification Form"

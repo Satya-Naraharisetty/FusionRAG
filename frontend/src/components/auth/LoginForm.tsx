@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { authApi } from "../../api/auth";
 import { LoginCard } from "./LoginCard";
+import { SEOHead } from "../seo/SEOHead";
 import toast from "react-hot-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -133,6 +134,11 @@ export const LoginForm: React.FC = () => {
 
   return (
     <div className="auth-page">
+      <SEOHead
+        title="Sign In"
+        description="Sign in to your Hybrid RAG account to access your AI document chat studio, indexed knowledge bases, and custom RAG evaluations."
+        canonicalUrl="https://hybrid-rag-gilt.vercel.app/login"
+      />
       <LoginCard
         email={email}
         setEmail={setEmail}

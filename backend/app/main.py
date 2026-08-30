@@ -309,6 +309,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
+    summary="Enterprise Hybrid RAG (Retrieval Augmented Generation) API backend combining dense vectors and BM25 sparse search with cross-encoder reranking.",
+    description="""
+# Hybrid RAG API
+
+Production-ready, highly observable, verifiable AI Document QA and retrieval platform.
+
+## Features
+* **Hybrid Retrieval**: Dense embeddings (Qdrant) + BM25 Sparse Search fused via Reciprocal Rank Fusion (RRF).
+* **Neural Reranking**: Cross-Encoder model scoring for high-precision context relevance.
+* **Evaluation Framework**: Automated Faithfulness, Context Relevancy, and Hallucination metric pipelines.
+* **Streaming QA**: Low-latency token streaming with inline grounded citations.
+    """,
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan,
 )
@@ -575,6 +590,20 @@ def metrics_endpoint():
         content=export_prometheus_metrics(),
         media_type="text/plain; version=0.0.4; charset=utf-8",
     )
+
+
+@app.get("/robots.txt", response_class=Response)
+def backend_robots_txt():
+    """Robots exclusion policy for FastAPI Render backend."""
+    content = (
+        "User-agent: *\n"
+        "Allow: /docs\n"
+        "Allow: /redoc\n"
+        f"Allow: {settings.API_V1_STR}/openapi.json\n"
+        f"Disallow: {settings.API_V1_STR}/\n"
+        "Disallow: /metrics\n"
+    )
+    return Response(content=content, media_type="text/plain; charset=utf-8")
 
 
 @app.api_route("/", methods=["GET", "HEAD"])

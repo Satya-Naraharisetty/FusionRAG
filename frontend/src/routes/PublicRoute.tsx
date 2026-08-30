@@ -18,5 +18,5 @@ export const PublicRoute: React.FC = () => {
     );
   }
 
-  return isAuthenticated ? <Navigate to="/" replace /> : <Outlet />;
+  return isAuthenticated ? <Navigate to="/chat" replace /> : <Outlet />;
 };

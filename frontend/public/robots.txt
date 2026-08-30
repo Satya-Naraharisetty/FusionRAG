@@ -1,0 +1,22 @@
+# Robots.txt for Hybrid RAG Chatbot
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /register
+Allow: /verify-email
+
+# Disallow private user data, conversation sessions, documents, and admin panels
+Disallow: /chat
+Disallow: /chat/
+Disallow: /documents
+Disallow: /documents/
+Disallow: /projects
+Disallow: /projects/
+Disallow: /settings
+Disallow: /settings/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /oauth/
+
+# Sitemap location
+Sitemap: https://hybrid-rag-gilt.vercel.app/sitemap.xml

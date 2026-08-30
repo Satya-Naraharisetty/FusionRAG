@@ -1,5 +1,5 @@
 import { Suspense, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { UploadQueueProvider } from "./context/UploadQueueContext";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -16,7 +16,7 @@ import { Toaster } from "react-hot-toast";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { lazyWithRetry } from "./utils/lazyWithRetry";
 
-// Lazy-loaded pages with auto-recovery on new deployment chunk rotations
+const LandingPage = lazyWithRetry(() => import("./pages/LandingPage"));
 const ChatPage = lazyWithRetry(() => import("./pages/ChatPage"));
 const DocumentsPage = lazyWithRetry(() => import("./pages/DocumentsPage"));
 const ProjectsPage = lazyWithRetry(() => import("./pages/ProjectsPage"));
@@ -60,6 +60,9 @@ function App() {
               }
             >
               <Routes>
+                {/* Public indexable landing page */}
+                <Route path="/" element={<LandingPage />} />
+
                 {/* Public guest-only routes */}
                 <Route element={<PublicRoute />}>
                   <Route path="/login" element={<LoginForm />} />
@@ -70,7 +73,6 @@ function App() {
                 {/* Secure application routes */}
                 <Route element={<ProtectedRoute />}>
                   <Route element={<ChatLayout />}>
-                    <Route index element={<Navigate to="/chat" replace />} />
                     <Route
                       path="/chat"
                       element={
