@@ -231,6 +231,8 @@ node_modules/
 .eslintcache
 
 # Local Ingested & Vector Databases Data Directories
+data/
+/data/
 /backend/data/
 /backend/data/uploads/
 /backend/data/vector_storage/
