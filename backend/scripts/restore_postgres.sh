@@ -16,7 +16,7 @@ elif [ -f .env ]; then
 fi
 
 DB_USER=${POSTGRES_USER:-postgres}
-DB_NAME=${POSTGRES_DB:-hybrid_rag}
+DB_NAME=${POSTGRES_DB:-fusion_rag}
 DB_HOST=${POSTGRES_SERVER:-localhost}
 DB_PORT=${POSTGRES_PORT:-5432}
 

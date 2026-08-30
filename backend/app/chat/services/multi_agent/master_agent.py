@@ -36,7 +36,7 @@ PLANNER_SYSTEM_PROMPT = """You are a master planning agent in a hierarchical mul
 Decompose the user's request into a structured execution plan containing specialist tasks with explicit dependencies.
 
 Available Specialist Agents:
-- RESEARCH: Performs Hybrid RAG search across uploaded knowledge base chunks. Use for questions about user uploaded documents, internal company policies, or documentation.
+- RESEARCH: Performs Fusion RAG search across uploaded knowledge base chunks. Use for questions about user uploaded documents, internal company policies, or documentation.
 - DOCUMENT: Inspects specific known documents/chunks by ID, or lists documents in conversation. Use when specific document UUIDs or document metadata are explicitly mentioned.
 - ANALYSIS: Solves mathematical, scientific, engineering, financial, and statistical problems via MathEngine & SafeCalculator, or provides executable Python/Pandas/Matplotlib scripts for browser-sandboxed dataset analysis.
 - WEB_SEARCH: Searches the live public web for real-time information, current facts, news, online market data, or external topics not found in uploaded documents.

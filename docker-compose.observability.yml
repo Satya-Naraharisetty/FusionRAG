@@ -1,13 +1,13 @@
 services:
   prometheus:
     image: prom/prometheus:v2.51.0
-    container_name: hybrid_rag_prometheus
+    container_name: fusion_rag_prometheus
     restart: "no"
     ports:
       - "9090:9090"
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - hybrid_rag_prometheus_data:/prometheus
+      - fusion_rag_prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -19,18 +19,18 @@ services:
 
   jaeger:
     image: jaegertracing/all-in-one:1.57
-    container_name: hybrid_rag_jaeger
+    container_name: fusion_rag_jaeger
     restart: "no"
     environment:
       - COLLECTOR_OTLP_ENABLED=true
     ports:
       - "16686:16686" # Web UI
-      - "4317:4317"   # OTLP gRPC receiver
-      - "4318:4318"   # OTLP HTTP receiver
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
 
   grafana:
     image: grafana/grafana:10.4.0
-    container_name: hybrid_rag_grafana
+    container_name: fusion_rag_grafana
     restart: "no"
     ports:
       - "3000:3000"
@@ -42,11 +42,11 @@ services:
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - hybrid_rag_grafana_data:/var/lib/grafana
+      - fusion_rag_grafana_data:/var/lib/grafana
     depends_on:
       - prometheus
       - jaeger
 
 volumes:
-  hybrid_rag_prometheus_data:
-  hybrid_rag_grafana_data:
+  fusion_rag_prometheus_data:
+  fusion_rag_grafana_data:

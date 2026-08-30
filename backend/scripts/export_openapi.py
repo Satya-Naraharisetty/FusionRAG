@@ -17,7 +17,7 @@ os.environ.setdefault("ENCRYPTION_MASTER_KEY", "0" * 64)
 os.environ.setdefault("POSTGRES_SERVER", "localhost")
 os.environ.setdefault("POSTGRES_USER", "postgres")
 os.environ.setdefault("POSTGRES_PASSWORD", "postgres")
-os.environ.setdefault("POSTGRES_DB", "hybrid_rag")
+os.environ.setdefault("POSTGRES_DB", "fusion_rag")
 os.environ.setdefault("REDIS_HOST", "localhost")
 os.environ.setdefault("QDRANT_HOST", "localhost")
 

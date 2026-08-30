@@ -129,7 +129,7 @@ class RedisStreamTaskQueue(DurableTaskQueue):
             inject_trace_context,
         )
 
-        tracer = get_tracer("hybrid-rag.queue")
+        tracer = get_tracer("fusion-rag.queue")
 
         # Inject active W3C trace context into payload metadata if active
         enriched_payload = dict(payload)

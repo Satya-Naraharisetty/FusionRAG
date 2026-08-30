@@ -166,7 +166,7 @@ class EmbeddingService:
                     get_tracer,
                 )
 
-                tracer = get_tracer("hybrid-rag.embedding")
+                tracer = get_tracer("fusion-rag.embedding")
 
                 # 2. Call embedding generator
                 texts = [

@@ -42,7 +42,7 @@ def init_telemetry(app: Any = None) -> None:
         return
 
     try:
-        service_name = getattr(settings, "OTEL_SERVICE_NAME", "hybrid-rag-backend")
+        service_name = getattr(settings, "OTEL_SERVICE_NAME", "fusion-rag-backend")
         resource = Resource.create(
             {
                 SERVICE_NAME: service_name,
@@ -140,7 +140,7 @@ def shutdown_telemetry() -> None:
     _is_initialized = False
 
 
-def get_tracer(name: str = "hybrid-rag") -> Tracer:
+def get_tracer(name: str = "fusion-rag") -> Tracer:
     """
     Returns an OpenTelemetry tracer instance for creating spans.
     """

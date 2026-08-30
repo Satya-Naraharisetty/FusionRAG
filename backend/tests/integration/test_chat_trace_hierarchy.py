@@ -34,14 +34,14 @@ async def test_chat_orchestration_trace_hierarchy():
         mock_ctx.recent_messages = []
         mock_ctx.summary = None
         mock_rewrite = MagicMock()
-        mock_rewrite.rewritten_query = "What is Hybrid RAG?"
+        mock_rewrite.rewritten_query = "What is Fusion RAG?"
         mock_rewrite.rewrite_applied = False
         mock_rewrite.rewrite_reason = "No history"
         mock_conv_mgr.prepare_context.return_value = (mock_ctx, mock_rewrite)
 
         mock_retrieval = AsyncMock()
         mock_retrieval.retrieve.return_value = SearchResult(
-            original_query="What is Hybrid RAG?",
+            original_query="What is Fusion RAG?",
             retrieval_time=0.05,
             total_matches=1,
             retrieved_chunks=[
@@ -49,7 +49,7 @@ async def test_chat_orchestration_trace_hierarchy():
                     chunk_id=uuid4(),
                     document_id=uuid4(),
                     document_name="doc1.pdf",
-                    text="Hybrid RAG combines dense and sparse search.",
+                    text="Fusion RAG combines dense and sparse search.",
                     similarity_score=0.9,
                     normalized_score=0.9,
                     metadata={},
@@ -63,7 +63,7 @@ async def test_chat_orchestration_trace_hierarchy():
         mock_prompt_builder = MagicMock()
         mock_prompt_builder.get_system_prompt.return_value = "System prompt"
         mock_prompt_builder.build_prompt.return_value = (
-            [{"role": "user", "content": "What is Hybrid RAG?"}],
+            [{"role": "user", "content": "What is Fusion RAG?"}],
             mock_retrieval.retrieve.return_value.retrieved_chunks,
         )
 
@@ -78,7 +78,7 @@ async def test_chat_orchestration_trace_hierarchy():
 
         mock_llm_service = AsyncMock()
         mock_llm_service.generate.return_value = ProviderResponse(
-            content="Hybrid RAG is a search paradigm.",
+            content="Fusion RAG is a search paradigm.",
             usage=Usage(prompt_tokens=50, completion_tokens=20, total_tokens=70),
         )
 
@@ -96,7 +96,7 @@ async def test_chat_orchestration_trace_hierarchy():
         )
 
         resp = await orchestrator.generate_answer(
-            question="What is Hybrid RAG?",
+            question="What is Fusion RAG?",
             user_id=user_id,
             top_k=5,
             conversation_id=conv_id,

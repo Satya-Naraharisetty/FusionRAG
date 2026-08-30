@@ -193,7 +193,7 @@ async def _query_pending_failed_jobs() -> list[UUID]:
 
         db_url = os.environ.get(
             "TEST_DATABASE_URL",
-            "postgresql://postgres:postgres@localhost:5433/hybrid_rag_test",
+            "postgresql://postgres:postgres@localhost:5433/fusion_rag_test",
         )
     if not db_url:
         logger.error("DATABASE_URL not configured, skipping startup recovery query.")
@@ -234,7 +234,7 @@ async def _run_cleanup_jobs_async(job_ids: list[UUID]) -> None:
 
         db_url = os.environ.get(
             "TEST_DATABASE_URL",
-            "postgresql://postgres:postgres@localhost:5433/hybrid_rag_test",
+            "postgresql://postgres:postgres@localhost:5433/fusion_rag_test",
         )
     if not db_url:
         return

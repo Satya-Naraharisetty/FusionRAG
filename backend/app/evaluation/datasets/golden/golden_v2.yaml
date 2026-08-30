@@ -1,6 +1,6 @@
 dataset_id: golden_rag_dataset
 version: 2.0.0
-description: Production-Grade Golden Evaluation Dataset v2 for Advanced Hybrid RAG
+description: Production-Grade Golden Evaluation Dataset v2 for Advanced Fusion RAG
   with Discriminative and Negative Test Cases
 samples:
 - id: golden-01
@@ -308,7 +308,7 @@ samples:
   - engineering_policies.md
   - api_specifications.md
   ground_truth_context:
-  - 'P95 Latency Target: Hybrid RAG query processing and candidate retrieval must
+  - 'P95 Latency Target: Fusion RAG query processing and candidate retrieval must
     return within 250 milliseconds.'
   - 'Standard Tier Tenants: Limited to 100 requests per minute per IP... Enterprise
     Tier Tenants: Limited to 1000 requests per minute'
@@ -1544,7 +1544,7 @@ samples:
   ground_truth_context:
   - availability Service Level Objective (SLO) of 99.95% uptime for standard tier
     tenants and 99.99% (four nines) for enterprise tier tenants
-  - 'P95 Latency Target: Hybrid RAG query processing and candidate retrieval must
+  - 'P95 Latency Target: Fusion RAG query processing and candidate retrieval must
     return within 250 milliseconds.'
   relevant_chunks:
   - document: engineering_policies.md
@@ -1836,7 +1836,7 @@ samples:
   category: negative_ambiguous_safety
   difficulty: easy
   question: details on things
-  expected_answer: The platform provides high-availability multi-tenant Hybrid RAG
+  expected_answer: The platform provides high-availability multi-tenant Fusion RAG
     search services.
   expected_documents:
   - engineering_policies.md
@@ -1867,7 +1867,7 @@ samples:
   expected_documents:
   - engineering_policies.md
   ground_truth_context:
-  - 'P95 Latency Target: Hybrid RAG query processing and candidate retrieval must
+  - 'P95 Latency Target: Fusion RAG query processing and candidate retrieval must
     return within 250 milliseconds.'
   relevant_chunks:
   - document: engineering_policies.md

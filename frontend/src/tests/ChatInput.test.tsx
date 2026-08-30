@@ -52,7 +52,7 @@ describe("ChatInput", () => {
         isStreaming={false}
       />
     );
-    expect(screen.getByPlaceholderText(/Message Hybrid RAG/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Message NexusRAG/i)).toBeInTheDocument();
     // Brand-new chat, nothing attached yet — the lifecycle note is visible so
     // users know chat files stay in this chat and die with it.
     expect(screen.getByText(/Only usable in this chat/)).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe("ChatInput", () => {
       />
     );
 
-    const textarea = screen.getByPlaceholderText(/Message Hybrid RAG/i);
+    const textarea = screen.getByPlaceholderText(/Message NexusRAG/i);
     fireEvent.change(textarea, { target: { value: "Hello assistant" } });
     
     const form = textarea.closest("form");
@@ -90,7 +90,7 @@ describe("ChatInput", () => {
       />
     );
 
-    const textarea = screen.getByPlaceholderText(/Message Hybrid RAG/i);
+    const textarea = screen.getByPlaceholderText(/Message NexusRAG/i);
     expect(screen.queryByText(/Document mode/i)).not.toBeInTheDocument();
 
     fireEvent.change(textarea, {
@@ -303,7 +303,7 @@ describe("ChatInput", () => {
     uploadFile();
     expect(await screen.findByText("test.pdf")).toBeInTheDocument();
 
-    const textarea = screen.getByPlaceholderText(/Message Hybrid RAG/i);
+    const textarea = screen.getByPlaceholderText(/Message NexusRAG/i);
     fireEvent.change(textarea, { target: { value: "See attached" } });
     const form = textarea.closest("form");
     if (form) fireEvent.submit(form);
@@ -364,7 +364,7 @@ describe("ChatInput", () => {
 
     // Sending keeps the deferred rows in the tray — they're handed to the
     // conversation by ChatWindow once the backend creates it.
-    const textarea = screen.getByPlaceholderText(/Message Hybrid RAG/i);
+    const textarea = screen.getByPlaceholderText(/Message NexusRAG/i);
     fireEvent.change(textarea, { target: { value: "with attachment" } });
     const form = textarea.closest("form");
     if (form) fireEvent.submit(form);

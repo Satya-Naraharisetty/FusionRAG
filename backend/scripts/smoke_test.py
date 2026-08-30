@@ -39,7 +39,7 @@ def create_smoke_engine(url: str):
 API_URL = get_env_or_default("VITE_API_URL", "http://localhost:8000")
 POSTGRES_URL = get_env_or_default(
     "DATABASE_URL",
-    "postgresql://postgres:postgres_secure_password_123@db:5432/hybrid_rag",
+    "postgresql://postgres:postgres_secure_password_123@db:5432/fusion_rag",
 )
 REDIS_HOST = get_env_or_default("REDIS_HOST", "redis")
 REDIS_PORT = int(get_env_or_default("REDIS_PORT", "6379"))
@@ -171,7 +171,7 @@ async def run_full_e2e_checks():
 
             # 3. Upload a sample document chunk
             logger.info("Uploading test document chunk...")
-            test_content = b"This is a smoke test content for Hybrid RAG Chatbot validation. We are checking full flow."
+            test_content = b"This is a smoke test content for Fusion RAG Chatbot validation. We are checking full flow."
             files = {"file": ("smoketest.txt", test_content, "text/plain")}
             res = await client.post(
                 f"{API_URL}/api/v1/documents/upload", files=files, headers=headers
@@ -305,7 +305,7 @@ async def run_full_e2e_checks():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Hybrid RAG Chatbot Smoke Test Runner")
+    parser = argparse.ArgumentParser(description="Fusion RAG Chatbot Smoke Test Runner")
     parser.add_argument(
         "--quick",
         action="store_true",

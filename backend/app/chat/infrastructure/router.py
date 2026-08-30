@@ -102,7 +102,7 @@ class LLMProviderRouter(LLMProvider):
             get_tracer,
         )
 
-        tracer = get_tracer("hybrid-rag.llm")
+        tracer = get_tracer("fusion-rag.llm")
 
         provider_key = self._policy.select_provider_key(
             model, self._providers, self._breakers
@@ -268,7 +268,7 @@ class LLMProviderRouter(LLMProvider):
             get_tracer,
         )
 
-        tracer = get_tracer("hybrid-rag.llm")
+        tracer = get_tracer("fusion-rag.llm")
 
         provider_key = self._policy.select_provider_key(
             model, self._providers, self._breakers

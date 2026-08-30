@@ -1113,7 +1113,7 @@ async def test_sanitized_diagnostics_formatting_and_boundaries():
                 )
             ],
             execution_time_ms=120.5,
-            metadata={"routed_capability": "research.hybrid_rag"},
+            metadata={"routed_capability": "research.fusion_rag"},
         ),
         AgentResult(
             task_id="t2",
@@ -1166,7 +1166,7 @@ async def test_sanitized_diagnostics_formatting_and_boundaries():
     assert t1_diag["agent_type"] == "RESEARCH"
     assert t1_diag["status"] == "COMPLETED"
     assert t1_diag["success"] is True
-    assert t1_diag["routed_capability"] == "research.hybrid_rag"
+    assert t1_diag["routed_capability"] == "research.fusion_rag"
 
     t2_diag = sanitized["tasks"][1]
     assert t2_diag["task_id"] == "t2"

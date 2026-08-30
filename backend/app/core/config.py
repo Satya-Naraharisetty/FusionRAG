@@ -15,7 +15,7 @@ class ConfigurationError(RuntimeError):
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Hybrid RAG Chatbot"
+    PROJECT_NAME: str = "NexusRAG"
     API_V1_STR: str = "/api/v1"
 
     # PostgreSQL Configurations
@@ -193,7 +193,7 @@ class Settings(BaseSettings):
     ENABLE_TRACING: bool = True
     ENABLE_PROMETHEUS_METRICS: bool = True
     OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://localhost:4317"
-    OTEL_SERVICE_NAME: str = "hybrid-rag-backend"
+    OTEL_SERVICE_NAME: str = "fusion-rag-backend"
     OTEL_TRACES_SAMPLER_RATIO: float = 1.0
 
     # Ingestion & Upload Configurations
@@ -346,10 +346,10 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
     # Base URL of the backend used to build OAuth callback URIs.
-    # Local: http://localhost:8000 | Production: https://hybrid-rag-gilt.vercel.app
+    # Local: http://localhost:8000 | Production: https://fusion-rag-gilt.vercel.app
     OAUTH_REDIRECT_BASE_URL: str = "http://localhost:8000"
     # Base URL of the frontend used to redirect after OAuth success/failure.
-    # Local: http://localhost:5173 | Production: https://hybrid-rag-frontend.vercel.app
+    # Local: http://localhost:5173 | Production: https://fusionrag.vercel.app
     FRONTEND_URL: str = "http://localhost:5173"
 
     # Transactional Email (Resend) & Magic Link & Email Verification

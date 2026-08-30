@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Runs Alembic migrations for the Hybrid RAG backend.
+# Runs Alembic migrations for the Fusion RAG backend.
 #
 # Usage:
 #   ./scripts/migrate.sh          # upgrade to the latest revision

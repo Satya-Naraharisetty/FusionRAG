@@ -266,7 +266,7 @@ def test_gemini_provider_contract_prompt_and_tokens() -> None:
 
 
 @pytest.mark.asyncio
-async def test_hybrid_rag_pipeline_orchestration_ordering() -> None:
+async def test_fusion_rag_pipeline_orchestration_ordering() -> None:
     """
     Verifies the observable 12-stage retrieval pipeline sequence:
     Validation -> Scan -> Query Processing -> Parallel Branches (FTS + Embedding->Qdrant)

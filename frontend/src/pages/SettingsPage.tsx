@@ -232,7 +232,7 @@ const SettingsPage: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `hybrid-rag-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `fusion-rag-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     toast.success("Backup exported.");
   };
@@ -323,8 +323,8 @@ const SettingsPage: React.FC = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex cursor-pointer items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${activeTab === tab.id
-                    ? "border border-(--border-subtle) bg-(--bg-secondary) text-(--text-primary)"
-                    : "border border-transparent text-(--text-muted) hover:bg-(--bg-secondary)/60 hover:text-(--text-primary)"
+                  ? "border border-(--border-subtle) bg-(--bg-secondary) text-(--text-primary)"
+                  : "border border-transparent text-(--text-muted) hover:bg-(--bg-secondary)/60 hover:text-(--text-primary)"
                   }`}
                 aria-current={activeTab === tab.id ? "page" : undefined}
               >
@@ -433,12 +433,12 @@ const SettingsPage: React.FC = () => {
                             <div className="h-1.5 w-full overflow-hidden rounded-full bg-(--bg-tertiary)">
                               <div
                                 className={`h-full transition-all duration-300 ${passwordStrength.score <= 1
-                                    ? "bg-red-500 w-1/4"
-                                    : passwordStrength.score === 2
-                                      ? "bg-amber-500 w-2/4"
-                                      : passwordStrength.score === 3
-                                        ? "bg-blue-500 w-3/4"
-                                        : "bg-emerald-500 w-full"
+                                  ? "bg-red-500 w-1/4"
+                                  : passwordStrength.score === 2
+                                    ? "bg-amber-500 w-2/4"
+                                    : passwordStrength.score === 3
+                                      ? "bg-blue-500 w-3/4"
+                                      : "bg-emerald-500 w-full"
                                   }`}
                               />
                             </div>
@@ -521,8 +521,8 @@ const SettingsPage: React.FC = () => {
                           key={opt}
                           onClick={() => setTheme(opt)}
                           className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium capitalize transition-colors ${theme === opt
-                              ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
-                              : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
+                            ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
+                            : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
                             }`}
                           data-active={theme === opt}
                         >
@@ -569,8 +569,8 @@ const SettingsPage: React.FC = () => {
                           key={opt}
                           onClick={() => setDensity(opt)}
                           className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium capitalize transition-colors ${density === opt
-                              ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
-                              : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
+                            ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
+                            : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
                             }`}
                           data-active={density === opt}
                         >
@@ -598,8 +598,8 @@ const SettingsPage: React.FC = () => {
                             }
                           }}
                           className={`group relative flex items-center justify-between gap-1.5 cursor-pointer rounded-md border px-3 py-2 text-left text-xs font-medium transition-colors ${isSelected
-                              ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
-                              : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
+                            ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
+                            : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
                             }`}
                           data-active={isSelected}
                           title={opt.status === "coming-soon" ? `${opt.name} — Coming Soon` : opt.name}

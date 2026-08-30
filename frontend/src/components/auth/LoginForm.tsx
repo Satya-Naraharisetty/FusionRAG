@@ -20,12 +20,12 @@ export const LoginForm: React.FC = () => {
   const navigate = useNavigate();
   const { login, loginWithGoogle, loginWithGithub } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [email, setEmail]             = useState("");
-  const [password, setPassword]       = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe]   = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [isMagicLink, setIsMagicLink] = useState(false);
-  const [error, setError]             = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Show a toast if we were redirected back from a failed OAuth attempt
@@ -84,7 +84,7 @@ export const LoginForm: React.FC = () => {
     try {
       await login(email, password);
       if (rememberMe) localStorage.setItem("login-remember-email", email);
-      else            localStorage.removeItem("login-remember-email");
+      else localStorage.removeItem("login-remember-email");
       toast.success("Welcome back!");
     } catch (err: unknown) {
       const e = err as {
@@ -114,10 +114,10 @@ export const LoginForm: React.FC = () => {
         e.status === 429
           ? (typeof e.data?.detail === "string" ? e.data.detail : "Too many login attempts. Please wait 5 minutes and try again.")
           : e.data?.error?.message ||
-            (typeof e.data?.detail === "string" ? e.data.detail : undefined) ||
-            e.data?.message ||
-            e.message ||
-            "Invalid email or password.";
+          (typeof e.data?.detail === "string" ? e.data.detail : undefined) ||
+          e.data?.message ||
+          e.message ||
+          "Invalid email or password.";
       setError(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -136,8 +136,8 @@ export const LoginForm: React.FC = () => {
     <div className="auth-page">
       <SEOHead
         title="Sign In"
-        description="Sign in to your Hybrid RAG account to access your AI document chat studio, indexed knowledge bases, and custom RAG evaluations."
-        canonicalUrl="https://hybrid-rag-gilt.vercel.app/login"
+        description="Sign in to your Fusion RAG account to access your AI document chat studio, indexed knowledge bases, and custom RAG evaluations."
+        canonicalUrl="https://fusion-rag-gilt.vercel.app/login"
       />
       <LoginCard
         email={email}

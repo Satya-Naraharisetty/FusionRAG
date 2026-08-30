@@ -152,7 +152,7 @@ def create_fake_retrieval_service(
 
 def test_registry_default_capabilities() -> None:
     registry = create_default_capability_registry()
-    research = registry.get("research.hybrid_rag")
+    research = registry.get("research.fusion_rag")
     doc = registry.get("document.inspection")
     analysis = registry.get("analysis.safe_calculator")
     synthesis = registry.get("synthesis.grounded_summary")
@@ -238,7 +238,7 @@ async def test_deterministic_routing_research_task() -> None:
     )
 
     decision = await router.route(task, context)
-    assert decision.selected_capability_id == "research.hybrid_rag"
+    assert decision.selected_capability_id == "research.fusion_rag"
     assert decision.capability_type == CapabilityType.RESEARCH
     assert decision.reason_code == "EXACT_CAPABILITY_MATCH"
     assert decision.confidence == 1.0
@@ -372,7 +372,7 @@ async def test_budget_routing_task_latency_budget_exceeded() -> None:
     registry = create_default_capability_registry()
     router = TaskRouter(registry=registry)
     context = AgentExecutionContext(request_id="req-7", user_id=uuid4())
-    # research.hybrid_rag has estimated latency 1200ms
+    # research.fusion_rag has estimated latency 1200ms
     task = AgentTask(
         task_id="task-7",
         request="Quick search",
@@ -383,7 +383,7 @@ async def test_budget_routing_task_latency_budget_exceeded() -> None:
     decision = await router.route(task, context)
     assert decision.selected_capability_id is None
     assert decision.reason_code == "BUDGET_EXCEEDED"
-    assert decision.rejected_capabilities["research.hybrid_rag"] == "BUDGET_EXCEEDED"
+    assert decision.rejected_capabilities["research.fusion_rag"] == "BUDGET_EXCEEDED"
 
 
 @pytest.mark.asyncio
@@ -391,7 +391,7 @@ async def test_budget_routing_task_cost_budget_exceeded() -> None:
     registry = create_default_capability_registry()
     router = TaskRouter(registry=registry)
     context = AgentExecutionContext(request_id="req-8", user_id=uuid4())
-    # research.hybrid_rag has estimated cost 1.0 unit
+    # research.fusion_rag has estimated cost 1.0 unit
     task = AgentTask(
         task_id="task-8",
         request="Low cost search",
@@ -441,7 +441,7 @@ async def test_security_arbitrary_capability_id_rejected() -> None:
     decision = await router.route(task, context)
     # The unregistered preferred capability is rejected, falling back to eligible research capability
     assert "system.arbitrary_executor" in decision.rejected_capabilities
-    assert decision.selected_capability_id == "research.hybrid_rag"
+    assert decision.selected_capability_id == "research.fusion_rag"
 
 
 @pytest.mark.asyncio
@@ -529,7 +529,7 @@ async def test_execution_engine_routing_and_metadata_recording() -> None:
     assert len(outcome.failed_results) == 0
 
     res_map = {r.task_id: r for r in outcome.completed_results}
-    assert res_map["t1"].metadata.get("routed_capability") == "research.hybrid_rag"
+    assert res_map["t1"].metadata.get("routed_capability") == "research.fusion_rag"
     assert res_map["t1"].metadata.get("routing_reason_code") == "EXACT_CAPABILITY_MATCH"
     assert res_map["t2"].metadata.get("routed_capability") == "analysis.safe_calculator"
 
@@ -539,7 +539,7 @@ async def test_execution_engine_no_capability_failure_isolation() -> None:
     registry = CapabilityRegistry(
         [
             CapabilityDescriptor(
-                capability_id="research.hybrid_rag",
+                capability_id="research.fusion_rag",
                 capability_type=CapabilityType.RESEARCH,
                 description="Disabled research",
                 enabled=False,
@@ -715,7 +715,7 @@ async def test_routed_research_agent_invokes_research_planner() -> None:
 
 @pytest.mark.asyncio
 async def test_llm_advisory_router_valid_recommendation() -> None:
-    fake_llm = FakeLLMProvider(['{"capability_id": "research.hybrid_rag"}'])
+    fake_llm = FakeLLMProvider(['{"capability_id": "research.fusion_rag"}'])
     registry = create_default_capability_registry()
     router = TaskRouter(
         registry=registry,
@@ -731,7 +731,7 @@ async def test_llm_advisory_router_valid_recommendation() -> None:
     )
 
     decision = await router.route(task, context)
-    assert decision.selected_capability_id == "research.hybrid_rag"
+    assert decision.selected_capability_id == "research.fusion_rag"
 
 
 @pytest.mark.asyncio
@@ -775,7 +775,7 @@ async def test_llm_advisory_router_unregistered_recommendation_rejected() -> Non
     )
 
     decision = await router.route(task, context)
-    assert decision.selected_capability_id == "research.hybrid_rag"
+    assert decision.selected_capability_id == "research.fusion_rag"
 
 
 # ---------------------------------------------------------------------------

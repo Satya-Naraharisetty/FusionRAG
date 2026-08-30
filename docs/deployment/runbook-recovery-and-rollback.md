@@ -1,6 +1,6 @@
 # Production Recovery & Rollback Runbook
 
-This operational runbook provides concise, actionable procedures for rolling back failed deployments and recovering system state across the Hybrid RAG production architecture (Combination H).
+This operational runbook provides concise, actionable procedures for rolling back failed deployments and recovering system state across the Fusion RAG production architecture (Combination H).
 
 ---
 

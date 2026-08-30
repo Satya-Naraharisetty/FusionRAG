@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # Pin the compose project name so the pre-built backend image tag
-    # (hybrid_rag-backend:latest) is deterministic regardless of the checkout
+    # (fusion_rag-backend:latest) is deterministic regardless of the checkout
     # directory name.
     env:
-      COMPOSE_PROJECT_NAME: hybrid_rag
+      COMPOSE_PROJECT_NAME: fusion_rag
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - name: Checkout Code
@@ -37,10 +37,10 @@ jobs:
           JWT_SECRET=$JWT_SECRET
           COOKIE_SECURE=False
           REQUIRE_EMAIL_VERIFICATION=False
-          DATABASE_URL=postgresql://postgres:postgres@postgres:5432/hybrid_rag
+          DATABASE_URL=postgresql://postgres:postgres@postgres:5432/fusion_rag
           POSTGRES_SERVER=postgres
           POSTGRES_PORT=5432
-          POSTGRES_DB=hybrid_rag
+          POSTGRES_DB=fusion_rag
           POSTGRES_USER=postgres
           POSTGRES_PASSWORD=postgres
           REDIS_HOST=redis
@@ -62,7 +62,7 @@ jobs:
           file: ./backend/Dockerfile
           push: false
           load: true
-          tags: hybrid_rag-backend:latest
+          tags: fusion_rag-backend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

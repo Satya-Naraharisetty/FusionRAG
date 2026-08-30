@@ -78,7 +78,7 @@ async def test_duplicate_summarize_conversation_job_is_idempotent(
 
     mock_llm = AsyncMock()
     mock_llm.generate = AsyncMock(
-        return_value=("Consolidated summary of hybrid RAG and RRF discussions.", 25)
+        return_value=("Consolidated summary of Fusion RAG and RRF discussions.", 25)
     )
 
     handler = SummarizeConversationJobHandler(

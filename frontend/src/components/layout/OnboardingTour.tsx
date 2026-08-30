@@ -81,7 +81,7 @@ export const OnboardingTour: React.FC = () => {
                   <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/20">
                     <Sparkles size={18} />
                   </div>
-                  <h3 className="text-base font-semibold text-[var(--text-primary)] font-title">Welcome to Hybrid RAG</h3>
+                  <h3 className="text-base font-semibold text-[var(--text-primary)] font-title">Welcome to NexusRAG</h3>
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-sm mx-auto">
                     Ground your AI answers with precision using hybrid sparse + dense vector retrieval for verified, accurate responses.
                   </p>

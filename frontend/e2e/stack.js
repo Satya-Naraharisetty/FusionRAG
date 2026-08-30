@@ -7,7 +7,7 @@
  * Used by redis-fallback.js and redis-fallback-login.js. Platform-agnostic
  * (works on Windows cmd.exe and CI bash): docker compose commands target the
  * repo's docker-compose.yml explicitly, honor the COMPOSE_PROJECT_NAME
- * override (CI pins it to `hybrid_rag`), and quote the compose path.
+ * override (CI pins it to `fusion_rag`), and quote the compose path.
  */
 const { execSync } = require('child_process');
 const path = require('path');

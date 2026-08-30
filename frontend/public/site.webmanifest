@@ -1,7 +1,7 @@
 {
-  "name": "Hybrid RAG Chatbot",
-  "short_name": "RAG Chat",
-  "description": "Production-ready Hybrid RAG Chatbot with dense vector search, BM25 sparse retrieval, and reranking.",
+  "name": "NexusRAG",
+  "short_name": "NexusRAG",
+  "description": "NexusRAG is a production-ready Fusion RAG platform combining dense vector search, BM25 sparse retrieval, and cross-encoder reranking.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0b0e14",

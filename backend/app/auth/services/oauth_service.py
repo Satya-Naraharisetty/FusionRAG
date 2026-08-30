@@ -192,7 +192,7 @@ class OAuthService:
         )
         headers = {
             "Accept": "application/json",
-            "User-Agent": "Hybrid-RAG-Chatbot",
+            "User-Agent": "fusion-rag-Chatbot",
         }
         async with httpx.AsyncClient(timeout=10) as client:
             # Step 1: exchange code → tokens

@@ -1,6 +1,6 @@
 # Production Security Checklist & WAF Deployment Blueprint
 
-This document specifies the security controls for the Hybrid RAG platform, explicitly distinguishing **[APPLICATION COMPLETE]** controls (implemented in codebase and verified via automated tests) from **[DEPLOYMENT REQUIRED]** controls (to be configured in infrastructure/cloud environments).
+This document specifies the security controls for the Fusion RAG platform, explicitly distinguishing **[APPLICATION COMPLETE]** controls (implemented in codebase and verified via automated tests) from **[DEPLOYMENT REQUIRED]** controls (to be configured in infrastructure/cloud environments).
 
 ---
 

@@ -9,16 +9,16 @@ import toast from "react-hot-toast";
 export const RegisterForm: React.FC = () => {
   const navigate = useNavigate();
   const { register, loginWithGoogle, loginWithGithub } = useAuth();
-  const [email, setEmail]                       = useState("");
-  const [password, setPassword]                 = useState("");
-  const [confirmPassword, setConfirmPassword]   = useState("");
-  const [showPassword, setShowPassword]         = useState(false);
-  const [isMagicLink, setIsMagicLink]           = useState(false);
-  const [error, setError]                       = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting]         = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isMagicLink, setIsMagicLink] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const strength          = checkPasswordStrength(password);
-  const doPasswordsMatch  = password.length > 0 && password === confirmPassword;
+  const strength = checkPasswordStrength(password);
+  const doPasswordsMatch = password.length > 0 && password === confirmPassword;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,9 +35,9 @@ export const RegisterForm: React.FC = () => {
     }
 
     if (!email || !password || !confirmPassword) { setError("Please fill in all fields."); return; }
-    if (password.length < 8)   { setError("Password must be at least 8 characters."); return; }
+    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
     if (password !== confirmPassword) { setError("Passwords do not match."); return; }
-    if (strength.score < 2)    { setError("Password is too weak. Please choose a stronger one."); return; }
+    if (strength.score < 2) { setError("Password is too weak. Please choose a stronger one."); return; }
 
     setIsSubmitting(true);
     try {
@@ -64,8 +64,8 @@ export const RegisterForm: React.FC = () => {
     <div className="auth-page">
       <SEOHead
         title="Create an Account"
-        description="Create your free Hybrid RAG account to begin indexing documents with dense and sparse search, cross-encoder reranking, and citation-backed QA."
-        canonicalUrl="https://hybrid-rag-gilt.vercel.app/register"
+        description="Create your free Fusion RAG account to begin indexing documents with dense and sparse search, cross-encoder reranking, and citation-backed QA."
+        canonicalUrl="https://fusion-rag-gilt.vercel.app/register"
       />
       <RegisterCard
         email={email}

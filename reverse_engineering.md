@@ -1,6 +1,6 @@
-# Reverse Engineering Manual: Production-Grade Hybrid RAG Chatbot
+# Reverse Engineering Manual: Production-Grade Fusion RAG Chatbot
 
-This document provides an exhaustive, authoritative technical blueprint of the **Hybrid RAG Chatbot** system. It details the architecture, design choices, data models, pipelines, algorithms, and step-by-step instructions required to build this system from scratch without AI assistance.
+This document provides an exhaustive, authoritative technical blueprint of the **Fusion RAG Chatbot** system. It details the architecture, design choices, data models, pipelines, algorithms, and step-by-step instructions required to build this system from scratch without AI assistance.
 
 ---
 
@@ -271,7 +271,7 @@ flowchart TD
 ```
 
 ### 3.1. Parsing Strategies
-The [`ExtractorFactory`](file:///d:/fun/hybrid_rag/backend/app/documents/infrastructure/extractors.py) dynamically instantiates extractors:
+The [`ExtractorFactory`](file:///d:/fun/fusion_rag/backend/app/documents/infrastructure/extractors.py) dynamically instantiates extractors:
 * **PDF**: Text and tables extracted page-by-page via `pypdf`, preserving logical reading order and stripping header/footer noise.
 * **DOCX**: Iterates through paragraphs, lists, and tables via `python-docx`.
 * **HTML**: Uses `BeautifulSoup4` to remove `<script>`, `<style>`, and `<head>` tags, preserving headings (`<h1>`-`<h6>`), `<p>`, and tabular data.
@@ -280,7 +280,7 @@ The [`ExtractorFactory`](file:///d:/fun/hybrid_rag/backend/app/documents/infrast
 * **Images**: Multimodal OCR parsing using Google Gemini Vision to extract structured descriptions, tables, and transcripts.
 
 ### 3.2. Hierarchical Chunking
-The [`ChunkingService`](file:///d:/fun/hybrid_rag/backend/app/documents/services/chunking.py) supports:
+The [`ChunkingService`](file:///d:/fun/fusion_rag/backend/app/documents/services/chunking.py) supports:
 1. **Recursive Character Chunking**: Splits by `["\n\n", "\n", " ", ""]` maintaining `chunk_size` (default 500) and `chunk_overlap` (default 50).
 2. **Semantic Chunking**: Splits on embedding cosine similarity shifts between consecutive sentences.
 3. **Parent-Child & Sentence-Window**: Indexes small child chunks (400 chars) for granular retrieval, resolving parent chunks (1500 chars) or surrounding sentence windows during context selection.
@@ -356,16 +356,16 @@ When queries require multi-step reasoning, hypothetical answers, or tools, the `
 3. **OpenTelemetry & Jaeger**:
    - Distributed trace spans exported to Jaeger (`:4317` gRPC / `:4318` HTTP), with `TelemetrySanitizer` stripping raw document text, prompts, and tokens.
 4. **Grafana Pre-Provisioned Dashboards (`:3000`)**:
-   - `Hybrid RAG — Retrieval & Pipeline`
-   - `Hybrid RAG — LLM & Providers`
-   - `Hybrid RAG — Queue & Workers`
-   - `Hybrid RAG — HTTP & API SLO`
+   - `Fusion RAG — Retrieval & Pipeline`
+   - `Fusion RAG — LLM & Providers`
+   - `Fusion RAG — Queue & Workers`
+   - `Fusion RAG — HTTP & API SLO`
 
 ---
 
 ## 7. Rebuilding Roadmap (Step-by-Step Guide)
 
-Follow these steps to rebuild the Hybrid RAG Chatbot from scratch:
+Follow these steps to rebuild the Fusion RAG Chatbot from scratch:
 
 ### Step 1: Environment & Tooling Setup
 1. Install Python 3.12+, Node.js v18+, Docker Desktop, and Astral `uv`.

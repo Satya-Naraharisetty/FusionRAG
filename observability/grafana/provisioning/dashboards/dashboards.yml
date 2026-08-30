@@ -1,9 +1,9 @@
 apiVersion: 1
 
 providers:
-  - name: "Hybrid RAG Dashboards"
+  - name: "Fusion RAG Dashboards"
     orgId: 1
-    folder: "Hybrid RAG Operations"
+    folder: "Fusion RAG Operations"
     type: file
     disableDeletion: false
     updateIntervalSeconds: 15

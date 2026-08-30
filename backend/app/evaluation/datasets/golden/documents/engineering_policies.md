@@ -2,7 +2,7 @@
 
 ## Section 1: Service Level Agreements (SLAs) and SLOs
 The platform commits to a standard availability Service Level Objective (SLO) of 99.95% uptime for standard tier tenants and 99.99% (four nines) for enterprise tier tenants, calculated on a rolling 30-day window.
-- **P95 Latency Target**: Hybrid RAG query processing and candidate retrieval must return within 250 milliseconds.
+- **P95 Latency Target**: Fusion RAG query processing and candidate retrieval must return within 250 milliseconds.
 - **P99 Latency Target**: Complete end-to-end multi-agent answer synthesis must complete within 2500 milliseconds.
 
 ## Section 2: Incident Classification & Severity Levels

@@ -289,7 +289,7 @@ class CleanupJob(BaseModel):
 # Multimodal, Structured & Knowledge Graph Document Domain Models
 # =====================================================================
 
-NAMESPACE_HYBRID_RAG = UUID("e89f8742-1234-5678-9abc-def012345678")
+NAMESPACE_fusion_rag = UUID("e89f8742-1234-5678-9abc-def012345678")
 
 
 def normalize_entity_name(raw_name: str) -> str:
@@ -336,7 +336,7 @@ def generate_element_id(
 ) -> UUID:
 
     return uuid5(
-        NAMESPACE_HYBRID_RAG,
+        NAMESPACE_fusion_rag,
         f"{user_id}:{document_id}:{document_version}:element:{element_index}",
     )
 
@@ -346,7 +346,7 @@ def generate_entity_id(
 ) -> UUID:
 
     return uuid5(
-        NAMESPACE_HYBRID_RAG,
+        NAMESPACE_fusion_rag,
         f"{user_id}:entity:{normalized_entity_name}:{normalized_entity_type}",
     )
 
@@ -361,7 +361,7 @@ def generate_qdrant_point_id(
 ) -> UUID:
 
     return uuid5(
-        NAMESPACE_HYBRID_RAG,
+        NAMESPACE_fusion_rag,
         f"{user_id}:{document_id}:{document_version}:{element_id}:{representation_type}:{embedding_contract_id}",
     )
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Hybrid RAG — login flow E2E smoke test.
+ * Fusion RAG — login flow E2E smoke test.
  *
  * Verifies the complete auth path against a running stack (Vite dev server +
  * backend on :8000):
@@ -162,154 +162,154 @@ async function main() {
   // Wrap the whole browser phase (launch + checks) so the throwaway user is
   // deleted even if Chrome fails to launch or any check throws.
   try {
-  if (reg.ok) {
-    const browser = await puppeteer.launch({
-      executablePath: CHROME_PATH,
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-gpu'],
-    });
-    try {
-      // ---- 2. Browser login ----
-      const page = await browser.newPage();
-      await page.setViewport({ width: 1440, height: 900 });
-      const pageErrors = [];
-      const consoleErrors = [];
-      const failedRequests = [];
-      page.on('console', (m) => {
-        if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 160));
+    if (reg.ok) {
+      const browser = await puppeteer.launch({
+        executablePath: CHROME_PATH,
+        headless: 'new',
+        args: ['--no-sandbox', '--disable-gpu'],
       });
-      page.on('pageerror', (e) => pageErrors.push(e.message.slice(0, 160)));
-      page.on('requestfailed', (r) => failedRequests.push(`${r.url().slice(0, 120)} :: ${r.failure()?.errorText || ''}`));
+      try {
+        // ---- 2. Browser login ----
+        const page = await browser.newPage();
+        await page.setViewport({ width: 1440, height: 900 });
+        const pageErrors = [];
+        const consoleErrors = [];
+        const failedRequests = [];
+        page.on('console', (m) => {
+          if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 160));
+        });
+        page.on('pageerror', (e) => pageErrors.push(e.message.slice(0, 160)));
+        page.on('requestfailed', (r) => failedRequests.push(`${r.url().slice(0, 120)} :: ${r.failure()?.errorText || ''}`));
 
-      await page.goto(`${FRONTEND_URL}/login`, { waitUntil: 'networkidle2', timeout: 60000 });
-      await page.evaluate(() => {
-        localStorage.setItem('onboarding-completed', 'true');
-      });
-      await page.waitForSelector('#login-email', { timeout: 20000 });
-      check('login page renders', true);
+        await page.goto(`${FRONTEND_URL}/login`, { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.evaluate(() => {
+          localStorage.setItem('onboarding-completed', 'true');
+        });
+        await page.waitForSelector('#login-email', { timeout: 20000 });
+        check('login page renders', true);
 
-      await page.type('#login-email', EMAIL);
-      await page.type('#login-password', PASSWORD);
-      await page.click('button[type="submit"]');
-      await sleep(9000);
+        await page.type('#login-email', EMAIL);
+        await page.type('#login-password', PASSWORD);
+        await page.click('button[type="submit"]');
+        await sleep(9000);
 
-      const urlAfter = page.url();
-      check('login redirects to /chat', urlAfter.includes('/chat'), urlAfter);
-      await dismissOnboardingTour(page);
+        const urlAfter = page.url();
+        check('login redirects to /chat', urlAfter.includes('/chat'), urlAfter);
+        await dismissOnboardingTour(page);
 
-      const bodyText = await page.evaluate(() => document.body.innerText);
-      check('no error text on page', !/invalid|error|failed/i.test(bodyText.slice(0, 2000)));
-      check('logged-in user visible in sidebar', bodyText.includes(EMAIL));
+        const bodyText = await page.evaluate(() => document.body.innerText);
+        check('no error text on page', !/invalid|error|failed/i.test(bodyText.slice(0, 2000)));
+        check('logged-in user visible in sidebar', bodyText.includes(EMAIL));
 
-      const apiCookies = await page.cookies(`${API_URL}/api/v1/auth/refresh`);
-      const rc = apiCookies.find((c) => c.name === 'refresh_token');
-      check(
-        'refresh cookie stored (API path)',
-        !!rc,
-        rc ? `domain=${rc.domain} path=${rc.path} httpOnly=${rc.httpOnly}` : ''
-      );
+        const apiCookies = await page.cookies(`${API_URL}/api/v1/auth/refresh`);
+        const rc = apiCookies.find((c) => c.name === 'refresh_token');
+        check(
+          'refresh cookie stored (API path)',
+          !!rc,
+          rc ? `domain=${rc.domain} path=${rc.path} httpOnly=${rc.httpOnly}` : ''
+        );
 
-      // ---- 3. Session persistence (fresh page, same browser context = same cookies) ----
-      const page2 = await browser.newPage();
-      await page2.setViewport({ width: 1440, height: 900 });
-      const errors2 = [];
-      const http4xx = [];
-      page2.on('console', (m) => { if (m.type() === 'error') errors2.push(m.text().slice(0, 160)); });
-      page2.on('pageerror', (e) => errors2.push('PAGEERR: ' + e.message.slice(0, 160)));
-      page2.on('response', (r) => { if (r.status() >= 400) http4xx.push(`${r.status()} ${r.url().slice(0, 100)}`); });
+        // ---- 3. Session persistence (fresh page, same browser context = same cookies) ----
+        const page2 = await browser.newPage();
+        await page2.setViewport({ width: 1440, height: 900 });
+        const errors2 = [];
+        const http4xx = [];
+        page2.on('console', (m) => { if (m.type() === 'error') errors2.push(m.text().slice(0, 160)); });
+        page2.on('pageerror', (e) => errors2.push('PAGEERR: ' + e.message.slice(0, 160)));
+        page2.on('response', (r) => { if (r.status() >= 400) http4xx.push(`${r.status()} ${r.url().slice(0, 100)}`); });
 
-      await page2.goto(`${FRONTEND_URL}/chat`, { waitUntil: 'networkidle2', timeout: 60000 });
-      await sleep(9000);
-      await dismissOnboardingTour(page2);
-      const url2 = page2.url();
-      const text2 = await page2.evaluate(() => document.body.innerText);
+        await page2.goto(`${FRONTEND_URL}/chat`, { waitUntil: 'networkidle2', timeout: 60000 });
+        await sleep(9000);
+        await dismissOnboardingTour(page2);
+        const url2 = page2.url();
+        const text2 = await page2.evaluate(() => document.body.innerText);
 
-      check('session persists: stays on /chat', !url2.includes('/login'), url2);
-      check('session persists: user visible', text2.includes(EMAIL));
-      check('session persists: no console errors', errors2.length === 0, errors2.slice(0, 2).join(' | '));
-      check('session persists: no 4xx/5xx', http4xx.length === 0, http4xx.slice(0, 2).join(' | '));
+        check('session persists: stays on /chat', !url2.includes('/login'), url2);
+        check('session persists: user visible', text2.includes(EMAIL));
+        check('session persists: no console errors', errors2.length === 0, errors2.slice(0, 2).join(' | '));
+        check('session persists: no 4xx/5xx', http4xx.length === 0, http4xx.slice(0, 2).join(' | '));
 
-      check('login attempt: no failed requests', failedRequests.length === 0, failedRequests.slice(0, 2).join(' | '));
+        check('login attempt: no failed requests', failedRequests.length === 0, failedRequests.slice(0, 2).join(' | '));
 
-      // On a logged-out boot, the app probes /auth/me without a token; that
-      // expected 401 shows up in the browser console as a resource-load error
-      // and is how the app decides to show the login page. Ignore that exact
-      // pattern; any other console error is a real failure.
-      const realConsoleErrors = consoleErrors.filter(
-        (t) => !/Failed to load resource: the server responded with a status of 401/.test(t)
-      );
-      check('login attempt: no unexpected console errors', realConsoleErrors.length === 0, realConsoleErrors.slice(0, 2).join(' | '));
-      check('login attempt: no uncaught page errors', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
+        // On a logged-out boot, the app probes /auth/me without a token; that
+        // expected 401 shows up in the browser console as a resource-load error
+        // and is how the app decides to show the login page. Ignore that exact
+        // pattern; any other console error is a real failure.
+        const realConsoleErrors = consoleErrors.filter(
+          (t) => !/Failed to load resource: the server responded with a status of 401/.test(t)
+        );
+        check('login attempt: no unexpected console errors', realConsoleErrors.length === 0, realConsoleErrors.slice(0, 2).join(' | '));
+        check('login attempt: no uncaught page errors', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
-      // ---- 4. Delete the account via the Settings UI ----
-      // Drives the real Settings -> Data & Privacy -> Delete Account flow,
-      // including the typed-email + re-entered-password confirmation gate,
-      // then proves the account is gone (redirect to /login + rejected
-      // re-login). On success the account is already deleted, so the API
-      // cleanup in the outer finally becomes a no-op safety net.
-      const uiPage = await browser.newPage();
-      await uiPage.setViewport({ width: 1440, height: 900 });
-      const uiErrors = [];
-      const uiPageErrors = [];
-      uiPage.on('console', (m) => { if (m.type() === 'error') uiErrors.push(m.text().slice(0, 160)); });
-      uiPage.on('pageerror', (e) => uiPageErrors.push('PAGEERR: ' + e.message.slice(0, 160)));
+        // ---- 4. Delete the account via the Settings UI ----
+        // Drives the real Settings -> Data & Privacy -> Delete Account flow,
+        // including the typed-email + re-entered-password confirmation gate,
+        // then proves the account is gone (redirect to /login + rejected
+        // re-login). On success the account is already deleted, so the API
+        // cleanup in the outer finally becomes a no-op safety net.
+        const uiPage = await browser.newPage();
+        await uiPage.setViewport({ width: 1440, height: 900 });
+        const uiErrors = [];
+        const uiPageErrors = [];
+        uiPage.on('console', (m) => { if (m.type() === 'error') uiErrors.push(m.text().slice(0, 160)); });
+        uiPage.on('pageerror', (e) => uiPageErrors.push('PAGEERR: ' + e.message.slice(0, 160)));
 
-      await uiPage.goto(`${FRONTEND_URL}/settings`, { waitUntil: 'networkidle2', timeout: 60000 });
-      await sleep(3000);
-      await dismissOnboardingTour(uiPage);
-      const settingsTitle = await uiPage.evaluate(() => document.querySelector('h1')?.textContent || '');
-      check('settings page renders', settingsTitle.includes('Settings'), settingsTitle);
+        await uiPage.goto(`${FRONTEND_URL}/settings`, { waitUntil: 'networkidle2', timeout: 60000 });
+        await sleep(3000);
+        await dismissOnboardingTour(uiPage);
+        const settingsTitle = await uiPage.evaluate(() => document.querySelector('h1')?.textContent || '');
+        check('settings page renders', settingsTitle.includes('Settings'), settingsTitle);
 
-      check('Data & Privacy tab opens', await clickButtonByExactText(uiPage, 'Data & Privacy'));
-      await sleep(1500);
+        check('Data & Privacy tab opens', await clickButtonByExactText(uiPage, 'Data & Privacy'));
+        await sleep(1500);
 
-      check('delete dialog opens', await clickButtonByExactText(uiPage, 'Delete'));
-      await uiPage.waitForSelector('#delete-account-confirm-email', { timeout: 10000 }).catch(() => {});
-      check('dialog email input present', !!(await uiPage.$('#delete-account-confirm-email')));
+        check('delete dialog opens', await clickButtonByExactText(uiPage, 'Delete'));
+        await uiPage.waitForSelector('#delete-account-confirm-email', { timeout: 10000 }).catch(() => { });
+        check('dialog email input present', !!(await uiPage.$('#delete-account-confirm-email')));
 
-      let confirmState = await getDialogSubmitState(uiPage);
-      check('confirm disabled initially', !!confirmState && confirmState.disabled === true);
+        let confirmState = await getDialogSubmitState(uiPage);
+        check('confirm disabled initially', !!confirmState && confirmState.disabled === true);
 
-      await uiPage.type('#delete-account-confirm-email', 'wrong@example.com');
-      confirmState = await getDialogSubmitState(uiPage);
-      check('confirm stays disabled with wrong email', !!confirmState && confirmState.disabled === true);
+        await uiPage.type('#delete-account-confirm-email', 'wrong@example.com');
+        confirmState = await getDialogSubmitState(uiPage);
+        check('confirm stays disabled with wrong email', !!confirmState && confirmState.disabled === true);
 
-      // Select-all + replace with the exact account email
-      await uiPage.click('#delete-account-confirm-email', { clickCount: 3 });
-      await uiPage.type('#delete-account-confirm-email', EMAIL);
-      confirmState = await getDialogSubmitState(uiPage);
-      check('confirm stays disabled until password entered', !!confirmState && confirmState.disabled === true);
+        // Select-all + replace with the exact account email
+        await uiPage.click('#delete-account-confirm-email', { clickCount: 3 });
+        await uiPage.type('#delete-account-confirm-email', EMAIL);
+        confirmState = await getDialogSubmitState(uiPage);
+        check('confirm stays disabled until password entered', !!confirmState && confirmState.disabled === true);
 
-      await uiPage.type('#delete-account-confirm-password', PASSWORD);
-      confirmState = await getDialogSubmitState(uiPage);
-      check('confirm enabled with matching email + password', !!confirmState && confirmState.disabled === false);
+        await uiPage.type('#delete-account-confirm-password', PASSWORD);
+        confirmState = await getDialogSubmitState(uiPage);
+        check('confirm enabled with matching email + password', !!confirmState && confirmState.disabled === false);
 
-      check('delete confirmed', await clickDialogSubmitButton(uiPage));
-      let redirectedToLogin = false;
-      for (let i = 0; i < 30; i++) {
-        if (uiPage.url().includes('/login')) { redirectedToLogin = true; break; }
-        await sleep(500);
+        check('delete confirmed', await clickDialogSubmitButton(uiPage));
+        let redirectedToLogin = false;
+        for (let i = 0; i < 30; i++) {
+          if (uiPage.url().includes('/login')) { redirectedToLogin = true; break; }
+          await sleep(500);
+        }
+        check('redirected to /login after deletion', redirectedToLogin, uiPage.url());
+
+        // Definitive proof the account is gone: the same credentials are rejected
+        const relogin = await fetch(`${API_URL}/api/v1/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
+        });
+        check('API login rejected after deletion', relogin.status === 401, `HTTP ${relogin.status}`);
+        if (relogin.status === 401) uiDeleted = true;
+
+        const uiConsoleErrors = uiErrors.filter(
+          (t) => !/Failed to load resource: the server responded with a status of 401/.test(t)
+        );
+        check('delete flow: no unexpected console errors', uiConsoleErrors.length === 0, uiConsoleErrors.slice(0, 2).join(' | '));
+        check('delete flow: no uncaught page errors', uiPageErrors.length === 0, uiPageErrors.slice(0, 2).join(' | '));
+      } finally {
+        await browser.close();
       }
-      check('redirected to /login after deletion', redirectedToLogin, uiPage.url());
-
-      // Definitive proof the account is gone: the same credentials are rejected
-      const relogin = await fetch(`${API_URL}/api/v1/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
-      });
-      check('API login rejected after deletion', relogin.status === 401, `HTTP ${relogin.status}`);
-      if (relogin.status === 401) uiDeleted = true;
-
-      const uiConsoleErrors = uiErrors.filter(
-        (t) => !/Failed to load resource: the server responded with a status of 401/.test(t)
-      );
-      check('delete flow: no unexpected console errors', uiConsoleErrors.length === 0, uiConsoleErrors.slice(0, 2).join(' | '));
-      check('delete flow: no uncaught page errors', uiPageErrors.length === 0, uiPageErrors.slice(0, 2).join(' | '));
-    } finally {
-      await browser.close();
     }
-  }
   } finally {
     // ---- 4. Cleanup (always, even on launch failure or thrown check) ----
     // Only attempt cleanup when the account was actually registered; otherwise

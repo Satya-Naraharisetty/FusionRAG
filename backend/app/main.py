@@ -309,9 +309,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    summary="Enterprise Hybrid RAG (Retrieval Augmented Generation) API backend combining dense vectors and BM25 sparse search with cross-encoder reranking.",
+    summary="NexusRAG (Enterprise Hybrid Retrieval-Augmented Generation) API backend combining dense vectors and BM25 sparse search with cross-encoder reranking.",
     description="""
-# Hybrid RAG API
+# NexusRAG API
 
 Production-ready, highly observable, verifiable AI Document QA and retrieval platform.
 
@@ -440,7 +440,7 @@ class ProductionMiddleware(BaseHTTPMiddleware):
             mask_ip_address,
         )
 
-        tracer = get_tracer("hybrid-rag.http")
+        tracer = get_tracer("fusion-rag.http")
         parent_ctx = extract_trace_context(dict(request.headers))
 
         route_template = resolve_route_template(request)

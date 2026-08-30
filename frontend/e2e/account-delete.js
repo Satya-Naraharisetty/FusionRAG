@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Hybrid RAG — DELETE /auth/account API smoke test.
+ * Fusion RAG — DELETE /auth/account API smoke test.
  *
  * Pure API assertion (no browser, no Chrome): exercises the account-deletion
  * endpoint end-to-end against a running backend:

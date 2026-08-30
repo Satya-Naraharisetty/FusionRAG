@@ -1,8 +1,8 @@
-# Product Requirements Document (PRD): Production-Grade Hybrid RAG Chatbot
+# Product Requirements Document (PRD): Production-Grade Fusion RAG Chatbot
 
 ## 1. Executive Summary
 
-This document specifies the product requirements for a production-grade **Hybrid RAG (Retrieval-Augmented Generation) Chatbot**. The goal of this application is to serve as a premier reference implementation of modern, production-quality AI engineering. It is designed for containerized local deployment, portfolio demonstration, and reliable production operations.
+This document specifies the product requirements for a production-grade **Fusion RAG (Retrieval-Augmented Generation) Chatbot**. The goal of this application is to serve as a premier reference implementation of modern, production-quality AI engineering. It is designed for containerized local deployment, portfolio demonstration, and reliable production operations.
 
 The platform provides **highly accurate, grounded, observable, and multi-strategy answers** based on user-uploaded documents, featuring dual-branch hybrid retrieval (PostgreSQL FTS / BM25 + Qdrant Dense ANN), Reciprocal Rank Fusion (RRF), Cross-Encoder joint cross-attention reranking, Adaptive RAG orchestration, agentic tool execution sandboxes, and full OpenTelemetry/Prometheus observability.
 
@@ -10,7 +10,7 @@ The platform provides **highly accurate, grounded, observable, and multi-strateg
 
 ## 2. Vision
 
-To build a definitive reference implementation of a Hybrid RAG Chatbot that demonstrates how to transition RAG from a fragile prototype to a robust, observable, resilient, and enterprise-grade production platform.
+To build a definitive reference implementation of a Fusion RAG Chatbot that demonstrates how to transition RAG from a fragile prototype to a robust, observable, resilient, and enterprise-grade production platform.
 
 ---
 

@@ -1,6 +1,6 @@
-# Hybrid RAG — Local Observability Stack & Operational Runbook
+# Fusion RAG — Local Observability Stack & Operational Runbook
 
-This directory contains the operational observability stack for the Hybrid RAG platform, providing real-time metric visualization, distributed trace exploration, and reliability monitoring.
+This directory contains the operational observability stack for the Fusion RAG platform, providing real-time metric visualization, distributed trace exploration, and reliability monitoring.
 
 ---
 
@@ -8,7 +8,7 @@ This directory contains the operational observability stack for the Hybrid RAG p
 
 ```
                         ┌─────────────────────────┐
-                        │   Hybrid RAG Backend    │
+                        │   Fusion RAG Backend    │
                         │        (FastAPI)        │
                         └───────────┬─────────────┘
                                     │
@@ -74,7 +74,7 @@ docker compose -f docker-compose.observability.yml down -v
 
 Grafana automatically loads both datasources (**Prometheus** & **Jaeger**) and 4 curated dashboards located in `observability/grafana/dashboards/`:
 
-### 1. `Hybrid RAG — Retrieval & Pipeline`
+### 1. `Fusion RAG — Retrieval & Pipeline`
 - **Purpose**: Answer *"How is my RAG pipeline performing and where is latency originating?"*
 - **Key Panels**:
   - **Throughput by Strategy**: Direct, Adaptive, Multi-Agent requests per second.
@@ -83,7 +83,7 @@ Grafana automatically loads both datasources (**Prometheus** & **Jaeger**) and 4
   - **Candidate Funnel**: Number of candidate chunks surviving at each retrieval stage.
   - **Adaptive Replans**: Frequency and classification reasons triggering query expansion/replanning.
 
-### 2. `Hybrid RAG — LLM & Providers`
+### 2. `Fusion RAG — LLM & Providers`
 - **Purpose**: Monitor provider latency, streaming responsiveness, and token expenditure.
 - **Key Panels**:
   - **Time to First Token (TTFT)**: P50/P95/P99 latency to the initial streaming token (key responsiveness metric).
@@ -91,7 +91,7 @@ Grafana automatically loads both datasources (**Prometheus** & **Jaeger**) and 4
   - **Token Consumption**: Real-time rate of prompt tokens vs. completion tokens.
   - **Circuit Breaker Status**: State of provider circuit breakers (`Closed`, `Half-Open`, `Open`).
 
-### 3. `Hybrid RAG — Queue & Workers`
+### 3. `Fusion RAG — Queue & Workers`
 - **Purpose**: Monitor background document ingestion, embedding generation, and worker health.
 - **Key Panels**:
   - **Stream Length & Consumer Lag**: Redis Stream depth and pending unacknowledged entries (PEL).
@@ -99,7 +99,7 @@ Grafana automatically loads both datasources (**Prometheus** & **Jaeger**) and 4
   - **Worker Execution Duration**: P95 processing time per job type.
   - **Self-Healing Recoveries**: Orphan auto-claims and `DurableIngestionReaper` recovery counts.
 
-### 4. `Hybrid RAG — HTTP & API SLO`
+### 4. `Fusion RAG — HTTP & API SLO`
 - **Purpose**: High-level service availability, error rates, and API ingress health.
 - **Key Panels**:
   - **Request Throughput & Active In-Flight Requests**.
@@ -127,7 +127,7 @@ Identify Stage Bottleneck
 Open Jaeger UI (http://localhost:16686)
        │
        ▼
-Search Service: "hybrid-rag-backend" | Operation: "rag.chat_orchestration"
+Search Service: "fusion-rag-backend" | Operation: "rag.chat_orchestration"
        │
        ▼
 Inspect Trace Waterfall Hierarchy:

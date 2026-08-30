@@ -266,8 +266,8 @@ export const VerifyEmailPage: React.FC = () => {
     <div className="auth-page flex min-h-dvh w-full items-center justify-center p-4 bg-[var(--bg-primary)]">
       <SEOHead
         title="Verify Email"
-        description="Verify your email address to activate your Hybrid RAG account."
-        canonicalUrl="https://hybrid-rag-gilt.vercel.app/verify-email"
+        description="Verify your email address to activate your Fusion RAG account."
+        canonicalUrl="https://fusion-rag-gilt.vercel.app/verify-email"
         robots="noindex, follow"
       />
       <div
@@ -289,15 +289,15 @@ export const VerifyEmailPage: React.FC = () => {
             {isVerified
               ? "Email Verified!"
               : tokenParam && isVerifying
-              ? "Verifying link..."
-              : "Verify your email"}
+                ? "Verifying link..."
+                : "Verify your email"}
           </h1>
           <p className="text-sm text-[var(--text-secondary)] text-center leading-relaxed">
             {isVerified
               ? "Your account is activated. Redirecting you to chat..."
               : email
-              ? `We sent a 6-digit verification code and a one-click link to ${email}`
-              : "Enter your 6-digit code or click the verification link sent to your inbox."}
+                ? `We sent a 6-digit verification code and a one-click link to ${email}`
+                : "Enter your 6-digit code or click the verification link sent to your inbox."}
           </p>
         </div>
 
@@ -411,8 +411,8 @@ export const VerifyEmailPage: React.FC = () => {
                 {resendCooldown > 0
                   ? `Resend available in ${resendCooldown}s`
                   : isResending
-                  ? "Sending new code..."
-                  : "Resend Code & Link"}
+                    ? "Sending new code..."
+                    : "Resend Code & Link"}
               </button>
             </div>
 

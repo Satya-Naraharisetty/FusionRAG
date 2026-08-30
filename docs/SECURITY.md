@@ -11,7 +11,7 @@ All secrets, credentials, API keys, and certificates must be handled dynamically
 ---
 
 ## 2. Required Environment Variables
-The application requires the following environment variables. Refer to [backend/.env.example](file:///d:/fun/hybrid_rag/backend/.env.example) for the complete up-to-date template.
+The application requires the following environment variables. Refer to [backend/.env.example](file:///d:/fun/fusion_rag/backend/.env.example) for the complete up-to-date template.
 
 ### Core LLM & Inference Providers
 - `GEMINI_API_KEY`: API Key for Google Gemini LLM chat completion (`gemini-3.5-flash-lite`), vision OCR parsing, and query rewriting.

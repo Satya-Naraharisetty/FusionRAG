@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Hybrid RAG — Redis-down rate-limit fallback smoke test.
+ * Fusion RAG — Redis-down rate-limit fallback smoke test.
  *
  * Pure API + docker-compose orchestration (no browser, no Chrome): proves the
  * in-memory rate-limit fallback actually enforces limits when Redis is
@@ -34,7 +34,7 @@
  * Env overrides:
  *   API_URL                default http://localhost:8000
  *   COMPOSE_PROJECT_NAME   compose project of the running stack (CI pins this
- *                          to `hybrid_rag`; local defaults to the repo dir
+ *                          to `fusion_rag`; local defaults to the repo dir
  *                          name, which docker compose derives itself)
  *   RATE_LIMIT_BUDGET      expected per-user delete budget (default 10)
  *   RATE_LIMIT_EXTRA       extra requests sent past the budget (default 2)

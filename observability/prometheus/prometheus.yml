@@ -3,7 +3,7 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: "hybrid-rag-backend"
+  - job_name: "fusion-rag-backend"
     metrics_path: "/metrics"
     scrape_interval: 15s
     scrape_timeout: 10s
@@ -12,5 +12,5 @@ scrape_configs:
           - "backend:8000"
           - "host.docker.internal:8000"
         labels:
-          app: "hybrid-rag"
+          app: "fusion-rag"
           environment: "local"

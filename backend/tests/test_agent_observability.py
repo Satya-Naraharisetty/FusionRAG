@@ -347,7 +347,7 @@ async def test_security_audit_worker_routing_and_capability_mismatch():
     mismatch_task = AgentTask(
         task_id="sec_2",
         agent_type=AgentType.RESEARCH,
-        request="Hybrid RAG query",
+        request="Fusion RAG query",
         capability_requirements=[
             CapabilityRequirement(capability_type=CapabilityType.DOCUMENT_INSPECTION)
         ],

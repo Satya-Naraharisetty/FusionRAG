@@ -244,7 +244,7 @@ class ChatOrchestrator:
             hash_user_id,
         )
 
-        tracer = get_tracer("hybrid-rag.orchestration")
+        tracer = get_tracer("fusion-rag.orchestration")
 
         with tracer.start_as_current_span("rag.chat_orchestration") as orch_span:
             orch_span.set_attribute("rag.strategy", strategy_label)
@@ -721,7 +721,7 @@ class ChatOrchestrator:
             except Exception:
                 pass
 
-        tracer = get_tracer("hybrid-rag.orchestration")
+        tracer = get_tracer("fusion-rag.orchestration")
 
         # Strip the @documents priority mention (if present) before any
         # processing so it never leaks into retrieval, prompts or history.

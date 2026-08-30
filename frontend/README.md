@@ -1,6 +1,6 @@
-# Hybrid RAG — Frontend Client
+# Fusion RAG — Frontend Client
 
-The frontend Single Page Application (SPA) for the **Hybrid RAG Platform**, built with **React 18**, **Vite 5**, **TypeScript**, and **Vanilla CSS**.
+The frontend Single Page Application (SPA) for the **Fusion RAG Platform**, built with **React 18**, **Vite 5**, **TypeScript**, and **Vanilla CSS**.
 
 ---
 

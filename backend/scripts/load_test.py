@@ -17,7 +17,7 @@ API_URL = os.getenv("VITE_API_URL", "http://127.0.0.1:8000")
 
 # Setup a clean corpus for repeatable BM25 indexing
 TEST_DOC_CONTENT = """
-The Hybrid RAG Chatbot is designed to provide high-complexity production answers.
+The Fusion RAG Chatbot is designed to provide high-complexity production answers.
 We combine dense vector retrieval and sparse BM25 retrieval to produce a hybrid retriever.
 In our first milestone, we are focusing on improving performance and scalability.
 The event loop thread must not be blocked by synchronous SQLAlchemy repository operations.
@@ -131,7 +131,7 @@ async def run_client_task(token, duration, results_list, stop_event):
                 res = await client.post(
                     f"{API_URL}/api/v1/search",
                     json={
-                        "query": "hybrid RAG performance and scalability",
+                        "query": "Fusion RAG performance and scalability",
                         "top_k": 3,
                     },
                     headers=headers,
@@ -250,7 +250,7 @@ async def run_benchmark(token, concurrency, duration, warmup):
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="Hybrid RAG Chatbot Load Testing Tool")
+    parser = argparse.ArgumentParser(description="Fusion RAG Chatbot Load Testing Tool")
     parser.add_argument(
         "--warmup", type=int, default=3, help="Warm-up period in seconds"
     )

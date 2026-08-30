@@ -2,7 +2,7 @@
 
 ## Target Architecture
 
-The finalized deployment architecture for the Hybrid RAG system is **Combination H**:
+The finalized deployment architecture for the Fusion RAG system is **Combination H**:
 
 - **PostgreSQL (Intended Supabase Managed Deployment)**:
   - Authoritative relational system of record for application business state: users, credentials, refresh sessions, documents, document chunks, embedding metadata, conversations, messages, summaries, and asynchronous cleanup jobs.

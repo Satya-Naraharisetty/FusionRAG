@@ -177,7 +177,7 @@ absorbs transient Gemini free-tier 429s. Embeddings run locally
 | `FRONTEND_URL` | `http://localhost:5173` | Vite dev server origin (login flow) |
 | `API_URL` | `http://localhost:8000` | Backend origin (all scripts) |
 | `CHROME_PATH` | `C:/Program Files/Google/Chrome/Application/chrome.exe` | Path to Chrome binary (login flow) |
-| `COMPOSE_PROJECT_NAME` | auto | Compose project of the running stack (redis-fallback*; CI pins `hybrid_rag`) |
+| `COMPOSE_PROJECT_NAME` | auto | Compose project of the running stack (redis-fallback*; CI pins `fusion_rag`) |
 | `RATE_LIMIT_BUDGET` | `10` | Expected per-user delete budget (redis-fallback*) |
 | `RATE_LIMIT_EXTRA` | `2` | Requests sent past the budgets to observe 429 (redis-fallback*) |
 | `RATE_LIMIT_GENERAL_ALLOWED` | `70` | General limiter rpm+burst budget (`60`+`10`; redis-fallback-login) |
@@ -228,7 +228,7 @@ created and left behind via the API, never touched directly).
 
 The backend pytest integration suite no longer touches the dev database. It
 connects to its own dedicated Postgres — the `postgres-test` compose service
-(`hybrid_rag_test` on port **5433**) — via the shared `backend/tests/db.py`
+(`fusion_rag_test` on port **5433**) — via the shared `backend/tests/db.py`
 helper, whose URL can be overridden with `TEST_DATABASE_URL`.
 
 The suite creates and truncates tables (`users`, `refresh_sessions`, ...) on

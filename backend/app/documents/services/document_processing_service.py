@@ -90,7 +90,7 @@ class DocumentProcessingService:
                 get_tracer,
             )
 
-            tracer = get_tracer("hybrid-rag.ingestion")
+            tracer = get_tracer("fusion-rag.ingestion")
 
             file_bytes = await self._storage_provider.get(document.filename)
 

@@ -193,7 +193,7 @@ def test_safe_calculator_ast_evaluation():
 
 
 def test_prompt_injection_scanner():
-    PromptInjectionScanner.scan_prompt("What is hybrid RAG?")  # Clean
+    PromptInjectionScanner.scan_prompt("What is Fusion RAG?")  # Clean
 
     with pytest.raises(PromptInjectionError):
         PromptInjectionScanner.scan_prompt(

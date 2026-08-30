@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Hybrid RAG — two-tier document model E2E verification.
+ * Fusion RAG — two-tier document model E2E verification.
  *
  * Drives the real UI (Vite dev + backend on :8000) through the full document
  * model:

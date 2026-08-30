@@ -1,6 +1,6 @@
 # Complete Free-Tier Deployment Guide ($0 / Month)
 
-This guide walks you through deploying the Hybrid RAG system (Combination H) for **$0 / month** using free-tier services.
+This guide walks you through deploying the Fusion RAG system (Combination H) for **$0 / month** using free-tier services.
 
 ---
 
@@ -25,7 +25,7 @@ Render provides a free Web Service tier suitable for FastAPI:
 1. Log in to [render.com](https://render.com) and click **New +** $\rightarrow$ **Web Service**.
 2. Connect your GitHub repository.
 3. Configure the service:
-   - **Name**: `hybrid-rag-backend`
+   - **Name**: `fusion-rag-backend`
    - **Root Directory**: `backend`
    - **Runtime**: `Python 3`
    - **Build Command**:
@@ -43,7 +43,7 @@ Go to the **Environment** tab in your Render Web Service and add:
 
 ```dotenv
 ENV=production
-PROJECT_NAME=Hybrid RAG Chatbot
+PROJECT_NAME=Fusion RAG Chatbot
 API_V1_STR=/api/v1
 
 # Supabase PostgreSQL (Transaction Pooler Port 6543)
@@ -110,7 +110,7 @@ Vercel is the optimal free hosting platform for the frontend.
 3. Set **Root Directory** to `frontend`.
 4. In **Environment Variables**, add:
    ```dotenv
-   VITE_API_BASE_URL=https://hybrid-rag-backend.onrender.com
+   VITE_API_BASE_URL=https://fusion-rag-backend.onrender.com
    ```
    *(or `NEXT_PUBLIC_API_URL` if using Next.js)*.
 5. Click **Deploy**.

@@ -1,7 +1,7 @@
 [project]
-name = "hybrid-rag-backend"
+name = "fusion-rag-backend"
 version = "0.1.0"
-description = "FastAPI Backend for Hybrid RAG Chatbot"
+description = "FastAPI Backend for Fusion RAG Chatbot"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.110.0",

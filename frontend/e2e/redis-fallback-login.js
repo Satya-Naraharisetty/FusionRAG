@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Hybrid RAG — Redis-down GENERAL-limiter fallback + per-endpoint isolation.
+ * Fusion RAG — Redis-down GENERAL-limiter fallback + per-endpoint isolation.
  *
  * Companion to redis-fallback.js. Where that script proves the account-delete
  * limiter's in-memory fallback, this one proves the GENERAL limiter (shared by
@@ -49,7 +49,7 @@
  * Exit code 0 on success, 1 on failure. Env overrides:
  *   API_URL                     default http://localhost:8000
  *   COMPOSE_PROJECT_NAME        compose project of the running stack
- *                               (CI pins `hybrid_rag`)
+ *                               (CI pins `fusion_rag`)
  *   RATE_LIMIT_GENERAL_ALLOWED  rpm+burst budget of the general limiter (70)
  *   RATE_LIMIT_GENERAL_LOWER    floor for the 429 boundary (60)
  *   RATE_LIMIT_BUDGET           per-user delete budget (10)

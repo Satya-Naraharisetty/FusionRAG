@@ -34,7 +34,7 @@ class ResearchAgent(BaseSpecialistAgent):
     """
     Research / Retrieval specialist agent.
     Decomposes research tasks using an internal ResearchPlanner, executes targeted
-    retrieval subqueries concurrently via the existing Hybrid RAG pipeline
+    retrieval subqueries concurrently via the existing Fusion RAG pipeline
     (Qdrant dense + BM25 sparse + RRF fusion + MMR diversity reranking),
     merges and deduplicates evidence with full provenance preservation,
     and returns a structured AgentResult.

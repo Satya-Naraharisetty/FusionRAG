@@ -1,78 +1,62 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover"
-    />
-    <title>Hybrid RAG Chatbot — Enterprise Document QA with Hybrid Retrieval</title>
-    <!-- Primary Meta Tags -->
-    <meta
-      name="title"
-      content="Hybrid RAG Chatbot — Enterprise Document QA with Hybrid Retrieval"
-    />
-    <meta
-      name="description"
-      content="Production-ready Hybrid RAG Chatbot combining dense vector retrieval, BM25 sparse search, cross-encoder reranking, and citation-grounded generation."
-    />
-    <meta
-      name="keywords"
-      content="Hybrid RAG, Retrieval Augmented Generation, Dense Retrieval, BM25 Sparse Search, Cross-Encoder Reranking, Qdrant, FastAPI, React, AI Document QA"
-    />
-    <meta name="author" content="Hybrid RAG Team" />
-    <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="https://hybrid-rag-gilt.vercel.app/" />
 
-    <!-- Brand favicons & PWA Manifest -->
-    <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.svg" />
-    <link rel="icon" type="image/x-icon" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/favicon.svg" />
-    <link rel="manifest" href="/site.webmanifest" />
-    <meta name="theme-color" content="#0b0e14" />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+  <title>NexusRAG — Unified Enterprise Hybrid Retrieval & Document QA</title>
+  <!-- Primary Meta Tags -->
+  <meta name="title" content="NexusRAG — Unified Enterprise Hybrid Retrieval & Document QA" />
+  <meta name="description"
+    content="NexusRAG is a production-ready Fusion RAG platform combining dense vector search, BM25 sparse retrieval, neural cross-encoder reranking, and citation-grounded generation." />
+  <meta name="keywords"
+    content="NexusRAG, Fusion RAG, Retrieval Augmented Generation, Dense Retrieval, BM25 Sparse Search, Cross-Encoder Reranking, Qdrant, FastAPI, React, AI Document QA" />
+  <meta name="author" content="NexusRAG Team" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://fusion-rag-gilt.vercel.app/" />
 
-    <!-- Social preview (Open Graph / Twitter) -->
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Hybrid RAG Chatbot" />
-    <meta property="og:title" content="Hybrid RAG Chatbot — Enterprise Document QA with Hybrid Retrieval" />
-    <meta
-      property="og:description"
-      content="Production-ready Hybrid RAG Chatbot combining dense vector retrieval, BM25 sparse search, cross-encoder reranking, and citation-grounded generation."
-    />
-    <meta property="og:url" content="https://hybrid-rag-gilt.vercel.app/" />
-    <meta property="og:image" content="https://hybrid-rag-gilt.vercel.app/og-image.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta
-      property="og:image:alt"
-      content="Hybrid RAG Chatbot — AI-powered document chat with hybrid retrieval"
-    />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Hybrid RAG Chatbot — Enterprise Document QA with Hybrid Retrieval" />
-    <meta
-      name="twitter:description"
-      content="Production-ready Hybrid RAG Chatbot combining dense vector retrieval, BM25 sparse search, cross-encoder reranking, and citation-grounded generation."
-    />
-    <meta name="twitter:image" content="https://hybrid-rag-gilt.vercel.app/og-image.png" />
+  <!-- Brand favicons & PWA Manifest -->
+  <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.svg" />
+  <link rel="icon" type="image/x-icon" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/favicon.svg" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <meta name="theme-color" content="#0b0e14" />
 
-    <!-- PWA / mobile web app -->
-    <meta name="application-name" content="RAG Chat" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="RAG Chat" />
+  <!-- Social preview (Open Graph / Twitter) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="NexusRAG" />
+  <meta property="og:title" content="NexusRAG — Unified Enterprise Hybrid Retrieval & Document QA" />
+  <meta property="og:description"
+    content="NexusRAG is a production-ready Fusion RAG platform combining dense vector search, BM25 sparse retrieval, neural cross-encoder reranking, and citation-grounded generation." />
+  <meta property="og:url" content="https://fusion-rag-gilt.vercel.app/" />
+  <meta property="og:image" content="https://fusion-rag-gilt.vercel.app/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="NexusRAG — Unified Enterprise Hybrid Retrieval & Document QA" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="NexusRAG — Unified Enterprise Hybrid Retrieval & Document QA" />
+  <meta name="twitter:description"
+    content="NexusRAG is a production-ready Fusion RAG platform combining dense vector search, BM25 sparse retrieval, neural cross-encoder reranking, and citation-grounded generation." />
+  <meta name="twitter:image" content="https://fusion-rag-gilt.vercel.app/og-image.png" />
 
-    <!-- Schema.org Structured Data (JSON-LD) -->
-    <script type="application/ld+json">
+  <!-- PWA / mobile web app -->
+  <meta name="application-name" content="NexusRAG" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="NexusRAG" />
+
+  <!-- Schema.org Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
-        "name": "Hybrid RAG Chatbot",
-        "url": "https://hybrid-rag-gilt.vercel.app/",
+        "name": "NexusRAG",
+        "url": "https://fusion-rag-gilt.vercel.app/",
         "operatingSystem": "Web Browser",
         "applicationCategory": "BusinessApplication",
-        "description": "Production-ready Hybrid RAG platform combining dense embeddings and BM25 sparse search with cross-encoder reranking for verifiable document QA.",
+        "description": "NexusRAG is an enterprise hybrid retrieval platform combining dense vector embeddings and BM25 sparse search with neural cross-encoder reranking for verifiable document QA.",
         "featureList": [
           "Hybrid Dense and BM25 Sparse Search",
           "Reciprocal Rank Fusion (RRF) & Cross-Encoder Reranking",
@@ -88,13 +72,17 @@
       }
     </script>
 
-    <!-- Importing modern Outfit, Space Grotesk, and Inter fonts from Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+  <!-- Importing modern Outfit, Space Grotesk, and Inter fonts from Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>

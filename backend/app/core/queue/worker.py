@@ -254,7 +254,7 @@ class QueueWorker:
             get_tracer,
         )
 
-        tracer = get_tracer("hybrid-rag.worker")
+        tracer = get_tracer("fusion-rag.worker")
         trace_ctx_payload = (
             job.payload.get("_trace_context") if isinstance(job.payload, dict) else None
         )

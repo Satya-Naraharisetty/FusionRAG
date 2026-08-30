@@ -1,6 +1,6 @@
-# Production-Grade Hybrid RAG Chatbot
+# Production-Grade Fusion RAG Chatbot
 
-A high-performance, observable, and modular reference implementation of an enterprise-grade **Hybrid RAG (Retrieval-Augmented Generation) Platform** built with **FastAPI (Python 3.12+)**, **React + Vite + TypeScript**, **PostgreSQL**, **Qdrant**, **Redis 7**, **Jina AI**, and **Google Gemini**.
+A high-performance, observable, and modular reference implementation of an enterprise-grade **Fusion RAG (Retrieval-Augmented Generation) Platform** built with **FastAPI (Python 3.12+)**, **React + Vite + TypeScript**, **PostgreSQL**, **Qdrant**, **Redis 7**, **Jina AI**, and **Google Gemini**.
 
 ---
 
@@ -101,7 +101,7 @@ graph TD
 
 ```bash
 git clone <repository-url>
-cd hybrid_rag
+cd fusion_rag
 
 # Copy environment template
 cp backend/.env.example backend/.env

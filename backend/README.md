@@ -1,6 +1,6 @@
-# Hybrid RAG — Backend Service
+# Fusion RAG — Backend Service
 
-The backend service for the **Hybrid RAG Platform**, built with **Python 3.12+**, **FastAPI**, **SQLAlchemy 2.0 (Async + asyncpg)**, **Pydantic v2**, **Qdrant**, and **Redis 7**.
+The backend service for the **Fusion RAG Platform**, built with **Python 3.12+**, **FastAPI**, **SQLAlchemy 2.0 (Async + asyncpg)**, **Pydantic v2**, **Qdrant**, and **Redis 7**.
 
 ---
 

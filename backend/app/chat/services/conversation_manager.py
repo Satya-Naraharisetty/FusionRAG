@@ -128,7 +128,7 @@ class ConversationManager:
         else:
             from app.core.telemetry import get_tracer
 
-            tracer = get_tracer("hybrid-rag.conversation")
+            tracer = get_tracer("fusion-rag.conversation")
             with tracer.start_as_current_span("llm.query_rewrite") as span:
                 rewrite_result = await self._rewriter.rewrite(question, recent_messages)
                 span.set_attribute("rewrite.applied", rewrite_result.rewrite_applied)
@@ -444,7 +444,7 @@ class ConversationManager:
 
             db_url = os.environ.get(
                 "TEST_DATABASE_URL",
-                "postgresql://postgres:postgres@localhost:5433/hybrid_rag_test",
+                "postgresql://postgres:postgres@localhost:5433/fusion_rag_test",
             )
 
         if not db_url:

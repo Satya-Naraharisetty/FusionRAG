@@ -1,6 +1,6 @@
-# System Architecture Manual - Hybrid RAG Chatbot
+# System Architecture Manual - Fusion RAG Chatbot
 
-This document provides a comprehensive architectural specification of the design, pipelines, workflows, and protocols implemented across the **Hybrid RAG Chatbot** platform.
+This document provides a comprehensive architectural specification of the design, pipelines, workflows, and protocols implemented across the **Fusion RAG Chatbot** platform.
 
 ---
 
@@ -179,7 +179,7 @@ flowchart TD
 
 ## 6. Evaluation Framework & Operational Confidence Governance
 
-To prevent regressions, validate complex agentic workflows, and monitor live operations, Hybrid RAG enforces a formal multi-tier evaluation system:
+To prevent regressions, validate complex agentic workflows, and monitor live operations, Fusion RAG enforces a formal multi-tier evaluation system:
 
 ### Operational Confidence Categories
 1. **Benchmark-Proven**: Offline evaluation over versioned golden datasets (`golden_rag_dataset`, `golden_multi_agent_v1`) measuring exact mathematical properties and quality scores under deterministic execution.

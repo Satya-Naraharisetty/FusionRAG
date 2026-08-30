@@ -1,8 +1,8 @@
-# Hybrid RAG Evaluation & Regression Framework
+# Fusion RAG Evaluation & Regression Framework
 
 ## 1. Operational Confidence Levels
 
-The Hybrid RAG evaluation subsystem avoids equating offline benchmark scores with production readiness by enforcing a rigorous five-category operational confidence model:
+The Fusion RAG evaluation subsystem avoids equating offline benchmark scores with production readiness by enforcing a rigorous five-category operational confidence model:
 
 | Category | Status | Definition & Repository Evidence |
 |---|---|---|

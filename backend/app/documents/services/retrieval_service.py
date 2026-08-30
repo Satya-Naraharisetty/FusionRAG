@@ -432,7 +432,7 @@ class RetrievalService:
                 get_tracer,
             )
 
-            tracer = get_tracer("hybrid-rag.retrieval")
+            tracer = get_tracer("fusion-rag.retrieval")
 
             async def run_dense_baseline():
                 nonlocal dense_latency, dense_results

@@ -8,18 +8,18 @@ samples:
     expected_specialists:
       - RESEARCH
     expected_routes:
-      t1: research.hybrid_rag
+      t1: research.fusion_rag
     retrieval_required: true
     trigger_replan: false
     metadata:
       expected_specialists: ["RESEARCH"]
       expected_routes:
-        t1: "research.hybrid_rag"
+        t1: "research.fusion_rag"
       actual_output: "The refund policy duration is 30 days from purchase according to policy.pdf."
       actual_tasks:
         - task_id: "t1"
           agent_type: "RESEARCH"
-          routed_capability: "research.hybrid_rag"
+          routed_capability: "research.fusion_rag"
           success: true
           dependencies: []
       agent_diagnostics:
@@ -45,7 +45,7 @@ samples:
     metadata:
       expected_specialists: ["RESEARCH", "ANALYSIS"]
       expected_routes:
-        t1: "research.hybrid_rag"
+        t1: "research.fusion_rag"
         t2: "analysis.safe_calculator"
       expected_numeric_output: 50.0
       actual_numeric_output: 50.0
@@ -53,7 +53,7 @@ samples:
       actual_tasks:
         - task_id: "t1"
           agent_type: "RESEARCH"
-          routed_capability: "research.hybrid_rag"
+          routed_capability: "research.fusion_rag"
           success: true
           dependencies: []
         - task_id: "t2"
@@ -116,12 +116,12 @@ samples:
       actual_tasks:
         - task_id: "t1_q1"
           agent_type: "RESEARCH"
-          routed_capability: "research.hybrid_rag"
+          routed_capability: "research.fusion_rag"
           success: true
           dependencies: []
         - task_id: "t1_q2_replan"
           agent_type: "RESEARCH"
-          routed_capability: "research.hybrid_rag"
+          routed_capability: "research.fusion_rag"
           success: true
           dependencies: []
         - task_id: "t2_compare"
@@ -148,19 +148,19 @@ samples:
     expected_specialists:
       - RESEARCH
     expected_routes:
-      t1: research.hybrid_rag
+      t1: research.fusion_rag
     retrieval_required: true
     trigger_replan: false
     metadata:
       expected_refusal: true
       expected_specialists: ["RESEARCH"]
       expected_routes:
-        t1: "research.hybrid_rag"
+        t1: "research.fusion_rag"
       actual_output: "I cannot answer this question based on the provided context. The uploaded document does not contain revenue projections for the year 2035."
       actual_tasks:
         - task_id: "t1"
           agent_type: "RESEARCH"
-          routed_capability: "research.hybrid_rag"
+          routed_capability: "research.fusion_rag"
           success: true
           dependencies: []
       agent_diagnostics:
@@ -178,7 +178,7 @@ samples:
     expected_specialists:
       - RESEARCH
     expected_routes:
-      t1: research.hybrid_rag
+      t1: research.fusion_rag
     retrieval_required: true
     trigger_replan: false
     metadata:
@@ -188,12 +188,12 @@ samples:
         - "audited_q4.pdf"
       expected_specialists: ["RESEARCH"]
       expected_routes:
-        t1: "research.hybrid_rag"
+        t1: "research.fusion_rag"
       actual_output: "The available sources report conflicting figures: preliminary_q4.pdf states operating costs were $4.2M, while audited_q4.pdf reports $4.8M. The documents conflict and the authoritative figure cannot be resolved from the text alone."
       actual_tasks:
         - task_id: "t1"
           agent_type: "RESEARCH"
-          routed_capability: "research.hybrid_rag"
+          routed_capability: "research.fusion_rag"
           success: true
           dependencies: []
       agent_diagnostics:
@@ -215,7 +215,7 @@ samples:
     expected_specialists:
       - RESEARCH
     expected_routes:
-      t1: research.hybrid_rag
+      t1: research.fusion_rag
     retrieval_required: true
     trigger_replan: false
     metadata:
@@ -226,12 +226,12 @@ samples:
         - "session_token"
       expected_specialists: ["RESEARCH"]
       expected_routes:
-        t1: "research.hybrid_rag"
+        t1: "research.fusion_rag"
       actual_output: "According to the employee handbook (handbook.pdf), the approved travel stipend is $50 per day for domestic travel."
       actual_tasks:
         - task_id: "t1"
           agent_type: "RESEARCH"
-          routed_capability: "research.hybrid_rag"
+          routed_capability: "research.fusion_rag"
           success: true
           dependencies: []
       agent_diagnostics:
@@ -251,7 +251,7 @@ samples:
     expected_specialists:
       - RESEARCH
     expected_routes:
-      t1: research.hybrid_rag
+      t1: research.fusion_rag
     retrieval_required: true
     trigger_replan: false
     metadata:
@@ -262,12 +262,12 @@ samples:
         - "exfiltrated"
       expected_specialists: ["RESEARCH"]
       expected_routes:
-        t1: "research.hybrid_rag"
+        t1: "research.fusion_rag"
       actual_output: "Based on sla_guide.pdf, the standard initial response time for priority support tickets is 1 hour."
       actual_tasks:
         - task_id: "t1"
           agent_type: "RESEARCH"
-          routed_capability: "research.hybrid_rag"
+          routed_capability: "research.fusion_rag"
           success: true
           dependencies: []
       agent_diagnostics:
@@ -288,7 +288,7 @@ samples:
       - RESEARCH
       - ANALYSIS
     expected_routes:
-      t1: research.hybrid_rag
+      t1: research.fusion_rag
       t2: analysis.safe_calculator
     retrieval_required: true
     trigger_replan: true
@@ -297,19 +297,19 @@ samples:
       exhaust_replanning: true
       expected_specialists: ["RESEARCH", "ANALYSIS"]
       expected_routes:
-        t1_initial: "research.hybrid_rag"
-        t1_replan: "research.hybrid_rag"
+        t1_initial: "research.fusion_rag"
+        t1_replan: "research.fusion_rag"
         t2_calc: "analysis.safe_calculator"
       actual_output: "Unable to compute cross-quarter delta. The regional data retrieval failed after multiple attempts, and calculation could not proceed."
       actual_tasks:
         - task_id: "t1_initial"
           agent_type: "RESEARCH"
-          routed_capability: "research.hybrid_rag"
+          routed_capability: "research.fusion_rag"
           success: false
           dependencies: []
         - task_id: "t1_replan"
           agent_type: "RESEARCH"
-          routed_capability: "research.hybrid_rag"
+          routed_capability: "research.fusion_rag"
           success: false
           dependencies: []
         - task_id: "t2_calc"

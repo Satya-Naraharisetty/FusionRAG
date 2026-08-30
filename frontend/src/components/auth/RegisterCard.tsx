@@ -49,7 +49,7 @@ export const RegisterCard: React.FC<RegisterCardProps> = ({
       {/* Brand mark */}
       <div className="flex flex-col items-center mb-8">
         <div className="mb-4 flex h-12 w-12 select-none items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-lg font-bold text-[var(--text-primary)] shadow-sm">
-          H
+          N
         </div>
         <h1 className="mb-1.5 text-2xl font-bold tracking-tight text-[var(--text-primary)]">
           Create account

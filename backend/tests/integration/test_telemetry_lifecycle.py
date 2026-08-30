@@ -138,7 +138,7 @@ class TestRAGRequestTelemetry:
         )._value.get()
 
         resp = await orchestrator.generate_answer(
-            question="What is Hybrid RAG?",
+            question="What is Fusion RAG?",
             user_id=user_id,
             top_k=3,
             conversation_id=conv_id,

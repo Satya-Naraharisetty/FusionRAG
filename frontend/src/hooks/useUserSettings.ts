@@ -9,7 +9,7 @@ import {
 import { useEffect, useMemo } from "react";
 
 const USER_SETTINGS_QUERY_KEY = "user-settings";
-const SYNC_CHANNEL_NAME = "hybrid_rag_user_sync";
+const SYNC_CHANNEL_NAME = "fusion_rag_user_sync";
 
 export const useUserSettings = () => {
   const { user, isAuthenticated } = useAuth();

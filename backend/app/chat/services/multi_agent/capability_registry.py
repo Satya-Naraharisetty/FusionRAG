@@ -95,7 +95,7 @@ def create_default_capability_registry() -> CapabilityRegistry:
     """
     default_descriptors = [
         CapabilityDescriptor(
-            capability_id="research.hybrid_rag",
+            capability_id="research.fusion_rag",
             capability_type=CapabilityType.RESEARCH,
             description="Performs hybrid dense and sparse search over indexed knowledge base chunks.",
             supported_operations=["semantic_search", "hybrid_search"],
