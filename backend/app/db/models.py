@@ -10,7 +10,7 @@ foreign keys from the documents tables.
 
 from app.auth.infrastructure.persistence import models as _auth_models  # noqa: F401
 from app.chat.infrastructure.persistence import models as _chat_models  # noqa: F401
-from app.db.session import Base
+from app.db.base import Base
 from app.documents.infrastructure.persistence import (
     models as _document_models,  # noqa: F401
 )

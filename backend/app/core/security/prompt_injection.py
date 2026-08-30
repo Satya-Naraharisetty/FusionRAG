@@ -1,5 +1,9 @@
 import logging
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.core.security.intent_classifier import IntentClassifier
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +64,34 @@ class PromptInjectionScanner:
                         "pattern_matched": pattern.pattern,
                     },
                 )
+                raise PromptInjectionError(
+                    "Potential prompt injection or safety override detected."
+                )
+
+    @classmethod
+    async def scan_with_intent(
+        cls,
+        prompt: str,
+        intent_classifier: "IntentClassifier | None" = None,
+    ) -> None:
+        """
+        Full two-layer prompt safety scan.
+
+        Layer 1 (sync): Fast regex pattern matching — catches known jailbreak strings.
+        Layer 2 (async): LLM intent classification — catches novel/obfuscated attacks.
+
+        Raises PromptInjectionError if either layer fires.
+        The intent classifier is skipped when None (e.g. ENABLE_INTENT_GUARDRAILS=False).
+        """
+        # Layer 1 — synchronous, ~0.1ms
+        cls.scan_prompt(prompt)
+
+        # Layer 2 — async LLM call, ~200ms, timeout-bounded, fail-open
+        if intent_classifier is not None:
+            from app.core.security.intent_classifier import PromptIntent
+
+            intent = await intent_classifier.classify(prompt)
+            if intent == PromptIntent.UNSAFE:
                 raise PromptInjectionError(
                     "Potential prompt injection or safety override detected."
                 )

@@ -109,16 +109,6 @@ class Settings(BaseSettings):
     EMBEDDING_BATCH_SIZE: int = 32
     EMBEDDING_VERSION: str = "v1"
 
-    @property
-    def effective_embedding_dimension(self) -> int:
-        """Return the configured embedding dimension."""
-        return self.EMBEDDING_DIMENSION
-
-    @property
-    def effective_embedding_model(self) -> str:
-        """Return the configured embedding model."""
-        return self.EMBEDDING_MODEL
-
     # CORS Configurations
     # NoDecode disables pydantic-settings' eager JSON decoding so that both
     # comma-separated ("http://a,http://b") and JSON-array values are handled
@@ -141,7 +131,9 @@ class Settings(BaseSettings):
         # Legacy / alternate local ports
         "http://localhost:8080",
     ]
-    BACKEND_CORS_ORIGIN_REGEX: str | None = r"https://.*\.vercel\.app"
+    BACKEND_CORS_ORIGIN_REGEX: str | None = (
+        r"https://(.*\.vercel\.app|.*\.onrender\.com)"
+    )
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
@@ -180,6 +172,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     COOKIE_NAME: str = "refresh_token"
+    ACCESS_TOKEN_COOKIE_NAME: str = (
+        "access_token"  # HttpOnly cookie for the short-lived access token
+    )
     COOKIE_DOMAIN: str | None = None
     COOKIE_PATH: str = "/api/v1/auth"
     COOKIE_SECURE: bool = True
@@ -512,6 +507,7 @@ class Settings(BaseSettings):
     ENABLE_DISTRIBUTED_LOCKS: bool = True
     ENABLE_RATE_LIMITER: bool = True
     ENABLE_RESOURCE_QUOTAS: bool = True
+    ENABLE_INTENT_GUARDRAILS: bool = False
 
     INDEX_CACHE_MAX_USERS: int = 500
     CLEANUP_RECOVERY_BATCH_SIZE: int = 20

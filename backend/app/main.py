@@ -3,20 +3,15 @@ import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import FastAPI, Request, Response, status
-from fastapi.encoders import jsonable_encoder
-from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy.sql import text
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.api.exception_handlers import register_exception_handlers
 from app.api.v1.admin import router as admin_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.chat import router as chat_router
@@ -27,29 +22,9 @@ from app.api.v1.health import router as health_router
 from app.api.v1.observability import router as observability_router
 from app.api.v1.search import router as search_router
 from app.api.v1.user_settings import router as user_settings_router
-from app.auth.domain.exceptions import (
-    AccountDisabledException,
-    DuplicateAccountException,
-    EmailNotVerifiedException,
-    ExpiredVerificationTokenException,
-    InvalidCredentialsException,
-    InvalidSessionException,
-    InvalidVerificationTokenException,
-    MaxVerificationAttemptsException,
-    UserNotFoundException,
-)
 from app.auth.infrastructure.crypto.token_provider import JWTTokenProvider
-from app.chat.domain.exceptions import (
-    LLMProviderError,
-    NoRelevantContext,
-    PromptTooLarge,
-    StreamingCancelled,
-    TokenBudgetExceeded,
-)
-from app.core.config import ConfigurationError, settings
+from app.core.config import settings
 from app.core.context.request_context import RequestContext, current_request_context
-
-# Run centralized logging configuration setup before other imports
 from app.core.logger import (
     client_ip_ctx,
     request_duration_ctx,
@@ -59,192 +34,16 @@ from app.core.logger import (
     request_status_ctx,
     setup_logging,
 )
-from app.core.security import PromptInjectionError
-
-# Register every ORM model on Base.metadata at import time.
-# Without this, the chat tables (conversations, conversation_messages,
-# conversation_summaries) referenced by the documents.conversation_id FK
-# are missing and any Document flush crashes with NoReferencedTableError.
-from app.db.models import Base  # noqa: F401  (side-effect: full model registration)
-from app.documents.domain.exceptions import (
-    DocumentCorrupted,
-    DocumentExtractionFailed,
-    DocumentNotFound,
-    DocumentProcessingInProgressException,
-    DocumentTooLarge,
-    DuplicateDocumentException,
-    InvalidStateTransitionException,
-    UnauthorizedDocumentAccess,
-    UnsupportedDocumentType,
+from app.core.startup import (
+    run_startup_validations,
+    seed_admin_user,
+    verify_alembic_migrations,
+    verify_postgres_connectivity,
 )
+from app.db.models import Base  # noqa: F401  (side-effect: full model registration)
 
 setup_logging(settings.LOG_FORMAT, settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
-
-# 1. Startup validations
-
-
-def run_startup_validations() -> None:
-    """
-    Validates that required system settings are non-empty and well-formed.
-    """
-    logger.info("Auditing environment settings configurations...")
-
-    # Validate core infrastructure parameters
-    infra_vars: dict[str, str | None] = {
-        "JWT_SECRET": settings.JWT_SECRET,
-    }
-    if settings.is_production:
-        infra_vars["ENCRYPTION_MASTER_KEY"] = getattr(
-            settings, "ENCRYPTION_MASTER_KEY", None
-        )
-    if not settings.DATABASE_URL:
-        infra_vars["POSTGRES_SERVER"] = settings.POSTGRES_SERVER
-        infra_vars["POSTGRES_DB"] = settings.POSTGRES_DB
-
-    # Dynamically validate S3 settings if storage provider is S3
-    if settings.STORAGE_PROVIDER.lower() == "s3":
-        infra_vars["S3_BUCKET"] = getattr(settings, "S3_BUCKET", None)
-
-    empty_infra = [k for k, v in infra_vars.items() if not v or not str(v).strip()]
-
-    # On Vercel serverless, skip presence checks for Redis and Qdrant — these
-    # services are validated lazily at first use and their absence at boot
-    # must not prevent the ASGI app from starting (which would also suppress
-    # all CORS headers and present as a CORS error in the browser).
-    import os as _os
-
-    if _os.getenv("VERCEL") != "1":
-        # Validate Redis config
-        if not settings.REDIS_URL and not settings.REDIS_HOST:
-            empty_infra.append("REDIS_HOST or REDIS_URL")
-
-        # Validate Qdrant config
-        if not settings.QDRANT_URL and not settings.QDRANT_HOST:
-            empty_infra.append("QDRANT_HOST or QDRANT_URL")
-
-    if empty_infra:
-        raise ConfigurationError(
-            f"Startup aborted due to empty required infrastructure parameters: "
-            f"{', '.join(empty_infra)}"
-        )
-
-    # Validate API keys based on configured providers
-    key_vars: dict[str, str | None] = {
-        "GEMINI_FALLBACK_API_KEY": settings.get_gemini_fallback_api_key()
-        or settings.GEMINI_LLM_API_KEY
-    }
-
-    empty_keys = [k for k, v in key_vars.items() if not v or not str(v).strip()]
-    if empty_keys:
-        msg = f"Empty required API key parameters: {', '.join(empty_keys)}"
-        # On Vercel the app must boot so CORS preflight responses are served;
-        # missing keys are downgraded to a warning and calls will fail at
-        # request time rather than silently blocking all cross-origin requests.
-        if settings.is_production and _os.getenv("VERCEL") != "1":
-            raise ConfigurationError(f"Startup aborted due to: {msg}")
-        else:
-            logger.warning(
-                f"{msg}. This is allowed in development mode, but LLM or cloud embedding calls will fail."
-            )
-
-
-async def verify_postgres_connectivity(engine) -> None:
-    """
-    Verifies that the PostgreSQL database container is online and accepting connections.
-    """
-    import os
-
-    if (
-        settings.is_testing
-        or os.getenv("VERCEL") == "1"
-        or type(engine).__name__ in ("MagicMock", "Mock")
-    ):
-        logger.info("Skipping PostgreSQL connectivity check.")
-        return
-
-    logger.info("Testing PostgreSQL connection readiness...")
-    for attempt in range(1, 6):
-        try:
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
-            logger.info("PostgreSQL database connection verified.")
-            return
-        except Exception as e:
-            logger.warning(
-                f"PostgreSQL connection verification attempt {attempt}/5 failed: {e}. "
-                "Retrying in 2.0 seconds..."
-            )
-            if attempt < 5:
-                await asyncio.sleep(2.0)
-
-    raise ConfigurationError("PostgreSQL database connection could not be established.")
-
-
-async def verify_alembic_migrations(engine) -> None:
-    """
-    Verifies that the database schema is up-to-date with the latest Alembic migration.
-    Fails startup if it isn't.
-    """
-    import os
-
-    if (
-        settings.is_testing
-        or os.getenv("VERCEL") == "1"
-        or os.getenv("SKIP_DB_MIGRATION_CHECK", "false").lower() in ("true", "1", "yes")
-        or type(engine).__name__ in ("MagicMock", "Mock")
-    ):
-        logger.info("Skipping database migration check.")
-        return
-
-    logger.info("Verifying database schema migrations are up-to-date...")
-    from alembic.config import Config
-    from alembic.runtime.migration import MigrationContext
-    from alembic.script import ScriptDirectory
-
-    try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        ini_path = os.path.join(base_dir, "alembic.ini")
-        if not os.path.exists(ini_path):
-            logger.warning(
-                f"Alembic config not found at {ini_path}. Skipping migration check."
-            )
-            return
-
-        config = Config(ini_path)
-        script = ScriptDirectory.from_config(config)
-        head_revision = script.get_current_head()
-
-        if not head_revision:
-            logger.info("No migrations defined. Skipping migration check.")
-            return
-    except Exception as e:
-        logger.warning(
-            f"Could not load Alembic config or migrations: {e}. Skipping check."
-        )
-        return
-
-    def get_revision(conn):
-        context = MigrationContext.configure(conn)
-        return context.get_current_revision()
-
-    try:
-        async with engine.connect() as conn:
-            current_revision = await conn.run_sync(get_revision)
-    except Exception as e:
-        raise ConfigurationError(
-            f"Database migrations check failed. Unable to read current revision: {e}"
-        ) from e
-
-    logger.info(
-        f"Database migration check: DB revision={current_revision}, Code head revision={head_revision}"
-    )
-    if current_revision != head_revision:
-        raise ConfigurationError(
-            f"Database schema is out of date. Current DB revision: {current_revision}, "
-            f"Latest application migration head: {head_revision}. "
-            "Please run migrations using scripts/migrate.sh."
-        )
 
 
 # 2. Lifespan context manager
@@ -288,64 +87,7 @@ async def lifespan(app: FastAPI):
         )
 
         # Seed and enforce single default admin user from environment settings if configured
-        if not settings.is_testing and settings.ADMIN_EMAIL and settings.ADMIN_PASSWORD:
-            logger.info("Enforcing single default admin account seeding...")
-            async with app.state.db_session_factory() as db_session:
-                try:
-                    from sqlalchemy import select, update
-
-                    from app.auth.infrastructure.crypto.password_hasher import (
-                        Argon2PasswordHasher,
-                    )
-                    from app.auth.infrastructure.persistence.models import (
-                        SQLAlchemyUser,
-                    )
-
-                    email = settings.ADMIN_EMAIL.strip().lower()
-
-                    # 1. Demote any other admin users to "user" to maintain single admin constraint
-                    await db_session.execute(
-                        update(SQLAlchemyUser)
-                        .where(
-                            SQLAlchemyUser.role == "admin",
-                            SQLAlchemyUser.email != email,
-                        )
-                        .values(role="user")
-                    )
-
-                    # 2. Check if the configured admin user exists
-                    existing_admin_res = await db_session.execute(
-                        select(SQLAlchemyUser).where(SQLAlchemyUser.email == email)
-                    )
-                    existing_admin = existing_admin_res.scalar_one_or_none()
-
-                    if not existing_admin:
-                        hasher = Argon2PasswordHasher()
-                        hashed_pwd = hasher.hash(settings.ADMIN_PASSWORD)
-                        new_admin = SQLAlchemyUser(
-                            id=uuid.uuid4(),
-                            email=email,
-                            hashed_password=hashed_pwd,
-                            role="admin",
-                            is_active=True,
-                            created_at=datetime.now(UTC),
-                            updated_at=datetime.now(UTC),
-                        )
-                        db_session.add(new_admin)
-                        logger.info(
-                            f"Successfully seeded default admin account: {email}"
-                        )
-                    else:
-                        if existing_admin.role != "admin":
-                            existing_admin.role = "admin"
-                            logger.info(
-                                f"Successfully promoted existing user {email} to admin."
-                            )
-
-                    await db_session.commit()
-                except Exception as e:
-                    logger.error(f"Failed to seed/enforce default admin account: {e}")
-                    await db_session.rollback()
+        await seed_admin_user(app.state.db_session_factory)
 
         app.state.redis = init_redis_client(
             host=settings.REDIS_HOST,
@@ -449,8 +191,8 @@ async def lifespan(app: FastAPI):
                 vector_store=get_vector_store,
                 batch_size=settings.EMBEDDING_BATCH_SIZE,
                 provider_name=settings.EMBEDDING_PROVIDER,
-                model_name=settings.effective_embedding_model,
-                dimension=settings.effective_embedding_dimension,
+                model_name=settings.EMBEDDING_MODEL,
+                dimension=settings.EMBEDDING_DIMENSION,
                 embedding_version=settings.EMBEDDING_VERSION,
             ),
         )
@@ -809,327 +551,7 @@ app.add_middleware(
 # 4. Global exception handlers
 
 
-def format_error_response(
-    code: str, message: str, details: Any = None, status_code: int = 500
-) -> JSONResponse:
-    req_id = request_id_ctx.get() or "N/A"
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "error": {
-                "code": code,
-                "message": message,
-                "details": details or {},
-                "request_id": req_id,
-                "timestamp": datetime.now(UTC).isoformat(),
-            }
-        },
-    )
-
-
-@app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(_request: Request, exc: StarletteHTTPException):
-    return format_error_response(
-        code="HTTP_ERROR", message=exc.detail, status_code=exc.status_code
-    )
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(_request: Request, exc: RequestValidationError):
-    return format_error_response(
-        code="VALIDATION_ERROR",
-        message="Request parameters or body payload failed schema validations.",
-        details=jsonable_encoder(exc.errors()),
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-    )
-
-
-@app.exception_handler(ValidationError)
-async def pydantic_validation_exception_handler(
-    _request: Request, exc: ValidationError
-):
-    return format_error_response(
-        code="VALIDATION_ERROR",
-        message="Data validation checks failed.",
-        details=jsonable_encoder(exc.errors()),
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-    )
-
-
-@app.exception_handler(DuplicateAccountException)
-async def duplicate_account_exception_handler(
-    _request: Request, exc: DuplicateAccountException
-):
-    logger.info("Registration rejected: email already registered")
-    return format_error_response(
-        code="DUPLICATE_ACCOUNT",
-        message="An account with this email address already exists.",
-        status_code=status.HTTP_400_BAD_REQUEST,
-    )
-
-
-@app.exception_handler(InvalidCredentialsException)
-async def invalid_credentials_exception_handler(
-    _request: Request, exc: InvalidCredentialsException
-):
-    logger.info(f"Failed authentication: {exc}")
-    return format_error_response(
-        code="INVALID_CREDENTIALS",
-        message="Invalid email or password.",
-        status_code=status.HTTP_401_UNAUTHORIZED,
-    )
-
-
-@app.exception_handler(AccountDisabledException)
-async def account_disabled_exception_handler(
-    _request: Request, exc: AccountDisabledException
-):
-    logger.info("Action blocked: account has been deactivated.")
-    return format_error_response(
-        code="ACCOUNT_DISABLED",
-        message="Account has been deactivated.",
-        status_code=status.HTTP_401_UNAUTHORIZED,
-    )
-
-
-@app.exception_handler(UserNotFoundException)
-async def user_not_found_exception_handler(
-    _request: Request, exc: UserNotFoundException
-):
-    logger.info(f"Account operation rejected: {exc}")
-    return format_error_response(
-        code="USER_NOT_FOUND",
-        message="User account no longer exists.",
-        status_code=status.HTTP_404_NOT_FOUND,
-    )
-
-
-@app.exception_handler(EmailNotVerifiedException)
-async def email_not_verified_exception_handler(
-    _request: Request, exc: EmailNotVerifiedException
-):
-    logger.info(f"Authentication blocked: email unverified ({exc})")
-    return format_error_response(
-        code="EMAIL_NOT_VERIFIED",
-        message=str(exc) or "Please verify your email address before logging in.",
-        status_code=status.HTTP_403_FORBIDDEN,
-    )
-
-
-@app.exception_handler(InvalidVerificationTokenException)
-async def invalid_verification_token_exception_handler(
-    _request: Request, exc: InvalidVerificationTokenException
-):
-    logger.info(f"Verification rejected: {exc}")
-    return format_error_response(
-        code="INVALID_VERIFICATION_TOKEN",
-        message=str(exc) or "Invalid verification code or link.",
-        status_code=status.HTTP_400_BAD_REQUEST,
-    )
-
-
-@app.exception_handler(ExpiredVerificationTokenException)
-async def expired_verification_token_exception_handler(
-    _request: Request, exc: ExpiredVerificationTokenException
-):
-    logger.info(f"Verification expired: {exc}")
-    return format_error_response(
-        code="EXPIRED_VERIFICATION_TOKEN",
-        message=str(exc) or "Verification code has expired. Please request a new one.",
-        status_code=status.HTTP_400_BAD_REQUEST,
-    )
-
-
-@app.exception_handler(MaxVerificationAttemptsException)
-async def max_verification_attempts_exception_handler(
-    _request: Request, exc: MaxVerificationAttemptsException
-):
-    logger.warning(f"Verification rate limit reached: {exc}")
-    return format_error_response(
-        code="MAX_VERIFICATION_ATTEMPTS",
-        message=str(exc)
-        or "Too many failed attempts. Please request a new verification code.",
-        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-    )
-
-
-@app.exception_handler(InvalidSessionException)
-async def invalid_session_exception_handler(
-    _request: Request, exc: InvalidSessionException
-):
-    logger.info(f"Session validation rejected: {exc}")
-    response = format_error_response(
-        code="INVALID_SESSION",
-        message="Session is invalid, expired, or has been revoked.",
-        status_code=status.HTTP_401_UNAUTHORIZED,
-    )
-    response.delete_cookie(
-        key=settings.COOKIE_NAME,
-        path=settings.COOKIE_PATH,
-        domain=settings.COOKIE_DOMAIN,
-        secure=settings.COOKIE_SECURE,
-        httponly=True,
-        samesite=settings.COOKIE_SAMESITE,
-    )
-    return response
-
-
-@app.exception_handler(UnsupportedDocumentType)
-async def unsupported_document_type_handler(
-    _request: Request, exc: UnsupportedDocumentType
-):
-    return format_error_response(
-        code="UNSUPPORTED_DOCUMENT_TYPE",
-        message=str(exc),
-        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-    )
-
-
-@app.exception_handler(DocumentTooLarge)
-async def document_too_large_handler(_request: Request, exc: DocumentTooLarge):
-    return format_error_response(
-        code="DOCUMENT_TOO_LARGE",
-        message=str(exc),
-        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-    )
-
-
-@app.exception_handler(DocumentNotFound)
-async def document_not_found_handler(_request: Request, exc: DocumentNotFound):
-    return format_error_response(
-        code="DOCUMENT_NOT_FOUND",
-        message=str(exc),
-        status_code=status.HTTP_404_NOT_FOUND,
-    )
-
-
-@app.exception_handler(UnauthorizedDocumentAccess)
-async def unauthorized_document_access_handler(
-    _request: Request, exc: UnauthorizedDocumentAccess
-):
-    return format_error_response(
-        code="UNAUTHORIZED_DOCUMENT_ACCESS",
-        message=str(exc),
-        status_code=status.HTTP_403_FORBIDDEN,
-    )
-
-
-@app.exception_handler(DuplicateDocumentException)
-async def duplicate_document_exception_handler(
-    _request: Request, exc: DuplicateDocumentException
-):
-    return format_error_response(
-        code="DUPLICATE_DOCUMENT",
-        message=str(exc),
-        status_code=status.HTTP_400_BAD_REQUEST,
-    )
-
-
-@app.exception_handler(DocumentCorrupted)
-async def document_corrupted_handler(_request: Request, exc: DocumentCorrupted):
-    return format_error_response(
-        code="DOCUMENT_CORRUPTED",
-        message=str(exc),
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-    )
-
-
-@app.exception_handler(DocumentExtractionFailed)
-async def document_extraction_failed_handler(
-    _request: Request, exc: DocumentExtractionFailed
-):
-    return format_error_response(
-        code="DOCUMENT_EXTRACTION_FAILED",
-        message=str(exc),
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    )
-
-
-@app.exception_handler(InvalidStateTransitionException)
-async def invalid_state_transition_handler(
-    _request: Request, exc: InvalidStateTransitionException
-):
-    return format_error_response(
-        code="INVALID_STATE_TRANSITION",
-        message=str(exc),
-        status_code=status.HTTP_400_BAD_REQUEST,
-    )
-
-
-@app.exception_handler(DocumentProcessingInProgressException)
-async def document_processing_in_progress_handler(
-    _request: Request, exc: DocumentProcessingInProgressException
-):
-    return format_error_response(
-        code="DOCUMENT_PROCESSING_IN_PROGRESS",
-        message=str(exc),
-        status_code=status.HTTP_409_CONFLICT,
-    )
-
-
-@app.exception_handler(NoRelevantContext)
-async def no_relevant_context_handler(_request: Request, exc: NoRelevantContext):
-    return format_error_response(
-        code="NO_RELEVANT_CONTEXT",
-        message=str(exc),
-        status_code=status.HTTP_404_NOT_FOUND,
-    )
-
-
-@app.exception_handler(LLMProviderError)
-async def llm_provider_error_handler(_request: Request, exc: LLMProviderError):
-    return format_error_response(
-        code="LLM_PROVIDER_ERROR",
-        message=str(exc),
-        status_code=status.HTTP_502_BAD_GATEWAY,
-    )
-
-
-@app.exception_handler(PromptTooLarge)
-async def prompt_too_large_handler(_request: Request, exc: PromptTooLarge):
-    return format_error_response(
-        code="PROMPT_TOO_LARGE",
-        message=str(exc),
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-    )
-
-
-@app.exception_handler(TokenBudgetExceeded)
-async def token_budget_exceeded_handler(_request: Request, exc: TokenBudgetExceeded):
-    return format_error_response(
-        code="TOKEN_BUDGET_EXCEEDED",
-        message=str(exc),
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-    )
-
-
-@app.exception_handler(StreamingCancelled)
-async def streaming_cancelled_handler(_request: Request, exc: StreamingCancelled):
-    logger.info("Streaming client disconnected gracefully.")
-    return format_error_response(
-        code="STREAMING_CANCELLED",
-        message=str(exc),
-        status_code=499,
-    )
-
-
-@app.exception_handler(PromptInjectionError)
-async def prompt_injection_handler(_request: Request, exc: PromptInjectionError):
-    return format_error_response(
-        code="PROMPT_INJECTION_DETECTED",
-        message=str(exc),
-        status_code=status.HTTP_400_BAD_REQUEST,
-    )
-
-
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(_request: Request, exc: Exception):
-    logger.error(f"Unhandled system crash: {exc}", exc_info=True)
-    return format_error_response(
-        code="INTERNAL_SERVER_ERROR",
-        message="An unexpected system error occurred.",
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    )
+register_exception_handlers(app)
 
 
 app.include_router(health_router, prefix=settings.API_V1_STR, tags=["Health"])

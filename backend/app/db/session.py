@@ -4,18 +4,8 @@ import redis.asyncio as async_redis
 from fastapi import Request
 from qdrant_client import AsyncQdrantClient
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
 
-from app.core.config import settings
-
-
-class Base(DeclarativeBase):
-    """
-    Central declarative base class for all SQLAlchemy ORM models.
-    """
-
-    pass
-
+from app.db.base import Base  # noqa: F401
 
 # Dependency Injection Provider Functions
 
@@ -37,22 +27,24 @@ async def get_db(request: Request):
 
 def get_redis(request: Request) -> async_redis.Redis:
     """
-    FastAPI dependency injection provider to retrieve the lifespan-managed Redis client.
+    FastAPI dependency injection provider to retrieve Redis client.
+    Fetches the redis client initialized in lifespan from request app state.
     """
-    redis_client = getattr(request.app.state, "redis", None)
-    if redis_client is None:
+    redis = getattr(request.app.state, "redis", None)
+    if redis is None:
         raise RuntimeError("Redis client is not initialized in application state.")
-    return redis_client
+    return redis
 
 
 def get_qdrant(request: Request) -> AsyncQdrantClient:
     """
-    FastAPI DI provider to retrieve the lifespan-managed Qdrant client.
+    FastAPI dependency injection provider to retrieve Qdrant client.
+    Fetches the qdrant client initialized in lifespan from request app state.
     """
-    qdrant_client = getattr(request.app.state, "qdrant", None)
-    if qdrant_client is None:
+    qdrant = getattr(request.app.state, "qdrant", None)
+    if qdrant is None:
         raise RuntimeError("Qdrant client is not initialized in application state.")
-    return qdrant_client
+    return qdrant
 
 
 # Client Initialization Helper Functions
@@ -60,22 +52,23 @@ def get_qdrant(request: Request) -> AsyncQdrantClient:
 
 def init_postgres_engine(database_url: str) -> AsyncEngine:
     """
-    Instantiates an async database engine with connection pooling parameters.
+    Instantiates the Async SQLAlchemy PostgreSQL database engine with connection pooling and timeouts.
     """
-    engine_kwargs: dict[str, Any] = {
-        "pool_pre_ping": True,
-        "pool_size": settings.DATABASE_POOL_SIZE,
-        "max_overflow": settings.DATABASE_MAX_OVERFLOW,
-    }
-
-    # Normalize url scheme to postgresql+asyncpg
+    # Force use of asyncpg driver
     if database_url.startswith("postgresql://"):
         database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    elif database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
 
-    # Strip pgbouncer query parameter as psycopg2/asyncpg doesn't support it
-    if database_url and "pgbouncer=" in database_url.lower():
+    engine_kwargs: dict[str, Any] = {
+        "pool_size": 20,
+        "max_overflow": 10,
+        "pool_timeout": 30.0,
+        "pool_recycle": 1800,
+        "pool_pre_ping": True,
+        "echo": False,
+    }
+
+    # Handle PgBouncer/Supabase session mode
+    if "pgbouncer=true" in database_url.lower():
         from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
         parsed = urlparse(database_url)
@@ -88,9 +81,6 @@ def init_postgres_engine(database_url: str) -> AsyncEngine:
     return create_async_engine(database_url, **engine_kwargs)
 
 
-_redis_pool = None
-
-
 def init_redis_client(
     host: str | None = None,
     port: int | None = None,
@@ -101,31 +91,27 @@ def init_redis_client(
     """
     Instantiates the Redis key-value cache client connection pool or from a connection URL.
     """
-    global _redis_pool
-    if _redis_pool is None:
-        if url:
-            _redis_pool = async_redis.ConnectionPool.from_url(
-                url,
-                decode_responses=True,
-                socket_timeout=3.0,
-                socket_connect_timeout=3.0,
-                max_connections=50,
-            )
-        else:
-            connection_class = (
-                async_redis.SSLConnection if ssl else async_redis.Connection
-            )
-            _redis_pool = async_redis.ConnectionPool(
-                host=host or "localhost",
-                port=port or 6379,
-                password=password,
-                connection_class=connection_class,
-                decode_responses=True,
-                socket_timeout=3.0,
-                socket_connect_timeout=3.0,
-                max_connections=50,  # Optimized production size
-            )
-    return async_redis.Redis(connection_pool=_redis_pool)
+    if url:
+        pool = async_redis.ConnectionPool.from_url(
+            url,
+            decode_responses=True,
+            socket_timeout=3.0,
+            socket_connect_timeout=3.0,
+            max_connections=50,
+        )
+    else:
+        connection_class = async_redis.SSLConnection if ssl else async_redis.Connection
+        pool = async_redis.ConnectionPool(
+            host=host or "localhost",
+            port=port or 6379,
+            password=password,
+            connection_class=connection_class,
+            decode_responses=True,
+            socket_timeout=3.0,
+            socket_connect_timeout=3.0,
+            max_connections=50,
+        )
+    return async_redis.Redis(connection_pool=pool)
 
 
 def init_qdrant_client(

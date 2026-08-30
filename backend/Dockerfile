@@ -9,9 +9,6 @@ COPY requirements.txt ./
 # Install dependencies using pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code after installing dependencies
-COPY . .
-
 # Production stage: minimal runtime image
 FROM python:3.12-slim
 

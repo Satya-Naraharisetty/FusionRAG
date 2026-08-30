@@ -9,15 +9,7 @@ export interface TokenResponse {
   expires_in: number;
 }
 
-const TOKEN_STORAGE_KEY = "hybrid_rag_access_token";
-
-let accessToken: string | null = (() => {
-  try {
-    return typeof window !== "undefined" ? localStorage.getItem(TOKEN_STORAGE_KEY) : null;
-  } catch {
-    return null;
-  }
-})();
+let accessToken: string | null = null;
 
 let onTokenRefreshed: ((token: string) => void) | null = null;
 let onAuthFailure: (() => void) | null = null;
@@ -25,29 +17,9 @@ let activeRefreshPromise: Promise<TokenResponse> | null = null;
 
 export const setAccessToken = (token: string | null) => {
   accessToken = token;
-  try {
-    if (typeof window !== "undefined") {
-      if (token) {
-        localStorage.setItem(TOKEN_STORAGE_KEY, token);
-      } else {
-        localStorage.removeItem(TOKEN_STORAGE_KEY);
-      }
-    }
-  } catch {
-    // Ignore storage quota / access errors
-  }
 };
 
-export const getAccessToken = () => {
-  if (!accessToken && typeof window !== "undefined") {
-    try {
-      accessToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-    } catch {
-      // Ignore
-    }
-  }
-  return accessToken;
-};
+export const getAccessToken = () => accessToken;
 
 export const registerTokenRefreshHandler = (handler: (token: string) => void) => {
   onTokenRefreshed = handler;
@@ -342,7 +314,8 @@ export async function* createSSEStream(
       if (trimmed.startsWith("event:")) {
         currentEvent = trimmed.slice(6).trim() as SSEEventType;
       } else if (trimmed.startsWith("data:")) {
-        currentData += trimmed.slice(5).trim();
+        const chunk = trimmed.slice(5).trim();
+        currentData = currentData ? `${currentData}\n${chunk}` : chunk;
       }
     }
   }

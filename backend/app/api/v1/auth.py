@@ -78,12 +78,22 @@ async def verify_email(
         user_id=user.id, user_agent=user_agent, ip_address=ip_address
     )
 
-    # Configure secure browser cookie
+    # Configure secure browser cookies
     response.set_cookie(
         key=settings.COOKIE_NAME,
         value=refresh_token,
         max_age=settings.COOKIE_MAX_AGE,
         path=settings.COOKIE_PATH,
+        domain=settings.COOKIE_DOMAIN or None,
+        secure=settings.COOKIE_SECURE,
+        httponly=True,
+        samesite=settings.COOKIE_SAMESITE,
+    )
+    response.set_cookie(
+        key=settings.ACCESS_TOKEN_COOKIE_NAME,
+        value=access_token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
         domain=settings.COOKIE_DOMAIN or None,
         secure=settings.COOKIE_SECURE,
         httponly=True,
@@ -157,12 +167,22 @@ async def login(
         user_id=user.id, user_agent=user_agent, ip_address=ip_address
     )
 
-    # Configure secure browser cookie
+    # Configure secure browser cookies
     response.set_cookie(
         key=settings.COOKIE_NAME,
         value=refresh_token,
         max_age=settings.COOKIE_MAX_AGE,
         path=settings.COOKIE_PATH,
+        domain=settings.COOKIE_DOMAIN or None,
+        secure=settings.COOKIE_SECURE,
+        httponly=True,
+        samesite=settings.COOKIE_SAMESITE,
+    )
+    response.set_cookie(
+        key=settings.ACCESS_TOKEN_COOKIE_NAME,
+        value=access_token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
         domain=settings.COOKIE_DOMAIN or None,
         secure=settings.COOKIE_SECURE,
         httponly=True,
@@ -202,12 +222,22 @@ async def refresh(
         raw_refresh_token=token, user_agent=user_agent, ip_address=ip_address
     )
 
-    # Configure rotated cookie
+    # Configure rotated cookies
     response.set_cookie(
         key=settings.COOKIE_NAME,
         value=new_refresh_token,
         max_age=settings.COOKIE_MAX_AGE,
         path=settings.COOKIE_PATH,
+        domain=settings.COOKIE_DOMAIN or None,
+        secure=settings.COOKIE_SECURE,
+        httponly=True,
+        samesite=settings.COOKIE_SAMESITE,
+    )
+    response.set_cookie(
+        key=settings.ACCESS_TOKEN_COOKIE_NAME,
+        value=access_token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
         domain=settings.COOKIE_DOMAIN or None,
         secure=settings.COOKIE_SECURE,
         httponly=True,
@@ -237,6 +267,14 @@ async def logout(
     response.delete_cookie(
         key=settings.COOKIE_NAME,
         path=settings.COOKIE_PATH,
+        domain=settings.COOKIE_DOMAIN or None,
+        secure=settings.COOKIE_SECURE,
+        httponly=True,
+        samesite=settings.COOKIE_SAMESITE,
+    )
+    response.delete_cookie(
+        key=settings.ACCESS_TOKEN_COOKIE_NAME,
+        path="/",
         domain=settings.COOKIE_DOMAIN or None,
         secure=settings.COOKIE_SECURE,
         httponly=True,
@@ -315,6 +353,14 @@ async def delete_account(
     response.delete_cookie(
         key=settings.COOKIE_NAME,
         path=settings.COOKIE_PATH,
+        domain=settings.COOKIE_DOMAIN,
+        secure=settings.COOKIE_SECURE,
+        httponly=True,
+        samesite=settings.COOKIE_SAMESITE,
+    )
+    response.delete_cookie(
+        key=settings.ACCESS_TOKEN_COOKIE_NAME,
+        path="/",
         domain=settings.COOKIE_DOMAIN,
         secure=settings.COOKIE_SECURE,
         httponly=True,

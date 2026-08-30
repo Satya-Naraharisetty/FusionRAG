@@ -187,30 +187,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const initAuth = async () => {
       try {
-        const savedToken = getAccessToken();
-        if (savedToken) {
-          setAccessToken(savedToken);
-          setAccessTokenState(savedToken);
-          const userProfile = await authApi.getMe();
-          if (active) {
-            setUser(userProfile);
-            setIsLoading(false);
-          }
-          return;
-        }
-
         const response = await authApi.refresh();
         if (active) {
+          setAccessToken(response.access_token);
           setAccessTokenState(response.access_token);
           const userProfile = await authApi.getMe();
           setUser(userProfile);
           scheduleRefresh(response.expires_in);
         }
-      } catch (err) {
-        if (active) {
-          setUser(null);
-          setAccessTokenState(null);
-          setAccessToken(null);
+      } catch (_err) {
+        // Silent refresh failed (no session cookie or expired)
+        try {
+          // Attempt direct getMe if access token cookie is already present
+          const userProfile = await authApi.getMe();
+          if (active) {
+            setUser(userProfile);
+          }
+        } catch (_meErr) {
+          if (active) {
+            setUser(null);
+            setAccessTokenState(null);
+            setAccessToken(null);
+          }
         }
       } finally {
         if (active) {

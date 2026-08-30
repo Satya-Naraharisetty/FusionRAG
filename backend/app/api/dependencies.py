@@ -120,25 +120,35 @@ class AuthenticationGuard:
     async def __call__(
         self,
         request: Request,
-        credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+        credentials: HTTPAuthorizationCredentials | None = Depends(
+            HTTPBearer(
+                auto_error=False
+            )  # auto_error=False: missing header falls through to cookie
+        ),
     ) -> dict[str, Any]:
         """
         Stateless authentication check. Signature verified in-memory.
+        Accepts the access token from the Authorization header (Bearer) or
+        the HttpOnly access_token cookie — header takes priority.
         """
-        if not credentials:
+        # Try Authorization header first (API clients, SSE with explicit token)
+        token: str | None = credentials.credentials if credentials else None
+
+        # Fall back to HttpOnly cookie (browser clients)
+        if not token:
+            token = request.cookies.get(settings.ACCESS_TOKEN_COOKIE_NAME)
+
+        if not token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Not authenticated",
             )
 
-        token = credentials.credentials
         try:
             claims = self._token_provider.decode_token(token)
             return claims
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError) as e:
-            import logging
-
-            logging.getLogger(__name__).warning(f"JWT Verification failed: {e}")
+            logger.warning("JWT Verification failed: %s", e)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired access token",
@@ -237,9 +247,11 @@ async def check_rate_limit(
 ) -> None:
     identifier = _resolve_rate_limit_identifier(request)
     if await rate_limiter.is_rate_limited(identifier):
+        retry_after = str(int(getattr(rate_limiter, "window_seconds", 60)))
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many requests. Please try again later.",
+            headers={"Retry-After": retry_after},
         )
 
 
@@ -263,9 +275,11 @@ async def check_account_delete_rate_limit(
 ) -> None:
     identifier = _resolve_rate_limit_identifier(request)
     if await rate_limiter.is_rate_limited(identifier):
+        retry_after = str(int(getattr(rate_limiter, "window_seconds", 60)))
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many attempts. Please try again later.",
+            headers={"Retry-After": retry_after},
         )
 
 
@@ -377,8 +391,8 @@ def get_embedding_generator(request: Request = None) -> EmbeddingGenerator:  # t
         logger.info("Using JinaEmbeddingGenerator for dense embeddings")
         _embedding_generator_instance = JinaEmbeddingGenerator(
             api_key=settings.get_jina_api_key(),
-            model=settings.effective_embedding_model,
-            dimension=settings.effective_embedding_dimension,
+            model=settings.EMBEDDING_MODEL,
+            dimension=settings.EMBEDDING_DIMENSION,
         )
 
     return _embedding_generator_instance
@@ -418,7 +432,7 @@ def get_vector_store(request: Request = None) -> VectorStore:  # type: ignore[as
     return QdrantVectorStore(
         client=qdrant_client,
         collection_name=settings.VECTOR_COLLECTION_NAME,
-        dimension=settings.effective_embedding_dimension,
+        dimension=settings.EMBEDDING_DIMENSION,
     )
 
 
@@ -448,8 +462,8 @@ def get_embedding_service(
         uuid_generator=SystemUUIDGenerator(),
         batch_size=settings.EMBEDDING_BATCH_SIZE,
         provider_name=settings.EMBEDDING_PROVIDER,
-        model_name=settings.effective_embedding_model,
-        dimension=settings.effective_embedding_dimension,
+        model_name=settings.EMBEDDING_MODEL,
+        dimension=settings.EMBEDDING_DIMENSION,
         embedding_version=settings.EMBEDDING_VERSION,
     )
 
@@ -792,6 +806,30 @@ def get_planner_llm_provider(request: Request = None):  # type: ignore[assignmen
     from app.chat.infrastructure.gemini_provider import GeminiProvider
 
     return GeminiProvider(api_key=settings.get_gemini_planner_api_key())
+
+
+def get_intent_classifier(request: Request = None) -> Any:  # type: ignore[assignment]
+    if not settings.ENABLE_INTENT_GUARDRAILS:
+        return None
+
+    import sys
+
+    main_mod = sys.modules.get("app.main")
+    if (
+        main_mod
+        and hasattr(main_mod, "app")
+        and hasattr(main_mod.app, "dependency_overrides")
+        and get_intent_classifier in main_mod.app.dependency_overrides
+    ):
+        return main_mod.app.dependency_overrides[get_intent_classifier]()
+
+    import google.generativeai as genai
+
+    from app.core.security.intent_classifier import IntentClassifier
+
+    genai.configure(api_key=settings.get_gemini_llm_api_key())
+    client = genai.GenerativeModel(model_name="gemini-3.5-flash-lite")
+    return IntentClassifier(gemini_client=client)
 
 
 def get_hyde_executor(

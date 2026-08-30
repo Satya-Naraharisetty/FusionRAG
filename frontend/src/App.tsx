@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { UploadQueueProvider } from "./context/UploadQueueContext";
@@ -8,6 +8,7 @@ import { LoginForm } from "./components/auth/LoginForm";
 import { RegisterForm } from "./components/auth/RegisterForm";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { PublicRoute } from "./routes/PublicRoute";
+import { AdminRoute } from "./routes/AdminRoute";
 import { ChatLayout } from "./components/layout/ChatLayout";
 import { ErrorBoundary } from "./components/error/ErrorBoundary";
 import { ErrorPage } from "./components/error/ErrorPage";
@@ -24,17 +25,20 @@ const OAuthCallbackPage = lazyWithRetry(() => import("./pages/OAuthCallbackPage"
 const AdminDashboardPage = lazyWithRetry(() => import("./pages/AdminDashboardPage"));
 const VerifyEmailPage = lazyWithRetry(() => import("./pages/VerifyEmailPage"));
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-    },
-  },
-});
-
 function App() {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            refetchOnWindowFocus: false,
+            retry: 1,
+            staleTime: 5 * 60 * 1000, // 5 minutes
+          },
+        },
+      })
+  );
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
@@ -107,14 +111,16 @@ function App() {
                         </ErrorBoundary>
                       }
                     />
-                    <Route
-                      path="/admin/dashboard"
-                      element={
-                        <ErrorBoundary>
-                          <AdminDashboardPage />
-                        </ErrorBoundary>
-                      }
-                    />
+                    <Route element={<AdminRoute />}>
+                      <Route
+                        path="/admin/dashboard"
+                        element={
+                          <ErrorBoundary>
+                            <AdminDashboardPage />
+                          </ErrorBoundary>
+                        }
+                      />
+                    </Route>
                   </Route>
                 </Route>
 
