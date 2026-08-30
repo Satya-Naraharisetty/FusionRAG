@@ -123,14 +123,12 @@ const ToggleCheckbox: React.FC<{
       aria-label={label}
     />
     <div
-      className={`w-9 h-5 rounded-full transition-colors duration-200 ${
-        checked ? "bg-(--accent-primary)" : "bg-(--bg-tertiary)"
-      } border ${checked ? "border-(--accent-primary)/50" : "border-(--border-default)"}`}
+      className={`w-9 h-5 rounded-full transition-colors duration-200 ${checked ? "bg-(--accent-primary)" : "bg-(--bg-tertiary)"
+        } border ${checked ? "border-(--accent-primary)/50" : "border-(--border-default)"}`}
     >
       <div
-        className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-(--bg-primary) shadow-sm transition-transform duration-200 ${
-          checked ? "translate-x-4" : "translate-x-0"
-        }`}
+        className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-(--bg-primary) shadow-sm transition-transform duration-200 ${checked ? "translate-x-4" : "translate-x-0"
+          }`}
       />
     </div>
   </label>
@@ -231,9 +229,9 @@ const SettingsPage: React.FC = () => {
       if (key) data[key] = localStorage.getItem(key) || "";
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href     = url;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
     a.download = `hybrid-rag-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     toast.success("Backup exported.");
@@ -324,11 +322,10 @@ const SettingsPage: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex cursor-pointer items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${
-                  activeTab === tab.id
+                className={`flex cursor-pointer items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${activeTab === tab.id
                     ? "border border-(--border-subtle) bg-(--bg-secondary) text-(--text-primary)"
                     : "border border-transparent text-(--text-muted) hover:bg-(--bg-secondary)/60 hover:text-(--text-primary)"
-                }`}
+                  }`}
                 aria-current={activeTab === tab.id ? "page" : undefined}
               >
                 {tab.icon}
@@ -380,8 +377,8 @@ const SettingsPage: React.FC = () => {
                         {user?.has_password
                           ? "Change your password to keep your account secure."
                           : user?.oauth_provider
-                          ? `You signed in via ${user.oauth_provider.charAt(0).toUpperCase() + user.oauth_provider.slice(1)}. Set a password to also log in with email and password.`
-                          : "Set a password to enable email/password authentication."}
+                            ? `You signed in via ${user.oauth_provider.charAt(0).toUpperCase() + user.oauth_provider.slice(1)}. Set a password to also log in with email and password.`
+                            : "Set a password to enable email/password authentication."}
                       </p>
                     </div>
                     {!showPasswordForm && (
@@ -435,15 +432,14 @@ const SettingsPage: React.FC = () => {
                             </div>
                             <div className="h-1.5 w-full overflow-hidden rounded-full bg-(--bg-tertiary)">
                               <div
-                                className={`h-full transition-all duration-300 ${
-                                  passwordStrength.score <= 1
+                                className={`h-full transition-all duration-300 ${passwordStrength.score <= 1
                                     ? "bg-red-500 w-1/4"
                                     : passwordStrength.score === 2
-                                    ? "bg-amber-500 w-2/4"
-                                    : passwordStrength.score === 3
-                                    ? "bg-blue-500 w-3/4"
-                                    : "bg-emerald-500 w-full"
-                                }`}
+                                      ? "bg-amber-500 w-2/4"
+                                      : passwordStrength.score === 3
+                                        ? "bg-blue-500 w-3/4"
+                                        : "bg-emerald-500 w-full"
+                                  }`}
                               />
                             </div>
                             {passwordStrength.feedback && (
@@ -516,19 +512,18 @@ const SettingsPage: React.FC = () => {
                         opt === "dark"
                           ? t("settings.appearance.themeDark")
                           : opt === "light"
-                          ? t("settings.appearance.themeLight")
-                          : opt === "system"
-                          ? t("settings.appearance.themeSystem")
-                          : t("settings.appearance.themeHighContrast");
+                            ? t("settings.appearance.themeLight")
+                            : opt === "system"
+                              ? t("settings.appearance.themeSystem")
+                              : t("settings.appearance.themeHighContrast");
                       return (
                         <button
                           key={opt}
                           onClick={() => setTheme(opt)}
-                          className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium capitalize transition-colors ${
-                            theme === opt
+                          className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium capitalize transition-colors ${theme === opt
                               ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
                               : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
-                          }`}
+                            }`}
                           data-active={theme === opt}
                         >
                           {themeLabel}
@@ -567,17 +562,16 @@ const SettingsPage: React.FC = () => {
                         opt === "comfortable"
                           ? t("settings.appearance.densityComfortable")
                           : opt === "cozy"
-                          ? t("settings.appearance.densityCozy")
-                          : t("settings.appearance.densityCompact");
+                            ? t("settings.appearance.densityCozy")
+                            : t("settings.appearance.densityCompact");
                       return (
                         <button
                           key={opt}
                           onClick={() => setDensity(opt)}
-                          className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium capitalize transition-colors ${
-                            density === opt
+                          className={`cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium capitalize transition-colors ${density === opt
                               ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
                               : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
-                          }`}
+                            }`}
                           data-active={density === opt}
                         >
                           {densityLabel}
@@ -603,11 +597,10 @@ const SettingsPage: React.FC = () => {
                               setComingSoonLang(opt);
                             }
                           }}
-                          className={`group relative flex items-center justify-between gap-1.5 cursor-pointer rounded-md border px-3 py-2 text-left text-xs font-medium transition-colors ${
-                            isSelected
+                          className={`group relative flex items-center justify-between gap-1.5 cursor-pointer rounded-md border px-3 py-2 text-left text-xs font-medium transition-colors ${isSelected
                               ? "border-(--border-hover) bg-(--bg-secondary) text-(--text-primary)"
                               : "border-(--border-subtle) bg-transparent text-(--text-muted) hover:border-(--border-default) hover:text-(--text-primary)"
-                          }`}
+                            }`}
                           data-active={isSelected}
                           title={opt.status === "coming-soon" ? `${opt.name} — Coming Soon` : opt.name}
                         >
@@ -829,37 +822,42 @@ const SettingsPage: React.FC = () => {
                     }
                   />
 
-                  <SettingRow
-                    label="Factory Reset"
-                    description="Wipe all local preferences, folders, tags, and settings. You will be signed out."
-                    control={
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => setShowResetConfigDialog(true)}
-                        className="gap-1.5"
-                      >
-                        <RotateCcw size={13} />
-                        Reset
-                      </Button>
-                    }
-                  />
+                  {/* Factory reset & Delete Account are only available for regular users; admin accounts are protected against lockout */}
+                  {user?.role !== "admin" && (
+                    <>
+                      <SettingRow
+                        label="Factory Reset"
+                        description="Wipe all local preferences, folders, tags, and settings. You will be signed out."
+                        control={
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setShowResetConfigDialog(true)}
+                            className="gap-1.5"
+                          >
+                            <RotateCcw size={13} />
+                            Reset
+                          </Button>
+                        }
+                      />
 
-                  <SettingRow
-                    label="Delete Account"
-                    description="Permanently delete your account, all conversations, and documents. This cannot be undone."
-                    control={
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => setShowDeleteAccountDialog(true)}
-                        className="gap-1.5"
-                      >
-                        <UserX size={13} />
-                        Delete
-                      </Button>
-                    }
-                  />
+                      <SettingRow
+                        label="Delete Account"
+                        description="Permanently delete your account, all conversations, and documents. This cannot be undone."
+                        control={
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setShowDeleteAccountDialog(true)}
+                            className="gap-1.5"
+                          >
+                            <UserX size={13} />
+                            Delete
+                          </Button>
+                        }
+                      />
+                    </>
+                  )}
                 </div>
               </div>
             )}

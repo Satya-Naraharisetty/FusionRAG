@@ -5,8 +5,8 @@ export interface StrengthResult {
   feedback: string;
 }
 
-export const checkPasswordStrength = (password: string): StrengthResult => {
-  if (!password) {
+export const checkPasswordStrength = (password?: string | null): StrengthResult => {
+  if (!password || typeof password !== "string") {
     return { score: 0, label: "Very Weak", color: "bg-red-650", feedback: "Please enter a password." };
   }
 

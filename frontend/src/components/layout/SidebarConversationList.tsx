@@ -49,7 +49,9 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
   const appliedTags = useMemo(() => {
     const map = new Map<string, string>();
     Object.values(tags).forEach((tagList) => {
-      tagList.forEach((t) => map.set(t.name.toLowerCase(), t.color));
+      tagList?.forEach((t) => {
+        if (t?.name) map.set(t.name.toLowerCase(), t.color);
+      });
     });
     return Array.from(map.entries()).map(([name, color]) => ({ name, color }));
   }, [tags]);
@@ -58,11 +60,12 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
     let result = conversations;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter((c) => c.title.toLowerCase().includes(q));
+      result = result.filter((c) => (c?.title || "").toLowerCase().includes(q));
     }
     if (activeFilterTag) {
+      const filterLower = activeFilterTag.toLowerCase();
       result = result.filter((c) =>
-        tags[c.id]?.some((t) => t.name.toLowerCase() === activeFilterTag.toLowerCase())
+        tags[c.id]?.some((t) => (t?.name || "").toLowerCase() === filterLower)
       );
     }
     return result;
@@ -78,7 +81,7 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
 
   const folderedIds = useMemo(() => {
     const set = new Set<string>();
-    folders.forEach((f) => f.conversationIds.forEach((id) => set.add(id)));
+    folders.forEach((f) => f.conversationIds?.forEach((id) => set.add(id)));
     return set;
   }, [folders]);
 
@@ -86,7 +89,7 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
     pinnedIds
       .map((id) => conversationMap.get(id))
       .filter((c): c is Conversation =>
-        !!c && (!searchQuery.trim() || c.title.toLowerCase().includes(searchQuery.toLowerCase()))
+        !!c && (!searchQuery.trim() || (c.title || "").toLowerCase().includes(searchQuery.toLowerCase()))
       ),
     [pinnedIds, conversationMap, searchQuery]
   );
@@ -140,7 +143,7 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5 px-1">
           <TagIcon size={11} className="text-[var(--text-muted)] flex-shrink-0" />
           {appliedTags.map((t) => {
-            const isSelected = activeFilterTag?.toLowerCase() === t.name.toLowerCase();
+            const isSelected = (activeFilterTag || "").toLowerCase() === (t.name || "").toLowerCase();
             return (
               <button
                 key={t.name}

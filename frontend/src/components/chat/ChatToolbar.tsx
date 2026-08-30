@@ -10,7 +10,7 @@ interface ChatToolbarProps {
 
 export const ChatToolbar: React.FC<ChatToolbarProps> = ({
   title = "New Chat",
-  model = "Hybrid RAG v1",
+  model,
   connectionLost = false,
 }) => {
   const { collapsed, setCollapsed } = useSidebarState();
@@ -35,11 +35,13 @@ export const ChatToolbar: React.FC<ChatToolbarProps> = ({
 
       {/* Right */}
       <div className="flex items-center gap-3.5 flex-shrink-0">
-        {/* Model badge */}
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-primary)] shadow-[0_0_6px_var(--accent-primary)] flex-shrink-0" />
-          {model}
-        </span>
+        {/* Dynamic Model badge */}
+        {model && (
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-primary)] shadow-[0_0_6px_var(--accent-primary)] flex-shrink-0" />
+            {model}
+          </span>
+        )}
 
         {/* Stream connection loss — browser offline is covered by OfflineBanner */}
         {connectionLost && (

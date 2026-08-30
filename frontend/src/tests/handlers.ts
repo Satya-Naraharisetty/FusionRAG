@@ -13,7 +13,7 @@ const handlers = [
     return HttpResponse.json({
       id: "user-123",
       email: "test@example.com",
-      role: "admin",
+      role: "user",
       is_active: true,
       is_verified: false,
       created_at: new Date().toISOString(),
@@ -53,7 +53,7 @@ const handlers = [
     return HttpResponse.json({
       id: "user-123",
       email: "test@example.com",
-      role: "admin",
+      role: "user",
       is_active: true,
       is_verified: true,
       oauth_provider: null,

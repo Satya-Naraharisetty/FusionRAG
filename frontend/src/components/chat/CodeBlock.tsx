@@ -19,10 +19,11 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
   const [showLineNumbers, setShowLineNumbers] = useState(true);
   const [wrapLines, setWrapLines] = useState(false);
 
+  const langLower = (language || "").toLowerCase();
   const isPython =
-    language.toLowerCase() === "python" ||
-    language.toLowerCase() === "py" ||
-    (language === "" && (code.includes("import pandas") || code.includes("import matplotlib") || code.includes("import numpy") || code.includes("plt.")));
+    langLower === "python" ||
+    langLower === "py" ||
+    (!language && (code.includes("import pandas") || code.includes("import matplotlib") || code.includes("import numpy") || code.includes("plt.")));
 
   useEffect(() => {
     let active = true;
@@ -133,7 +134,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
                 ) : (
                   <>
                     <Play size={10} className="fill-current" />
-                    <span>Run</span>
+                    <span>Run in Sandbox</span>
                   </>
                 )}
               </button>

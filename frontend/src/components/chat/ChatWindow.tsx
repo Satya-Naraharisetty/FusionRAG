@@ -161,8 +161,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
     }
   };
 
+  const formatModelName = (raw?: string | null): string | undefined => {
+    if (!raw) return undefined;
+    return raw
+      .split(/[-_]/)
+      .map((w) => (/^\d+(\.\d+)*$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+      .join(" ");
+  };
+
   const activeTitle = activeConv?.title || "New Chat";
-  const activeModel = activeConv?.settings?.model || "Hybrid RAG v1";
+  const activeModel = formatModelName(activeConv?.settings?.model);
 
   return (
     <div
