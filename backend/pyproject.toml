@@ -33,6 +33,7 @@ dependencies = [
     "sympy>=1.13.0",
     "scipy>=1.13.0",
     "numpy>=1.26.0",
+    "pypdfium2>=4.30.0",
 ]
 
 [project.optional-dependencies]

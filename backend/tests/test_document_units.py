@@ -196,6 +196,136 @@ async def test_pdf_extractor(mock_pdf_reader):
 
 
 @pytest.mark.asyncio
+@patch("app.documents.infrastructure.extractors.PdfReader")
+@patch("app.documents.infrastructure.extractors.pypdfium2")
+@patch("app.documents.infrastructure.extractors.httpx.AsyncClient")
+async def test_pdf_extractor_scanned_ocr_pypdfium2(
+    mock_client_cls, mock_pdfium, mock_pdf_reader
+):
+    # Setup mock for page with sparse text (e.g. scanned handwritten page)
+    mock_page = MagicMock()
+    mock_page.extract_text.return_value = ""  # No digital text
+    mock_pdf_reader.return_value.pages = [mock_page]
+
+    # Setup pypdfium2 mock
+    mock_pdfium_doc = MagicMock()
+    mock_pdfium_page = MagicMock()
+    mock_pil_img = MagicMock()
+    mock_pil_img.save.side_effect = lambda buf, **_kwargs: buf.write(
+        b"fake_rendered_png_bytes"
+    )
+    mock_pdfium_page.render.return_value.to_pil.return_value = mock_pil_img
+    mock_pdfium_doc.__getitem__.return_value = mock_pdfium_page
+    mock_pdfium.PdfDocument.return_value = mock_pdfium_doc
+
+    # Setup httpx Gemini OCR response
+    mock_client = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "candidates": [
+            {"content": {"parts": [{"text": "Handwritten math formula: E = mc^2"}]}}
+        ]
+    }
+    mock_resp.raise_for_status = MagicMock()
+    mock_client.post = AsyncMock(return_value=mock_resp)
+    mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+    with patch("app.documents.infrastructure.extractors.settings") as mock_settings:
+        mock_settings.get_gemini_llm_api_key.return_value = "mock_key"
+        extractor = PDFExtractor()
+        res = await extractor.extract(b"dummy handwritten pdf bytes")
+
+        assert res.page_count == 1
+        assert "Handwritten math formula: E = mc^2" in res.text
+
+
+@pytest.mark.asyncio
+@patch("app.documents.infrastructure.extractors.PdfReader")
+@patch("app.documents.infrastructure.extractors.pypdfium2", None)
+@patch("app.documents.infrastructure.extractors.httpx.AsyncClient")
+async def test_pdf_extractor_fallback_pypdf_images(mock_client_cls, mock_pdf_reader):
+    # Setup mock page with sparse text and embedded scan image
+    mock_img = MagicMock()
+    mock_img.data = b"raw image bytes"
+    mock_page = MagicMock()
+    mock_page.extract_text.return_value = ""
+    mock_page.images = [mock_img]
+    mock_pdf_reader.return_value.pages = [mock_page]
+
+    # Setup httpx Gemini OCR response
+    mock_client = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "candidates": [
+            {"content": {"parts": [{"text": "Handwritten notes: Meeting at 3 PM"}]}}
+        ]
+    }
+    mock_resp.raise_for_status = MagicMock()
+    mock_client.post = AsyncMock(return_value=mock_resp)
+    mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+    with patch("app.documents.infrastructure.extractors.settings") as mock_settings:
+        mock_settings.get_gemini_llm_api_key.return_value = "mock_key"
+        extractor = PDFExtractor()
+        res = await extractor.extract(b"dummy pdf bytes with embedded image")
+
+        assert res.page_count == 1
+        assert "Handwritten notes: Meeting at 3 PM" in res.text
+
+
+@pytest.mark.asyncio
+@patch("app.documents.infrastructure.extractors.PdfReader")
+@patch("app.documents.infrastructure.extractors.pypdfium2")
+@patch("app.documents.infrastructure.extractors.httpx.AsyncClient")
+async def test_pdf_extractor_mixed_digital_and_handwritten(
+    mock_client_cls, mock_pdfium, mock_pdf_reader
+):
+    # Page 1: Digital text (length > 30 chars)
+    page_1 = MagicMock()
+    page_1.extract_text.return_value = (
+        "This is a full digital paragraph with more than thirty characters of text."
+    )
+
+    # Page 2: Handwritten scan (length < 30 chars)
+    page_2 = MagicMock()
+    page_2.extract_text.return_value = ""
+
+    mock_pdf_reader.return_value.pages = [page_1, page_2]
+
+    # Setup pypdfium2 mock
+    mock_pdfium_doc = MagicMock()
+    mock_pdfium_page = MagicMock()
+    mock_pil_img = MagicMock()
+    mock_pil_img.save.side_effect = lambda buf, **_kwargs: buf.write(
+        b"fake_rendered_png_bytes"
+    )
+    mock_pdfium_page.render.return_value.to_pil.return_value = mock_pil_img
+    mock_pdfium_doc.__getitem__.return_value = mock_pdfium_page
+    mock_pdfium.PdfDocument.return_value = mock_pdfium_doc
+
+    # Setup httpx Gemini OCR response
+    mock_client = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "candidates": [
+            {"content": {"parts": [{"text": "Handwritten annotations on page 2"}]}}
+        ]
+    }
+    mock_resp.raise_for_status = MagicMock()
+    mock_client.post = AsyncMock(return_value=mock_resp)
+    mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+    with patch("app.documents.infrastructure.extractors.settings") as mock_settings:
+        mock_settings.get_gemini_llm_api_key.return_value = "mock_key"
+        extractor = PDFExtractor()
+        res = await extractor.extract(b"dummy mixed pdf bytes")
+
+        assert res.page_count == 2
+        assert "This is a full digital paragraph" in res.text
+        assert "Handwritten annotations on page 2" in res.text
+
+
+@pytest.mark.asyncio
 @patch("app.documents.infrastructure.extractors.docx.Document")
 async def test_docx_extractor(mock_docx_doc):
     # Setup mock

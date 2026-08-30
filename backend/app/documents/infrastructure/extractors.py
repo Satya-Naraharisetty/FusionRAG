@@ -8,6 +8,11 @@ import docx
 import httpx
 from pypdf import PdfReader
 
+try:
+    import pypdfium2
+except ImportError:
+    pypdfium2 = None  # type: ignore[assignment]
+
 from app.core.config import settings
 from app.documents.domain.exceptions import DocumentCorrupted, UnsupportedDocumentType
 from app.documents.domain.interfaces import DocumentExtractor
@@ -17,32 +22,161 @@ logger = logging.getLogger(__name__)
 
 
 class PDFExtractor(DocumentExtractor):
+    def __init__(self, min_text_chars_per_page: int = 30) -> None:
+        self.min_text_chars_per_page = min_text_chars_per_page
+        self._ocr_semaphore = asyncio.Semaphore(5)
+
     async def extract(self, file_bytes: bytes) -> ExtractionResult:
         """
-        Parses text from PDF using pypdf inside a thread pool.
+        Parses text from PDF. If a page contains sparse or no digital text
+        (e.g. scanned handwritten notes or image-only pages), it automatically
+        rasterizes the page via pypdfium2 (with pypdf.images fallback) and runs
+        Gemini Multimodal Vision OCR.
         """
         if not file_bytes:
             raise DocumentCorrupted("PDF file is empty.")
 
-        def _parse():
+        def _parse_pages():
             reader = PdfReader(io.BytesIO(file_bytes))
             if len(reader.pages) == 0:
                 raise DocumentCorrupted("PDF has 0 pages.")
 
-            text = ""
-            for page in reader.pages:
-                text += page.extract_text() or ""
-
-            return ExtractionResult(text=text, page_count=len(reader.pages))
+            pages_data = []
+            for idx, page in enumerate(reader.pages):
+                page_text = page.extract_text() or ""
+                needs_ocr = len(page_text.strip()) < self.min_text_chars_per_page
+                pages_data.append(
+                    {
+                        "index": idx,
+                        "text": page_text,
+                        "needs_ocr": needs_ocr,
+                    }
+                )
+            return len(reader.pages), pages_data
 
         try:
-            return await asyncio.to_thread(_parse)
+            page_count, pages_data = await asyncio.to_thread(_parse_pages)
         except DocumentCorrupted:
             raise
         except Exception as e:
             raise DocumentCorrupted(
                 f"Failed to parse PDF document. It may be corrupted: {e}"
+            ) from e
+
+        # Check if any pages need OCR and if API key is present
+        api_key = settings.get_gemini_llm_api_key()
+        pages_needing_ocr = [p for p in pages_data if p["needs_ocr"]]
+
+        if pages_needing_ocr and api_key:
+
+            async def _process_page_ocr(page_info: dict) -> tuple[int, str]:
+                page_idx = page_info["index"]
+                image_bytes = await self._render_or_extract_page_image(
+                    file_bytes, page_idx
+                )
+                if not image_bytes:
+                    return page_idx, page_info["text"]
+
+                prompt = (
+                    "Analyze this document page. Extract all handwritten notes, printed text, "
+                    "mathematical expressions, diagrams, tables, and margin notes word-for-word (OCR). "
+                    "Output only the verbatim extracted text clearly without conversational filler."
+                )
+                try:
+                    async with self._ocr_semaphore:
+                        ocr_text = await self._extract_ocr_via_gemini(
+                            image_bytes, "image/png", prompt, api_key
+                        )
+                    combined = (
+                        f"{page_info['text'].strip()}\n{ocr_text.strip()}".strip()
+                        if page_info["text"].strip()
+                        else ocr_text.strip()
+                    )
+                    return page_idx, combined
+                except Exception as ocr_err:
+                    logger.warning(
+                        f"OCR failed for PDF page {page_idx + 1}: {ocr_err}. Falling back to raw text."
+                    )
+                    return page_idx, page_info["text"]
+
+            ocr_results = await asyncio.gather(
+                *[_process_page_ocr(p) for p in pages_needing_ocr],
+                return_exceptions=False,
             )
+            ocr_map = dict(ocr_results)
+            final_pages_text = [ocr_map.get(p["index"], p["text"]) for p in pages_data]
+        else:
+            final_pages_text = [p["text"] for p in pages_data]
+
+        full_text = "".join(final_pages_text)
+        return ExtractionResult(text=full_text, page_count=page_count)
+
+    async def _render_or_extract_page_image(
+        self, file_bytes: bytes, page_idx: int
+    ) -> bytes | None:
+        def _render():
+            # Primary: pypdfium2 full-page rasterization (Google PDFium engine)
+            if pypdfium2 is not None:
+                try:
+                    pdf = pypdfium2.PdfDocument(file_bytes)
+                    page = pdf[page_idx]
+                    # Render at scale=2 (approx 150 DPI) for crisp handwriting recognition with low RAM footprint
+                    pil_img = page.render(scale=2).to_pil()
+                    buf = io.BytesIO()
+                    pil_img.save(buf, format="PNG")
+                    return buf.getvalue()
+                except Exception as err:
+                    logger.debug(
+                        f"pypdfium2 rendering failed on page {page_idx}: {err}. Trying pypdf fallback."
+                    )
+
+            # Fallback: pypdf page.images extraction
+            try:
+                reader = PdfReader(io.BytesIO(file_bytes))
+                page = reader.pages[page_idx]
+                if page.images and len(page.images) > 0:
+                    return page.images[0].data
+            except Exception as err:
+                logger.debug(f"pypdf image extraction failed on page {page_idx}: {err}")
+
+            return None
+
+        return await asyncio.to_thread(_render)
+
+    async def _extract_ocr_via_gemini(
+        self, image_bytes: bytes, mime_type: str, prompt: str, api_key: str
+    ) -> str:
+        base64_data = base64.b64encode(image_bytes).decode("utf-8")
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "inlineData": {
+                                "mimeType": mime_type,
+                                "data": base64_data,
+                            }
+                        },
+                    ]
+                }
+            ],
+            "generationConfig": {"temperature": 0.0, "maxOutputTokens": 2048},
+        }
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+
+            try:
+                return data["candidates"][0]["content"]["parts"][0]["text"]
+            except (KeyError, IndexError) as e:
+                raise RuntimeError(
+                    f"Unexpected response structure from Gemini API: {e}"
+                ) from e
 
 
 class DOCXExtractor(DocumentExtractor):
