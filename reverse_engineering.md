@@ -1752,7 +1752,7 @@ Tracks DAG execution depth, concurrency factors, task success rates, evidence su
 - **`BenchmarkRunner` (`benchmark_runner.py`)**: Batch execution across the 4 profiles (`quick`, `standard`, `full`, `nightly`).
 - **`RegressionRunner` (`regression_runner.py`)**: Dual-Gate PR regression enforcer ($\text{Faithfulness} \ge 0.90, \Delta \le 0.03$).
 
-### 60.3 Complete Catalog of All 33 Registered Metrics in `registry.py`
+### 60.3 Complete Catalog of All 33 Registered Metrics in `backend/app/evaluation/metrics/registry.py`
 
 ```
 ========================================================================================================================
