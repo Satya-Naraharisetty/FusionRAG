@@ -325,13 +325,14 @@ class ChatOrchestrator:
                 # query-rewrite that feeds it are both skipped (see PromptBuilder
                 # _NO_CONTEXT_NOTE). Resolving the scope here (before prepare_context)
                 # lets skip_rewrite match the retrieval decision.
-                retrieval_doc_ids, effective_doc_priority = (
-                    await self._resolve_retrieval_scope(
-                        conversation_id=conversation_id,
-                        user_id=user_id,
-                        document_ids=document_ids,
-                        documents_priority=documents_priority,
-                    )
+                (
+                    retrieval_doc_ids,
+                    effective_doc_priority,
+                ) = await self._resolve_retrieval_scope(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    document_ids=document_ids,
+                    documents_priority=documents_priority,
                 )
                 skip_retrieval = not bool(retrieval_doc_ids)
 
@@ -814,13 +815,11 @@ class ChatOrchestrator:
         # mention was used (or explicit document_ids were passed). Everything
         # else answers from general knowledge: retrieval and the LLM
         # query-rewrite that feeds it are both skipped.
-        retrieval_doc_ids, effective_doc_priority = (
-            await self._resolve_retrieval_scope(
-                conversation_id=conversation_id,
-                user_id=user_id,
-                document_ids=document_ids,
-                documents_priority=documents_priority,
-            )
+        retrieval_doc_ids, effective_doc_priority = await self._resolve_retrieval_scope(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            document_ids=document_ids,
+            documents_priority=documents_priority,
         )
         skip_retrieval = not bool(retrieval_doc_ids)
 
