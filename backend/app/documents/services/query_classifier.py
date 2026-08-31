@@ -233,7 +233,15 @@ class DeterministicQueryClassifier(QueryClassifier):
             lower in self._GREETINGS
             or (
                 word_count <= 4
-                and any(g in lower for g in ("how are you", "what's up", "who are you", "what can you do"))
+                and any(
+                    g in lower
+                    for g in (
+                        "how are you",
+                        "what's up",
+                        "who are you",
+                        "what can you do",
+                    )
+                )
             )
             or (word_count <= 3 and any(w in self._GREETINGS for w in words))
             or (word_count <= 2 and words and words[0] in self._CONVERSATIONAL_PREFIXES)
@@ -310,7 +318,9 @@ class DeterministicQueryClassifier(QueryClassifier):
 
         # 5. Numerical Check
         numerical_hits = sum(
-            1 for p in self._NUMERICAL_PATTERNS if (p.search(lower) or p.search(clean_lower))
+            1
+            for p in self._NUMERICAL_PATTERNS
+            if (p.search(lower) or p.search(clean_lower))
         )
         if numerical_hits >= 1:
             # Check if it has multiple sub-questions
