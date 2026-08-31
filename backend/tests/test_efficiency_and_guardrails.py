@@ -13,14 +13,14 @@ from app.core.security.prompt_injection import (
 
 def test_adaptive_max_tokens_calculation():
     """Verify adaptive max tokens calculation based on query intent."""
-    assert PromptBuilder.get_adaptive_max_tokens("CONVERSATIONAL", 1000) == 150
-    assert PromptBuilder.get_adaptive_max_tokens("GREETING", 1000) == 150
-    assert PromptBuilder.get_adaptive_max_tokens("FACTUAL", 1000) == 350
-    assert PromptBuilder.get_adaptive_max_tokens("NUMERICAL", 1000) == 350
-    assert PromptBuilder.get_adaptive_max_tokens("COMPARISON", 1000) == 800
-    assert PromptBuilder.get_adaptive_max_tokens("MULTI_HOP", 1000) == 800
-    assert PromptBuilder.get_adaptive_max_tokens("EXPLANATION", 1000) == 1000
-    assert PromptBuilder.get_adaptive_max_tokens(None, 1000) == 1000
+    assert PromptBuilder.get_adaptive_max_tokens("CONVERSATIONAL", 4096) == 1024
+    assert PromptBuilder.get_adaptive_max_tokens("GREETING", 4096) == 1024
+    assert PromptBuilder.get_adaptive_max_tokens("FACTUAL", 4096) == 2048
+    assert PromptBuilder.get_adaptive_max_tokens("NUMERICAL", 4096) == 2048
+    assert PromptBuilder.get_adaptive_max_tokens("COMPARISON", 4096) == 4096
+    assert PromptBuilder.get_adaptive_max_tokens("MULTI_HOP", 4096) == 4096
+    assert PromptBuilder.get_adaptive_max_tokens("EXPLANATION", 4096) == 4096
+    assert PromptBuilder.get_adaptive_max_tokens(None, 4096) == 4096
 
 
 @pytest.mark.asyncio

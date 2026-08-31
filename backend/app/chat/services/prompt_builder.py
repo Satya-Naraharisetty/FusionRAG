@@ -45,22 +45,22 @@ class PromptBuilder:
     @staticmethod
     def get_adaptive_max_tokens(
         query_type: str | None = None,
-        base_max_tokens: int = 1000,
+        base_max_tokens: int = 4096,
     ) -> int:
         """
         Dynamically calculate max response tokens based on the classified query intent
-        to minimize latency, prevent runaway responses, and reduce token consumption.
+        while ensuring sufficient headroom for complete, untruncated responses.
         """
         if not query_type:
             return base_max_tokens
 
         qt = str(query_type).upper()
         if "CONVERSATIONAL" in qt or "GREETING" in qt:
-            return min(150, base_max_tokens)
+            return min(1024, base_max_tokens)
         elif "FACTUAL" in qt or "NUMERICAL" in qt:
-            return min(350, base_max_tokens)
+            return min(2048, base_max_tokens)
         elif "COMPARISON" in qt or "MULTI_HOP" in qt:
-            return min(800, base_max_tokens)
+            return base_max_tokens
         elif "EXPLANATION" in qt or "MULTI_DOCUMENT" in qt:
             return base_max_tokens
         return base_max_tokens

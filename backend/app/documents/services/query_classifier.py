@@ -228,18 +228,17 @@ class DeterministicQueryClassifier(QueryClassifier):
                     reasons=["Matched entity relationship / knowledge graph pattern"],
                 )
 
-        word_count = len(words)
-
-        # 1. Conversational Check
-        if (
+        # 1. Conversational Check (pure greetings, salutations, casual status check)
+        is_pure_greeting = (
             lower in self._GREETINGS
-            or (words and words[0] in self._CONVERSATIONAL_PREFIXES)
             or (
                 word_count <= 4
-                and any(g in lower for g in ("how are you", "what's up", "who are you"))
+                and any(g in lower for g in ("how are you", "what's up", "who are you", "what can you do"))
             )
             or (word_count <= 3 and any(w in self._GREETINGS for w in words))
-        ):
+            or (word_count <= 2 and words and words[0] in self._CONVERSATIONAL_PREFIXES)
+        )
+        if is_pure_greeting:
             return QueryClassification(
                 query_type=QueryType.CONVERSATIONAL,
                 confidence=0.95,
@@ -249,9 +248,19 @@ class DeterministicQueryClassifier(QueryClassifier):
                 reasons=["Matched conversational greeting or salutation pattern"],
             )
 
+        # For queries with leading greetings (e.g. "hello, can you compare..."), strip greeting prefix for pattern matching
+        clean_lower = re.sub(
+            r"^(?:hello|hi|hey|greetings|dear|good\s+(?:morning|afternoon|evening))\b[\s,:-]*",
+            "",
+            lower,
+            flags=re.IGNORECASE,
+        ).strip()
+        if not clean_lower:
+            clean_lower = lower
+
         # 2. Multi-Document Check
         for pattern in self._MULTI_DOCUMENT_PATTERNS:
-            if pattern.search(lower):
+            if pattern.search(lower) or pattern.search(clean_lower):
                 return QueryClassification(
                     query_type=QueryType.MULTI_DOCUMENT,
                     confidence=0.90,
@@ -264,7 +273,7 @@ class DeterministicQueryClassifier(QueryClassifier):
 
         # 3. Multi-Hop Check
         for pattern in self._MULTI_HOP_PATTERNS:
-            if pattern.search(lower):
+            if pattern.search(lower) or pattern.search(clean_lower):
                 return QueryClassification(
                     query_type=QueryType.MULTI_HOP,
                     confidence=0.88,
@@ -277,7 +286,7 @@ class DeterministicQueryClassifier(QueryClassifier):
 
         # 4. Comparison Check
         for pattern in self._COMPARISON_PATTERNS:
-            if pattern.search(lower):
+            if pattern.search(lower) or pattern.search(clean_lower):
                 # Conservative check: is this a multi-target comparison or a simple single comparison?
                 # Multi-target indicator: contains multiple independent aspects or conjuncts
                 has_multi_targets = bool(
@@ -300,7 +309,9 @@ class DeterministicQueryClassifier(QueryClassifier):
                 )
 
         # 5. Numerical Check
-        numerical_hits = sum(1 for p in self._NUMERICAL_PATTERNS if p.search(lower))
+        numerical_hits = sum(
+            1 for p in self._NUMERICAL_PATTERNS if (p.search(lower) or p.search(clean_lower))
+        )
         if numerical_hits >= 1:
             # Check if it has multiple sub-questions
             if " and " in lower and word_count > 8:
@@ -341,7 +352,7 @@ class DeterministicQueryClassifier(QueryClassifier):
 
         # 7. Explanation Check
         for pattern in self._EXPLANATION_PATTERNS:
-            if pattern.search(lower):
+            if pattern.search(lower) or pattern.search(clean_lower):
                 return QueryClassification(
                     query_type=QueryType.EXPLANATION,
                     confidence=0.85,

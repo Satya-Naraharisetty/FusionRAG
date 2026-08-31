@@ -87,6 +87,18 @@ def test_classifies_conversational_query(classifier):
     assert classification.recommended_top_k == 5
 
 
+def test_classifies_substantive_query_with_greeting_prefix(classifier):
+    # Queries starting with greetings but containing substantive requests should not be misclassified as pure greetings
+    c1 = classifier.classify("hello, can you help me build a rag chatbot?")
+    assert c1.query_type != QueryType.CONVERSATIONAL
+
+    c2 = classifier.classify("Hi, compare JWT and OAuth authentication")
+    assert c2.query_type == QueryType.COMPARISON
+
+    c3 = classifier.classify("Hey, explain how vector embeddings work")
+    assert c3.query_type == QueryType.EXPLANATION
+
+
 def test_classification_is_deterministic(classifier):
     q = "What is the token lifetime for JWT access tokens?"
     c1 = classifier.classify(q)
