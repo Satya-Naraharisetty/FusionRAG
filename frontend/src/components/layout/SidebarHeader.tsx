@@ -47,6 +47,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
     return (
       <div className="flex flex-col items-center gap-2 py-3">
         <button
+          id="sidebar-new-chat-btn"
           onClick={onNewChat}
           className={cn(
             "w-10 h-10 rounded-[var(--radius-lg)] flex items-center justify-center cursor-pointer transition-colors",
@@ -62,6 +63,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                id="sidebar-library-btn"
                 onClick={() => navigate("/documents")}
                 className={cn(
                   "relative w-10 h-10 rounded-[var(--radius-lg)] flex items-center justify-center cursor-pointer transition-colors",
@@ -112,6 +114,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
     <div className="flex flex-col gap-1 p-2 pb-1">
       {/* ── New Chat Link ── */}
       <button
+        id="sidebar-new-chat-btn"
         onClick={onNewChat}
         className={cn(
           "w-full h-9 rounded-[var(--radius-lg)] flex items-center gap-3 px-3 cursor-pointer text-[13px] font-medium transition-colors text-left",
@@ -129,6 +132,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              id="sidebar-library-btn"
               onClick={() => navigate("/documents")}
               className={cn(
                 "w-full h-9 rounded-[var(--radius-lg)] flex items-center justify-between px-3 cursor-pointer text-[13px] font-medium transition-colors text-left",

@@ -2,22 +2,128 @@ import React, { useState, useEffect } from "react";
 import { X, ChevronLeft, ChevronRight, HelpCircle, Sparkles, FileText, Keyboard, MessageSquare } from "lucide-react";
 import { Button } from "../ui/Button";
 
+interface TooltipConfig {
+  selector: string;
+  label: string;
+  icon: React.ReactNode;
+  desc: string;
+  fallback: { top: number; left: number; side: "left" | "top" };
+}
+
+const tooltipConfigs: TooltipConfig[] = [
+  {
+    selector: "#sidebar-new-chat-btn",
+    label: "Create Chats",
+    icon: <Sparkles size={13} className="text-[var(--accent-primary)]" />,
+    desc: "Click here to start a fresh chat thread anytime.",
+    fallback: { top: 60, left: 284, side: "left" },
+  },
+  {
+    selector: "#sidebar-library-btn",
+    label: "Document Library",
+    icon: <FileText size={13} className="text-[var(--accent-primary)]" />,
+    desc: "Upload files (PDF, DOCX, TXT, MD) to build and query your knowledge base.",
+    fallback: { top: 100, left: 284, side: "left" },
+  },
+  {
+    selector: "#sidebar-search-input",
+    label: "Search & Shortcuts",
+    icon: <Keyboard size={13} className="text-[var(--accent-primary)]" />,
+    desc: "Quickly search past conversations or press Ctrl+K for the command palette.",
+    fallback: { top: 180, left: 284, side: "left" },
+  },
+];
+
 export const OnboardingTour: React.FC = () => {
-  const [isOpen, setIsOpen]               = useState(false);
-  const [slideIdx, setSlideIdx]           = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
+  const [slideIdx, setSlideIdx] = useState(0);
   const [showTooltipStep, setShowTooltipStep] = useState<number | null>(null);
+  const [tooltipLayout, setTooltipLayout] = useState<{
+    top: number;
+    left: number;
+    arrowSide: "left" | "top";
+    targetRect: { top: number; left: number; width: number; height: number } | null;
+  } | null>(null);
 
   useEffect(() => {
     const completed = localStorage.getItem("onboarding-completed");
     if (!completed) setIsOpen(true);
   }, []);
 
+  useEffect(() => {
+    if (showTooltipStep === null) {
+      setTooltipLayout(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      const cfg = tooltipConfigs[showTooltipStep];
+      if (!cfg) return;
+
+      const el = document.querySelector(cfg.selector);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const tooltipWidth = 240;
+        const tooltipHeight = 140;
+        const spaceRight = window.innerWidth - rect.right;
+
+        if (spaceRight >= tooltipWidth + 16) {
+          // Position to the right of the target element
+          const targetCenterY = rect.top + rect.height / 2;
+          const top = Math.max(16, Math.min(targetCenterY - 36, window.innerHeight - tooltipHeight - 16));
+          const left = rect.right + 12;
+          setTooltipLayout({
+            top,
+            left,
+            arrowSide: "left",
+            targetRect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+          });
+        } else {
+          // Position below the target element
+          const top = Math.min(rect.bottom + 10, window.innerHeight - tooltipHeight - 16);
+          const left = Math.max(16, Math.min(rect.left, window.innerWidth - tooltipWidth - 16));
+          setTooltipLayout({
+            top,
+            left,
+            arrowSide: "top",
+            targetRect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+          });
+        }
+      } else {
+        // Sane fallback
+        setTooltipLayout({
+          top: cfg.fallback.top,
+          left: cfg.fallback.left,
+          arrowSide: cfg.fallback.side,
+          targetRect: null,
+        });
+      }
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    const timer = setTimeout(updatePosition, 50);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      clearTimeout(timer);
+    };
+  }, [showTooltipStep]);
+
   const handleNext = () => {
     if (slideIdx < 3) setSlideIdx(slideIdx + 1);
-    else { setIsOpen(false); setShowTooltipStep(0); }
+    else {
+      setIsOpen(false);
+      setShowTooltipStep(0);
+    }
   };
 
-  const handlePrev = () => { if (slideIdx > 0) setSlideIdx(slideIdx - 1); };
+  const handlePrev = () => {
+    if (slideIdx > 0) setSlideIdx(slideIdx - 1);
+  };
 
   const handleSkip = () => {
     setIsOpen(false);
@@ -26,8 +132,14 @@ export const OnboardingTour: React.FC = () => {
     showCompletionToast();
   };
 
+  const handlePrevTooltip = () => {
+    if (showTooltipStep !== null && showTooltipStep > 0) {
+      setShowTooltipStep(showTooltipStep - 1);
+    }
+  };
+
   const handleNextTooltip = () => {
-    if (showTooltipStep !== null && showTooltipStep < 2) {
+    if (showTooltipStep !== null && showTooltipStep < tooltipConfigs.length - 1) {
       setShowTooltipStep(showTooltipStep + 1);
     } else {
       setShowTooltipStep(null);
@@ -38,14 +150,16 @@ export const OnboardingTour: React.FC = () => {
 
   const showCompletionToast = () => {
     const el = document.createElement("div");
-    el.className = "fixed bottom-6 right-6 z-50 bg-[var(--bg-elevated)] border border-[var(--border-default)] text-[var(--text-primary)] text-xs font-medium px-4 py-3 rounded-[var(--radius-xl)] shadow-md flex items-center gap-2 animate-in slide-in-from-bottom duration-300";
+    el.className =
+      "fixed bottom-6 right-6 z-50 bg-[var(--bg-elevated)] border border-[var(--border-default)] text-[var(--text-primary)] text-xs font-medium px-4 py-3 rounded-[var(--radius-xl)] shadow-md flex items-center gap-2 animate-in slide-in-from-bottom duration-300";
     el.innerHTML = `<span class="text-emerald-400">✨</span> Onboarding complete! Feel free to start chatting.`;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 4000);
   };
 
   /* Shared kbd style */
-  const kbd = "bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] px-1 py-0.5 rounded text-[var(--text-muted)] text-[10px] font-mono";
+  const kbd =
+    "bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] px-1 py-0.5 rounded text-[var(--text-muted)] text-[10px] font-mono";
 
   if (!isOpen && showTooltipStep === null) return null;
 
@@ -151,31 +265,74 @@ export const OnboardingTour: React.FC = () => {
         </div>
       )}
 
-      {/* ── Tooltip steps ── */}
-      {[0, 1, 2].map((step) => {
-        if (showTooltipStep !== step) return null;
-        const configs = [
-          { label: "Create Chats",        icon: <Sparkles size={12} className="text-[var(--accent-primary)]" />, desc: "Click here to start a new chat thread.", pos: "bottom-[74px] left-[70px]" },
-          { label: "Upload Knowledge",    icon: <FileText size={12} className="text-[var(--accent-primary)]" />, desc: "Access the documents dashboard to upload files and build your knowledge base.", pos: "bottom-[32px] left-[70px]" },
-          { label: "Keyboard Shortcuts",  icon: <Keyboard size={12} className="text-[var(--accent-primary)]" />, desc: "Use Ctrl+K for the command palette, Ctrl+N for new chat, and arrow keys to navigate.", pos: "bottom-[20px] left-[150px]" },
-        ];
-        const c = configs[step];
-        return (
-          <div
-            key={step}
-            className={`fixed ${c.pos} z-50 max-w-[220px] bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-xl)] p-3 shadow-md animate-bounce`}
-          >
-            <div className="absolute left-[-5px] top-5 w-2.5 h-2.5 rotate-45 bg-[var(--bg-elevated)] border-l border-b border-[var(--border-default)]" />
-            <h4 className="text-xs font-semibold text-[var(--text-primary)] mb-1 flex items-center gap-1.5">
-              {c.icon} {c.label}
+      {/* ── Spotlight on active element ── */}
+      {showTooltipStep !== null && tooltipLayout?.targetRect && (
+        <div
+          style={{
+            top: tooltipLayout.targetRect.top - 3,
+            left: tooltipLayout.targetRect.left - 3,
+            width: tooltipLayout.targetRect.width + 6,
+            height: tooltipLayout.targetRect.height + 6,
+          }}
+          className="fixed z-40 pointer-events-none rounded-[var(--radius-lg)] border-2 border-[var(--accent-primary)] ring-4 ring-[var(--accent-primary)]/20 animate-pulse transition-all duration-200"
+        />
+      )}
+
+      {/* ── Tooltip step card ── */}
+      {showTooltipStep !== null && tooltipLayout && (
+        <div
+          style={{
+            top: `${tooltipLayout.top}px`,
+            left: `${tooltipLayout.left}px`,
+          }}
+          className="fixed z-50 w-[240px] bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-xl)] p-3.5 shadow-xl animate-in fade-in zoom-in-95 duration-200 transition-all"
+        >
+          {/* Arrow pointer */}
+          {tooltipLayout.arrowSide === "left" && (
+            <div className="absolute left-[-5px] top-6 w-2.5 h-2.5 rotate-45 bg-[var(--bg-elevated)] border-l border-b border-[var(--border-default)]" />
+          )}
+          {tooltipLayout.arrowSide === "top" && (
+            <div className="absolute top-[-5px] left-6 w-2.5 h-2.5 rotate-45 bg-[var(--bg-elevated)] border-t border-l border-[var(--border-default)]" />
+          )}
+
+          {/* Header */}
+          <div className="flex items-center justify-between mb-1.5">
+            <h4 className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+              {tooltipConfigs[showTooltipStep].icon} {tooltipConfigs[showTooltipStep].label}
             </h4>
-            <p className="text-[10px] text-[var(--text-muted)] leading-normal mb-2.5">{c.desc}</p>
-            <Button size="sm" onClick={handleNextTooltip} fullWidth className="h-7 text-[10px]">
-              {step === 2 ? "Finish Tour" : "Got it"}
+            <span className="text-[9px] font-mono text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">
+              {showTooltipStep + 1}/{tooltipConfigs.length}
+            </span>
+          </div>
+
+          <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed mb-3">
+            {tooltipConfigs[showTooltipStep].desc}
+          </p>
+
+          {/* Controls */}
+          <div className="flex items-center gap-1.5">
+            {showTooltipStep > 0 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handlePrevTooltip}
+                className="h-7 text-[10px] px-2"
+              >
+                Back
+              </Button>
+            )}
+            <Button
+              size="sm"
+              onClick={handleNextTooltip}
+              fullWidth
+              className="h-7 text-[10px]"
+            >
+              {showTooltipStep === tooltipConfigs.length - 1 ? "Finish Tour" : "Got it"}
             </Button>
           </div>
-        );
-      })}
+        </div>
+      )}
     </>
   );
 };
+
