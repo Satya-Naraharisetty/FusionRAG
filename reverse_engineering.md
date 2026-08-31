@@ -64,7 +64,7 @@ This document is the **definitive, exhaustive technical specification, data flow
   - [25. PlanValidator: Schema, Cycle Detection & Constraint Enforcement](#25-planvalidator-schema-cycle-detection--constraint-enforcement)
   - [26. TaskRouter & CapabilityRegistry: Capability-Aware Cost/Latency Routing](#26-taskrouter--capabilityregistry-capability-aware-costlatency-routing)
   - [27. AgentExecutor, ToolRegistry & Single-Agent Tool Calling Subsystem](#27-agentexecutor-toolregistry--single-agent-tool-calling-subsystem)
-  - [28. Multi-Agent Operational Subsystems: Health Diagnostics, Title Generator & Retention](#28-multi-agent-operational-subsystems-health-diagnostics-title-generator--retention)
+  - [28. Multi-Agent & Chat Operational Subsystems: Access Control, Memory & Title Generator](#28-multi-agent--chat-operational-subsystems-access-control-memory--title-generator)
 - [Part IV: Complete Relational Database Schema & Data Models (All 25 PostgreSQL Tables)](#part-iv-complete-relational-database-schema--data-models-all-25-postgresql-tables)
   - [29. Relational Architecture, Entity-Relationship Diagram (ERD) & Bounded Contexts](#29-relational-architecture-entity-relationship-diagram-erd--bounded-contexts)
   - [30. Authentication & Security Context (5 Tables)](#30-authentication--security-context-5-tables)
@@ -83,7 +83,7 @@ This document is the **definitive, exhaustive technical specification, data flow
   - [42. Resend Email Service, Token Cost Pricing Engine & Dynamic Feature Flags](#42-resend-email-service-token-cost-pricing-engine--dynamic-feature-flags)
   - [43. Application Lifespan, Startup Hooks & Middleware Cardinality Defense](#43-application-lifespan-startup-hooks--middleware-cardinality-defense)
 - [Part VI: Document Ingestion, Advanced Chunking & Retrieval Intelligence](#part-vi-document-ingestion-advanced-chunking--retrieval-intelligence)
-  - [44. Ingestion Worker Lease Protocol & Durable Ingestion Reaper](#44-ingestion-worker-lease-protocol--durable-ingestion-reaper)
+  - [44. Ingestion Worker Lease Protocol, Multi-Phase Pipeline & Durable Reaper](#44-ingestion-worker-lease-protocol-multi-phase-pipeline--durable-reaper)
   - [45. Advanced Chunking Strategies: Recursive, Parent-Child & Sentence-Window](#45-advanced-chunking-strategies-recursive-parent-child--sentence-window)
   - [46. Empty Knowledge Base Index Cache & Weighted RRF Fusion](#46-empty-knowledge-base-index-cache--weighted-rrf-fusion)
   - [47. Document Parsers, Multimodal OCR & Metadata Extractors](#47-document-parsers-multimodal-ocr--metadata-extractors)
@@ -539,7 +539,7 @@ sequenceDiagram
         DB-->>API: Valid Session Row
         API->>DB: UPDATE refresh_sessions SET is_revoked=TRUE, revoked_at=now() WHERE id=:session_id
         API->>Hasher: Generate new 32-byte secure random token
-        API->>DB: INSERT INTO refresh_sessions (id, token_hash=sha256(new_token), user_id, expires_at)
+        API->>DB: INSERT INTO refresh_sessions (id, token_hash=sha256(new_token), user_id, expires_at, last_used_at=now())
         API->>API: Generate new 15-min JWT access token
         API-->>Client: HTTP 200 OK (New Access Token in Body, New Refresh Token in HttpOnly Cookie)
     end
@@ -670,7 +670,6 @@ def _apply_evidence_relevance_gate(
     gated_results = []
     rejected_count = 0
     for res in results:
-        # Filter out evidence items with relevance score below threshold
         filtered_evidence = [
             item for item in res.evidence if item.relevance_score >= 0.65
         ]
@@ -830,8 +829,13 @@ Located in `backend/app/chat/services/`:
 
 ---
 
-## 28. Multi-Agent Operational Subsystems: Health Diagnostics, Title Generator & Retention
+## 28. Multi-Agent & Chat Operational Subsystems: Access Control, Memory & Title Generator
 
+- **`ConversationAccessService` (`access_service.py`)**: Centralized ownership & authorization verification protecting conversations and scoped document attachments.
+- **`ConversationSummarizer` & `RollingMemoryManager` (`conversation_summarizer.py`, `rolling_memory.py`)**: Triggered when active conversation length exceeds `SUMMARY_TRIGGER_MESSAGES=20`, producing incremental records in `conversation_summaries`.
+- **Message Branching & Edit Truncation (`delete_messages_from`)**: ChatGPT-style message editing where deleting or modifying a message cascades and deletes all subsequent replies.
+- **`TokenEstimator` (`token_estimator.py`)**: Context overflow prevention before external LLM calls.
+- **`AnswerGenerationService` (`answer_generation_service.py`)**: Non-streaming answer generator with citation grounding.
 - **Multi-Agent Health Diagnostics (`health_diagnostics.py`)**: Monitors background specialist health and marks degraded agents for automatic bypass.
 - **Automated Title Generation (`title_generator.py`)**: Non-blocking background extraction and LLM summarization for conversation titles.
 - **Conversation Retention Service (`retention_service.py`)**: Automated sweeps archiving conversations older than `MAX_CONVERSATION_AGE_DAYS=90`.
@@ -845,6 +849,12 @@ Located in `backend/app/chat/services/`:
 ### 29.1 Composite Foreign Keys, Partial Indexes & SQLite Variants
 - **Composite Tenant Fencing**: Tables (`document_processing_runs`, `document_processing_jobs`, `document_elements`, `graph_relationship_evidence`, `graph_entity_mentions`) enforce composite FKs on `["user_id", "document_id"]` referencing `documents(user_id, id)` with `ON DELETE CASCADE`.
 - **Partial Unique Index**: `CREATE UNIQUE INDEX uq_processing_runs_doc_active ON document_processing_runs(document_id) WHERE state = 'ACTIVE';` ensures a single active pipeline run per document.
+- **Column Alias Mapping**: SQLAlchemy model attribute aliases map directly to raw DB column names:
+  - `settings_json` $\rightarrow$ DB column `"settings"`
+  - `metadata_json` $\rightarrow$ DB column `"metadata"`
+  - `payload_json` $\rightarrow$ DB column `"payload"`
+  - `properties_json` $\rightarrow$ DB column `"properties"`
+  - `bounding_box_json` $\rightarrow$ DB column `"bounding_box"`
 - **Cross-Dialect SQLite Type Variance**: Uses `.with_variant(JSON(), "sqlite")`, `.with_variant(Integer(), "sqlite")`, and `.with_variant(Text(), "sqlite")` across `JSONB`, `BigInteger`, and `TSVECTOR` columns for in-memory SQLite unit testing.
 
 ```mermaid
@@ -904,6 +914,7 @@ erDiagram
 - `user_agent` (TEXT)
 - `is_revoked` (BOOLEAN, default `FALSE`, Indexed)
 - `revoked_at` (TIMESTAMPTZ, Nullable)
+- `last_used_at` (TIMESTAMPTZ, default `now()`)
 - `expires_at` (TIMESTAMPTZ, Indexed)
 - `created_at` (TIMESTAMPTZ, default `now()`)
 
@@ -945,8 +956,8 @@ erDiagram
 - `user_id` (UUID, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE, Indexed)
 - `title` (VARCHAR(255), default `'New Conversation'`)
 - `state` (VARCHAR(50), default `'active'`, Indexed) — `active`, `archived`
-- `settings_json` (JSONB, default `'{}'`)
-- `metadata_json` (JSONB, default `'{}'`)
+- `settings` (JSONB, default `'{}'`, ORM alias `settings_json`)
+- `metadata` (JSONB, default `'{}'`, ORM alias `metadata_json`)
 - `version` (INTEGER, default `1`) — Optimistic Concurrency Control
 - `last_message_at` (TIMESTAMPTZ, default `now()`, Indexed)
 - `created_at` (TIMESTAMPTZ, default `now()`)
@@ -962,7 +973,7 @@ erDiagram
 - `citations` (JSONB, default `'[]'`)
 - `structured_content` (JSONB, default `'{}'`)
 - `tool_calls` (JSONB, default `'[]'`)
-- `metadata_json` (JSONB, default `'{}'`)
+- `metadata` (JSONB, default `'{}'`, ORM alias `metadata_json`)
 - `prompt_tokens` (INTEGER, default `0`)
 - `completion_tokens` (INTEGER, default `0`)
 - `execution_duration_ms` (FLOAT, default `0.0`)
@@ -1014,13 +1025,10 @@ erDiagram
 - `document_id` (UUID, Foreign Key $\rightarrow$ `documents.id` ON DELETE CASCADE, Indexed)
 - `chunk_index` (INTEGER)
 - `text` (TEXT)
-- `token_count` (INTEGER)
 - `token_estimate` (INTEGER, default `0`)
 - `character_start` (INTEGER, Nullable)
 - `character_end` (INTEGER, Nullable)
-- `metadata_json` (JSON, default `'{}'`)
-- `parent_chunk_id` (UUID, Nullable, Foreign Key $\rightarrow$ `document_chunks.id`)
-- `page_number` (INTEGER, Nullable)
+- `metadata` (JSON, default `'{}'`, ORM alias `metadata_json`)
 - `search_vector` (TSVECTOR, Generated Stored, GIN Indexed)
 - `created_at` (TIMESTAMPTZ, default `now()`)
 
@@ -1040,8 +1048,8 @@ erDiagram
 - `element_type` (VARCHAR(50)) — `table`, `figure`, `image`, `header`
 - `content` (TEXT)
 - `normalized_content` (TEXT, Nullable)
-- `bounding_box_json` (JSONB, default `'{}'`)
-- `metadata_json` (JSONB, default `'{}'`)
+- `bounding_box` (JSONB, default `'{}'`, ORM alias `bounding_box_json`)
+- `metadata` (JSONB, default `'{}'`, ORM alias `metadata_json`)
 - `page_number` (INTEGER)
 - `search_vector` (TSVECTOR, Generated Stored, GIN Indexed)
 
@@ -1074,10 +1082,12 @@ erDiagram
 - `id` (UUID, Primary Key)
 - `resource_type` (VARCHAR(50)) — `document`, `conversation`, `user`
 - `resource_id` (UUID, Indexed)
-- `s3_path` (VARCHAR(1024), Nullable)
-- `qdrant_filter_json` (JSONB, Nullable)
+- `payload` (JSON, default `'{}'`)
 - `status` (VARCHAR(50), default `'PENDING'`, Indexed)
 - `attempts` (INTEGER, default `0`)
+- `last_error` (TEXT, Nullable)
+- `created_at` (TIMESTAMPTZ, default `now()`)
+- `completed_at` (TIMESTAMPTZ, Nullable)
 
 ---
 
@@ -1119,15 +1129,23 @@ erDiagram
 
 ### 34.1 `outbox_events` Table
 - `id` (UUID, Primary Key)
+- `document_id` (UUID, Nullable, Indexed)
+- `document_version` (INTEGER, Nullable)
+- `user_id` (UUID, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE, Indexed)
 - `event_type` (VARCHAR(100), Indexed) — `document.created`, `document.deleted`, `chat.completed`
-- `payload` (JSONB)
+- `payload` (JSONB, ORM alias `payload_json`)
 - `status` (VARCHAR(50), default `'PENDING'`, Indexed) — `PENDING`, `PUBLISHED`, `FAILED`
-- `retry_count` (INTEGER, default `0`)
 - `created_at` (TIMESTAMPTZ, default `now()`, Indexed)
 - `published_at` (TIMESTAMPTZ, Nullable)
+- *Constraint*: `UNIQUE (user_id, document_id, document_version, event_type)`
 
 ### 34.2 `evaluation_runs` Table
 - `id` (UUID, Primary Key)
+- `name` (VARCHAR(255))
+- `dataset_id` (VARCHAR(100), Indexed)
+- `dataset_version` (VARCHAR(50))
+- `total_samples` (INTEGER, default `0`)
+- `completed_samples` (INTEGER, default `0`)
 - `profile` (VARCHAR(100))
 - `provider` (VARCHAR(50))
 - `model` (VARCHAR(100))
@@ -1144,16 +1162,25 @@ erDiagram
 - `avg_latency` (FLOAT, default `0.0`)
 - `max_latency` (FLOAT, default `0.0`)
 - `status` (VARCHAR(50), Indexed)
+- `error_message` (TEXT, Nullable)
 - `created_at` (TIMESTAMPTZ, default `now()`)
+- `completed_at` (TIMESTAMPTZ, Nullable)
 
 ### 34.3 `evaluation_results` Table
 - `id` (UUID, Primary Key)
 - `run_id` (UUID, Foreign Key $\rightarrow$ `evaluation_runs.id` ON DELETE CASCADE, Indexed)
 - `sample_id` (VARCHAR(100), Indexed)
-- `query` (TEXT)
-- `ground_truth` (TEXT)
-- `generated_answer` (TEXT)
-- `metrics_json` (JSONB)
+- `question` (TEXT)
+- `expected_answer` (TEXT)
+- `actual_answer` (TEXT)
+- `latency` (FLOAT, default `0.0`)
+- `input_tokens` (INTEGER, default `0`)
+- `output_tokens` (INTEGER, default `0`)
+- `cost` (FLOAT, default `0.0`)
+- `error_category` (VARCHAR(100), Nullable)
+- `metrics` (JSONB, default `'{}'`)
+- `retrieved_contexts` (JSONB, default `'[]'`)
+- `metadata` (JSONB, default `'{}'`, ORM alias `metadata_json`)
 
 ### 34.4 `benchmark_runs` Table
 - `id` (UUID, Primary Key)
@@ -1161,7 +1188,7 @@ erDiagram
 - `profile` (VARCHAR(100))
 - `status` (VARCHAR(50))
 - `results_summary` (JSON, default `'{}'`)
-- `metadata_json` (JSON, default `'{}'`)
+- `metadata` (JSON, default `'{}'`, ORM alias `metadata_json`)
 - `created_at` (TIMESTAMPTZ, default `now()`)
 
 ---
@@ -1217,7 +1244,7 @@ flowchart TD
 ```
 
 - **L1 In-Memory Cache**: LRU eviction ($N=1000$ entries, TTL=60s).
-- **L2 Redis Cache**: Partitioned by namespace (`cache:embeddings:*`, `cache:exact_llm:*`, `cache:retrieval:*`, `cache:query_rewrite:*`).
+- **L2 Redis Cache**: Partitioned by 6 managed namespaces (`prompt_rewrite`, `embeddings`, `conversation_memory`, `retrieval_results`, `evaluation_benchmarks`, `tool_executions`).
 - **Distributed Heartbeat Lock (`lock.py`)**: Mutex with background coroutine extending TTL during active long-running jobs.
 
 ---
@@ -1243,9 +1270,9 @@ stateDiagram-v2
 ## 40. Transactional Outbox Pattern, Event Bus & JobDispatcher Engine
 
 Located in `backend/app/core/events/` and `backend/app/core/queue/`:
-- **Transactional Outbox (`outbox_dispatcher.py`)**: Guaranteed message delivery through atomic PostgreSQL commits.
+- **Transactional Outbox (`outbox_dispatcher.py`)**: Guaranteed message delivery through atomic PostgreSQL commits with idempotency constraints.
 - **JobDispatcher & Handlers (`dispatcher.py`, `handlers.py`)**:
-  - `ProcessDocumentJobHandler`: Manages extraction, chunking, and NER linking.
+  - `ProcessDocumentJobHandler`: Manages extraction, chunking, and NER linking across 6 stages.
   - `GenerateEmbeddingsJobHandler`: Dispatches batch embeddings to Jina and upserts to Qdrant.
   - `SummarizeConversationJobHandler`: Executes asynchronous rolling summarization.
   - `InMemoryDurableTaskQueue`: Lightweight in-memory fallback.
@@ -1271,18 +1298,30 @@ Located in `backend/app/documents/services/cleanup_worker.py` and `app/documents
 ## 43. Application Lifespan, Startup Hooks & Middleware Cardinality Defense
 
 Located in `backend/app/main.py` and `backend/app/core/startup.py`:
-- **Lifespan Startup Tasks**: `seed_admin_user`, `cleanup_stale_unverified_signups`, `verify_alembic_migrations`, and Jina cross-encoder pre-warming.
+- **Lifespan Startup Tasks**:
+  - `seed_admin_user`: Auto-provisions system administrator on initial startup.
+  - `cleanup_stale_unverified_signups`: Purges abandoned unverified accounts older than 7 days.
+  - `run_durable_cleanup_recovery`: Reclaims orphaned two-phase deletion jobs.
+  - `verify_alembic_migrations`: Verifies database revision matches codebase.
+  - Pre-warms Jina cross-encoder network sessions.
 - **Middleware Cardinality Defense (`resolve_route_template()`)**: Normalizes raw UUID path variables into `/api/v1/conversations/{id}` to prevent Prometheus metric cardinality explosions.
 
 ---
 
 # Part VI: Document Ingestion, Advanced Chunking & Retrieval Intelligence
 
-## 44. Ingestion Worker Lease Protocol & Durable Ingestion Reaper
+## 44. Ingestion Worker Lease Protocol, Multi-Phase Pipeline & Durable Reaper
 
-Located in `backend/app/documents/services/`:
-- **Distributed Lease Locking**: Worker claims job with a unique `lease_token` (UUIDv4) and `lease_expires_at = now() + 180s`.
-- **Durable Ingestion Reaper (`ingestion_reaper.py`)**: Runs every 60s (`INGESTION_REAPER_INTERVAL_SECONDS=60.0`), reclaiming expired worker leases and routing failed jobs to `stream:jobs:dead_letter` after 3 attempts.
+### 44.1 Multi-Phase Ingestion State Machine (`ProcessDocumentJobHandler`)
+1. **Stage 1 (File Retrieval)**: Retrieves raw binary payload from configured `StorageProvider` (`database`, `local`, `s3`).
+2. **Stage 2 (Parsing)**: Invokes `ExtractorFactory` (`PDFExtractor`, `DocxExtractor`, `ImageVisionExtractor`, `MarkdownExtractor`, `PlainTextExtractor`).
+3. **Stage 3 (Knowledge Graph NER)**: Extracts entity triplets into `graph_entities` and `graph_relationships`.
+4. **Stage 4 (Chunking)**: Generates character-bounded chunks with token estimations and full-text GIN search vectors.
+5. **Stage 5 (Embedding Dispatch)**: Enqueues `GENERATE_EMBEDDINGS` task for Qdrant indexing.
+6. **Stage 6 (Cache Invalidation)**: Clears empty knowledge base cache for `user_id`.
+
+### 44.2 Durable Ingestion Reaper
+Runs every 60s (`INGESTION_REAPER_INTERVAL_SECONDS=60.0`), reclaiming expired worker leases and routing failed jobs to `stream:jobs:dead_letter` after 3 attempts.
 
 ---
 
@@ -1371,8 +1410,8 @@ Located in `frontend/src/workers/pyodide.worker.ts` and `frontend/src/lib/pyodid
 ## 52. Complete Custom Hook Architecture & State Context Providers
 
 ### 52.1 Frontend Context Providers
-- **`UploadQueueContext.tsx`**: Client-side progressive upload state machine, concurrency queue, and retry coordinator.
-- **`AuthContext.tsx`**: Session state, token refresh listener, and profile management.
+- **`UploadQueueContext.tsx`**: Multi-file progressive upload coordinator managing concurrency, per-file stage progress (1-7), error recovery, and cancellation tokens.
+- **`AuthContext.tsx`**: In-memory JWT storage, 14-minute silent token refresh via HTTP-only cookie, and global login modal triggers.
 - **`ThemeContext.tsx`**: Dark/Light mode tokens and system preference syncing.
 
 ### 52.2 Complete Custom Hook Inventory
@@ -1444,10 +1483,17 @@ stateDiagram-v2
 
 ### 56.1 Core Pydantic DTO Schema Definitions
 - **`VerifyEmailSchema`**: `{ email: str, token: str | None, otp: str | None }`
+- **`ResendVerificationSchema`**: `{ email: str }`
+- **`MagicLinkRequestSchema`**: `{ email: str }`
+- **`UpdatePasswordSchema`**: `{ current_password: str | None, new_password: str }`
+- **`DeleteAccountSchema`**: `{ password: str }`
 - **`ChatRequest`**: `{ question: str, conversation_id: UUID | None, stream: bool = True, document_ids: list[UUID] | None = None }`
 - **`HybridSearchRequest`**: `{ query: str, conversation_id: UUID | None = None, top_k: int = 20, alpha: float = 0.5, filter: dict | None = None }`
 - **`UpdateUserSettingsSchema`**: Partial JSONB updates for `folders`, `pinned_conversations`, `document_folders`, `preferences`.
 - **`EmbeddingStatusResponse`**: `{ document_id: UUID, status: str, total_chunks: int, indexed_chunks: int, progress_pct: float }`
+- **`RunBenchmarkRequest`**: `{ dataset_path: str, dataset_id: str, version: str, profile: str = "quick", pipelines: list[str] | None = None, mock: bool = False }`
+- **`RegressionRequest`**: `{ candidate_run_id: str, baseline_run_id: str, thresholds: dict[str, float] | None = None }`
+- **`DeepHealthResponse`**: `{ status: str, version: str, database: dict, redis: dict, vector_db: dict, storage: dict, llm: dict }`
 
 ```
 ========================================================================================================================
@@ -1467,7 +1513,7 @@ POST         /api/v1/auth/login                                 No             P
 POST         /api/v1/auth/magic-link                            No             Passwordless magic sign-in link generation
 POST         /api/v1/auth/refresh                               Cookie         Rotate refresh token and issue new 15-min JWT
 POST         /api/v1/auth/logout                                Yes            Revoke refresh session and clear cookies
-POST         /api/v1/auth/password                              Yes            Authenticated password update with old/new validation
+POST         /api/v1/auth/password                              Yes            Authenticated password update (UpdatePasswordSchema)
 POST         /api/v1/auth/verify-email                          No             Verify signup token hash or 6-digit OTP code
 POST         /api/v1/auth/resend-verification                   No             Resend email verification link
 GET          /api/v1/auth/oauth/google                          No             Initiate Google OAuth2 flow (sets state cookie)
@@ -1475,7 +1521,7 @@ GET          /api/v1/auth/oauth/google/callback                 No             G
 GET          /api/v1/auth/oauth/github                          No             Initiate GitHub OAuth2 flow (sets state cookie)
 GET          /api/v1/auth/oauth/github/callback                 No             GitHub OAuth2 token exchange (#token= redirect)
 GET          /api/v1/auth/me                                    Yes            Get current user profile and role
-DELETE       /api/v1/auth/account                               Yes            Account deletion with cryptographic key shredding
+DELETE       /api/v1/auth/account                               Yes            Account deletion with password verification
 
 3. Chat & Streaming Router (app/api/v1/chat.py)
 POST         /api/v1/chat/chat                                  Yes            Server-Sent Events (SSE) streaming chat endpoint
@@ -1508,7 +1554,7 @@ GET          /api/v1/documents/{id}/embeddings/status           Yes            R
 POST         /api/v1/evaluation/benchmark                       Admin          Trigger synthetic benchmark suite run
 POST         /api/v1/evaluation/regression                      Admin          Execute regression verification on golden dataset
 GET          /api/v1/evaluation/runs                            Admin          List evaluation run histories
-GET          /api/v1/evaluation/reports/{run_id}                Admin          Get full evaluation report (HTML/Markdown/JSON)
+GET          /api/v1/evaluation/reports/{run_id}                Admin          Get evaluation report (format: markdown/json/csv/html)
 
 8. Observability Router (app/api/v1/observability.py)
 GET          /api/v1/observability/metrics                      Admin          Retrieve aggregated multi-agent & quality metrics
@@ -1524,7 +1570,7 @@ GET          /api/v1/user/settings                              Yes            G
 PATCH        /api/v1/user/settings                              Yes            Update theme, folders, presets, and preferences
 
 11. Admin Router (app/api/v1/admin.py)
-POST         /api/v1/admin/cache/clear                          Admin          Dynamic cache clearing across L1/L2 namespaces
+POST         /api/v1/admin/cache/clear                          Admin          Dynamic cache clearing (?namespace=) across 6 pools
 GET          /api/v1/admin/operational-status                   Admin          Real-time system diagnostics and worker status
 ========================================================================================================================
 ```
@@ -1616,9 +1662,13 @@ Metric Name                     Registry Decorator Key             Category & Te
 
 ## 60. Golden Corpora, Benchmark Profiles, Drift Tracking & Report Generators
 
-- **4 Golden Document Corpora (`datasets/golden/documents/`)**: `api_specifications.md`, `cloud_architecture.md`, `engineering_policies.md`, `financial_report_2025.md`.
-- **Benchmark Profiles (`benchmark_profiles.yaml`)**: `ci_gate` (50 samples), `production` (500 samples), `nightly` (stress test).
-- **Report Generator (`report_generator.py`)**: Standalone HTML, Markdown, and JSON evaluation reports with pass/fail badges.
+- **4 Versioned Golden Datasets (`datasets/golden/`)**: `golden_v1.yaml`, `golden_v2.yaml`, `golden_v3.yaml`, `golden_multi_agent.yaml`.
+- **4 Benchmark Execution Profiles (`benchmark_profiles.yaml`)**:
+  - `quick`: 10 samples for rapid sanity verification.
+  - `standard`: 50 samples evaluating standard hybrid RAG.
+  - `full`: 200 samples executing full multi-agent DAGs.
+  - `nightly`: 500+ golden suite + stress test.
+- **Report Generator (`report_generator.py`)**: Standalone HTML, Markdown, and CSV evaluation reports with embedded CSS pass/fail badges and regression delta tables.
 - **Metric Drift Analysis**: Tracks regression over time against versioned golden baselines.
 
 ---
