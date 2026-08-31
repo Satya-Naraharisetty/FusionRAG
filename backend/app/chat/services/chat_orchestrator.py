@@ -88,35 +88,65 @@ class ChatOrchestrator:
                 "(repo has no _db); its id is leaving the process uncommitted."
             )
 
+    async def _has_prior_document_context(self, conversation_id: UUID | None) -> bool:
+        """
+        Check if any previous turn in this conversation referenced documents or citations,
+        making document search sticky for subsequent follow-up questions in the same thread.
+        """
+        if not conversation_id:
+            return False
+        msg_repo = getattr(self.conversation_manager, "_message_repo", None)
+        if not msg_repo:
+            return False
+        try:
+            recent_msgs = await msg_repo.get_recent_messages(conversation_id, limit=20)
+            for msg in recent_msgs:
+                if msg.citations and len(msg.citations) > 0:
+                    return True
+                if (
+                    msg.role in (MessageRole.USER, "user")
+                    and msg.content
+                    and self._DOCUMENTS_MENTION_PATTERN.search(msg.content)
+                ):
+                    return True
+            return False
+        except Exception:
+            logger.exception(
+                "Failed to check prior document context for %s", conversation_id
+            )
+            return False
+
     async def _resolve_retrieval_scope(
         self,
         conversation_id: UUID | None,
         user_id: UUID,
         document_ids: list[UUID] | None,
         documents_priority: bool,
-    ) -> list[UUID]:
+    ) -> tuple[list[UUID], bool]:
         """
         Decide what to retrieve under the two-tier document model.
 
-        Returns the explicit document ids to search (empty means "skip
-        retrieval entirely"):
+        Returns (explicit_document_ids, effective_documents_priority):
 
         * Chat-scoped documents (``conversation_id`` set on the document) are
           ALWAYS retrieved in their own conversation — no @documents mention
           needed.
-        * The user's global documents are only included when the @documents
-          mention was used (``documents_priority``) or explicit
-          ``document_ids`` were passed.
-
-        Always returning an explicit id list (instead of None for "everything")
-        keeps chat-scoped documents isolated: a mention can never spill another
-        conversation's attachments into this one.
+        * The user's global documents are included when:
+          - The @documents mention was used (``documents_priority``)
+          - Explicit ``document_ids`` were passed
+          - The conversation thread already has prior document context (sticky mode)
         """
         scoped_doc_ids = await self._load_conversation_documents(
             conversation_id, user_id
         )
 
-        if documents_priority or document_ids:
+        has_thread_doc_intent = documents_priority
+        if not has_thread_doc_intent and not document_ids and conversation_id:
+            has_thread_doc_intent = await self._has_prior_document_context(
+                conversation_id
+            )
+
+        if has_thread_doc_intent or document_ids:
             if document_ids:
                 global_doc_ids = list(document_ids)
             else:
@@ -125,7 +155,8 @@ class ChatOrchestrator:
             global_doc_ids = []
 
         # Deduplicate while preserving order (chat-scoped first).
-        return list(dict.fromkeys([*scoped_doc_ids, *global_doc_ids]))
+        final_doc_ids = list(dict.fromkeys([*scoped_doc_ids, *global_doc_ids]))
+        return final_doc_ids, has_thread_doc_intent
 
     async def _load_conversation_documents(
         self, conversation_id: UUID | None, user_id: UUID
@@ -294,11 +325,13 @@ class ChatOrchestrator:
                 # query-rewrite that feeds it are both skipped (see PromptBuilder
                 # _NO_CONTEXT_NOTE). Resolving the scope here (before prepare_context)
                 # lets skip_rewrite match the retrieval decision.
-                retrieval_doc_ids = await self._resolve_retrieval_scope(
-                    conversation_id=conversation_id,
-                    user_id=user_id,
-                    document_ids=document_ids,
-                    documents_priority=documents_priority,
+                retrieval_doc_ids, effective_doc_priority = (
+                    await self._resolve_retrieval_scope(
+                        conversation_id=conversation_id,
+                        user_id=user_id,
+                        document_ids=document_ids,
+                        documents_priority=documents_priority,
+                    )
                 )
                 skip_retrieval = not bool(retrieval_doc_ids)
 
@@ -345,7 +378,7 @@ class ChatOrchestrator:
                         request_id=request_id_ctx.get() or str(uuid.uuid4()),
                         user_id=user_id,
                         conversation_id=conversation_id,
-                        include_library_documents=documents_priority,
+                        include_library_documents=effective_doc_priority,
                         include_conversation_documents=True,
                         document_ids=retrieval_doc_ids,
                     )
@@ -470,7 +503,7 @@ class ChatOrchestrator:
                         user_id=user_id,
                         conversation_id=conversation_id,
                         include_conversation_documents=True,
-                        include_library_documents=documents_priority,
+                        include_library_documents=effective_doc_priority,
                         document_ids=retrieval_doc_ids if retrieval_doc_ids else None,
                     )
                     if (
@@ -535,7 +568,7 @@ class ChatOrchestrator:
                         token_estimator=self.token_estimator,
                         max_context_tokens=self.max_context_tokens,
                         max_memory_tokens=self.max_memory_tokens,
-                        document_priority=documents_priority,
+                        document_priority=effective_doc_priority,
                     )
                     prompt_span.set_attribute("prompt.chunks_count", len(final_chunks))
 
@@ -553,7 +586,7 @@ class ChatOrchestrator:
                             user_id=user_id,
                             conversation_id=conversation_id,
                             db_session=self.conversation_manager._conversation_repo._db,  # type: ignore[attr-defined]
-                            include_library_documents=documents_priority,
+                            include_library_documents=effective_doc_priority,
                             include_conversation_documents=True,
                         )
                         agent_resp = await self.agent_executor.execute(
@@ -781,11 +814,13 @@ class ChatOrchestrator:
         # mention was used (or explicit document_ids were passed). Everything
         # else answers from general knowledge: retrieval and the LLM
         # query-rewrite that feeds it are both skipped.
-        retrieval_doc_ids = await self._resolve_retrieval_scope(
-            conversation_id=conversation_id,
-            user_id=user_id,
-            document_ids=document_ids,
-            documents_priority=documents_priority,
+        retrieval_doc_ids, effective_doc_priority = (
+            await self._resolve_retrieval_scope(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                document_ids=document_ids,
+                documents_priority=documents_priority,
+            )
         )
         skip_retrieval = not bool(retrieval_doc_ids)
 
@@ -860,7 +895,7 @@ class ChatOrchestrator:
                     request_id=request_id_ctx.get() or str(uuid.uuid4()),
                     user_id=user_id,
                     conversation_id=conversation_id,
-                    include_library_documents=documents_priority,
+                    include_library_documents=effective_doc_priority,
                     include_conversation_documents=True,
                     document_ids=retrieval_doc_ids,
                 )
@@ -996,7 +1031,7 @@ class ChatOrchestrator:
                 user_id=user_id,
                 conversation_id=conversation_id,
                 include_conversation_documents=True,
-                include_library_documents=documents_priority,
+                include_library_documents=effective_doc_priority,
                 document_ids=retrieval_doc_ids if retrieval_doc_ids else None,
             )
             if self.enable_adaptive_rag and self.adaptive_rag_orchestrator is not None:
@@ -1057,7 +1092,7 @@ class ChatOrchestrator:
                 token_estimator=self.token_estimator,
                 max_context_tokens=self.max_context_tokens,
                 max_memory_tokens=self.max_memory_tokens,
-                document_priority=documents_priority,
+                document_priority=effective_doc_priority,
             )
             prompt_span.set_attribute("prompt.chunks_count", len(final_chunks))
 
@@ -1136,10 +1171,10 @@ class ChatOrchestrator:
                         user_id=user_id,
                         conversation_id=conversation_id,
                         db_session=self.conversation_manager._conversation_repo._db,  # type: ignore[attr-defined]
-                        # Explicit retrieval intent: set from the @documents mention.
+                        # Explicit retrieval intent: set from the @documents mention or sticky thread context.
                         # This is the only authoritative source for agent tools;
                         # never derived from model-supplied document IDs.
-                        include_library_documents=documents_priority,
+                        include_library_documents=effective_doc_priority,
                         include_conversation_documents=True,
                     )
                     async for event in self.agent_executor.execute_stream(

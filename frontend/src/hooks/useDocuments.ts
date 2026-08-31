@@ -108,7 +108,12 @@ export const useUploadDocument = () => {
         toast.error(`Failed to upload file: ${err.message || err}`);
       }
     },
-    onSuccess: (data, _variables, context) => {
+    onSuccess: (data, variables, context) => {
+      if (variables?.conversationId) {
+        queryClient.invalidateQueries({
+          queryKey: [QUERY_KEYS.DOCUMENTS, "conversation", variables.conversationId],
+        });
+      }
       if (!context?.tempId) {
         // Chat-scoped upload: nothing optimistic to replace; the composer tray
         // is the feedback, so keep it quiet (matching the pre-queue behaviour)
@@ -123,8 +128,13 @@ export const useUploadDocument = () => {
       });
       toast.success(`File "${data.original_filename}" uploaded successfully.`);
     },
-    onSettled: () => {
+    onSettled: (_data, _err, variables) => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.DOCUMENTS] });
+      if (variables?.conversationId) {
+        queryClient.invalidateQueries({
+          queryKey: [QUERY_KEYS.DOCUMENTS, "conversation", variables.conversationId],
+        });
+      }
     },
   });
 };

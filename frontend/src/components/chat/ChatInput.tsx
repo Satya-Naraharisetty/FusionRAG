@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Square, AlertCircle, Paperclip, Mic, X, ArrowUp, History, Trash2, FileText } from "lucide-react";
 import { Button } from "../ui/Button";
 import { useDraft } from "../../hooks/useDrafts";
@@ -21,7 +22,7 @@ import {
   type QueueFile,
 } from "../../context/UploadQueueContext";
 import { getDocumentProcessingStep } from "../../lib/uploadStages";
-import { UPLOAD_LIMITS } from "../../lib/constants";
+import { QUERY_KEYS, UPLOAD_LIMITS } from "../../lib/constants";
 import { t } from "../../lib/messages";
 import toast from "react-hot-toast";
 import { cn } from "../../lib/utils";
@@ -57,6 +58,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onVoiceInput,
   droppedFiles,
 }) => {
+  const queryClient = useQueryClient();
   const { draft, setDraft, clearDraft } = useDraft(conversationId);
   const { isOnline } = useOnlineStatus();
   const [text, setText] = useState(draft);
@@ -192,6 +194,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     // be handed to the conversation once it's created (not lost here).
     if (conversationId) {
       removeItems(chatRows.map((r) => r.id));
+      queryClient.invalidateQueries({
+        queryKey: [QUERY_KEYS.DOCUMENTS, "conversation", conversationId],
+      });
     }
     clearDraft();
     if (textareaRef.current) {

@@ -40,7 +40,10 @@ export const MessageList: React.FC<MessageListProps> = ({
     overscan: OVERSAM,
   });
 
+  const prevMessagesLength = useRef(messages.length);
+
   const scrollToBottom = useCallback((smooth = true) => {
+    const container = parentRef.current;
     if (messages.length > 0) {
       try {
         virtualizer.scrollToIndex(messages.length - 1, {
@@ -48,10 +51,22 @@ export const MessageList: React.FC<MessageListProps> = ({
           behavior: smooth ? "smooth" : "auto",
         });
       } catch {
-        // Fallback to scrollIntoView
+        // Fallback
       }
     }
+    if (container) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: smooth ? "smooth" : "auto",
+      });
+    }
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+
+    requestAnimationFrame(() => {
+      if (container && !isUserScrolling.current) {
+        container.scrollTop = container.scrollHeight;
+      }
+    });
   }, [messages.length, virtualizer]);
 
   const handleScroll = useCallback(() => {
@@ -91,6 +106,11 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   // When a new message is added or while streaming, keep view scrolled to latest
   useEffect(() => {
+    if (messages.length > prevMessagesLength.current) {
+      isUserScrolling.current = false;
+    }
+    prevMessagesLength.current = messages.length;
+
     if (!isUserScrolling.current) {
       scrollToBottom(true);
     }
@@ -115,7 +135,6 @@ export const MessageList: React.FC<MessageListProps> = ({
         onWheel={handleWheel}
         onTouchStart={handleTouchStart}
         className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent flex flex-col"
-        style={{ contain: "layout paint" }}
         role="log"
         aria-live="polite"
         aria-busy={isStreaming}
@@ -125,7 +144,6 @@ export const MessageList: React.FC<MessageListProps> = ({
             height: virtualizer.getTotalSize(),
             width: "100%",
             position: "relative",
-            contain: "layout paint",
           }}
           className="flex flex-col"
         >
