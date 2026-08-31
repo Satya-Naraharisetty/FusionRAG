@@ -16,12 +16,14 @@ from app.chat.domain.exceptions import (
 from app.chat.domain.models import (
     AnswerResponse,
     Citation,
+    ContextResolution,
     ConversationContext,
     HistoryRewriteResult,
     MessageRole,
     RetrievalDiagnostics,
     Usage,
 )
+from app.chat.domain.multi_agent import AgentExecutionContext
 from app.chat.services.agent_executor import AgentExecutor
 from app.chat.services.conversation_context_builder import ConversationContextBuilder
 from app.chat.services.conversation_manager import ConversationManager
@@ -373,7 +375,40 @@ class ChatOrchestrator:
                         role=MessageRole.ASSISTANT,
                     )
 
-                    from app.chat.domain.multi_agent import AgentExecutionContext
+                    raw_res = getattr(rewrite_result, "resolution", None)
+                    context_res: ContextResolution | None = None
+                    if isinstance(raw_res, ContextResolution):
+                        context_res = raw_res
+                    elif isinstance(raw_res, dict):
+                        try:
+                            context_res = ContextResolution.model_validate(raw_res)
+                        except Exception:
+                            context_res = None
+
+                    source_mode_val = getattr(
+                        getattr(rewrite_result, "source_mode", None),
+                        "value",
+                        "DOCUMENT_ONLY",
+                    )
+                    context_action_val = getattr(
+                        getattr(rewrite_result, "context_action", None),
+                        "value",
+                        "STANDALONE",
+                    )
+                    intent_val = getattr(rewrite_result, "intent", "GENERAL_QUERY")
+                    dom_ctx = getattr(rewrite_result, "domain_context", None)
+                    dom_dict = (
+                        dom_ctx.model_dump()
+                        if dom_ctx is not None and hasattr(dom_ctx, "model_dump")
+                        else {}
+                    )
+                    ret_queries = getattr(rewrite_result, "retrieval_queries", None)
+                    ret_dict = (
+                        ret_queries.model_dump()
+                        if ret_queries is not None
+                        and hasattr(ret_queries, "model_dump")
+                        else {}
+                    )
 
                     agent_ctx = AgentExecutionContext(
                         request_id=request_id_ctx.get() or str(uuid.uuid4()),
@@ -382,12 +417,22 @@ class ChatOrchestrator:
                         include_library_documents=effective_doc_priority,
                         include_conversation_documents=True,
                         document_ids=retrieval_doc_ids,
+                        context_resolution=context_res,
+                        metadata={
+                            "original_query": question,
+                            "contextualized_query": query_to_retrieve,
+                            "source_mode": str(source_mode_val),
+                            "context_action": str(context_action_val),
+                            "intent": str(intent_val),
+                            "domain_context": dom_dict,
+                            "retrieval_queries": ret_dict,
+                        },
                     )
 
                     gen_start_time = time.perf_counter()
                     try:
                         multi_resp = await self.master_agent.execute_request(
-                            request=question,
+                            request=query_to_retrieve,
                             context=agent_ctx,
                             model=self.model,
                             temperature=self.temperature,
@@ -890,6 +935,40 @@ class ChatOrchestrator:
                     },
                 }
 
+                raw_res = getattr(rewrite_result, "resolution", None)
+                context_res: ContextResolution | None = None
+                if isinstance(raw_res, ContextResolution):
+                    context_res = raw_res
+                elif isinstance(raw_res, dict):
+                    try:
+                        context_res = ContextResolution.model_validate(raw_res)
+                    except Exception:
+                        context_res = None
+
+                source_mode_val = getattr(
+                    getattr(rewrite_result, "source_mode", None),
+                    "value",
+                    "DOCUMENT_ONLY",
+                )
+                context_action_val = getattr(
+                    getattr(rewrite_result, "context_action", None),
+                    "value",
+                    "STANDALONE",
+                )
+                intent_val = getattr(rewrite_result, "intent", "GENERAL_QUERY")
+                dom_ctx = getattr(rewrite_result, "domain_context", None)
+                dom_dict = (
+                    dom_ctx.model_dump()
+                    if dom_ctx is not None and hasattr(dom_ctx, "model_dump")
+                    else {}
+                )
+                ret_queries = getattr(rewrite_result, "retrieval_queries", None)
+                ret_dict = (
+                    ret_queries.model_dump()
+                    if ret_queries is not None and hasattr(ret_queries, "model_dump")
+                    else {}
+                )
+
                 agent_ctx = AgentExecutionContext(
                     request_id=request_id_ctx.get() or str(uuid.uuid4()),
                     user_id=user_id,
@@ -897,6 +976,16 @@ class ChatOrchestrator:
                     include_library_documents=effective_doc_priority,
                     include_conversation_documents=True,
                     document_ids=retrieval_doc_ids,
+                    context_resolution=context_res,
+                    metadata={
+                        "original_query": question,
+                        "contextualized_query": query_to_retrieve,
+                        "source_mode": str(source_mode_val),
+                        "context_action": str(context_action_val),
+                        "intent": str(intent_val),
+                        "domain_context": dom_dict,
+                        "retrieval_queries": ret_dict,
+                    },
                 )
 
                 gen_start_time = time.perf_counter()
@@ -906,7 +995,7 @@ class ChatOrchestrator:
                 stream_agent_diagnostics = None
 
                 async for event in self.master_agent.execute_request_stream(
-                    request=question,
+                    request=query_to_retrieve,
                     context=agent_ctx,
                     model=self.model,
                     temperature=self.temperature,

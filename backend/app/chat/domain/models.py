@@ -186,10 +186,75 @@ class ConversationContext(BaseModel):
     diagnostics: RetrievalDiagnostics = Field(default_factory=RetrievalDiagnostics)
 
 
-class RewriteDecision(BaseModel):
-    should_rewrite: bool
-    confidence: float
-    reason: str
+class ContextAction(str, Enum):
+    CONTINUE = "CONTINUE"  # Follow-up on same topic/entity
+    REFINE = "REFINE"  # Narrowing or filtering previous topic (e.g. "and in India?")
+    SWITCH = (
+        "SWITCH"  # Explicit or detected shift to a new topic (clears prior context)
+    )
+    RESET = "RESET"  # Explicit reset instruction
+    STANDALONE = (
+        "STANDALONE"  # Self-contained query requiring no prior conversational context
+    )
+
+
+class SourceMode(str, Enum):
+    DOCUMENT_ONLY = "DOCUMENT_ONLY"
+    WEB_REQUIRED = "WEB_REQUIRED"
+    HYBRID = "HYBRID"
+    CALCULATION_ONLY = "CALCULATION_ONLY"
+    DIRECT_ANSWER = "DIRECT_ANSWER"
+
+
+class DomainContext(BaseModel):
+    primary: str = "GENERAL"
+    secondary: list[str] = Field(default_factory=list)
+    entities: list[str] = Field(default_factory=list)
+
+
+class ChannelRetrievalQueries(BaseModel):
+    document_query: str | None = None
+    web_query: str | None = None
+    graph_query: str | None = None
+
+
+class KnownValue(BaseModel):
+    value: float | str
+    unit: str = ""
+    currency: str | None = None
+    source: str = "general"  # "document" | "web" | "calculation"
+    confidence: float = 1.0
+
+
+class ConversationTopicState(BaseModel):
+    active_subject: str | None = None
+    active_role: str | None = None
+    active_location: str | None = None
+    active_entities: list[str] = Field(default_factory=list)
+    active_intent: str | None = None
+    timeframe: str | None = None
+    compensation_period: str | None = None
+    currency: str | None = None
+    known_values: dict[str, KnownValue] = Field(default_factory=dict)
+
+
+class ContextResolution(BaseModel):
+    original_query: str
+    contextualized_query: str
+    retrieval_queries: ChannelRetrievalQueries = Field(
+        default_factory=ChannelRetrievalQueries
+    )
+    is_context_dependent: bool = False
+    context_action: ContextAction = ContextAction.STANDALONE
+    intent: str = "GENERAL_QUERY"
+    source_mode: SourceMode = SourceMode.DOCUMENT_ONLY
+    domain_context: DomainContext = Field(default_factory=DomainContext)
+    active_subject: str | None = None
+    active_role: str | None = None
+    active_location: str | None = None
+    active_entities: list[str] = Field(default_factory=list)
+    confidence: float = Field(default=0.9, ge=0.0, le=1.0)
+    rewrite_reason: str | None = None
 
 
 class HistoryRewriteResult(BaseModel):
@@ -197,6 +262,15 @@ class HistoryRewriteResult(BaseModel):
     rewritten_query: str
     rewrite_reason: str
     rewrite_applied: bool
+    context_action: ContextAction = ContextAction.STANDALONE
+    intent: str = "GENERAL_QUERY"
+    source_mode: SourceMode = SourceMode.DOCUMENT_ONLY
+    domain_context: DomainContext = Field(default_factory=DomainContext)
+    retrieval_queries: ChannelRetrievalQueries = Field(
+        default_factory=ChannelRetrievalQueries
+    )
+    resolution: ContextResolution | None = None
+    topic_state: ConversationTopicState | None = None
 
 
 # --- Backwards compatibility & Answer Response update ---

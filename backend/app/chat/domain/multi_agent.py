@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.chat.domain.models import Citation, Usage
+from app.chat.domain.models import Citation, ContextResolution, Usage
 from app.documents.domain.models import DocumentRetrievalScope
 
 
@@ -174,6 +174,7 @@ class AgentExecutionContext(BaseModel):
     include_library_documents: bool = False
     include_conversation_documents: bool = True
     document_ids: list[UUID] | None = None
+    context_resolution: ContextResolution | None = None
     dependency_results: dict[str, AgentResult] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
 

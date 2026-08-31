@@ -9,7 +9,13 @@ from app.chat.domain.agent_observability import (
     AgentQualityMetrics,
 )
 from app.chat.domain.interfaces import LLMProvider
-from app.chat.domain.models import ChatMessage, ChatRole
+from app.chat.domain.models import (
+    ChatMessage,
+    ChatRole,
+    ContextResolution,
+    DomainContext,
+    SourceMode,
+)
 from app.chat.domain.multi_agent import (
     AgentExecutionContext,
     AgentResult,
@@ -98,6 +104,82 @@ class MasterAgent:
         """Returns a normalized string hash identifying the task's functional operation."""
         params_str = json.dumps(task.parameters, sort_keys=True)
         return f"{task.agent_type.value}:{task.request.strip().lower()}:{params_str}"
+
+    def _apply_evidence_relevance_gate(
+        self,
+        results: list[AgentResult],
+        context: AgentExecutionContext,
+    ) -> tuple[list[AgentResult], int]:
+        """
+        Validates evidence against DomainContext and intent requirements before reaching synthesis.
+        Rejects off-domain or conflicting web/document findings (e.g. real estate appraisal on tech compensation).
+        """
+        filtered_results: list[AgentResult] = []
+        rejected_count = 0
+
+        # Extract domain context if available
+        domain_ctx = None
+        intent_str = ""
+        if context.context_resolution:
+            domain_ctx = context.context_resolution.domain_context
+            intent_str = context.context_resolution.intent
+        elif context.metadata:
+            if "domain_context" in context.metadata:
+                d_dict = context.metadata["domain_context"]
+                domain_ctx = (
+                    DomainContext.model_validate(d_dict)
+                    if isinstance(d_dict, dict)
+                    else None
+                )
+            intent_str = context.metadata.get("intent", "")
+
+        primary_domain = domain_ctx.primary.upper() if domain_ctx else ""
+
+        for res in results:
+            if not res.success or res.agent_type != AgentType.WEB_SEARCH:
+                filtered_results.append(res)
+                continue
+
+            # Check web search results for off-domain contamination
+            out_lower = (res.output or "").lower()
+            ev_text = " ".join([ev.content.lower() for ev in res.evidence])
+            combined_text = f"{out_lower} {ev_text}"
+
+            # Contamination detection: Real estate / property appraisal on tech compensation
+            if (
+                primary_domain in ("TECH_CAREER", "COMPENSATION")
+                or "COMPENSATION" in intent_str
+            ):
+                real_estate_markers = [
+                    "comparable sales",
+                    "fannie mae",
+                    "property valuation",
+                    "real estate",
+                    "home appraisal",
+                    "cma",
+                    "broker price opinion",
+                    "appraisal of property",
+                    "asset valuation method",
+                    "comparative market analysis",
+                ]
+                if any(m in combined_text for m in real_estate_markers):
+                    rejected_count += 1
+                    logger.warning(
+                        f"Evidence Relevance Gate rejected WebSearch task '{res.task_id}' due to Real Estate domain mismatch on {primary_domain} task."
+                    )
+                    gated_res = res.model_copy(
+                        update={
+                            "success": False,
+                            "error": "Evidence rejected by Evidence Relevance Gate: Real Estate / Property valuation content does not match TECH_CAREER compensation task.",
+                            "evidence": [],
+                        }
+                    )
+                    filtered_results.append(gated_res)
+                    continue
+
+            filtered_results.append(res)
+
+        return filtered_results, rejected_count
 
     async def _plan_with_llm(
         self,
@@ -194,6 +276,102 @@ class MasterAgent:
         req_lower = request.lower()
         tasks: list[AgentTask] = []
 
+        # 1. Check ContextResolution from context if available
+        res = context.context_resolution
+        if not res and context.metadata and "context_resolution" in context.metadata:
+            res_dict = context.metadata["context_resolution"]
+            if res_dict:
+                try:
+                    res = ContextResolution.model_validate(res_dict)
+                except Exception:
+                    pass
+
+        if res:
+            doc_query = res.retrieval_queries.document_query or request
+            web_query = res.retrieval_queries.web_query or request
+
+            if res.source_mode == SourceMode.HYBRID:
+                tasks.append(
+                    AgentTask(
+                        task_id="research_1",
+                        request=doc_query,
+                        agent_type=AgentType.RESEARCH,
+                        dependencies=[],
+                        parameters={"query": doc_query, "top_k": 5},
+                        expected_outputs=["Uploaded document evidence"],
+                    )
+                )
+                tasks.append(
+                    AgentTask(
+                        task_id="web_search_1",
+                        request=web_query,
+                        agent_type=AgentType.WEB_SEARCH,
+                        dependencies=[],
+                        parameters={"query": web_query, "max_results": 5},
+                        expected_outputs=["Live web search results for market data"],
+                    )
+                )
+                return ExecutionPlan(
+                    request_id=context.request_id,
+                    tasks=tasks,
+                    reasoning_summary=f"Hybrid resolution plan: {res.intent}",
+                    iteration=iteration,
+                )
+
+            elif res.source_mode == SourceMode.WEB_REQUIRED:
+                tasks.append(
+                    AgentTask(
+                        task_id="web_search_1",
+                        request=web_query,
+                        agent_type=AgentType.WEB_SEARCH,
+                        dependencies=[],
+                        parameters={"query": web_query, "max_results": 5},
+                        expected_outputs=["Live web search results"],
+                    )
+                )
+                return ExecutionPlan(
+                    request_id=context.request_id,
+                    tasks=tasks,
+                    reasoning_summary=f"Web search resolution plan: {res.intent}",
+                    iteration=iteration,
+                )
+
+            elif res.source_mode == SourceMode.CALCULATION_ONLY:
+                tasks.append(
+                    AgentTask(
+                        task_id="calc_1",
+                        request=request,
+                        agent_type=AgentType.ANALYSIS,
+                        dependencies=[],
+                        parameters={"expression": request, "action": "calculate"},
+                        expected_outputs=["Calculated math result"],
+                    )
+                )
+                return ExecutionPlan(
+                    request_id=context.request_id,
+                    tasks=tasks,
+                    reasoning_summary="Direct calculation plan",
+                    iteration=iteration,
+                )
+
+            elif res.source_mode == SourceMode.DOCUMENT_ONLY:
+                tasks.append(
+                    AgentTask(
+                        task_id="research_1",
+                        request=doc_query,
+                        agent_type=AgentType.RESEARCH,
+                        dependencies=[],
+                        parameters={"query": doc_query, "top_k": 5},
+                        expected_outputs=["Relevant evidence chunks for query"],
+                    )
+                )
+                return ExecutionPlan(
+                    request_id=context.request_id,
+                    tasks=tasks,
+                    reasoning_summary=f"Document research plan: {res.intent}",
+                    iteration=iteration,
+                )
+
         uuid_match = re.search(
             r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
             req_lower,
@@ -285,7 +463,6 @@ class MasterAgent:
                 "internet",
                 "live",
                 "stock price",
-                "market",
             ]
             is_web_query = any(w in req_lower for w in web_keywords)
             doc_keywords = [
@@ -733,12 +910,15 @@ class MasterAgent:
             ):
                 break
 
-        # Pass all accumulated results to SynthesisAgent
+        # Apply Evidence Relevance Gate before passing results to SynthesisAgent
         all_results_list = list(accumulated_results.values())
+        filtered_results, rejected_ev_count = self._apply_evidence_relevance_gate(
+            all_results_list, context
+        )
         synthesis_req = SynthesisRequest(
             request_id=context.request_id,
             original_request=request,
-            specialist_results=all_results_list,
+            specialist_results=filtered_results,
             context=context,
         )
 
@@ -1082,10 +1262,15 @@ class MasterAgent:
             ):
                 break
 
+        # Apply Evidence Relevance Gate before streaming synthesis
+        all_results_list = list(accumulated_results.values())
+        filtered_results, rejected_ev_count = self._apply_evidence_relevance_gate(
+            all_results_list, context
+        )
         synthesis_req = SynthesisRequest(
             request_id=context.request_id,
             original_request=request,
-            specialist_results=list(accumulated_results.values()),
+            specialist_results=filtered_results,
             context=context,
         )
 
