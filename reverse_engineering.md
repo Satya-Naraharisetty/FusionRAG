@@ -12,7 +12,7 @@ This document is the **definitive, exhaustive technical specification, data flow
                                               SYSTEM QUICK REFERENCE
 ========================================================================================================================
 * Core Framework:       FastAPI (Python 3.12+ ASGI) + Uvicorn + Pydantic v2
-* Primary Database:     PostgreSQL 16 (asyncpg + SQLAlchemy 2.0 async ORM, 23 Relational Tables)
+* Primary Database:     PostgreSQL 16 (asyncpg + SQLAlchemy 2.0 async ORM, 25 Relational Tables)
 * Vector Search Engine: Qdrant v1.19.0 (HNSW ANN, 768-dim Cosine, Payload Tenant Fencing)
 * Sparse Text Search:   PostgreSQL Full-Text Search (tsvector + ts_rank_cd + GIN Indexes)
 * In-Memory Cache/Queue:Redis 7 (redis.asyncio, Redis Streams Consumer Groups, L1/L2 Multi-Tier Caching)
@@ -49,71 +49,72 @@ This document is the **definitive, exhaustive technical specification, data flow
   - [12. Multi-Agent Topology & Comprehensive Specialist Classification Matrix](#12-multi-agent-topology--comprehensive-specialist-classification-matrix)
   - [13. MasterAgent: Hierarchical Planner, Replanner & Evidence Gating](#13-masteragent-hierarchical-planner-replanner--evidence-gating)
   - [14. AgentExecutionEngine: Topological Wave Executor & Concurrency Controller](#14-agentexecutionengine-topological-wave-executor--concurrency-controller)
-  - [15. ResearchAgent & ResearchPlanner: Sub-Query Decomposition & KB Retrieval](#15-researchagent--researchplanner-sub-query-decomposition--kb-retrieval)
-  - [16. DocumentAgent: Explicit Document & Chunk Inspection Specialist](#16-documentagent-explicit-document--chunk-inspection-specialist)
-  - [17. AnalysisAgent: Deterministic Math, AST Sandboxing, SymPy & MathEngine](#17-analysisagent-deterministic-math-ast-sandboxing-sympy--mathengine)
-  - [18. WebSearchAgent: Real-Time Multi-Provider Web Search Cascade](#18-websearchagent-real-time-multi-provider-web-search-cascade)
-  - [19. TableAgent: Tabular Data Extraction & Column Aggregations](#19-tableagent-tabular-data-extraction--column-aggregations)
-  - [20. VisionAgent: Multimodal Visual Reasoning & Chart Inspection](#20-visionagent-multimodal-visual-reasoning--chart-inspection)
-  - [21. GraphAgent: Knowledge Graph Traversal & Entity Relationship Reasoning](#21-graphagent-knowledge-graph-traversal--entity-relationship-reasoning)
-  - [22. SynthesisAgent: Context Grounding, Citation Tagging & Refusal Faithfulness](#22-synthesisagent-context-grounding-citation-tagging--refusal-faithfulness)
-  - [23. ResultEvaluator: Task Quality Scoring & Adaptive Replanning Engine](#23-resultevaluator-task-quality-scoring--adaptive-replanning-engine)
-  - [24. PlanValidator: Schema, Cycle Detection & Constraint Enforcement](#24-planvalidator-schema-cycle-detection--constraint-enforcement)
-  - [25. TaskRouter & CapabilityRegistry: Capability-Aware Cost/Latency Routing](#25-taskrouter--capabilityregistry-capability-aware-costlatency-routing)
-  - [26. AgentExecutor: Single-Agent Function/Tool Calling Loop & 7 Core Tools](#26-agentexecutor-single-agent-functiontool-calling-loop--7-core-tools)
-  - [27. Multi-Agent Operational Subsystems: Health Diagnostics, Title Generator & Retention](#27-multi-agent-operational-subsystems-health-diagnostics-title-generator--retention)
-- [Part IV: Complete Relational Database Schema & Data Models (All 23 PostgreSQL Tables)](#part-iv-complete-relational-database-schema--data-models-all-23-postgresql-tables)
-  - [28. Relational Architecture, Entity-Relationship Diagram (ERD) & Bounded Contexts](#28-relational-architecture-entity-relationship-diagram-erd--bounded-contexts)
-  - [29. Authentication & Security Context (5 Tables)](#29-authentication--security-context-5-tables)
-  - [30. Chat & Conversation Context (3 Tables)](#30-chat--conversation-context-3-tables)
-  - [31. Document Ingestion, Chunks & Storage Context (9 Tables)](#31-document-ingestion-chunks--storage-context-9-tables)
-  - [32. Knowledge Graph Context (4 Tables)](#32-knowledge-graph-context-4-tables)
-  - [33. Transactional Outbox & Automated Evaluation Context (4 Tables)](#33-transactional-outbox--automated-evaluation-context-4-tables)
+  - [15. Dedicated Adaptive RAG Orchestration Framework (`app/rag/orchestration/`)](#15-dedicated-adaptive-rag-orchestration-framework-appragorchestration)
+  - [16. ResearchAgent & ResearchPlanner: Sub-Query Decomposition & KB Retrieval](#16-researchagent--researchplanner-sub-query-decomposition--kb-retrieval)
+  - [17. DocumentAgent: Explicit Document & Chunk Inspection Specialist](#17-documentagent-explicit-document--chunk-inspection-specialist)
+  - [18. AnalysisAgent: Deterministic Math, AST Sandboxing, SymPy & MathEngine](#18-analysisagent-deterministic-math-ast-sandboxing-sympy--mathengine)
+  - [19. WebSearchAgent: Real-Time Multi-Provider Web Search Cascade](#19-websearchagent-real-time-multi-provider-web-search-cascade)
+  - [20. TableAgent: Tabular Data Extraction & Column Aggregations](#20-tableagent-tabular-data-extraction--column-aggregations)
+  - [21. VisionAgent: Multimodal Visual Reasoning & Chart Inspection](#21-visionagent-multimodal-visual-reasoning--chart-inspection)
+  - [22. GraphAgent: Knowledge Graph Traversal & Entity Relationship Reasoning](#22-graphagent-knowledge-graph-traversal--entity-relationship-reasoning)
+  - [23. SynthesisAgent: Context Grounding, Citation Tagging & Refusal Faithfulness](#23-synthesisagent-context-grounding-citation-tagging--refusal-faithfulness)
+  - [24. ResultEvaluator: Task Quality Scoring & Adaptive Replanning Engine](#24-resultevaluator-task-quality-scoring--adaptive-replanning-engine)
+  - [25. PlanValidator: Schema, Cycle Detection & Constraint Enforcement](#25-planvalidator-schema-cycle-detection--constraint-enforcement)
+  - [26. TaskRouter & CapabilityRegistry: Capability-Aware Cost/Latency Routing](#26-taskrouter--capabilityregistry-capability-aware-costlatency-routing)
+  - [27. AgentExecutor, ToolRegistry & Single-Agent Tool Calling Subsystem](#27-agentexecutor-toolregistry--single-agent-tool-calling-subsystem)
+  - [28. Multi-Agent Operational Subsystems: Health Diagnostics, Title Generator & Retention](#28-multi-agent-operational-subsystems-health-diagnostics-title-generator--retention)
+- [Part IV: Complete Relational Database Schema & Data Models (All 25 PostgreSQL Tables)](#part-iv-complete-relational-database-schema--data-models-all-25-postgresql-tables)
+  - [29. Relational Architecture, Entity-Relationship Diagram (ERD) & Bounded Contexts](#29-relational-architecture-entity-relationship-diagram-erd--bounded-contexts)
+  - [30. Authentication & Security Context (5 Tables)](#30-authentication--security-context-5-tables)
+  - [31. Chat & Conversation Context (3 Tables)](#31-chat--conversation-context-3-tables)
+  - [32. Document Ingestion, Chunks & Storage Context (9 Tables)](#32-document-ingestion-chunks--storage-context-9-tables)
+  - [33. Knowledge Graph Context (4 Tables)](#33-knowledge-graph-context-4-tables)
+  - [34. Transactional Outbox Context (1 Table) & Automated Evaluation Context (3 Tables)](#34-transactional-outbox-context-1-table--automated-evaluation-context-3-tables)
 - [Part V: Security, Reliability, Caching & Distributed Infrastructure](#part-v-security-reliability-caching--distributed-infrastructure)
-  - [34. Envelope Encryption, Key Management & Crypto-Shredding (AES-256-GCM + DEK/KEK)](#34-envelope-encryption-key-management--crypto-shredding-aes-256-gcm--dekkek)
-  - [35. Malware & Antivirus Scanning (ClamAV TCP Streaming + EICAR)](#35-malware--antivirus-scanning-clamav-tcp-streaming--eicar)
-  - [36. Prompt Injection Defense, Intent Guardrails & AST Sandboxing](#36-prompt-injection-defense-intent-guardrails--ast-sandboxing)
-  - [37. Multi-Tier Caching (L1 Memory + L2 Redis) & Distributed Heartbeat Locking](#37-multi-tier-caching-l1-memory--l2-redis--distributed-heartbeat-locking)
-  - [38. Reliability Framework: Bulkheads, Circuit Breakers, Exponential Jitter Retries & Timeouts](#38-reliability-framework-bulkheads-circuit-breakers-exponential-jitter-retries--timeouts)
-  - [39. Transactional Outbox Pattern, Event Bus & JobDispatcher Engine](#39-transactional-outbox-pattern-event-bus--jobdispatcher-engine)
-  - [40. Storage Provider Abstraction & Two-Phase Durable Cleanup Worker](#40-storage-provider-abstraction--two-phase-durable-cleanup-worker)
-  - [41. Resend Email Service, Token Cost Pricing Engine & Dynamic Feature Flags](#41-resend-email-service-token-cost-pricing-engine--dynamic-feature-flags)
-  - [42. Application Lifespan, Startup Hooks & Middleware Cardinality Defense](#42-application-lifespan-startup-hooks--middleware-cardinality-defense)
-- [Part VI: Document Ingestion, Advanced Chunking & Knowledge Graph Pipeline](#part-vi-document-ingestion-advanced-chunking--knowledge-graph-pipeline)
-  - [43. Advanced Chunking Strategies: Recursive, Parent-Child & Sentence-Window](#43-advanced-chunking-strategies-recursive-parent-child--sentence-window)
-  - [44. Empty Knowledge Base Index Cache & Weighted RRF Fusion](#44-empty-knowledge-base-index-cache--weighted-rrf-fusion)
-  - [45. Ingestion-Time NER & Relationship Extraction Pipeline](#45-ingestion-time-ner--relationship-extraction-pipeline)
-  - [46. BFS Knowledge Graph Pathfinding & Multi-Hop Retrieval](#46-bfs-knowledge-graph-pathfinding--multi-hop-retrieval)
-  - [47. Adaptive RAG Orchestration State Machine (DIRECT, HYDE, MULTI_HOP, SPECIALIST)](#47-adaptive-rag-orchestration-state-machine-direct-hyde-multi_hop-specialist)
+  - [35. Envelope Encryption, Key Management & Crypto-Shredding (AES-256-GCM + DEK/KEK)](#35-envelope-encryption-key-management--crypto-shredding-aes-256-gcm--dekkek)
+  - [36. Malware & Antivirus Scanning (ClamAV TCP Streaming + EICAR)](#36-malware--antivirus-scanning-clamav-tcp-streaming--eicar)
+  - [37. Prompt Injection Defense, Intent Guardrails & AST Sandboxing](#37-prompt-injection-defense-intent-guardrails--ast-sandboxing)
+  - [38. Multi-Tier Caching (L1 Memory + L2 Redis) & Distributed Heartbeat Locking](#38-multi-tier-caching-l1-memory--l2-redis--distributed-heartbeat-locking)
+  - [39. Reliability Framework: Bulkheads, Circuit Breakers, Exponential Jitter Retries & Timeouts](#39-reliability-framework-bulkheads-circuit-breakers-exponential-jitter-retries--timeouts)
+  - [40. Transactional Outbox Pattern, Event Bus & JobDispatcher Engine](#40-transactional-outbox-pattern-event-bus--jobdispatcher-engine)
+  - [41. Storage Provider Abstraction & Two-Phase Durable Cleanup Worker](#41-storage-provider-abstraction--two-phase-durable-cleanup-worker)
+  - [42. Resend Email Service, Token Cost Pricing Engine & Dynamic Feature Flags](#42-resend-email-service-token-cost-pricing-engine--dynamic-feature-flags)
+  - [43. Application Lifespan, Startup Hooks & Middleware Cardinality Defense](#43-application-lifespan-startup-hooks--middleware-cardinality-defense)
+- [Part VI: Document Ingestion, Advanced Chunking & Retrieval Intelligence](#part-vi-document-ingestion-advanced-chunking--retrieval-intelligence)
+  - [44. Ingestion Worker Lease Protocol & Durable Ingestion Reaper](#44-ingestion-worker-lease-protocol--durable-ingestion-reaper)
+  - [45. Advanced Chunking Strategies: Recursive, Parent-Child & Sentence-Window](#45-advanced-chunking-strategies-recursive-parent-child--sentence-window)
+  - [46. Empty Knowledge Base Index Cache & Weighted RRF Fusion](#46-empty-knowledge-base-index-cache--weighted-rrf-fusion)
+  - [47. Document Parsers, Multimodal OCR & Metadata Extractors](#47-document-parsers-multimodal-ocr--metadata-extractors)
+  - [48. Query Intelligence: Classification, Decomposition, Expansion & HyDE](#48-query-intelligence-classification-decomposition-expansion--hyde)
+  - [49. Ingestion-Time NER, Relationship Extraction & BFS Knowledge Graph Retrieval](#49-ingestion-time-ner-relationship-extraction--bfs-knowledge-graph-retrieval)
+  - [50. Adaptive RAG Orchestration State Machine (DIRECT, HYDE, MULTI_HOP, SPECIALIST)](#50-adaptive-rag-orchestration-state-machine-direct-hyde-multi_hop-specialist)
 - [Part VII: Frontend Architecture, Pyodide WASM & UI Component Tree](#part-vii-frontend-architecture-pyodide-wasm--ui-component-tree)
-  - [48. Pyodide WebAssembly (WASM) Sandbox Worker Architecture](#48-pyodide-webassembly-wasm-sandbox-worker-architecture)
-  - [49. Complete Custom Hook Architecture & SSE Streaming Protocol](#49-complete-custom-hook-architecture--sse-streaming-protocol)
-  - [50. 7-Stage Upload Pipeline & Document Status State Machine](#50-7-stage-upload-pipeline--document-status-state-machine)
-  - [51. Projects, Workspaces & Folder Organization Subsystems](#51-projects-workspaces--folder-organization-subsystems)
-  - [52. Stream Recovery, In-Flight Re-Authentication & UI Component Tree](#52-stream-recovery-in-flight-re-authentication--ui-component-tree)
+  - [51. Pyodide WebAssembly (WASM) Sandbox Worker Protocol & Managers](#51-pyodide-webassembly-wasm-sandbox-worker-protocol--managers)
+  - [52. Complete Custom Hook Architecture & SSE Streaming Protocol](#52-complete-custom-hook-architecture--sse-streaming-protocol)
+  - [53. 7-Stage Progressive Upload Pipeline & State Machine](#53-7-stage-progressive-upload-pipeline--state-machine)
+  - [54. Projects, Workspaces & Hierarchical Folder Subsystems](#54-projects-workspaces--hierarchical-folder-subsystems)
+  - [55. Stream Recovery, In-Flight Re-Authentication & UI Component Tree](#55-stream-recovery-in-flight-re-authentication--ui-component-tree)
 - [Part VIII: Complete REST & SSE API Endpoint Catalog (All 45+ Endpoints)](#part-viii-complete-rest--sse-api-endpoint-catalog-all-45-endpoints)
-  - [53. Exhaustive Route Specifications Across All 10 Routers & Root App](#53-exhaustive-route-specifications-across-all-10-routers--root-app)
+  - [56. Exhaustive Route Specifications Across All 10 Routers & Root App](#56-exhaustive-route-specifications-across-all-10-routers--root-app)
 - [Part IX: Production Observability, Quality Assurance & Evaluation Suite](#part-ix-production-observability-quality-assurance--evaluation-suite)
-  - [54. OpenTelemetry Tracing, Prometheus Metric Registry & Telemetry Sanitizer](#54-opentelemetry-tracing-prometheus-metric-registry--telemetry-sanitizer)
-  - [55. Multi-Agent Observability & Quality Metrics (AgentObservabilityService)](#55-multi-agent-observability--quality-metrics-agentobservabilityservice)
-  - [56. Comprehensive Evaluation Framework: Ragas, DeepEval & 20 Custom Metrics](#56-comprehensive-evaluation-framework-ragas-deepeval--20-custom-metrics)
-  - [57. Golden Corpora, Benchmark Profiles, Drift Tracking & Report Generators](#57-golden-corpora-benchmark-profiles-drift-tracking--report-generators)
+  - [57. OpenTelemetry Tracing, Prometheus Metric Registry & Telemetry Sanitizer](#57-opentelemetry-tracing-prometheus-metric-registry--telemetry-sanitizer)
+  - [58. Multi-Agent Observability & Quality Metrics (AgentObservabilityService)](#58-multi-agent-observability--quality-metrics-agentobservabilityservice)
+  - [59. Comprehensive Evaluation Framework: Ragas, DeepEval & 20 Custom Metrics](#59-comprehensive-evaluation-framework-ragas-deepeval--20-custom-metrics)
+  - [60. Golden Corpora, Benchmark Profiles, Drift Tracking & Report Generators](#60-golden-corpora-benchmark-profiles-drift-tracking--report-generators)
 - [Part X: DevOps, CI/CD Automation, Operational Tooling & Edge Deployment](#part-x-devops-cicd-automation-operational-tooling--edge-deployment)
-  - [58. The 4 GitHub Actions Workflows (CI, E2E Playwright, Eval Gate, Nightly Benchmark)](#58-the-4-github-actions-workflows-ci-e2e-playwright-eval-gate-nightly-benchmark)
-  - [59. Operational CLI Scripts, Backup/Restore & Smoke Testing](#59-operational-cli-scripts-backuprestore--smoke-testing)
-  - [60. Nginx Edge Reverse Proxy, Grafana Dashboards & Runbooks](#60-nginx-edge-reverse-proxy-grafana-dashboards--runbooks)
+  - [61. The 4 GitHub Actions Workflows (CI, E2E Playwright, Eval Gate, Nightly Benchmark)](#61-the-4-github-actions-workflows-ci-e2e-playwright-eval-gate-nightly-benchmark)
+  - [62. Operational CLI Scripts, Backup/Restore & Smoke Testing](#62-operational-cli-scripts-backuprestore--smoke-testing)
+  - [63. Docker Compose Topologies, Alembic Lineage, Nginx Reverse Proxy & Runbooks](#63-docker-compose-topologies-alembic-lineage-nginx-reverse-proxy--runbooks)
 - [Part XI: Real-World Engineering Case Studies (DaveAI Production Challenges)](#part-xi-real-world-engineering-case-studies-daveai-production-challenges)
-  - [61. Case Study 1: The Asynchronous Streaming Transaction Race Condition (EarlyCommit Fix)](#61-case-study-1-the-asynchronous-streaming-transaction-race-condition-earlycommit-fix)
-  - [62. Case Study 2: Database Connection Pool Starvation during Streaming Responses](#62-case-study-2-database-connection-pool-starvation-during-streaming-responses)
-  - [63. Case Study 3: Cascading Timeouts & Topological Deadlocks in Multi-Agent Execution](#63-case-study-3-cascading-timeouts--topological-deadlocks-in-multi-agent-execution)
-  - [64. Case Study 4: Multi-Key Rate-Limit Cascades & High-Traffic Failover](#64-case-study-4-multi-key-rate-limit-cascades--high-traffic-failover)
+  - [64. Case Study 1: The Asynchronous Streaming Transaction Race Condition (EarlyCommit Fix)](#64-case-study-1-the-asynchronous-streaming-transaction-race-condition-earlycommit-fix)
+  - [65. Case Study 2: Database Connection Pool Starvation during Streaming Responses](#65-case-study-2-database-connection-pool-starvation-during-streaming-responses)
+  - [66. Case Study 3: Cascading Timeouts & Topological Deadlocks in Multi-Agent Execution](#66-case-study-3-cascading-timeouts--topological-deadlocks-in-multi-agent-execution)
+  - [67. Case Study 4: Multi-Key Rate-Limit Cascades & High-Traffic Failover](#67-case-study-4-multi-key-rate-limit-cascades--high-traffic-failover)
 - [Part XII: Master Technical Interview Preparation Guide & Environment Catalog](#part-xii-master-technical-interview-preparation-guide--environment-catalog)
-  - [65. Technical Narrative Framework (STAR Format for Fusion RAG)](#65-technical-narrative-framework-star-format-for-fusion-rag)
-  - [66. Backend Architecture & Distributed Systems Interview Questions](#66-backend-architecture--distributed-systems-interview-questions)
-  - [67. Generative AI, RAG & LLM Systems Interview Questions](#67-generative-ai-rag--llm-systems-interview-questions)
-  - [68. System Design, Resilience & Failure Scenarios Interview Questions](#68-system-design-resilience--failure-scenarios-interview-questions)
-  - [69. Rapid Revision Flashcard Matrix (Numbers, Formulas, DB Indexes & Shell Commands)](#69-rapid-revision-flashcard-matrix-numbers-formulas-db-indexes--shell-commands)
-  - [70. Exhaustive Environment Configuration Variable Catalog (All 150+ Parameters)](#70-exhaustive-environment-configuration-variable-catalog-all-150-parameters)
+  - [68. Technical Narrative Framework (STAR Format for Fusion RAG)](#68-technical-narrative-framework-star-format-for-fusion-rag)
+  - [69. Technical Architecture & Distributed Systems Interview Q&A](#69-technical-architecture--distributed-systems-interview-qa)
+  - [70. Rapid Revision Flashcard Matrix (Numbers, Formulas, DB Indexes & Shell Commands)](#70-rapid-revision-flashcard-matrix-numbers-formulas-db-indexes--shell-commands)
+  - [71. Exhaustive Environment Configuration Variable Catalog (All 150+ Parameters)](#71-exhaustive-environment-configuration-variable-catalog-all-150-parameters)
 
 ---
 
@@ -230,7 +231,7 @@ Standard Retrieval-Augmented Generation (RAG) implementations suffer from five p
 |                                                                                                   |
 |  +-----------------------+   +------------------------+   +------------------------------------+  |
 |  |     POSTGRESQL 16     |   |        REDIS 7         |   |          QDRANT v1.19.0            |  |
-|  | - 23 Relational Tables|   | - Token Bucket RL      |   | - HNSW Vector Index                |  |
+|  | - 25 Relational Tables|   | - Token Bucket RL      |   | - HNSW Vector Index                |  |
 |  | - Users, Auth, Keys   |   | - L1/L2 Semantic Cache |   | - 768-dim Cosine Distance          |  |
 |  | - Conversations & Msgs|   | - Distributed Mutexes  |   | - Payload Tenant Filter:           |  |
 |  | - Chunks & GIN FTS    |   | - Streams Task Queue   |   |   (user_id + scope + conversation) |  |
@@ -276,7 +277,7 @@ FusionRAG/                           # Repository root
     pyproject.toml                   # Python dependencies and build metadata
     requirements.txt                 # Pinned production dependencies
     alembic.ini                      # Database migration configuration
-    alembic/versions/                # Versioned migration scripts
+    alembic/versions/                # 14 versioned migration scripts
     scripts/                         # Backup, restore, load testing, smoke testing, OpenAPI export
     .env.example                     # Environment template with all 150+ variables
 
@@ -299,9 +300,9 @@ FusionRAG/                           # Repository root
         telemetry/                   # OpenTelemetry setup, Prometheus metrics, TelemetrySanitizer
         feature_flags/               # Dynamic runtime feature flag engine
         math/                        # Deterministic MathEngine, FinancialMath, Statistical, LaTeX
-      db/                            # Async SQLAlchemy sessionmaker, ORM Base, and 23 Model mappings
+      db/                            # Async SQLAlchemy sessionmaker, ORM Base, and 25 Model mappings
       evaluation/                    # Ragas, DeepEval, 20-Metric Registry, Golden Datasets, Regression Runner
-      rag/orchestration/             # Adaptive RAG State Machine (StrategyRouter, EvidenceEvaluator, Master)
+      rag/orchestration/             # Dedicated Adaptive RAG Framework (master, strategy, replanner, telemetry)
 
   frontend/
     src/
@@ -747,9 +748,23 @@ class AgentExecutionEngine:
 
 ---
 
-## 15. ResearchAgent & ResearchPlanner: Sub-Query Decomposition & KB Retrieval
+## 15. Dedicated Adaptive RAG Orchestration Framework (`app/rag/orchestration/`)
 
-### 15.1 ResearchAgent Mechanics
+Located in `backend/app/rag/orchestration/`:
+- **`AdaptiveRAGOrchestrator` (`master.py`)**: Master state machine managing query lifecycle, task budgeting, and worker dispatching across 4 core strategies.
+- **`EvidenceSufficiencyEvaluator` (`evidence_evaluator.py`)**:
+  - Computes composite confidence metric $S_{\text{evidence}} \in [0.0, 1.0]$ based on reranker score distribution, cross-chunk agreement, and coverage density.
+  - Gating threshold: $S_{\text{evidence}} \ge 0.70$ triggers direct LLM answer synthesis; $S_{\text{evidence}} < 0.70$ triggers replanner widening.
+- **`RetrievalStrategyRouter` (`strategy_router.py`)**: Rule-based & semantic classifier selecting between `DIRECT`, `HYDE`, `MULTI_HOP`, or `SPECIALIST`.
+- **`Replanner` (`replanner.py`) & `compute_task_fingerprint`**: Generates task delta plans. Uses SHA-256 fingerprinting on normalized sub-query strings and scope filters to guarantee zero duplicate retrieval runs.
+- **`OrchestrationTelemetry` (`telemetry.py`)**: Tracks granular event logs (`OrchestrationTelemetryEvent`) for Jaeger spans and frontend execution cards.
+- **`RetrievalWorker` (`worker.py`)**: Non-blocking worker coroutine executing isolated retrieval tasks.
+
+---
+
+## 16. ResearchAgent & ResearchPlanner: Sub-Query Decomposition & KB Retrieval
+
+### 16.1 ResearchAgent Mechanics
 Located in [research_agent.py](file:///d:/fun/FusionRAG/backend/app/chat/services/multi_agent/research_agent.py):
 - **Decomposition**: Uses `ResearchPlanner` to break complex research topics into 1-4 targeted sub-queries.
 - **Deduplication**: Computes cosine similarity across sub-query embeddings; discards queries with $\text{similarity} > 0.85$ to avoid redundant retrievals.
@@ -758,9 +773,9 @@ Located in [research_agent.py](file:///d:/fun/FusionRAG/backend/app/chat/service
 
 ---
 
-## 16. DocumentAgent: Explicit Document & Chunk Inspection Specialist
+## 17. DocumentAgent: Explicit Document & Chunk Inspection Specialist
 
-### 16.1 Document Inspection & Metadata Retrieval
+### 17.1 Document Inspection & Metadata Retrieval
 Located in [document_agent.py](file:///d:/fun/FusionRAG/backend/app/chat/services/multi_agent/document_agent.py):
 - **Document Scoping**: Lists available documents filtered by `user_id` and active `conversation_id`.
 - **Direct UUID Fetching**: Looks up exact document chunks and structural metadata directly from PostgreSQL by UUID.
@@ -768,9 +783,9 @@ Located in [document_agent.py](file:///d:/fun/FusionRAG/backend/app/chat/service
 
 ---
 
-## 17. AnalysisAgent: Deterministic Math, AST Sandboxing, SymPy & MathEngine
+## 18. AnalysisAgent: Deterministic Math, AST Sandboxing, SymPy & MathEngine
 
-### 17.1 Detailed MathEngine Subsystems (`app/core/math/engine.py`)
+### 18.1 Detailed MathEngine Subsystems (`app/core/math/engine.py`)
 Located in [engine.py](file:///d:/fun/FusionRAG/backend/app/core/math/engine.py):
 - **`FinancialMathSubsystem`**:
   - `cagr(beginning_value, ending_value, periods)`: Compound annual growth rate calculation.
@@ -787,18 +802,18 @@ Located in [engine.py](file:///d:/fun/FusionRAG/backend/app/core/math/engine.py)
 
 ---
 
-## 18. WebSearchAgent: Real-Time Multi-Provider Web Search Cascade
+## 19. WebSearchAgent: Real-Time Multi-Provider Web Search Cascade
 
-### 18.1 Live Web Ingestion & Multi-Provider Cascade
+### 19.1 Live Web Ingestion & Multi-Provider Cascade
 Located in [web_search_agent.py](file:///d:/fun/FusionRAG/backend/app/chat/services/multi_agent/web_search_agent.py):
 - **Automated Failover Cascade**: Tries primary provider **SerpAPI** $\rightarrow$ falls back to **Firecrawl** $\rightarrow$ falls back to **DuckDuckGo**.
 - **Provenance & Snippets**: Extracts top 5 web results, formats them with title, URL, and snippet text, and generates deterministic UUIDv5 `EvidenceItem` records.
 
 ---
 
-## 19. TableAgent: Tabular Data Extraction & Column Aggregations
+## 20. TableAgent: Tabular Data Extraction & Column Aggregations
 
-### 19.1 TableProcessor & Structured Tabular Reasoning
+### 20.1 TableProcessor & Structured Tabular Reasoning
 Located in [table_agent.py](file:///d:/fun/FusionRAG/backend/app/chat/services/multi_agent/table_agent.py):
 - **Parsers**: Native support for Markdown table strings and CSV format data via `TableProcessor`.
 - **Column Aggregations**: Executes deterministic calculations across extracted table columns (`SUM`, `AVG`, `MIN`, `MAX`, `COUNT`).
@@ -806,27 +821,27 @@ Located in [table_agent.py](file:///d:/fun/FusionRAG/backend/app/chat/services/m
 
 ---
 
-## 20. VisionAgent: Multimodal Visual Reasoning & Chart Inspection
+## 21. VisionAgent: Multimodal Visual Reasoning & Chart Inspection
 
-### 20.1 VisionProcessor & Diagram Inspection
+### 21.1 VisionProcessor & Diagram Inspection
 Located in [vision_agent.py](file:///d:/fun/FusionRAG/backend/app/chat/services/multi_agent/vision_agent.py):
 - **Multimodal Visual Analysis**: Accepts raw image bytes from documents or uploads and calls `VisionProcessor` backed by Gemini Vision API.
 - **Element Classification**: Classifies visual elements (`FIGURE`, `CHART`, `DIAGRAM`, `TABLE_SNAPSHOT`), extracting textual descriptions and data points into structured evidence.
 
 ---
 
-## 21. GraphAgent: Knowledge Graph Traversal & Entity Relationship Reasoning
+## 22. GraphAgent: Knowledge Graph Traversal & Entity Relationship Reasoning
 
-### 21.1 PostgresGraphRetriever & Entity Traversal
+### 22.1 PostgresGraphRetriever & Entity Traversal
 Located in [graph_agent.py](file:///d:/fun/FusionRAG/backend/app/chat/services/multi_agent/graph_agent.py):
 - **Entity Relationship Reasoning**: Interfaces with `PostgresGraphRetriever` to traverse relational knowledge graph edges.
 - **Cross-Document Multi-Hop**: Discovers indirect relationships between entities across distinct document boundaries with confidence scoring.
 
 ---
 
-## 22. SynthesisAgent: Context Grounding, Citation Tagging & Refusal Faithfulness
+## 23. SynthesisAgent: Context Grounding, Citation Tagging & Refusal Faithfulness
 
-### 22.1 Grounded Answer Generation & Citation Attribution
+### 23.1 Grounded Answer Generation & Citation Attribution
 Located in [synthesis_agent.py](file:///d:/fun/FusionRAG/backend/app/chat/services/multi_agent/synthesis_agent.py):
 - **Strict Evidence Integrity**: Constructs responses using **only** successful specialist results and verified `EvidenceItem` chunks.
 - **Refusal Faithfulness**: Enforces explicit refusal statements when evidence is missing, conflicting, or inconclusive for factual queries.
@@ -835,18 +850,18 @@ Located in [synthesis_agent.py](file:///d:/fun/FusionRAG/backend/app/chat/servic
 
 ---
 
-## 23. ResultEvaluator: Task Quality Scoring & Adaptive Replanning Engine
+## 24. ResultEvaluator: Task Quality Scoring & Adaptive Replanning Engine
 
-### 23.1 LLM-as-Judge Task Verification
+### 24.1 LLM-as-Judge Task Verification
 Located in [result_evaluator.py](file:///d:/fun/FusionRAG/backend/app/chat/services/multi_agent/result_evaluator.py):
 - **Completeness & Evidence Scoring**: Evaluates completed task outputs against `expected_outputs` and `required_evidence`, generating a score between $0.0$ and $1.0$.
 - **Decision Engine**: Emits `ACCEPT` (score $\ge 0.85$), `REPLAN` (score $< 0.85$ and replan budget remains), or `FAIL`.
 
 ---
 
-## 24. PlanValidator: Schema, Cycle Detection & Constraint Enforcement
+## 25. PlanValidator: Schema, Cycle Detection & Constraint Enforcement
 
-### 24.1 Structural Validation Rules
+### 25.1 Structural Validation Rules
 Located in [plan_validator.py](file:///d:/fun/FusionRAG/backend/app/chat/services/multi_agent/plan_validator.py):
 - **Schema Validation**: Guarantees all required fields (`task_id`, `agent_type`, `request`, `dependencies`) exist and are non-empty.
 - **Topological Cycle Detection**: Performs depth-first search / Kahn's algorithm; rejects plans containing cyclic deadlocks.
@@ -854,21 +869,23 @@ Located in [plan_validator.py](file:///d:/fun/FusionRAG/backend/app/chat/service
 
 ---
 
-## 25. TaskRouter & CapabilityRegistry: Capability-Aware Cost/Latency Routing
+## 26. TaskRouter & CapabilityRegistry: Capability-Aware Cost/Latency Routing
 
-### 25.1 Semantic Capability Mapping
+### 26.1 Semantic Capability Mapping
 Located in [task_router.py](file:///d:/fun/FusionRAG/backend/app/chat/services/multi_agent/task_router.py) and [capability_registry.py](file:///d:/fun/FusionRAG/backend/app/chat/services/multi_agent/capability_registry.py):
 - Maintains a registry of agent capabilities, allowed parameters, and tool whitelists.
 - Routes sub-tasks to the optimal agent while verifying that cost units and latency budgets are respected.
 
 ---
 
-## 26. AgentExecutor: Single-Agent Function/Tool Calling Loop & 7 Core Tools
+## 27. AgentExecutor, ToolRegistry & Single-Agent Tool Calling Subsystem
 
-### 26.1 Single-Agent Function Calling Loop
-Located in [agent_executor.py](file:///d:/fun/FusionRAG/backend/app/chat/services/agent_executor.py):
-- Runs a standalone function-calling loop with Gemini LLM when multi-agent mode is disabled or for direct single-agent execution.
-- **7 Registered Tools**:
+Located in `backend/app/chat/services/`:
+- **`ToolRegistry` & `ToolDiscoveryService` (`tool_registry.py`, `tool_discovery.py`)**:
+  - Dynamically registers tool classes and reflects docstrings into Google Gemini function-calling JSON schemas.
+  - Parameter validation ensures type safety and range bounds.
+- **`ToolExecutor` (`tool_executor.py`)**: Sandboxed tool invocation handling timeouts, cancellation, and error fallback formatting.
+- **7 Core Registered Tools (`app/chat/services/tools/`)**:
   1. `SafeCalculator`: AST arithmetic evaluator.
   2. `WebSearchTool`: Live internet search.
   3. `SemanticSearchTool`: Qdrant dense vector search.
@@ -879,29 +896,29 @@ Located in [agent_executor.py](file:///d:/fun/FusionRAG/backend/app/chat/service
 
 ---
 
-## 27. Multi-Agent Operational Subsystems: Health Diagnostics, Title Generator & Retention
+## 28. Multi-Agent Operational Subsystems: Health Diagnostics, Title Generator & Retention
 
-### 27.1 Multi-Agent Health Diagnostics (`health_diagnostics.py`)
+### 28.1 Multi-Agent Health Diagnostics (`health_diagnostics.py`)
 - **Heartbeat & Liveness Scoring**: Monitors background specialist health and records per-agent latency distributions.
 - **Degraded-Agent Auto-Bypass**: If a specialist agent fails consecutively or exceeds timeouts ($N \ge 3$), `HealthDiagnostics` marks the agent status as `DEGRADED`, causing `TaskRouter` to automatically fall back to single-pass hybrid retrieval or general research agents.
 
-### 27.2 Automated Conversation Title Generation (`title_generator.py`)
+### 28.2 Automated Conversation Title Generation (`title_generator.py`)
 - **Non-Blocking Background Execution**: Triggered asynchronously after turn 1 of a new conversation.
 - **Heuristic Fast-Path**: If the first user query is short ($\le 6$ words), extracts a clean TitleCase title directly via regex. For complex queries, invokes a fast LLM prompt (`"Summarize into a 3-5 word title"`) in the background, updating `conversations.title` without delaying token streaming.
 
-### 27.3 Conversation Data Retention & Archival (`retention_service.py`)
+### 28.3 Conversation Data Retention & Archival (`retention_service.py`)
 - **Automated Lifecycle Policy**: Sweeps conversations older than `MAX_CONVERSATION_AGE_DAYS=90`. Inactive conversations are marked `is_archived=TRUE`, and orphaned summaries are pruned to maintain high database indexing performance.
 
 ---
 
-# Part IV: Complete Relational Database Schema & Data Models (All 23 PostgreSQL Tables)
+# Part IV: Complete Relational Database Schema & Data Models (All 25 PostgreSQL Tables)
 
-## 28. Relational Architecture, Entity-Relationship Diagram (ERD) & Bounded Contexts
+## 29. Relational Architecture, Entity-Relationship Diagram (ERD) & Bounded Contexts
 
-### 28.1 Architecture & Overview
-The relational database architecture is implemented in PostgreSQL 16 using SQLAlchemy 2.0 async ORM and `asyncpg`. The 23 tables are partitioned into 6 distinct bounded contexts.
+### 29.1 Architecture & Overview
+The relational database architecture is implemented in PostgreSQL 16 using SQLAlchemy 2.0 async ORM and `asyncpg`. The 25 tables are partitioned into 6 distinct bounded contexts.
 
-### 28.2 Database Entity-Relationship Diagram (ERD)
+### 29.2 Database Entity-Relationship Diagram (ERD)
 
 ```mermaid
 erDiagram
@@ -938,7 +955,7 @@ erDiagram
 
 ```
 ========================================================================================================================
-                                     23 POSTGRESQL RELATIONAL TABLES OVERVIEW
+                                     25 POSTGRESQL RELATIONAL TABLES OVERVIEW
 ========================================================================================================================
 Bounded Context                 Table Name                    Primary Purpose & Business Role
 ------------------------------------------------------------------------------------------------------------------------
@@ -977,9 +994,9 @@ Bounded Context                 Table Name                    Primary Purpose & 
 
 ---
 
-## 29. Authentication & Security Context (5 Tables)
+## 30. Authentication & Security Context (5 Tables)
 
-### 29.1 `users` Table
+### 30.1 `users` Table
 - `id` (UUID, Primary Key, default `gen_random_uuid()`)
 - `email` (VARCHAR(255), Unique, Indexed)
 - `hashed_password` (VARCHAR(255), Nullable for OAuth users)
@@ -991,7 +1008,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `created_at` (TIMESTAMPTZ, default `now()`)
 - `updated_at` (TIMESTAMPTZ, default `now()`)
 
-### 29.2 `refresh_sessions` Table
+### 30.2 `refresh_sessions` Table
 - `id` (UUID, Primary Key)
 - `user_id` (UUID, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE, Indexed)
 - `token_hash` (VARCHAR(64), Unique, Indexed) — SHA-256 hash of raw refresh token
@@ -1002,7 +1019,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `expires_at` (TIMESTAMPTZ, Indexed)
 - `created_at` (TIMESTAMPTZ, default `now()`)
 
-### 29.3 `user_encryption_keys` Table
+### 30.3 `user_encryption_keys` Table
 - `id` (UUID, Primary Key)
 - `user_id` (UUID, Unique, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE)
 - `wrapped_dek` (BYTEA) — AES-256-GCM encrypted Data Encryption Key
@@ -1010,7 +1027,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `created_at` (TIMESTAMPTZ, default `now()`)
 - `rotated_at` (TIMESTAMPTZ, Nullable)
 
-### 29.4 `email_verification_tokens` Table
+### 30.4 `email_verification_tokens` Table
 - `id` (UUID, Primary Key)
 - `user_id` (UUID, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE, Indexed)
 - `token_hash` (VARCHAR(64), Unique, Indexed)
@@ -1020,7 +1037,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `is_used` (BOOLEAN, default `FALSE`)
 - `used_at` (TIMESTAMPTZ, Nullable)
 
-### 29.5 `user_settings` Table
+### 30.5 `user_settings` Table
 - `user_id` (UUID, Primary Key, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE)
 - `folders` (JSONB, default `'[]'`)
 - `pinned_conversations` (JSONB, default `'[]'`)
@@ -1033,9 +1050,9 @@ Bounded Context                 Table Name                    Primary Purpose & 
 
 ---
 
-## 30. Chat & Conversation Context (3 Tables)
+## 31. Chat & Conversation Context (3 Tables)
 
-### 30.1 `conversations` Table
+### 31.1 `conversations` Table
 - `id` (UUID, Primary Key)
 - `user_id` (UUID, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE, Indexed)
 - `title` (VARCHAR(255), default `'New Conversation'`)
@@ -1047,7 +1064,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `created_at` (TIMESTAMPTZ, default `now()`)
 - `updated_at` (TIMESTAMPTZ, default `now()`, Indexed)
 
-### 30.2 `conversation_messages` Table
+### 31.2 `conversation_messages` Table
 - `id` (UUID, Primary Key)
 - `conversation_id` (UUID, Foreign Key $\rightarrow$ `conversations.id` ON DELETE CASCADE, Indexed)
 - `role` (VARCHAR(20)) — `user`, `assistant`, `system`
@@ -1063,7 +1080,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `execution_duration_ms` (FLOAT, default `0.0`)
 - `created_at` (TIMESTAMPTZ, default `now()`, Indexed)
 
-### 30.3 `conversation_summaries` Table
+### 31.3 `conversation_summaries` Table
 - `id` (UUID, Primary Key)
 - `conversation_id` (UUID, Unique, Foreign Key $\rightarrow$ `conversations.id` ON DELETE CASCADE)
 - `summary` (TEXT)
@@ -1075,9 +1092,9 @@ Bounded Context                 Table Name                    Primary Purpose & 
 
 ---
 
-## 31. Document Ingestion, Chunks & Storage Context (9 Tables)
+## 32. Document Ingestion, Chunks & Storage Context (9 Tables)
 
-### 31.1 `documents` Table
+### 32.1 `documents` Table
 - `id` (UUID, Primary Key)
 - `user_id` (UUID, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE, Indexed)
 - `conversation_id` (UUID, Foreign Key $\rightarrow$ `conversations.id` ON DELETE SET NULL, Nullable, Indexed)
@@ -1100,11 +1117,11 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `processing_completed_at` (TIMESTAMPTZ, Nullable)
 - `created_at` (TIMESTAMPTZ, default `now()`)
 
-### 31.2 `document_files` Table
+### 32.2 `document_files` Table
 - `key` (VARCHAR(1024), Primary Key) — Unique storage key identifier
 - `content` (BYTEA) — Large binary file data
 
-### 31.3 `document_chunks` Table
+### 32.3 `document_chunks` Table
 - `id` (UUID, Primary Key)
 - `document_id` (UUID, Foreign Key $\rightarrow$ `documents.id` ON DELETE CASCADE, Indexed)
 - `chunk_index` (INTEGER)
@@ -1115,7 +1132,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `search_vector` (TSVECTOR, Generated Stored, GIN Indexed) — PostgreSQL FTS
 - `created_at` (TIMESTAMPTZ, default `now()`)
 
-### 31.4 `document_embeddings` Table
+### 32.4 `document_embeddings` Table
 - `id` (UUID, Primary Key)
 - `chunk_id` (UUID, Unique, Foreign Key $\rightarrow$ `document_chunks.id` ON DELETE CASCADE)
 - `embedding_provider` (VARCHAR(50), default `'jina-embeddings-v3'`)
@@ -1123,7 +1140,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `qdrant_point_id` (VARCHAR(64), Indexed)
 - `status` (VARCHAR(50), default `'completed'`)
 
-### 31.5 `document_elements` Table
+### 32.5 `document_elements` Table
 - `id` (UUID, Primary Key)
 - `document_id` (UUID, Foreign Key $\rightarrow$ `documents.id` ON DELETE CASCADE, Indexed)
 - `element_index` (INTEGER)
@@ -1136,7 +1153,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `page_number` (INTEGER)
 - `search_vector` (TSVECTOR, Generated Stored, GIN Indexed)
 
-### 31.6 `processing_config_versions` Table
+### 32.6 `processing_config_versions` Table
 - `id` (UUID, Primary Key)
 - `version_name` (VARCHAR(50))
 - `chunk_size` (INTEGER, default `500`)
@@ -1144,14 +1161,14 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `semantic_threshold` (FLOAT, default `0.85`)
 - `is_active` (BOOLEAN, default `TRUE`)
 
-### 31.7 `document_processing_runs` Table
+### 32.7 `document_processing_runs` Table
 - `id` (UUID, Primary Key)
 - `document_id` (UUID, Foreign Key $\rightarrow$ `documents.id` ON DELETE CASCADE, Indexed)
 - `config_version_id` (UUID, Foreign Key $\rightarrow$ `processing_config_versions.id`)
 - `status` (VARCHAR(50))
 - `duration_ms` (FLOAT)
 
-### 31.8 `document_processing_jobs` Table
+### 32.8 `document_processing_jobs` Table
 - `id` (UUID, Primary Key)
 - `run_id` (UUID, Foreign Key $\rightarrow$ `document_processing_runs.id` ON DELETE CASCADE, Indexed)
 - `job_type` (VARCHAR(50)) — `extraction`, `chunking`, `embedding`, `graph_ner`
@@ -1163,7 +1180,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `attempts` (INTEGER, default `0`)
 - `last_error` (TEXT, Nullable)
 
-### 31.9 `durable_cleanup_jobs` Table
+### 32.9 `durable_cleanup_jobs` Table
 - `id` (UUID, Primary Key)
 - `resource_type` (VARCHAR(50)) — `document`, `conversation`, `user`
 - `resource_id` (UUID, Indexed)
@@ -1174,16 +1191,16 @@ Bounded Context                 Table Name                    Primary Purpose & 
 
 ---
 
-## 32. Knowledge Graph Context (4 Tables)
+## 33. Knowledge Graph Context (4 Tables)
 
-### 32.1 `graph_entities` Table
+### 33.1 `graph_entities` Table
 - `id` (UUID, Primary Key)
 - `name` (VARCHAR(255), Indexed)
 - `category` (VARCHAR(100), Indexed) — `PERSON`, `ORGANIZATION`, `METRIC`, `LOCATION`, `CONCEPT`
 - `confidence` (FLOAT, default `1.0`)
 - `user_id` (UUID, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE, Indexed)
 
-### 32.2 `graph_relationships` Table
+### 33.2 `graph_relationships` Table
 - `id` (UUID, Primary Key)
 - `source_entity_id` (UUID, Foreign Key $\rightarrow$ `graph_entities.id` ON DELETE CASCADE, Indexed)
 - `target_entity_id` (UUID, Foreign Key $\rightarrow$ `graph_entities.id` ON DELETE CASCADE, Indexed)
@@ -1191,7 +1208,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `confidence` (FLOAT, default `1.0`)
 - `user_id` (UUID, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE, Indexed)
 
-### 32.3 `graph_relationship_evidence` Table
+### 33.3 `graph_relationship_evidence` Table
 - `id` (UUID, Primary Key)
 - `relationship_id` (UUID, Foreign Key $\rightarrow$ `graph_relationships.id` ON DELETE CASCADE, Indexed)
 - `chunk_id` (UUID, Foreign Key $\rightarrow$ `document_chunks.id` ON DELETE CASCADE, Indexed)
@@ -1199,7 +1216,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `source_span` (TEXT)
 - `confidence` (FLOAT, default `1.0`)
 
-### 32.4 `graph_entity_mentions` Table
+### 33.4 `graph_entity_mentions` Table
 - `id` (UUID, Primary Key)
 - `entity_id` (UUID, Foreign Key $\rightarrow$ `graph_entities.id` ON DELETE CASCADE, Indexed)
 - `chunk_id` (UUID, Foreign Key $\rightarrow$ `document_chunks.id` ON DELETE CASCADE, Indexed)
@@ -1208,9 +1225,9 @@ Bounded Context                 Table Name                    Primary Purpose & 
 
 ---
 
-## 33. Transactional Outbox & Automated Evaluation Context (4 Tables)
+## 34. Transactional Outbox Context (1 Table) & Automated Evaluation Context (3 Tables)
 
-### 33.1 `outbox_events` Table
+### 34.1 `outbox_events` Table
 - `id` (UUID, Primary Key)
 - `event_type` (VARCHAR(100), Indexed) — `document.created`, `document.deleted`, `chat.completed`
 - `payload` (JSONB)
@@ -1219,7 +1236,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `created_at` (TIMESTAMPTZ, default `now()`, Indexed)
 - `published_at` (TIMESTAMPTZ, Nullable)
 
-### 33.2 `evaluation_runs` Table
+### 34.2 `evaluation_runs` Table
 - `id` (UUID, Primary Key)
 - `run_name` (VARCHAR(255))
 - `dataset_name` (VARCHAR(255), Indexed)
@@ -1230,7 +1247,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `status` (VARCHAR(50), Indexed)
 - `created_at` (TIMESTAMPTZ, default `now()`)
 
-### 33.3 `evaluation_results` Table
+### 34.3 `evaluation_results` Table
 - `id` (UUID, Primary Key)
 - `run_id` (UUID, Foreign Key $\rightarrow$ `evaluation_runs.id` ON DELETE CASCADE, Indexed)
 - `sample_id` (VARCHAR(100), Indexed)
@@ -1239,7 +1256,7 @@ Bounded Context                 Table Name                    Primary Purpose & 
 - `generated_answer` (TEXT)
 - `metrics_json` (JSONB) — Raw score breakdown for all 20 metrics
 
-### 33.4 `benchmark_runs` Table
+### 34.4 `benchmark_runs` Table
 - `id` (UUID, Primary Key)
 - `profile_name` (VARCHAR(100)) — `production`, `ci_gate`, `nightly`
 - `baseline_version` (VARCHAR(50))
@@ -1251,9 +1268,9 @@ Bounded Context                 Table Name                    Primary Purpose & 
 
 # Part V: Security, Reliability, Caching & Distributed Infrastructure
 
-## 34. Envelope Encryption, Key Management & Crypto-Shredding (AES-256-GCM + DEK/KEK)
+## 35. Envelope Encryption, Key Management & Crypto-Shredding (AES-256-GCM + DEK/KEK)
 
-### 34.1 Mental Model & Flowchart
+### 35.1 Mental Model & Flowchart
 * **Master Key (KEK - Key Encryption Key)**: The server's 256-bit environment master key.
 * **Data Encryption Key (DEK)**: A unique individual 256-bit key generated per user.
 * **Wrapped DEK**: The user's individual key is encrypted using AES-256-GCM with the Master Key and safely stored in `user_encryption_keys.wrapped_dek`.
@@ -1268,7 +1285,7 @@ flowchart LR
 
 ---
 
-## 35. Malware & Antivirus Scanning (ClamAV TCP Streaming + EICAR)
+## 36. Malware & Antivirus Scanning (ClamAV TCP Streaming + EICAR)
 
 Located in `backend/app/core/security/malware.py`:
 - **Daemon Protocol**: Uploaded file bytes are streamed over a non-blocking TCP socket to `clamd` on port `3310` using the `INSTREAM` protocol.
@@ -1276,7 +1293,7 @@ Located in `backend/app/core/security/malware.py`:
 
 ---
 
-## 36. Prompt Injection Defense, Intent Guardrails & AST Sandboxing
+## 37. Prompt Injection Defense, Intent Guardrails & AST Sandboxing
 
 Located in `backend/app/core/security/`:
 - **Intent Classifier Guardrails (`intent_classifier.py`)**: Pre-retrieval classification blocking toxic, adversarial, or out-of-domain prompts before token consumption.
@@ -1286,9 +1303,9 @@ Located in `backend/app/core/security/`:
 
 ---
 
-## 37. Multi-Tier Caching (L1 Memory + L2 Redis) & Distributed Heartbeat Locking
+## 38. Multi-Tier Caching (L1 Memory + L2 Redis) & Distributed Heartbeat Locking
 
-### 37.1 Multi-Tier Cache Lifecycle Architecture (`app/core/cache/multi_tier.py`)
+### 38.1 Multi-Tier Cache Lifecycle Architecture (`app/core/cache/multi_tier.py`)
 
 ```mermaid
 flowchart TD
@@ -1307,13 +1324,13 @@ flowchart TD
 
 ---
 
-## 38. Reliability Framework: Bulkheads, Circuit Breakers, Exponential Jitter Retries & Timeouts
+## 39. Reliability Framework: Bulkheads, Circuit Breakers, Exponential Jitter Retries & Timeouts
 
-### 38.1 Reliability Overview
+### 39.1 Reliability Overview
 Located in `backend/app/core/reliability/`:
 1. **Bulkheads (`bulkhead.py`)**: Concurrency semaphores (`Gemini: Semaphore(20)`, `Jina Reranker: Semaphore(4)`, `Vision: Semaphore(3)`).
 
-### 38.2 Circuit Breaker State Machine & Mental Model
+### 39.2 Circuit Breaker State Machine & Mental Model
 
 ```mermaid
 stateDiagram-v2
@@ -1334,7 +1351,7 @@ stateDiagram-v2
 
 ---
 
-## 39. Transactional Outbox Pattern, Event Bus & JobDispatcher Engine
+## 40. Transactional Outbox Pattern, Event Bus & JobDispatcher Engine
 
 Located in `backend/app/core/events/` and `backend/app/core/queue/`:
 - **Transactional Outbox (`outbox_dispatcher.py`)**: Guaranteed message delivery through atomic PostgreSQL commits.
@@ -1346,7 +1363,7 @@ Located in `backend/app/core/events/` and `backend/app/core/queue/`:
 
 ---
 
-## 40. Storage Provider Abstraction & Two-Phase Durable Cleanup Worker
+## 41. Storage Provider Abstraction & Two-Phase Durable Cleanup Worker
 
 Located in `backend/app/documents/services/cleanup_worker.py` and `app/documents/infrastructure/storage.py`:
 - **3 Storage Providers**:
@@ -1357,7 +1374,7 @@ Located in `backend/app/documents/services/cleanup_worker.py` and `app/documents
 
 ---
 
-## 41. Resend Email Service, Token Cost Pricing Engine & Dynamic Feature Flags
+## 42. Resend Email Service, Token Cost Pricing Engine & Dynamic Feature Flags
 
 - **Resend Service (`resend_service.py`)**: Asynchronous transactional email delivery for magic links, activation OTPs, and password reset workflows.
 - **Pricing Provider (`pricing_provider.py`)**: Exact per-token cost calculation engine tracking USD consumption across Gemini LLMs and Jina embeddings.
@@ -1365,7 +1382,7 @@ Located in `backend/app/documents/services/cleanup_worker.py` and `app/documents
 
 ---
 
-## 42. Application Lifespan, Startup Hooks & Middleware Cardinality Defense
+## 43. Application Lifespan, Startup Hooks & Middleware Cardinality Defense
 
 Located in `backend/app/main.py` and `backend/app/core/startup.py`:
 - **Lifespan Startup Tasks**:
@@ -1378,9 +1395,22 @@ Located in `backend/app/main.py` and `backend/app/core/startup.py`:
 
 ---
 
-# Part VI: Document Ingestion, Advanced Chunking & Knowledge Graph Pipeline
+# Part VI: Document Ingestion, Advanced Chunking & Retrieval Intelligence
 
-## 43. Advanced Chunking Strategies: Recursive, Parent-Child & Sentence-Window
+## 44. Ingestion Worker Lease Protocol & Durable Ingestion Reaper
+
+Located in `backend/app/documents/services/`:
+- **Distributed Lease Locking**:
+  - Worker claims job by writing `lease_token` (UUIDv4) and setting `lease_expires_at = now() + 180s`.
+  - While running, worker coroutine updates `heartbeat_at` every 30 seconds.
+- **Durable Ingestion Reaper (`ingestion_reaper.py`)**:
+  - Runs periodically every 60s (`INGESTION_REAPER_INTERVAL_SECONDS=60.0`).
+  - Scans for jobs where `status = 'processing'` and `lease_expires_at < now()`.
+  - Increments `attempts`; if `attempts < 3`, resets `lease_token=NULL` and re-queues job; if `attempts >= 3`, routes payload to `stream:jobs:dead_letter` and marks job `status='FAILED'`.
+
+---
+
+## 45. Advanced Chunking Strategies: Recursive, Parent-Child & Sentence-Window
 
 Located in `backend/app/documents/services/chunking.py`:
 1. **Recursive Character Chunking (Default)**: Splits text hierarchically on paragraph, sentence, and word boundaries (`chunk_size=500`, `chunk_overlap=50`).
@@ -1389,35 +1419,51 @@ Located in `backend/app/documents/services/chunking.py`:
 
 ---
 
-## 44. Empty Knowledge Base Index Cache & Weighted RRF Fusion
+## 46. Empty Knowledge Base Index Cache & Weighted RRF Fusion
 
-### 44.1 Empty Knowledge Base Index Cache (`index_cache.py`)
+### 46.1 Empty Knowledge Base Index Cache (`index_cache.py`)
 - Caches whether a `user_id` has completed indexed document chunks (`EMPTY_KB_CACHE_TTL_SECONDS=60.0`, `INDEX_CACHE_MAX_USERS=500`).
 - If a user has 0 indexed chunks, bypasses expensive Qdrant and PostgreSQL GIN full-text searches.
 
-### 44.2 Weighted Reciprocal Rank Fusion (`fusion.py`)
+### 46.2 Weighted Reciprocal Rank Fusion (`fusion.py`)
 - Supports weighted scoring between dense vector rankings and sparse keyword rankings:
   $$\text{Score}_{\text{weighted}}(d) = w_{\text{dense}} \cdot \frac{1}{k + r_{\text{dense}}(d)} + w_{\text{sparse}} \cdot \frac{1}{k + r_{\text{sparse}}(d)}$$
 
 ---
 
-## 45. Ingestion-Time NER & Relationship Extraction Pipeline
+## 47. Document Parsers, Multimodal OCR & Metadata Extractors
 
-Located in `backend/app/documents/services/entity_extractor.py` and `relationship_extractor.py`:
-- Extracts JSON entity triplets and persists character offsets into `graph_entity_mentions` and `graph_relationship_evidence`.
-
----
-
-## 46. BFS Knowledge Graph Pathfinding & Multi-Hop Retrieval
-
-Located in `backend/app/documents/services/graph_traversal.py` and `graph_retriever.py`:
-- Executes Breadth-First Search (BFS) directly inside PostgreSQL using recursive Common Table Expressions (CTEs) up to depth 3.
+Located in `backend/app/documents/services/`:
+- **`OCRService` (`ocr_service.py`)**: Gemini Vision OCR fallback processing extracted image elements, generating normalized bounding boxes and alt texts.
+- **`TextCleaner` (`text_cleaner.py`)**: Strips non-printable unicode control characters, normalizes line breaks, and deduplicates whitespace spans.
+- **`MetadataExtractor` (`metadata_extractor.py`)**: Infers document language, word count, author, and MIME attributes.
+- **`TableProcessor` (`table_processor.py`)**: Formats CSV/Markdown tables with column alignment and summary statistics.
 
 ---
 
-## 47. Adaptive RAG Orchestration State Machine (DIRECT, HYDE, MULTI_HOP, SPECIALIST)
+## 48. Query Intelligence: Classification, Decomposition, Expansion & HyDE
 
-### 47.1 Dynamic Strategy Routing Flowchart
+Located in `backend/app/documents/services/`:
+- **`DeterministicQueryClassifier` (`query_classifier.py`)**: Classifies query complexity without LLM latency using regex token distributions.
+- **`DeterministicQueryDecomposer` (`query_decomposer.py`)**: Splits compound clauses into atomic sub-questions.
+- **`QueryExpansionService` (`query_expansion.py`)**: Enriches domain keywords with acronyms and synonyms.
+- **`SafeHyDEExecutor` (`hyde.py`)**: Generates synthetic hypothetical passage chunks to bridge semantic vocab gaps.
+- **`MMR` (`mmr.py`)**: Maximal Marginal Relevance scoring:
+  $$\text{MMR}(q, d) = \arg\max_{d \in R \setminus S} \left[ \lambda \cdot \text{Sim}_1(d, q) - (1 - \lambda) \max_{d_j \in S} \text{Sim}_2(d, d_j) \right]$$
+
+---
+
+## 49. Ingestion-Time NER, Relationship Extraction & BFS Knowledge Graph Retrieval
+
+Located in `backend/app/documents/services/`:
+- **Entity & Relation Extractor**: Parses JSON triplets and persists evidence spans into `graph_entity_mentions` and `graph_relationship_evidence`.
+- **PostgreSQL Recursive CTE BFS**: Traverses up to depth 3 across relational graph edges to discover cross-document connections.
+
+---
+
+## 50. Adaptive RAG Orchestration State Machine (DIRECT, HYDE, MULTI_HOP, SPECIALIST)
+
+### 50.1 Dynamic Strategy Routing Flowchart
 
 ```mermaid
 flowchart TD
@@ -1439,16 +1485,19 @@ flowchart TD
 
 # Part VII: Frontend Architecture, Pyodide WASM & UI Component Tree
 
-## 48. Pyodide WebAssembly (WASM) Sandbox Worker Architecture
+## 51. Pyodide WebAssembly (WASM) Sandbox Worker Protocol & Managers
 
 Located in `frontend/src/workers/pyodide.worker.ts` and `frontend/src/lib/pyodide/pyodideManager.ts`:
-- Executes Python and Pandas analysis scripts entirely inside a client-side WebAssembly Web Worker, completely preventing backend Remote Code Execution (RCE).
+- **Web Worker Message Schema**:
+  - Actions: `INIT`, `RUN_CODE`, `INTERRUPT`.
+  - Responses: `INIT_SUCCESS`, `STDOUT`, `STDERR`, `PLOT_PNG` (base64 PNG data URLs from Matplotlib `BytesIO`), `RESULT`, `ERROR`.
+- **Preloaded Environment**: In-browser virtual VM loaded with `numpy`, `pandas`, `matplotlib`, and `sympy`.
 
 ---
 
-## 49. Complete Custom Hook Architecture & SSE Streaming Protocol
+## 52. Complete Custom Hook Architecture & SSE Streaming Protocol
 
-### 49.1 Frontend Server-Sent Events (SSE) Lifecycle Sequence
+### 52.1 Frontend Server-Sent Events (SSE) Lifecycle Sequence
 
 ```mermaid
 sequenceDiagram
@@ -1477,7 +1526,7 @@ sequenceDiagram
     Hook->>UI: Finalize message, enable input box
 ```
 
-### 49.2 Complete Hook Inventory
+### 52.2 Complete Hook Inventory
 Located in `frontend/src/hooks/`:
 - `useSSEChat.ts`: Streaming SSE consumption and citation tagging.
 - `useDrafts.ts`: Message draft persistence across conversation switching.
@@ -1490,10 +1539,11 @@ Located in `frontend/src/hooks/`:
 - `useRecentAttachments.ts`: Recent upload attachments management.
 - `useSidebarState.ts`: Collapsible sidebar layout state.
 - `useUserSettings.ts`: User preferences and theme sync.
+- `useDocumentPipelineSummary.ts` & `useDocumentStatusMap.ts`: Real-time pipeline status aggregation.
 
 ---
 
-## 50. 7-Stage Upload Pipeline & Document Status State Machine
+## 53. 7-Stage Progressive Upload Pipeline & State Machine
 
 Located in `frontend/src/lib/uploadStages.ts` and `frontend/src/components/layout/SidebarUploadIndicator.tsx`:
 
@@ -1516,18 +1566,20 @@ stateDiagram-v2
 
 ---
 
-## 51. Projects, Workspaces & Folder Organization Subsystems
+## 54. Projects, Workspaces & Hierarchical Folder Subsystems
 
 - **Projects & Workspaces (`ProjectsPage.tsx`)**: Multi-project workspace isolation.
 - **Hierarchical Folders (`SidebarFolders.tsx`, `ConversationMenu.tsx`)**: Folder categorization with context actions (Rename, Pin, Export Markdown/JSON, Move, Archive, Delete).
 
 ---
 
-## 52. Stream Recovery, In-Flight Re-Authentication & UI Component Tree
+## 55. Stream Recovery, In-Flight Re-Authentication & UI Component Tree
 
 - **Stream Interruption Recovery (`StreamingRecovery.tsx`)**: Buffers tokens during network drops and provides an inline resume action.
 - **In-Flight Re-Authentication (`ReauthDialog.tsx`)**: Modal dialog refreshing tokens without discarding unsent drafts.
-- **Key UI Components**:
+- **Key UI Components & Pages**:
+  - `AdminDashboardPage.tsx`: Admin metrics and queue inspection.
+  - `VerifyEmailPage.tsx` & `OAuthCallbackPage.tsx`: Auth flows.
   - `CodeInterpreterOutput.tsx`: Pyodide stdout/stderr, tables, and Matplotlib chart renderer.
   - `ConversationDocumentChips.tsx`: Active document chips in conversation input.
   - `OfflineBanner.tsx` & `OfflinePage.tsx`: Network status indicators.
@@ -1539,7 +1591,7 @@ stateDiagram-v2
 
 # Part VIII: Complete REST & SSE API Endpoint Catalog (All 45+ Endpoints)
 
-## 53. Exhaustive Route Specifications Across All 10 Routers & Root App
+## 56. Exhaustive Route Specifications Across All 10 Routers & Root App
 
 ```
 ========================================================================================================================
@@ -1641,32 +1693,51 @@ GET          /api/v1/admin/operational-status                   Admin          R
 
 # Part IX: Production Observability, Quality Assurance & Evaluation Suite
 
-## 54. OpenTelemetry Tracing, Prometheus Metric Registry & Telemetry Sanitizer
+## 57. OpenTelemetry Tracing, Prometheus Metric Registry & Telemetry Sanitizer
 
 Distributed tracing is configured via `OTLPSpanExporter` transmitting spans over gRPC to Jaeger (`OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317`), with PII/secret sanitization and SHA-256 user ID hashing.
 
 ---
 
-## 55. Multi-Agent Observability & Quality Metrics (AgentObservabilityService)
+## 58. Multi-Agent Observability & Quality Metrics (AgentObservabilityService)
 
 Tracks DAG execution depth, concurrency factors, task success rates, evidence sufficiency scores, and duplicate queries avoided.
 
 ---
 
-## 56. Comprehensive Evaluation Framework: Ragas, DeepEval & 20 Custom Metrics
+## 59. Comprehensive Evaluation Framework: Ragas, DeepEval & 20 Custom Metrics
 
-### 56.1 Dual-Gate CI/CD Regression Enforcer
+### 59.1 Dual-Gate CI/CD Regression Enforcer
 Enforces Gate 1 ($\text{Faithfulness} \ge 0.90$) and Gate 2 ($\Delta \le 0.03$) against versioned golden baselines.
 
-### 56.2 The 20 Custom Metrics in MetricRegistry
-1. `HitRate@K` | 2. `Precision@K` | 3. `Recall@K` | 4. `MRR` | 5. `NDCG` | 6. `CitationValidity` | 7. `CitationPrecision` | 8. `CitationGrounding` | 9. `CitationCoverage` | 10. `TaskSuccessRate` | 11. `EvidenceSufficiency` | 12. `ReplanSuccessRate` | 13. `DuplicateTaskAvoidance` | 14. `AgentCallEfficiency` | 15. `ReasoningSteps` | 16. `ToolNecessity` | 17. `ToolOrdering` | 18. `ToolSuccessRate` | 19. `ToolChoiceCorrectness` | 20. `HistoryRewriting`.
+### 59.2 Exact Formulations for All 20 Custom Metrics (`app/evaluation/metrics/`)
+1. **`HitRate@K`**: $\mathbb{I}(\text{any expected doc} \in \text{Top-}K)$.
+2. **`Precision@K`**: $\frac{|\text{Relevant Chunks in Top-}K|}{K}$.
+3. **`Recall@K`**: $\frac{|\text{Relevant Chunks in Top-}K|}{|\text{Total Relevant Chunks in Ground Truth}|}$.
+4. **`MRR` (Mean Reciprocal Rank)**: $\frac{1}{\text{rank of first relevant chunk}}$.
+5. **`NDCG`**: $\frac{\text{DCG}@K}{\text{IDCG}@K}$, where $\text{DCG}@K = \sum_{i=1}^K \frac{2^{\text{rel}_i} - 1}{\log_2(i + 1)}$.
+6. **`CitationValidityMetric`**: $\frac{|\text{Valid UUID citations}|}{|\text{Total citations emitted}|}$.
+7. **`CitationPrecisionMetric`**: $\frac{|\text{Citations pointing to ground truth}|}{|\text{Total citations}|}$.
+8. **`CitationGroundingMetric`**: NLI semantic entailment score ($0.0 \dots 1.0$) between factual sentence and cited text.
+9. **`CitationCoverageMetric`**: $\frac{|\text{Factual claims supported by citations}|}{|\text{Total factual claims}|}$.
+10. **`TaskSuccessRateMetric`**: $\frac{|\text{Completed specialist tasks}|}{|\text{Total planned tasks}|}$.
+11. **`EvidenceSufficiencyMetric`**: Mean cross-attention score of aggregated evidence items.
+12. **`ReplanSuccessRateMetric`**: $\mathbb{I}(\text{Replan Wave achieved score } \ge 0.85)$.
+13. **`DuplicateTaskAvoidance`**: $\frac{|\text{Pruned redundant sub-queries}|}{|\text{Total decomposed queries}|}$.
+14. **`AgentCallEfficiencyMetric`**: $1.0 - \frac{|\text{Redundant specialist calls}|}{|\text{Total agent calls}|}$.
+15. **`ReasoningStepsMetric`**: Ratio of DAG depth to task complexity rating.
+16. **`ToolNecessityMetric`**: Binary verification that tool invocation was required.
+17. **`ToolOrderingMetric`**: Verification that dependent tool calls respected prerequisite order.
+18. **`ToolSuccessRateMetric`**: $\frac{|\text{Successful tool executions}|}{|\text{Attempted tool calls}|}$.
+19. **`ToolChoiceCorrectnessMetric`**: Semantic similarity between query requirement and tool metadata.
+20. **`HistoryRewritingMetric`**: Entailment score proving all conversational pronouns were resolved.
 
 ---
 
-## 57. Golden Corpora, Benchmark Profiles, Drift Tracking & Report Generators
+## 60. Golden Corpora, Benchmark Profiles, Drift Tracking & Report Generators
 
 - **4 Golden Document Corpora (`datasets/golden/documents/`)**: `api_specifications.md`, `cloud_architecture.md`, `engineering_policies.md`, `financial_report_2025.md`.
-- **Benchmark Profiles (`benchmark_profiles.yaml`)**: `ci_gate`, `production`, `nightly`.
+- **Benchmark Profiles (`benchmark_profiles.yaml`)**: `ci_gate` (50 samples), `production` (500 samples), `nightly` (stress test).
 - **Report Generator (`report_generator.py`)**: Standalone HTML, Markdown, and JSON evaluation reports with pass/fail badges.
 - **Metric Drift Analysis**: Tracks regression over time against versioned golden baselines.
 
@@ -1674,7 +1745,7 @@ Enforces Gate 1 ($\text{Faithfulness} \ge 0.90$) and Gate 2 ($\Delta \le 0.03$) 
 
 # Part X: DevOps, CI/CD Automation, Operational Tooling & Edge Deployment
 
-## 58. The 4 GitHub Actions Workflows (CI, E2E Playwright, Eval Gate, Nightly Benchmark)
+## 61. The 4 GitHub Actions Workflows (CI, E2E Playwright, Eval Gate, Nightly Benchmark)
 
 Located in `.github/workflows/`:
 1. `ci.yml`: Lints (Ruff, Mypy strict, ESLint) and unit/integration tests with 85%+ coverage.
@@ -1684,7 +1755,7 @@ Located in `.github/workflows/`:
 
 ---
 
-## 59. Operational CLI Scripts, Backup/Restore & Smoke Testing
+## 62. Operational CLI Scripts, Backup/Restore & Smoke Testing
 
 Located in `backend/scripts/`:
 - `backup_postgres.sh` & `restore_postgres.sh`: Automated PostgreSQL database dumps and restore procedures.
@@ -1697,43 +1768,37 @@ Located in `backend/scripts/`:
 
 ---
 
-## 60. Nginx Edge Reverse Proxy, Grafana Dashboards & Runbooks
+## 63. Docker Compose Topologies, Alembic Lineage, Nginx Reverse Proxy & Runbooks
 
-- **Nginx Reverse Proxy (`deployment/nginx/nginx.conf`)**:
-  - `proxy_buffering off;` and `proxy_cache off;` (critical for SSE streaming).
-  - `proxy_read_timeout 120s;` (preventing 504 gateway timeouts).
-  - Connection and rate limiting zones (`conn_limit_per_ip 20`, `api_limit_per_ip 60r/m burst=20`).
+- **Docker Compose Topologies**: Health checks, volume mounts, and network isolation.
+- **Alembic Database Migration Lineage**: 14 migrations from initial tables to composite indexes.
+- **Nginx Reverse Proxy (`deployment/nginx/nginx.conf`)**: `proxy_buffering off;`, `proxy_cache off;`, `proxy_read_timeout 120s;`.
 - **Grafana Dashboards (`observability/grafana/dashboards/`)**: `http-slo.json`, `llm-provider.json`, `queue-worker.json`, `rag-retrieval.json`.
-- **Runbooks & Deployment Docs (`docs/`)**:
-  - `docs/deployment/runbook-recovery-and-rollback.md`: Failover and disaster recovery runbook.
-  - `docs/deployment/free-tier-deployment-guide.md`: Deployment guide for Render / Supabase / Qdrant Cloud.
-  - `docs/security/production_security_checklist.md`: 50-point security audit checklist.
-  - `vercel.json`: Edge routing configuration for Vercel SPA deployment.
-- **E2E Playwright Test Scenarios (`frontend/e2e/`)**: `account-delete.js`, `login-flow.js`, `redis-fallback.js`, `verify-two-tier.js`.
+- **Runbooks & Deployment Docs (`docs/`)**: `runbook-recovery-and-rollback.md`, `free-tier-deployment-guide.md`, `production_security_checklist.md`, `vercel.json`.
 
 ---
 
 # Part XI: Real-World Engineering Case Studies (DaveAI Production Challenges)
 
-## 61. Case Study 1: The Asynchronous Streaming Transaction Race Condition (EarlyCommit Fix)
+## 64. Case Study 1: The Asynchronous Streaming Transaction Race Condition (EarlyCommit Fix)
 - **The Problem**: During streaming chat initialization (`POST /api/v1/chat/chat`), the backend generated a new `conversation_id`, yielded it in the first SSE metadata event, and began streaming tokens. When the frontend immediately flushed queued document attachments, the concurrent upload request queried the uncommitted conversation row, causing intermittent `404 Conversation Not Found` errors.
 - **The Solution**: Implemented the **EarlyCommit Pattern** in `ChatOrchestrator`, explicitly committing the conversation entity to PostgreSQL before yielding the first SSE metadata frame.
 
 ---
 
-## 62. Case Study 2: Database Connection Pool Starvation during Streaming Responses
+## 65. Case Study 2: Database Connection Pool Starvation during Streaming Responses
 - **The Problem**: Under high concurrent load (500+ simultaneous chat streams), holding open database sessions across the entire duration of 10-30s streaming LLM responses exhausted the connection pool (`asyncpg`).
 - **The Solution**: Decoupled database reads from streaming generation. Read sessions are explicitly closed and returned to the pool prior to token generation, with write sessions opened only after stream completion.
 
 ---
 
-## 63. Case Study 3: Cascading Timeouts & Topological Deadlocks in Multi-Agent Execution
+## 66. Case Study 3: Cascading Timeouts & Topological Deadlocks in Multi-Agent Execution
 - **The Problem**: Sequential execution of complex multi-agent tasks resulted in cumulative latency exceeding gateway timeouts (60s).
 - **The Solution**: Implemented topological execution waves in `AgentExecutionEngine`, executing independent tasks concurrently via `asyncio.gather()` with per-task timeouts (`task_timeout=20.0s`), reducing multi-agent query latency by 68%.
 
 ---
 
-## 64. Case Study 4: Multi-Key Rate-Limit Cascades & High-Traffic Failover
+## 67. Case Study 4: Multi-Key Rate-Limit Cascades & High-Traffic Failover
 - **The Problem**: Automated evaluations and background summarizers caused shared Gemini API keys to hit HTTP 429 rate limits, failing foreground user chats.
 - **The Solution**: Partitioned API keys into three isolated pools: `GEMINI_LLM_API_KEY` (chat streams), `GEMINI_PLANNER_API_KEY` (agent planning), and `GEMINI_FALLBACK_API_KEY` (emergency failover).
 
@@ -1741,7 +1806,7 @@ Located in `backend/scripts/`:
 
 # Part XII: Master Technical Interview Preparation Guide & Environment Catalog
 
-## 65. Technical Narrative Framework (STAR Format for Fusion RAG)
+## 68. Technical Narrative Framework (STAR Format for Fusion RAG)
 
 ```
 +---------------------------------------------------------------------------------------------------+
@@ -1766,7 +1831,7 @@ Located in `backend/scripts/`:
 
 ---
 
-## 66. Backend Architecture & Distributed Systems Interview Questions
+## 69. Technical Architecture & Distributed Systems Interview Q&A
 
 ### Q1: Walk us through how you design asynchronous APIs using FastAPI and Python to handle high-concurrency workloads.
 **Answer Structure**:
@@ -1794,66 +1859,9 @@ Located in `backend/scripts/`:
 
 ---
 
-## 67. Generative AI, RAG & LLM Systems Interview Questions
+## 70. Rapid Revision Flashcard Matrix (Numbers, Formulas, DB Indexes & Shell Commands)
 
-### Q4: Can you describe your experience in building production-oriented RAG pipelines? What components do you typically rely on?
-**Answer Structure**:
-1. **Hybrid Retrieval Architecture**: We combine dense semantic retrieval (Qdrant HNSW cosine indexing on `jina-embeddings-v3` 768-dim embeddings) and sparse keyword retrieval (PostgreSQL FTS GIN index).
-2. **Reciprocal Rank Fusion (RRF)**: Merges top-20 dense and top-20 sparse candidates using rank-based reciprocal scoring ($k=60$). This eliminates score calibration issues between cosine similarities ($[0, 1]$) and BM25/ts_rank scores ($[0, \infty)$).
-3. **Maximal Marginal Relevance (MMR)**: Re-scores candidates ($\lambda=0.5$) to maximize relevance while eliminating semantic redundancy across retrieved chunks.
-4. **Cross-Encoder Reranking**: Passes the top-20 fused candidates to `jina-reranker-v2-base-multilingual` to compute joint query-document cross-attention, selecting the top 5 golden chunks.
-5. **Context Budgeting**: `ContextSelector` applies a strict 6,000 token budget to assemble context into XML-fenced prompts for the Gemini LLM.
-
----
-
-### Q5: How do you handle latency, token limits, and cost optimization when integrating Large Language Models into backend applications?
-**Answer Structure**:
-1. **Multi-Tiered Caching Hierarchy**:
-   - Exact query cache in Redis using SHA-256 prompt hashing (TTL 1h) provides 0ms TTFT for duplicate queries.
-   - Dense embedding vector cache in Redis (TTL 24h) eliminates duplicate embedding API costs during re-indexing.
-2. **Matryoshka Representation Learning (MRL)**: Using Jina v3 embeddings allows truncating vector dimensions from 768 to 256/128 without retraining, slashing Qdrant RAM and search latency by up to 66%.
-3. **Heuristic History Rewriter Bypass**: We evaluate regex heuristics for pronouns before invoking the LLM for query rewriting, saving 250ms and token costs on ~40% of queries.
-4. **Rolling Memory Summarization**: When conversations exceed 20 messages, older messages are summarized and stored in `conversation_summaries`, maintaining a fixed-size 12-message sliding context window.
-
----
-
-### Q6: Can you share an example of an LLM-driven application you developed and how you evaluated its output accuracy or reliability?
-**Answer Structure**:
-1. **Application Architecture**: We developed a Hierarchical Multi-Agent RAG platform where a `MasterAgent` decomposes user intent into a validated Directed Acyclic Graph (DAG) of specialized sub-tasks (`ResearchAgent`, `DocumentAgent`, `AnalysisAgent`, `WebSearchAgent`, `TableAgent`, `VisionAgent`, `GraphAgent`).
-2. **Evaluation Framework**: Implemented a comprehensive evaluation pipeline using **Ragas** and **DeepEval** in `backend/app/evaluation/`.
-3. **Core Metrics Measured**:
-   - **Faithfulness**: Measures whether claims in the generated response are grounded in the retrieved context.
-   - **Answer Relevancy**: Evaluates semantic alignment between the user prompt and the output.
-   - **Context Precision & Recall**: Evaluates whether the retrieval pipeline retrieved all and only relevant chunks.
-   - **Multi-Agent Quality Metrics**: Refusal faithfulness, tool necessity, contradiction detection, and reasoning efficiency.
-4. **Dual-Gate CI/CD Enforcement**: Integrated into GitHub Actions CI via `scripts/regression.py`, enforcing an absolute quality floor ($\ge 0.90$) and a maximum regression threshold ($\Delta \le 0.03$) against versioned golden baselines.
-
----
-
-## 68. System Design, Resilience & Failure Scenarios Interview Questions
-
-### Q7: How do you approach error handling and resilience in asynchronous, distributed environments where third-party LLM APIs might fail or time out?
-**Answer Structure**:
-1. **Multi-Key Workload Isolation**: Configured distinct API keys (`GEMINI_LLM_API_KEY`, `GEMINI_PLANNER_API_KEY`, `GEMINI_FALLBACK_API_KEY`) to prevent background planning tasks from starving foreground user chat streams during rate-limit spikes.
-2. **Circuit Breakers with Full Jitter Exponential Backoff**: Outbound API calls utilize a custom circuit breaker pattern. Retries apply exponential backoff with full jitter:
-   $$T_{\text{sleep}} = \text{random}(0, \min(T_{\text{max}}, T_{\text{base}} \times 2^{\text{attempt}}))$$
-3. **Graceful Pipeline Degradation**:
-   - If the Cross-Encoder Reranker fails, the system automatically falls back to MMR-ranked retrieval candidates.
-   - If Query Classification fails, it defaults to standard hybrid retrieval.
-   - If external Web Search APIs fail, it cascades through SerpAPI $\rightarrow$ Firecrawl $\rightarrow$ DuckDuckGo.
-4. **Durable Dead-Letter Queues (DLQ)**: In background document processing, failed jobs retry up to 3 times before being routed to `stream:jobs:dead_letter`, triggering engineering alerts while keeping the primary worker queue clear.
-
----
-
-### Q8: Walk us through a complex technical challenge you faced while working on this architecture and how you resolved it.
-**Answer Structure**:
-*(Present the **EarlyCommit Streaming Race Condition** or **Streaming Connection Pool Starvation** from Section 61/62 with technical clarity, root cause analysis, and quantitative validation).*
-
----
-
-## 69. Rapid Revision Flashcard Matrix (Numbers, Formulas, DB Indexes & Shell Commands)
-
-### 69.1 Key System Constants & Production Defaults
+### 70.1 Key System Constants & Production Defaults
 
 ```
 ====================================================================================================
@@ -1876,7 +1884,7 @@ Redis Cache TTLs:         Embeddings: 24h | Exact LLM: 1h | Retrieval: 30m | Rew
 ====================================================================================================
 ```
 
-### 69.2 Essential PostgreSQL Indexes
+### 70.2 Essential PostgreSQL Indexes
 
 ```sql
 -- 1. Full-Text Search GIN Index on Document Chunks
@@ -1902,99 +1910,177 @@ CREATE INDEX idx_graph_relationships_source_target ON graph_relationships(source
 CREATE INDEX idx_outbox_events_pending ON outbox_events(status, created_at) WHERE status = 'PENDING';
 ```
 
-### 69.3 Essential Diagnostic Commands
-
-```bash
-# 1. Inspect Active PostgreSQL Connection Pool State
-SELECT count(*), state FROM pg_stat_activity GROUP BY state;
-
-# 2. Monitor Redis Streams Consumer Group Lag & Pending Entries
-redis-cli XINFO GROUPS stream:jobs:document_processing
-redis-cli XPENDING stream:jobs:document_processing doc_workers
-
-# 3. Check Qdrant Collection Status & Vector Counts
-curl http://localhost:6333/collections/documents
-
-# 4. Execute Automated Evaluation Regression Suite
-cd backend && python scripts/regression.py --dataset golden_rag_dataset --profile production
-
-# 5. Run Full Test Suite with Coverage
-cd backend && pytest tests/ -v --cov=app --cov-report=term-missing
-```
-
 ---
 
-## 70. Exhaustive Environment Configuration Variable Catalog (All 150+ Parameters)
+## 71. Exhaustive Environment Configuration Variable Catalog (All 150+ Parameters)
 
 ```
 ========================================================================================================================
                               EXHAUSTIVE PRODUCTION ENVIRONMENT CONFIGURATION CATALOG
 ========================================================================================================================
-Variable Name                    Default Value                       Category & Technical Purpose
+Pydantic Variable Name           Default Value                       Category & Technical Purpose
 ------------------------------------------------------------------------------------------------------------------------
-APP_NAME                         Fusion RAG                          Core application metadata identifier
-APP_ENV                          production                          Environment mode (development, staging, production)
-DEBUG                            False                               Enable FastAPI debug endpoints and verbose tracebacks
-API_V1_STR                       /api/v1                             Global URL prefix for all versioned API routes
-SERVER_HOST                      0.0.0.0                             Binding network interface for ASGI web server
-SERVER_PORT                      8000                                TCP listening port for FastAPI Uvicorn process
-CORS_ORIGINS                     ["http://localhost:5173"]           Whitelisted CORS origin list for React SPA
-CORS_ALLOW_CREDENTIALS           True                                Allow HttpOnly cookies to pass through CORS filter
+# 1. Project & Application Core
+PROJECT_NAME                     FusionRAG                           Application metadata display name
+API_V1_STR                       /api/v1                             Prefix path for version 1 API routers
+ENVIRONMENT                      production                          Runtime environment (development, staging, production)
+DEBUG                            False                               Enable FastAPI debug mode and tracebacks
+LOG_LEVEL                        INFO                                Logging severity threshold (DEBUG, INFO, WARNING)
+SERVICE_NAME                     fusion-rag-backend                  Microservice identifier in distributed traces
 
-DATABASE_URL                     postgresql+asyncpg://user:pw@db/rag Primary async PostgreSQL connection string
-DATABASE_POOL_SIZE               20                                  SQLAlchemy async engine connection pool size
-DATABASE_MAX_OVERFLOW            10                                  Maximum temporary connection overflow pool
-DATABASE_POOL_TIMEOUT            30.0                                Seconds to wait before raising connection pool timeout
-DATABASE_POOL_RECYCLE            1800                                Seconds after which idle connections are recycled
+# 2. PostgreSQL & Database Connection Pool
+POSTGRES_SERVER                  db                                  PostgreSQL server hostname
+POSTGRES_PORT                    5432                                PostgreSQL TCP listening port
+POSTGRES_USER                    postgres                            Database master authentication username
+POSTGRES_PASSWORD                ""                                  Database master authentication password
+POSTGRES_DB                      fusion_rag                          Primary application database name
+DATABASE_URL                     postgresql+asyncpg://...            Complete asynchronous database connection URI
+DATABASE_POOL_SIZE               20                                  SQLAlchemy async connection pool capacity
+DATABASE_MAX_OVERFLOW            10                                  Maximum temporary connection burst pool
+DATABASE_POOL_TIMEOUT            30.0                                Seconds to wait before timing out connection lease
+DATABASE_POOL_RECYCLE            1800                                Seconds after which idle connections are refreshed
+DATABASE_ECHO                    False                               Log raw SQL queries to stdout
 
-REDIS_HOST                       redis                               Redis 7 cache & streams server hostname
-REDIS_PORT                       6379                                Redis 7 listening TCP port
-REDIS_PASSWORD                   ""                                  Authentication password for Redis server
-REDIS_SSL                        False                               Enable TLS/SSL encryption for Redis traffic
+# 3. Redis In-Memory & Streams
+REDIS_HOST                       redis                               Redis 7 cache and queue server host
+REDIS_PORT                       6379                                Redis TCP listening port
+REDIS_PASSWORD                   ""                                  Redis authentication password
+REDIS_SSL                        False                               Enable SSL/TLS encryption for Redis transport
 REDIS_URL                        redis://redis:6379/0                Direct connection URI for Redis asyncio client
+REDIS_DB                         0                                   Redis database index number
 
-QDRANT_HOST                      qdrant                              Qdrant vector engine hostname
+# 4. Asynchronous Queue & Ingestion Reaper
+QUEUE_TYPE                       redis_stream                        Queue provider ("redis_stream" | "in_memory")
+QUEUE_STREAM_NAME                stream:jobs:document_processing     Redis Stream key for document ingestion jobs
+QUEUE_CONSUMER_GROUP             group:document_workers              Redis Stream consumer group name
+QUEUE_DEAD_LETTER_STREAM         stream:jobs:dead_letter             Dead-letter stream for exhausted retry jobs
+QUEUE_RETRY_SORTED_SET           queue:jobs:retry                    ZSET key for scheduled exponential retries
+QUEUE_MAX_STREAM_LENGTH          10000                               Maximum entries preserved in job stream
+QUEUE_MAX_ATTEMPTS               3                                   Maximum processing retry attempts before DLQ
+QUEUE_BASE_BACKOFF_SECONDS       2.0                                 Base exponent multiplier for retry backoff
+QUEUE_MAX_BACKOFF_SECONDS        60.0                                Cap on exponential backoff wait duration
+QUEUE_VISIBILITY_TIMEOUT_SECONDS 180                                 Worker lease duration before reaper recovery
+QUEUE_WORKER_CONCURRENCY         4                                   Concurrent worker coroutines per process
+QUEUE_WORKER_BLOCK_MS            2000                                Block time on XREADGROUP stream consumer
+INGESTION_REAPER_INTERVAL_SECONDS 60.0                               Frequency of stale worker lease reap checks
+INGESTION_REAPER_STALE_THRESHOLD 60.0                                Inactivity threshold triggering job reclaim
+
+# 5. Qdrant Vector Database
+QDRANT_HOST                      qdrant                              Qdrant vector engine host
 QDRANT_PORT                      6333                                Qdrant HTTP REST API port
 QDRANT_GRPC_PORT                 6334                                Qdrant high-performance gRPC port
-QDRANT_API_KEY                   ""                                  Authentication API key for cloud or secure Qdrant
-QDRANT_COLLECTION_NAME           documents                           Default collection name for chunk vector points
-QDRANT_VECTOR_SIZE               768                                 Dense vector dimensionality (Jina Embeddings v3)
-QDRANT_DISTANCE                  Cosine                              Vector similarity metric (Cosine distance)
+QDRANT_COLLECTION                documents                           Default collection name for chunk vectors
+QDRANT_API_KEY                   ""                                  Authentication API key for Qdrant
+QDRANT_URL                       http://qdrant:6333                  Direct connection URI for Qdrant client
 
-ENCRYPTION_MASTER_KEY            ""                                  256-bit Hex Key Encryption Key (KEK) for DEK wrapping
-JWT_SECRET_KEY                   ""                                  Cryptographic secret key for signing JWT access tokens
+# 6. Dense Embeddings & Sparse Search
+EMBEDDING_PROVIDER               jina                                Dense vector provider ("jina")
+EMBEDDING_MODEL                  jina-embeddings-v3                  Model tag (Matryoshka representation)
+EMBEDDING_DIMENSION              768                                 Vector coordinate dimension count
+EMBEDDING_BATCH_SIZE             32                                  Batch size for outbound embedding calls
+EMBEDDING_VERSION                v1                                  Version identifier for vector index
+SPARSE_RETRIEVER_TYPE            postgres_fts                        Sparse search engine ("postgres_fts" | "bm25")
+
+# 7. CORS & Edge Security
+BACKEND_CORS_ORIGINS             ["http://localhost:5173"]           Allowed origin list for React SPA
+BACKEND_CORS_ORIGIN_REGEX        https://(.*\.vercel\.app|.*\.onrender\.com) Origin regex for cloud previews
+
+# 8. Cryptography, JWT & Key Management
+MASTER_ENCRYPTION_KEY            ""                                  256-bit Hex Key Encryption Key (KEK)
+JWT_SECRET                       ""                                  Cryptographic signing secret for JWT access tokens
 JWT_ALGORITHM                    HS256                               Signature algorithm for access token claims
-ACCESS_TOKEN_EXPIRE_MINUTES      15                                  JWT access token expiration lifetime
+ACCESS_TOKEN_EXPIRE_MINUTES      15                                  JWT access token lifetime duration
 REFRESH_TOKEN_EXPIRE_DAYS        30                                  Refresh session persistence window in PostgreSQL
+COOKIE_DOMAIN                    ""                                  HttpOnly cookie domain restriction
+COOKIE_SECURE                    True                                Enforce HTTPS on refresh cookies
+COOKIE_SAMESITE                  lax                                 SameSite policy on cookies ("lax" | "strict")
 
-GEMINI_API_KEY                   ""                                  Primary Google Gemini API key for chat generation
-GEMINI_PLANNER_API_KEY           ""                                  Dedicated API key for MasterAgent DAG planning
+# 9. Google Gemini LLM Multi-Key Pools
+GEMINI_API_KEY                   ""                                  Primary Gemini key for foreground chat streaming
+GEMINI_PLANNER_API_KEY           ""                                  Dedicated key for MasterAgent DAG planning
 GEMINI_FALLBACK_API_KEY          ""                                  Emergency failover key for rate-limit isolation
-GEMINI_MODEL                     gemini-3.5-flash-lite               Default LLM model identifier for response synthesis
-GEMINI_VISION_MODEL              gemini-3.5-flash-lite               Multimodal model for document OCR and chart vision
+GEMINI_MODEL                     gemini-3.5-flash-lite               Default LLM model identifier for chat
+GEMINI_VISION_MODEL              gemini-3.5-flash-lite               Multimodal model for OCR & chart inspection
+GEMINI_TEMPERATURE               0.2                                 Sampling temperature for deterministic generation
+GEMINI_MAX_OUTPUT_TOKENS         4096                                Maximum completion token limit per LLM call
 
+# 10. Jina AI API (Embeddings & Reranking)
 JINA_API_KEY                     ""                                  Jina AI API key for embeddings and cross-encoder
-JINA_EMBEDDING_MODEL             jina-embeddings-v3                  Matryoshka representation dense embedding model
 JINA_RERANKER_MODEL              jina-reranker-v2-base-multilingual  Cross-encoder multilingual joint reranker model
 
+# 11. Live Web Search Providers
 SERPAPI_API_KEY                  ""                                  Primary live search provider API key
 FIRECRAWL_API_KEY                ""                                  Secondary web crawling & scraping fallback key
 
-CLAMAV_HOST                      clamav                              ClamAV antivirus daemon container hostname
+# 12. Antivirus & Malware Defense
+CLAMAV_HOST                      clamav                              ClamAV antivirus daemon container host
 CLAMAV_PORT                      3310                                ClamAV TCP daemon streaming port
 CLAMAV_TIMEOUT                   10.0                                Socket timeout for antivirus byte streaming
 
-QUEUE_TYPE                       redis_stream                        Asynchronous background task queue backend
-QUEUE_STREAM_NAME                stream:jobs:document_processing     Redis Stream key for document ingestion tasks
-QUEUE_CONSUMER_GROUP             doc_workers                         Redis Stream consumer group name
-QUEUE_WORKER_CONCURRENCY         4                                   Concurrent worker coroutines per process
+# 13. Multi-Tier Semantic Caching
+CACHE_NAMESPACE_EMBEDDINGS       cache:embeddings                    Redis namespace for dense embedding vectors
+CACHE_NAMESPACE_EXACT_LLM        cache:exact_llm                     Redis namespace for exact query LLM cache
+CACHE_NAMESPACE_RETRIEVAL        cache:retrieval                     Redis namespace for hybrid retrieval chunks
+CACHE_NAMESPACE_QUERY_REWRITE    cache:query_rewrite                 Redis namespace for rewritten user queries
+CACHE_TTL_EMBEDDINGS_SECONDS     86400                               24 hours TTL for embedding vectors
+CACHE_TTL_EXACT_LLM_SECONDS      3600                                1 hour TTL for exact query responses
+CACHE_TTL_RETRIEVAL_SECONDS      1800                                30 minutes TTL for retrieved chunks
+CACHE_TTL_QUERY_REWRITE_SECONDS  7200                                2 hours TTL for rewritten questions
+L1_CACHE_MAX_ENTRIES             1000                                Max LRU entries in in-memory L1 cache
+L1_CACHE_TTL_SECONDS             60.0                                TTL for L1 in-memory hot cache
 
-OTEL_EXPORTER_OTLP_ENDPOINT      http://jaeger:4317                  Jaeger OpenTelemetry gRPC collector endpoint
-OTEL_SERVICE_NAME                fusion-rag-backend                  Service name tag in distributed Jaeger spans
-PROMETHEUS_METRICS_ENABLED       True                                Enable Prometheus /metrics endpoint scraping
+# 14. Document Ingestion, Chunking & Limits
+MAX_UPLOAD_SIZE_BYTES            52428800                            50MB maximum single-file upload size
+UPLOAD_DIR                       data/uploads                        Local filesystem fallback upload directory
+STORAGE_PROVIDER                 local                               Storage backend ("database" | "local" | "s3")
+S3_BUCKET_NAME                   fusion-rag-documents                AWS S3 / MinIO storage bucket name
+S3_ENDPOINT_URL                  ""                                  Custom S3 API endpoint for MinIO
+DEFAULT_CHUNK_SIZE               500                                 Standard recursive chunk character length
+DEFAULT_CHUNK_OVERLAP            50                                  Character overlap between adjacent chunks
+PARENT_CHUNK_SIZE                1500                                Parent chunk size for contextual expansion
+CHILD_CHUNK_SIZE                 400                                 Child chunk size for vector search precision
+SENTENCE_WINDOW_SIZE             2                                   Neighboring sentences in window retrieval
 
-RESEND_API_KEY                   ""                                  Transactional email API key (Resend)
-RESEND_FROM_EMAIL                noreply@fusionrag.io                Sender address for verification & reset emails
+# 15. Hybrid Retrieval & Reranking Bounds
+VECTOR_TOP_K                     20                                  Candidates retrieved from Qdrant HNSW
+BM25_TOP_K                       20                                  Candidates retrieved from PostgreSQL GIN FTS
+RRF_K                            60                                  Reciprocal Rank Fusion smoothing constant
+MMR_LAMBDA                       0.5                                 Diversity trade-off parameter in MMR scoring
+RERANK_TOP_K                     5                                   Golden chunks selected after cross-encoder
+CONTEXT_MAX_TOKENS               6000                                Maximum token budget assembled for LLM context
+MAX_RETRIEVAL_CHUNKS             12                                  Hard cap on chunks passed to prompt builder
+
+# 16. Multi-Agent & Orchestration Budgets
+MAX_SPECIALIST_TASKS             5                                   Maximum tasks allowed in MasterAgent DAG
+MAX_PLAN_ITERATIONS              2                                   Maximum replanning iterations on low evidence
+MULTI_AGENT_TASK_TIMEOUT         20.0                                Hard per-task execution timeout in seconds
+EVIDENCE_SUFFICIENCY_THRESHOLD   0.70                                Minimum confidence score to accept retrieval
+
+# 17. Rate Limiting & Resource Quotas
+RATE_LIMIT_WINDOW_SECONDS        60                                  Sliding window size for rate limiting
+RATE_LIMIT_MAX_REQUESTS          60                                  Allowed requests per window per user IP
+USER_DAILY_TOKEN_LIMIT           1000000                             Daily LLM token budget per standard user
+USER_MAX_STORAGE_BYTES           524288000                           500MB total document storage quota per user
+
+# 18. Observability & Distributed Tracing
+OTEL_EXPORTER_OTLP_ENDPOINT      http://jaeger:4317                  Jaeger OpenTelemetry gRPC endpoint
+OTEL_SERVICE_NAME                fusion-rag-backend                  Service name tag in distributed traces
+PROMETHEUS_METRICS_ENABLED       True                                Enable Prometheus operational metrics scraping
+TELEMETRY_MAX_STRING_LENGTH      500                                 String truncation length in span attributes
+
+# 19. Transactional Email & Notifications
+RESEND_API_KEY                   ""                                  Resend REST API key for transactional emails
+RESEND_FROM_EMAIL                noreply@fusionrag.io                Sender email address for verification & reset
+EMAIL_OTP_EXPIRE_MINUTES         15                                  Lifetime for 6-digit email signup OTPs
+
+# 20. Dynamic Feature Flags (Runtime Toggles)
+ENABLE_SEMANTIC_CACHE            True                                Enable L1/L2 Redis semantic caching
+ENABLE_DISTRIBUTED_LOCKS         True                                Enable Redis mutexes during chunking
+ENABLE_RATE_LIMITER              True                                Enforce Redis sliding-window rate limiting
+ENABLE_PARENT_CHILD_RAG          True                                Enable parent-child contextual chunk retrieval
+ENABLE_HYDE                      True                                Enable hypothetical document embeddings
+ENABLE_INTENT_GUARDRAILS         True                                Enable pre-retrieval intent guardrail checks
+ENABLE_WEIGHTED_RRF              False                               Enable custom weights in rank fusion
 ========================================================================================================================
 ```
 
