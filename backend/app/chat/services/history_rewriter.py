@@ -124,7 +124,16 @@ class LLMHistoryRewriter(HistoryRewriter):
                 rewrite_applied=False,
             )
 
-        # 2. Check Cache
+        # 2. Check heuristics
+        if not self._heuristically_needs_rewrite(question):
+            return HistoryRewriteResult(
+                original_query=question,
+                rewritten_query=question,
+                rewrite_reason="Query heuristically determined to be standalone.",
+                rewrite_applied=False,
+            )
+
+        # 3. Check Cache
         last_message = history[-1]
         cache_key = self._get_cache_key(
             last_message.conversation_id, last_message.id, question
