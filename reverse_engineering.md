@@ -44,7 +44,7 @@ This document is the **definitive, exhaustive technical specification, data flow
   - [6. Real-Time Chat & SSE Streaming Lifecycle Sequence](#6-real-time-chat--sse-streaming-lifecycle-sequence)
   - [7. Production Hybrid Retrieval Pipeline Sequence (Dense + Sparse + RRF + MMR + Reranker)](#7-production-hybrid-retrieval-pipeline-sequence-dense--sparse--rrf--mmr--reranker)
   - [8. Hierarchical Multi-Agent DAG Planning & Execution Wave Sequence](#8-hierarchical-multi-agent-dag-planning--execution-wave-sequence)
-  - [9. Authentication, Token Rotation & Replay Attack Defense Sequence](#9-authentication-token-rotation--replay-attack-defense-sequence)
+  - [9. Authentication, Token Rotation, CSRF & Replay Attack Defense Sequence](#9-authentication-token-rotation-csrf--replay-attack-defense-sequence)
   - [10. Transactional Outbox Pattern & Event Bus Sequence](#10-transactional-outbox-pattern--event-bus-sequence)
   - [11. Knowledge Graph Extraction & Multi-Hop Traversal Sequence](#11-knowledge-graph-extraction--multi-hop-traversal-sequence)
 - [Part III: Specialist Agent & Dual-Layer Orchestration Architecture](#part-iii-specialist-agent--dual-layer-orchestration-architecture)
@@ -96,7 +96,7 @@ This document is the **definitive, exhaustive technical specification, data flow
   - [53. 7-Stage Progressive Upload Pipeline & State Machine](#53-7-stage-progressive-upload-pipeline--state-machine)
   - [54. Application Pages, Projects, Workspaces & Settings Subsystems](#54-application-pages-projects-workspaces--settings-subsystems)
   - [55. Stream Recovery, In-Flight Re-Authentication & UI Component Tree](#55-stream-recovery-in-flight-re-authentication--ui-component-tree)
-- [Part VIII: Complete REST & SSE API Endpoint Catalog (Exact Codebase Routes)](#part-viii-complete-rest--sse-api-endpoint-catalog-exact-codebase-routes)
+- [Part VIII: Complete REST & SSE API Endpoint Catalog (Exact Codebase Routes & DTOs)](#part-viii-complete-rest--sse-api-endpoint-catalog-exact-codebase-routes--dtos)
   - [56. Exhaustive Route Specifications Across All 10 Routers & Root App](#56-exhaustive-route-specifications-across-all-10-routers--root-app)
 - [Part IX: Production Observability, Quality Assurance & Evaluation Suite](#part-ix-production-observability-quality-assurance--evaluation-suite)
   - [57. OpenTelemetry Tracing, Prometheus Metric Registry & Telemetry Sanitizer](#57-opentelemetry-tracing-prometheus-metric-registry--telemetry-sanitizer)
@@ -512,7 +512,7 @@ sequenceDiagram
 
 ---
 
-## 9. Authentication, Token Rotation & Replay Attack Defense Sequence
+## 9. Authentication, Token Rotation, CSRF & Replay Attack Defense Sequence
 
 ```mermaid
 sequenceDiagram
@@ -654,12 +654,31 @@ Agent Name          File Location                                      Primary C
 
 ## 13. MasterAgent: Hierarchical Planner, Replanner & Evidence Gating
 
-Located in [master_agent.py](file:///d:/fun/FusionRAG/backend/app/chat/services/multi_agent/master_agent.py):
-1. **User Intent Analysis & DAG Decomposition**: Translates high-level requests into an `ExecutionPlan` JSON schema specifying tasks and explicit dependencies.
-2. **Schema & Policy Validation**: Passes the plan to `PlanValidator` to guarantee topological consistency, absence of cyclic dependencies, and adherence to `MAX_SPECIALIST_TASKS=5`.
-3. **Execution Delegation**: Dispatches validated plans **exclusively** to `AgentExecutionEngine`.
-4. **Result Quality Evaluation & Bounded Replanning**: Analyzes execution outcomes using `ResultEvaluator`. Generates delta execution plans for failed tasks up to `MAX_PLAN_ITERATIONS=2`.
-5. **Domain Context Evidence Gating**: Executes `_apply_evidence_relevance_gate()` to filter out off-domain findings before passing context to `SynthesisAgent`.
+### 13.1 Multi-Agent Internal Pydantic Contracts
+Located in [models.py](file:///d:/fun/FusionRAG/backend/app/chat/services/multi_agent/models.py):
+- **`Task`**: `{ task_id: str, agent_type: AgentType, request: str, dependencies: list[str], parameters: dict[str, Any] }`
+- **`ExecutionPlan`**: `{ plan_id: UUID, user_query: str, tasks: list[Task], estimated_cost_usd: float, reasoning_graph: dict }`
+- **`EvidenceItem`**: `{ id: UUID, text: str, source_type: str, source_id: str, confidence: float, relevance_score: float }`
+- **`AgentResult`**: `{ task_id: str, agent_type: AgentType, status: TaskStatus, output_text: str, evidence: list[EvidenceItem] }`
+- **`ExecutionOutcome`**: `{ plan_id: UUID, success: bool, results: dict[str, AgentResult], execution_duration_ms: float }`
+
+### 13.2 Evidence Relevance Gate Algorithm
+```python
+def _apply_evidence_relevance_gate(
+    self, results: list[AgentResult], context: AgentExecutionContext
+) -> tuple[list[AgentResult], int]:
+    gated_results = []
+    rejected_count = 0
+    for res in results:
+        # Filter out evidence items with relevance score below threshold
+        filtered_evidence = [
+            item for item in res.evidence if item.relevance_score >= 0.65
+        ]
+        rejected_count += len(res.evidence) - len(filtered_evidence)
+        res.evidence = filtered_evidence
+        gated_results.append(res)
+    return gated_results, rejected_count
+```
 
 ---
 
@@ -823,6 +842,11 @@ Located in `backend/app/chat/services/`:
 
 ## 29. Relational Architecture, Entity-Relationship Diagram (ERD) & Bounded Contexts
 
+### 29.1 Composite Foreign Keys, Partial Indexes & SQLite Variants
+- **Composite Tenant Fencing**: Tables (`document_processing_runs`, `document_processing_jobs`, `document_elements`, `graph_relationship_evidence`, `graph_entity_mentions`) enforce composite FKs on `["user_id", "document_id"]` referencing `documents(user_id, id)` with `ON DELETE CASCADE`.
+- **Partial Unique Index**: `CREATE UNIQUE INDEX uq_processing_runs_doc_active ON document_processing_runs(document_id) WHERE state = 'ACTIVE';` ensures a single active pipeline run per document.
+- **Cross-Dialect SQLite Type Variance**: Uses `.with_variant(JSON(), "sqlite")`, `.with_variant(Integer(), "sqlite")`, and `.with_variant(Text(), "sqlite")` across `JSONB`, `BigInteger`, and `TSVECTOR` columns for in-memory SQLite unit testing.
+
 ```mermaid
 erDiagram
     users ||--o{ conversations : "owns (1:N)"
@@ -854,45 +878,6 @@ erDiagram
     graph_relationships ||--o{ graph_relationship_evidence : "supported by (1:N)"
     
     evaluation_runs ||--o{ evaluation_results : "contains results (1:N)"
-```
-
-```
-========================================================================================================================
-                                     25 POSTGRESQL RELATIONAL TABLES OVERVIEW
-========================================================================================================================
-Bounded Context                 Table Name                    Primary Purpose & Business Role
-------------------------------------------------------------------------------------------------------------------------
-1. Auth & Security (5)          users                         User identity, Argon2id password hash, role, status flags
-                                refresh_sessions              SHA-256 hashed refresh tokens, revocation flags, audit IP
-                                user_encryption_keys          Wrapped per-user Data Encryption Keys (DEKs, AES-256-GCM)
-                                email_verification_tokens     SHA-256 tokens & OTP codes for signup verification
-                                user_settings                 JSONB folders, pinned items, and user preferences
-------------------------------------------------------------------------------------------------------------------------
-2. Chat & Conversation (3)      conversations                 Thread state, optimistic lock version, active doc filters
-                                conversation_messages         Role, content, JSONB citations, attachments, tool traces
-                                conversation_summaries        Rolling window context summarization range spans
-------------------------------------------------------------------------------------------------------------------------
-3. Document Pipeline (9)        documents                     Scope, versioning, checksum, status, MIME, language
-                                document_files                Key-value binary BLOB storage for database-backed files
-                                document_chunks               Chunk text, chunk index, character bounds, GIN vector
-                                document_embeddings           Vector dimension, Jina v3 contract, Qdrant point IDs
-                                document_elements             Structural elements (tables/figures) with bounding boxes
-                                processing_config_versions    Structured config JSONB & version identifiers
-                                document_processing_runs      High-level document processing pipeline runs
-                                document_processing_jobs      Granular step jobs with lease tokens & heartbeats
-                                durable_cleanup_jobs          2PC cleanup ledger for cascading S3/Qdrant deletions
-------------------------------------------------------------------------------------------------------------------------
-4. Knowledge Graph (4)          graph_entities                Extracted entities, categories, confidence scores
-                                graph_relationships           Directed entity-to-entity relations (predicates)
-                                graph_relationship_evidence   Chunk spans supporting specific graph relationships
-                                graph_entity_mentions         Exact character & chunk offsets of entity occurrences
-------------------------------------------------------------------------------------------------------------------------
-5. Transactional Outbox (1)     outbox_events                 Atomic domain event log for guaranteed message publishing
-------------------------------------------------------------------------------------------------------------------------
-6. Automated Evaluation (3)     evaluation_runs               Evaluation suite execution metadata and model config
-                                evaluation_results            Metric scores per QA sample (Faithfulness, Precision)
-                                benchmark_runs                Synthetic dataset benchmark performance histories
-========================================================================================================================
 ```
 
 ---
@@ -1207,10 +1192,14 @@ Located in `backend/app/core/security/malware.py`:
 ## 37. Prompt Injection Defense, Intent Guardrails & AST Sandboxing
 
 Located in `backend/app/core/security/`:
-- **Intent Classifier Guardrails (`intent_classifier.py`)**: Pre-retrieval classification blocking adversarial prompts.
-- **Pattern Defense (`prompt_injection.py`)**: Regex evaluation against jailbreak patterns (`"ignore previous instructions"`).
+- **Brute-Force Login Lockout Engine (`auth.py`)**: Tracks attempts keyed by `ip:{ip}:email:{email}` in Redis; locks account for 300s after 5 consecutive failures.
+- **ASGI Security Headers**:
+  - `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; object-src 'none';`
+  - `X-Frame-Options: DENY`
+  - `X-Content-Type-Options: nosniff`
+  - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
 - **AST SafeCalculator (`sandboxing.py`)**: Mathematical evaluation parser rejecting all dunder attributes and arbitrary calls.
-- **Quota Tracker (`quotas.py`) & Secret Masker (`secrets.py`)**: Daily per-user token and storage tracking, plus PII/secret scrubbing.
+- **Global Exception Handlers (`exception_handlers.py`)**: Maps domain exceptions (`AuthenticationError`, `QuotaExceededError`, `MalwareDetectedError`) to RFC-7807 problem details.
 
 ---
 
@@ -1317,10 +1306,16 @@ Located in `backend/app/documents/services/chunking.py`:
 ## 47. Document Parsers, Multimodal OCR & Metadata Extractors
 
 Located in `backend/app/documents/services/`:
-- **`OCRService` (`ocr_service.py`)**: Gemini Vision OCR fallback processing extracted image elements.
-- **`TextCleaner` (`text_cleaner.py`)**: Unicode sanitization and whitespace normalization.
-- **`MetadataExtractor` (`metadata_extractor.py`)**: Language, word count, and MIME heuristics.
-- **`TableProcessor` (`table_processor.py`)**: Structured table alignment and column statistics.
+- **Magic Byte Signatures**:
+  - `PDF`: `%PDF-` (`0x25 0x50 0x44 0x46 0x2D`)
+  - `DOCX`: `PK\x03\x04` (ZIP Container Header)
+  - `PNG`: `\x89PNG\r\n\x1a\n`
+  - `JPEG`: `\xFF\xD8\xFF`
+- **Extractors Hierarchy (`extractors.py`)**:
+  - `PDFExtractor`: Digital extraction via `pypdf` with automated OCR failover.
+  - `DocxExtractor`: Structured heading and table extraction.
+  - `ImageVisionExtractor`: Multimodal OCR via Gemini Vision converting screenshots into markdown tables/text.
+- **Zero-Downtime Replacement (`PUT /documents/{id}`)**: Increments document `version`, completes background chunking and vector indexing, and atomically swaps `active_version` on completion.
 
 ---
 
@@ -1438,14 +1433,21 @@ stateDiagram-v2
 
 - **Stream Interruption Recovery (`StreamingRecovery.tsx`)**: Buffers tokens during network drops and provides an inline resume action.
 - **In-Flight Re-Authentication (`ReauthDialog.tsx`)**: Modal dialog refreshing tokens without discarding unsent drafts.
-- **`CodeInterpreterOutput.tsx`**: Pyodide stdout/stderr, tables, and Matplotlib chart renderer.
-- **`lazyWithRetry.ts`**: Automatic chunk reload on bundle fetch failures.
+- **Shiki Syntax Highlighter (`highlighter.ts`)**: In-browser token highlighter supporting 30+ programming languages with light/dark themes.
+- **Core UI Components**: `ChatInput`, `ChatMessage`, `CitationCard`, `CitationDrawer`, `CodeBlock`, `ToolCallCard`, `StreamingCursor`, `ConversationDocumentChips`, `OnboardingTour`, `CommandPalette`, `MobileDrawer`, `OfflineBanner`, `SidebarFolders`, `ErrorBoundary`, `ErrorPage`, `OfflinePage`, `SEOHead`.
 
 ---
 
-# Part VIII: Complete REST & SSE API Endpoint Catalog (Exact Codebase Routes)
+# Part VIII: Complete REST & SSE API Endpoint Catalog (Exact Codebase Routes & DTOs)
 
 ## 56. Exhaustive Route Specifications Across All 10 Routers & Root App
+
+### 56.1 Core Pydantic DTO Schema Definitions
+- **`VerifyEmailSchema`**: `{ email: str, token: str | None, otp: str | None }`
+- **`ChatRequest`**: `{ question: str, conversation_id: UUID | None, stream: bool = True, document_ids: list[UUID] | None = None }`
+- **`HybridSearchRequest`**: `{ query: str, conversation_id: UUID | None = None, top_k: int = 20, alpha: float = 0.5, filter: dict | None = None }`
+- **`UpdateUserSettingsSchema`**: Partial JSONB updates for `folders`, `pinned_conversations`, `document_folders`, `preferences`.
+- **`EmbeddingStatusResponse`**: `{ document_id: UUID, status: str, total_chunks: int, indexed_chunks: int, progress_pct: float }`
 
 ```
 ========================================================================================================================
@@ -1466,14 +1468,12 @@ POST         /api/v1/auth/magic-link                            No             P
 POST         /api/v1/auth/refresh                               Cookie         Rotate refresh token and issue new 15-min JWT
 POST         /api/v1/auth/logout                                Yes            Revoke refresh session and clear cookies
 POST         /api/v1/auth/password                              Yes            Authenticated password update with old/new validation
-POST         /api/v1/auth/forgot-password                       No             Trigger password reset email via Resend
-POST         /api/v1/auth/reset-password                        No             Verify reset token and update password
 POST         /api/v1/auth/verify-email                          No             Verify signup token hash or 6-digit OTP code
 POST         /api/v1/auth/resend-verification                   No             Resend email verification link
-GET          /api/v1/auth/oauth/google                          No             Initiate Google OAuth2 flow
-GET          /api/v1/auth/oauth/google/callback                 No             Google OAuth2 token exchange callback
-GET          /api/v1/auth/oauth/github                          No             Initiate GitHub OAuth2 flow
-GET          /api/v1/auth/oauth/github/callback                 No             GitHub OAuth2 token exchange callback
+GET          /api/v1/auth/oauth/google                          No             Initiate Google OAuth2 flow (sets state cookie)
+GET          /api/v1/auth/oauth/google/callback                 No             Google OAuth2 token exchange (#token= redirect)
+GET          /api/v1/auth/oauth/github                          No             Initiate GitHub OAuth2 flow (sets state cookie)
+GET          /api/v1/auth/oauth/github/callback                 No             GitHub OAuth2 token exchange (#token= redirect)
 GET          /api/v1/auth/me                                    Yes            Get current user profile and role
 DELETE       /api/v1/auth/account                               Yes            Account deletion with cryptographic key shredding
 
@@ -1535,7 +1535,25 @@ GET          /api/v1/admin/operational-status                   Admin          R
 
 ## 57. OpenTelemetry Tracing, Prometheus Metric Registry & Telemetry Sanitizer
 
-Distributed tracing is configured via `OTLPSpanExporter` transmitting spans over gRPC to Jaeger (`OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317`), with PII/secret sanitization and SHA-256 user ID hashing.
+### 57.1 Complete Prometheus Metric Registry
+```
+========================================================================================================================
+                                     PROMETHEUS METRIC REGISTRY
+========================================================================================================================
+Metric Name                      Type          Labels / Dimensions           Description
+------------------------------------------------------------------------------------------------------------------------
+http_requests_total              Counter       method, route, status_code    Total HTTP request volume by endpoint
+http_request_duration_seconds    Histogram     method, route, status_code    Latency distribution across ASGI routes
+http_active_requests             Gauge         None                          In-flight concurrent requests
+rag_retrieval_duration_seconds   Histogram     strategy, provider            Retrieval branch latency (dense/sparse/rerank)
+rag_reranker_scores              Histogram     model                         Distribution of cross-encoder confidence scores
+agent_dag_execution_seconds      Histogram     plan_id, status               Total multi-agent DAG execution time
+agent_task_execution_seconds     Histogram     agent_type, status            Individual specialist task latency
+worker_queue_lag                 Gauge         queue_name                    Redis Stream unacknowledged message depth
+llm_token_usage_total            Counter       model, token_type             Prompt and completion tokens consumed
+llm_estimated_cost_usd_total     Counter       model                         Accumulated LLM operational cost in USD
+========================================================================================================================
+```
 
 ---
 
@@ -1627,6 +1645,9 @@ Located in `backend/scripts/`:
 - `export_openapi.py`: Static `openapi.json` generator.
 - `reset_all_data.py`: Purges and re-seeds development databases and vector collections.
 - `migrate.sh`: Alembic database migration runner.
+- `evaluate.py`: Standalone CLI to run evaluation against local or remote environments.
+- `benchmark.py`: Synthetic load and retrieval benchmark runner.
+- `regression.py`: CI PR gate regression verification script.
 
 ---
 
