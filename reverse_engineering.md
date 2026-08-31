@@ -189,7 +189,7 @@ Standard Retrieval-Augmented Generation (RAG) implementations suffer from five p
 |                   v                                                             v                 |
 |  +----------------------------------+                         +--------------------------------+  |
 |  |   DOCUMENT INGESTION ROUTE       |                         |      CHAT STREAMING ROUTE      |  |
-|  |   POST /api/v1/documents/upload  |                         |      POST /api/v1/chat/chat    |  |
+|  |   POST /api/v1/documents/upload  |                         |      POST /api/v1/chat         |  |
 |  |                                  |                         |                                |  |
 |  | 1. Magic Byte & Antivirus (ClamAV)|                         | 1. @documents Directive Parser |  |
 |  | 2. SHA-256 Deduplication Check   |                         | 2. EarlyCommit Session Lock    |  |
@@ -402,14 +402,14 @@ sequenceDiagram
     autonumber
     actor Client as Browser Client
     participant Nginx as Nginx Reverse Proxy
-    participant API as FastAPI (POST /chat/chat)
+    participant API as FastAPI (POST /api/v1/chat)
     participant Orch as ChatOrchestrator
     participant Rewriter as LLMHistoryRewriter
     participant RetService as RetrievalService
     participant Gemini as Google Gemini LLM (via FailoverProxy)
     participant Postgres as PostgreSQL 16
 
-    Client->>Nginx: POST /api/v1/chat/chat {question: "What about its warranty?", conversation_id: "uuid"}
+    Client->>Nginx: POST /api/v1/chat {question: "What about its warranty?", conversation_id: "uuid"}
     Nginx->>API: Forward HTTP POST (proxy_buffering off)
     API->>Orch: generate_stream(question, conversation_id, user_id)
     
@@ -600,7 +600,7 @@ sequenceDiagram
     Worker->>Extractor: extract_entities_and_relationships(chunk_text, doc_id)
     Extractor->>Extractor: LLM NER & Triplet Extraction (Subject, Predicate, Object)
     Extractor->>DB: INSERT INTO graph_entities (normalized_name, entity_type, confidence) ON CONFLICT DO UPDATE
-    Extractor->>DB: INSERT INTO graph_relationships (source_id, target_id, normalized_relation_type, weight)
+    Extractor->>DB: INSERT INTO graph_relationships (source_id, target_entity_id, normalized_relation_type, weight)
     Extractor->>DB: INSERT INTO graph_relationship_evidence (relationship_id, source_element_id, source_span)
 
     Note over GraphAgent,Retriever: Query Phase (Multi-Hop Traversal)
@@ -1568,9 +1568,9 @@ stateDiagram-v2
 - **`UpdatePasswordSchema`**: `{ current_password: str | None, new_password: str }`
 - **`DeleteAccountSchema`**: `{ password: str }`
 - **`ChatRequest`**: `{ question: str, conversation_id: UUID | None, stream: bool = True, document_ids: list[UUID] | None = None }`
-- **`HybridSearchRequest`**: `{ query: str, conversation_id: UUID | None = None, top_k: int = 20, alpha: float = 0.5, filter: dict | None = None }`
+- **`SearchRequest`**: `{ query: str, conversation_id: UUID | None = None, top_k: int = 20, document_ids: list[UUID] | None = None, filters: dict | None = None, retrieval_mode: str = "hybrid" }`
 - **`UpdateUserSettingsSchema`**: Partial JSONB updates for `folders`, `pinned_conversations`, `document_folders`, `preferences`.
-- **`EmbeddingStatusResponse`**: `{ document_id: UUID, status: str, total_chunks: int, indexed_chunks: int, progress_pct: float }`
+- **`EmbeddingStatusResponse`**: `{ status: str, chunks_total: int, embedded_chunks: int, failed_chunks: int, provider: str, model: str }`
 - **`RunBenchmarkRequest`**: `{ dataset_path: str, dataset_id: str, version: str, profile: str = "quick", pipelines: list[str] | None = None, mock: bool = False }`
 - **`RegressionRequest`**: `{ candidate_run_id: str, baseline_run_id: str, thresholds: dict[str, float] | None = None }`
 - **`DeepHealthResponse`**: `{ status: str, version: str, database: dict, redis: dict, vector_db: dict, storage: dict, llm: dict }`
@@ -1604,11 +1604,10 @@ GET          /api/v1/auth/me                                    Yes            G
 DELETE       /api/v1/auth/account                               Yes            Account deletion with password verification
 
 3. Chat & Streaming Router (app/api/v1/chat.py)
-POST         /api/v1/chat/chat                                  Yes            Server-Sent Events (SSE) streaming chat endpoint
-POST         /api/v1/chat/token-estimate                        Yes            Calculate token count & budget before streaming
+POST         /api/v1/chat                                       Yes            Server-Sent Events (SSE) streaming chat endpoint
 
 4. Search Router (app/api/v1/search.py)
-POST         /api/v1/search/search                              Yes            Unified hybrid retrieval (Dense + Sparse + RRF + MMR)
+POST         /api/v1/search                                     Yes            Unified hybrid retrieval (Dense + Sparse + RRF + MMR)
 
 5. Conversations Router (app/api/v1/conversations.py)
 GET          /api/v1/conversations                              Yes            List user conversations with pagination (skip, limit)
@@ -1617,16 +1616,13 @@ PATCH        /api/v1/conversations/{id}                         Yes            U
 DELETE       /api/v1/conversations/{id}                         Yes            Delete conversation and schedule cleanup
 GET          /api/v1/conversations/{id}/messages                Yes            Paginated conversation messages (before_id, limit)
 DELETE       /api/v1/conversations/{id}/messages/{message_id}   Yes            Message rollback/branching deletion
-GET          /api/v1/conversations/{id}/summary                 Yes            Fetch current incremental conversation summary
 POST         /api/v1/conversations/{conversation_id}/documents  Yes            Upload document scoped directly to conversation
 GET          /api/v1/conversations/{conversation_id}/documents  Yes            List documents scoped to conversation
 
 6. Documents Router (app/api/v1/documents.py)
 POST         /api/v1/documents/upload                           Yes            Multipart file upload (PDF/DOCX/TXT/MD/PNG)
-POST         /api/v1/documents/bulk-delete                      Yes            Batch document deletion with cascade cleanup
 GET          /api/v1/documents                                  Yes            List documents with filters (skip, limit, scope)
 GET          /api/v1/documents/{id}                             Yes            Get document metadata, status, and chunk statistics
-GET          /api/v1/documents/{id}/download                    Yes            Download original encrypted/raw file bytes
 PUT          /api/v1/documents/{id}                             Yes            Replace document with automated version bumping
 DELETE       /api/v1/documents/{id}                             Yes            Delete document and queue cascade cleanup
 POST         /api/v1/documents/{id}/reprocess                   Yes            Trigger re-chunking and re-indexing
@@ -1643,7 +1639,6 @@ GET          /api/v1/evaluation/reports/{run_id}                Admin          G
 8. Observability Router (app/api/v1/observability.py)
 GET          /api/v1/observability/metrics                      Admin          Retrieve aggregated multi-agent & quality metrics
 GET          /api/v1/observability/traces                       Admin          List recent multi-agent execution traces
-GET          /api/v1/observability/agents/health                Admin          Real-time specialist agent circuit breaker status
 
 9. Health & Diagnostics Router (app/api/v1/health.py)
 GET          /api/v1/health/liveness                            No             Kubernetes liveness probe (Process alive)
@@ -1652,14 +1647,11 @@ GET          /api/v1/health/deep                                No             D
 
 10. User Settings Router (app/api/v1/user_settings.py)
 GET          /api/v1/user/settings                              Yes            Get user JSONB settings, folders, and preferences
-PUT          /api/v1/user/settings                              Yes            Full replacement of user settings JSONB
 PATCH        /api/v1/user/settings                              Yes            Update theme, folders, presets, and preferences
 
 11. Admin Router (app/api/v1/admin.py)
 POST         /api/v1/admin/cache/clear                          Admin          Dynamic cache clearing (?namespace=) across 6 pools
 GET          /api/v1/admin/operational-status                   Admin          Real-time system diagnostics and worker status
-GET          /api/v1/admin/queue-status                         Admin          Redis Stream lag, pending tasks, dead letter counts
-GET          /api/v1/admin/stats                                Admin          System-wide storage, active users, token usage
 ========================================================================================================================
 ```
 
@@ -1803,12 +1795,13 @@ Located in `.github/workflows/`:
 - `migrate.sh`: Safe Alembic migration wrapper with connectivity verification.
 
 ### 63.2 Complete Test Suite Taxonomy
+- **Root Backend Test Suites (`backend/tests/` - 54 Core Suites)**: Comprehensive testing covering `test_adaptive_rag_e2e.py`, `test_advanced_rag_e2e.py`, `test_auth.py`, `test_chat.py`, `test_hybrid_retrieval.py`, `test_ingestion_reaper.py`, `test_queue_dlq.py`, `test_crypto_service.py`, `test_qdrant_store.py`, `test_postgres_sparse_retriever.py`, etc.
 - **`backend/tests/unit/` (16 Suites)**: AST math sandbox, crypto envelope encryption, token estimators, telemetry sanitizers, and JWT token rotation.
-- **`backend/tests/integration/` (15 Suites)**: Distributed trace propagation, dead-letter queue isolation, outbox publishing, and crash recovery.
+- **`backend/tests/integration/` (18 Suites + conftest)**: Distributed trace propagation, dead-letter queue isolation, outbox publishing, and crash recovery.
 - **`backend/tests/benchmarks/` (2 Suites)**: Agent execution performance and sparse retriever latency.
 - **`backend/tests/evaluation/` (6 JSON Datasets)**: `agent_dataset.json`, `conversation_dataset.json`, `hallucination_dataset.json`, `retrieval_dataset.json`, `simple_rag_dataset.json`, `tool_dataset.json`.
-- **`frontend/src/tests/` (18 Suites)**: Component rendering, custom hooks, and mock SSE stream readers.
-- **`frontend/e2e/` (4 Playwright Suites)**: `login-flow.js`, `account-delete.js`, `verify-two-tier.js`, `redis-fallback.js`.
+- **`frontend/src/tests/` (20 Suites)**: Component rendering, custom hooks, and mock SSE stream readers.
+- **`frontend/e2e/` (5 Playwright Suites + stack.js)**: `account-delete.js`, `login-flow.js`, `redis-fallback.js`, `redis-fallback-login.js`, `verify-two-tier.js`.
 
 ---
 
@@ -1855,7 +1848,7 @@ Revision Hash    Migration File Name                                          Sc
 # Part XI: Real-World Engineering Case Studies (DaveAI Production Challenges)
 
 ## 65. Case Study 1: The Asynchronous Streaming Transaction Race Condition (EarlyCommit Fix)
-- **The Problem**: During streaming chat initialization (`POST /api/v1/chat/chat`), the backend generated a new `conversation_id`, yielded it in the first SSE metadata event, and began streaming tokens. When the frontend immediately flushed queued document attachments, the concurrent upload request queried the uncommitted conversation row, causing intermittent `404 Conversation Not Found` errors.
+- **The Problem**: During streaming chat initialization (`POST /api/v1/chat`), the backend generated a new `conversation_id`, yielded it in the first SSE metadata event, and began streaming tokens. When the frontend immediately flushed queued document attachments, the concurrent upload request queried the uncommitted conversation row, causing intermittent `404 Conversation Not Found` errors.
 - **The Solution**: Implemented the **EarlyCommit Pattern** in `ChatOrchestrator`, explicitly committing the conversation entity to PostgreSQL before yielding the first SSE metadata frame.
 
 ---
