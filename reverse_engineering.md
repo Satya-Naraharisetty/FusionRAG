@@ -12,7 +12,7 @@ This document is the **definitive, exhaustive technical specification, data flow
                                               SYSTEM QUICK REFERENCE
 ========================================================================================================================
 * Core Framework:       FastAPI (Python 3.12+ ASGI) + Uvicorn + Pydantic v2
-* Primary Database:     PostgreSQL 16 (asyncpg + SQLAlchemy 2.0 async ORM, 25 Relational Tables, 14 Repositories)
+* Primary Database:     PostgreSQL 16 (asyncpg + SQLAlchemy 2.0 async ORM, 25 Relational Tables, 14 Domain Persistence Components)
 * Vector Search Engine: Qdrant v1.19.0 (HNSW ANN, 768-dim Cosine, Payload Tenant Fencing)
 * Sparse Text Search:   PostgreSQL Full-Text Search (tsvector + ts_rank_cd + GIN Indexes)
 * In-Memory Cache/Queue:Redis 7 (redis.asyncio, Redis Streams Task Queue, Redis PubSub Event Bus, L1/L2 Cache)
@@ -22,11 +22,11 @@ This document is the **definitive, exhaustive technical specification, data flow
 * Dual Orchestration:   1. Lightweight Adaptive RAG (app/rag/orchestration/) for single-turn intent routing
                         2. Full Multi-Agent DAG (app/chat/services/multi_agent/) for complex wave reasoning
 * Observability:        OpenTelemetry SDK + Jaeger (OTLP gRPC) + Prometheus + Grafana + PII Sanitizer
-* Evaluation Engine:    Ragas + DeepEval + 6 Evaluator Services + 4 Runners + 33 Registered Metrics Suite
+* Evaluation Engine:    Ragas + DeepEval + 6 Evaluator Services + 5 Runners + 33 Registered Metrics Suite
 * Frontend Architecture:React 18 + Vite 5 + TypeScript + Vanilla CSS Tokens + Pyodide WebAssembly (WASM)
-* Security & Crypto:    Envelope Encryption (AES-256-GCM + DEK/KEK), ClamAV Antivirus, AST Sandboxing
+* Security & Crypto:    Envelope Encryption (AES-256-GCM + DEK/KEK), ClamAV Antivirus, AST Sandboxing, Intent Guardrails
 * Reliability:          Bulkheads, Circuit Breakers, Exponential Full-Jitter Retries, Outbox Pattern
-* DevOps & CI/CD:       4 GitHub Actions Workflows (CI, E2E Playwright, Eval, Nightly Benchmark) + Nginx SSE
+* DevOps & CI/CD:       4 GitHub Actions Workflows (CI, E2E Playwright, Eval, Nightly Benchmark) + 12 CLI Scripts + Nginx SSE
 ========================================================================================================================
 ```
 
@@ -88,7 +88,7 @@ This document is the **definitive, exhaustive technical specification, data flow
   - [46. Advanced Chunking Strategies: Recursive, Parent-Child & Sentence-Window](#46-advanced-chunking-strategies-recursive-parent-child--sentence-window)
   - [47. Empty Knowledge Base Index Cache & Weighted RRF Fusion](#47-empty-knowledge-base-index-cache--weighted-rrf-fusion)
   - [48. Document Parsers, Multimodal OCR, Tables & Metadata Extractors](#48-document-parsers-multimodal-ocr-tables--metadata-extractors)
-  - [49. Query Intelligence: Classification, Decomposition, Expansion & HyDE](#49-query-intelligence-classification-decomposition-expansion--hyde)
+  - [49. Query Intelligence: Classification, Decomposition, Expansion, HyDE & ContextSelector](#49-query-intelligence-classification-decomposition-expansion-hyde--contextselector)
   - [50. Ingestion-Time NER, Relationship Extraction & BFS Knowledge Graph Retrieval](#50-ingestion-time-ner-relationship-extraction--bfs-knowledge-graph-retrieval)
   - [51. Adaptive RAG Orchestration State Machine (DIRECT, HYDE, MULTI_HOP, SPECIALIST)](#51-adaptive-rag-orchestration-state-machine-direct-hyde-multi_hop-specialist)
 - [Part VII: Frontend Architecture, Pyodide WASM & UI Subsystems](#part-vii-frontend-architecture-pyodide-wasm--ui-subsystems)
@@ -102,7 +102,7 @@ This document is the **definitive, exhaustive technical specification, data flow
 - [Part IX: Production Observability, Quality Assurance & Evaluation Suite](#part-ix-production-observability-quality-assurance--evaluation-suite)
   - [58. OpenTelemetry Tracing, Prometheus Metric Registry & Telemetry Sanitizer](#58-opentelemetry-tracing-prometheus-metric-registry--telemetry-sanitizer)
   - [59. Multi-Agent Observability & Quality Metrics (AgentObservabilityService)](#59-multi-agent-observability--quality-metrics-agentobservabilityservice)
-  - [60. Comprehensive Evaluation Framework: 6 Evaluators, 4 Runners & 33 Metrics](#60-comprehensive-evaluation-framework-6-evaluators-4-runners--33-metrics)
+  - [60. Comprehensive Evaluation Framework: 6 Evaluators, 5 Runners & 33 Metrics](#60-comprehensive-evaluation-framework-6-evaluators-5-runners--33-metrics)
   - [61. Golden Corpora, Benchmark Profiles, Drift Tracking & Report Generators](#61-golden-corpora-benchmark-profiles-drift-tracking--report-generators)
 - [Part X: DevOps, CI/CD Automation, Operational Tooling & Edge Deployment](#part-x-devops-cicd-automation-operational-tooling--edge-deployment)
   - [62. The 4 GitHub Actions Workflows (CI, E2E Playwright, Eval Gate, Nightly Benchmark)](#62-the-4-github-actions-workflows-ci-e2e-playwright-eval-gate-nightly-benchmark)
@@ -277,6 +277,10 @@ FusionRAG/                           # Repository root
   deployment/nginx/                  # Nginx configuration (reverse proxy, SSE buffer config)
   observability/                     # Grafana dashboards, Prometheus scrape configs
   docs/                              # Runbooks, Free-tier deployment guides, security checklist
+    api/openapi.json                 # Static OpenAPI 3.1 specification schema (110 KB)
+    architecture/                    # System topology and deployment blueprints
+    deployment/                      # Disaster recovery, rollback runbooks, free-tier guides
+    security/                        # Vulnerability reporting protocol and crypto manuals
 
   backend/
     Dockerfile                       # Multi-stage backend build (uv builder + slim runtime)
@@ -284,7 +288,7 @@ FusionRAG/                           # Repository root
     requirements.txt                 # Pinned production dependencies
     alembic.ini                      # Database migration configuration
     alembic/versions/                # 14 versioned migration scripts
-    scripts/                         # 11 Operational scripts (backup, restore, eval, benchmark, etc.)
+    scripts/                         # 12 Operational scripts (backup, restore, eval, benchmark, openapi, etc.)
     .env.example                     # Environment template with all 150+ variables
 
     app/
@@ -292,33 +296,38 @@ FusionRAG/                           # Repository root
       api/
         dependencies.py              # Dependency injection factories (get_db, get_redis, get_qdrant)
         exception_handlers.py        # Global domain exception to HTTP response mapping
-        v1/                          # 10 API Routers (auth, chat, documents, search, evaluation, etc.)
+        v1/                          # 10 API Routers (auth, chat, documents, search, evaluation, health, etc.)
       auth/                          # Authentication, Argon2id, JWT, OAuth, session management, DEK crypto
       chat/                          # Orchestration, LLM history rewriter, prompt builder, Multi-Agent DAG
       documents/                     # Ingestion, extractors, chunking, embeddings, hybrid retrieval, graph
       core/
         config.py                    # 150+ Pydantic settings
+        startup.py                   # Lifespan startup hooks (admin seeding, unverified cleanup, 2PC recovery)
+        prompts/                     # System prompt templates (system_prompt.txt)
         cost/                        # YAMLPricingProvider, token cost calculator & pricing.yaml
         context/                     # RequestContext dataclass and ContextVar propagation
         email/                       # ResendEmailService with HTML templates & OTP generators
         feature_flags/               # Dynamic runtime feature flag engine (flags.py)
         logger.py                    # Structured logging, JSON formatting, PII maskers
-        security/                    # Envelope encryption, ClamAV malware, prompt injection, quotas, idempotency
+        security/                    # Envelope encryption, ClamAV malware, prompt injection, quotas, rate_limiter
         reliability/                 # Bulkheads, Circuit Breakers, Exponential Retries, Timeouts
         cache/                       # L1 Memory + L2 Redis Multi-Tier Cache, Repositories Caching, Mutex
         events/                      # Transactional Outbox Dispatcher, Redis Event Bus & PubSub
         queue/                       # Redis Stream Task Queue, JobDispatcher, Handlers & QueueWorker
         telemetry/                   # OpenTelemetry setup, Prometheus metrics, TelemetrySanitizer
-        math/                        # Deterministic MathEngine, FinancialMath, Statistical, LaTeX
+        math/                        # Deterministic MathEngine, FinancialMath, Statistical, LaTeX, AST Sandbox
+      telemetry/                     # Root telemetry package alias
       db/                            # Async SQLAlchemy sessionmaker, ORM Base, and 25 Model mappings
-      evaluation/                    # 6 Evaluators, 4 Runners, 33 Metrics, Golden Datasets, Regression Gate
+      evaluation/                    # 6 Evaluators, 5 Runners, 33 Metrics, Golden Datasets, Regression Gate
       rag/orchestration/             # Dedicated Adaptive RAG Framework (master, strategy, replanner, telemetry)
 
   frontend/
     src/
       main.tsx                       # React root render
       App.tsx                        # Client-side routing and context provider tree
+      App.css                        # Application shell styling
       index.css                      # Global Vanilla CSS design tokens (light/dark mode)
+      shiki-langs.d.ts               # Shiki language bundle typings
       workers/
         pyodide.worker.ts            # Pyodide WebAssembly Web Worker for sandboxed Python/Pandas
       lib/
@@ -328,9 +337,18 @@ FusionRAG/                           # Repository root
         analytics.ts                 # Client-side event tracking
         notifications.ts             # Browser desktop notifications
         highlighter.ts               # Shiki syntax highlighter
+        constants.ts                 # Global UI limits, polling timeouts, SSE event types
+        messages.ts                  # Citation parsing and message content formatters
+        utils.ts                     # Style combining (cn) and formatting helpers
+      types/
+        index.ts                     # Core TypeScript interfaces (Conversation, Message, Document, Citation, etc.)
+      services/
+        api.ts, auth.ts              # Abstracted frontend API communication services
+      utils/
+        lazyWithRetry.ts             # Resilient dynamic chunk loading wrapper
       api/                           # Axios client with interceptors, token refresh buffer & endpoints
       routes/                        # Route guards (AdminRoute, ProtectedRoute, PublicRoute)
-      components/                    # ChatWindow, SSEStream, DocumentManager, CitationDrawer, CommandPalette
+      components/                    # ChatWindow, SSEStream, DocumentManager, CitationDrawer, CommandPalette, UI
       pages/                         # LandingPage, ProjectsPage, DocumentsPage, SettingsPage, ChatPage, etc.
       context/                       # AuthContext, ThemeContext, UploadQueueContext
       hooks/                         # useAuth, useConversations, useDocuments, useSSEChat, useDrafts, etc.
@@ -915,24 +933,24 @@ The persistence layer follows Domain-Driven Design (DDD) separating abstract int
 
 ```
 ========================================================================================================================
-                                     ALL 14 DOMAIN REPOSITORY IMPLEMENTATIONS
+                                     ALL 14 DOMAIN PERSISTENCE IMPLEMENTATIONS
 ========================================================================================================================
-Repository Class            File Location                                              Primary Responsibilities
+Persistence / Repo Class     File Location                                              Primary Responsibilities
 ------------------------------------------------------------------------------------------------------------------------
-1. UserRepository           app/auth/infrastructure/persistence/repositories/          User CRUD, OAuth sub lookup, verification
-2. RefreshSessionRepository app/auth/infrastructure/persistence/repositories/          Token rotation, replay attack revocation
-3. EncryptionKeyRepository  app/auth/infrastructure/persistence/repositories/          Wrapped DEK storage, key rotation
-4. EmailVerificationRepo    app/auth/infrastructure/persistence/repositories/          OTP verification, rate-limited attempts
-5. UserSettingsRepository   app/auth/infrastructure/persistence/repositories/          JSONB preferences, folders, presets
-6. ConversationRepository   app/chat/infrastructure/persistence/repositories/          Threads, optimistic locking, archiving
-7. MessageRepository        app/chat/infrastructure/persistence/repositories/          Message history, branch deletions
-8. SummaryRepository        app/chat/infrastructure/persistence/repositories/          Incremental rolling summaries
-9. DocumentRepository       app/documents/infrastructure/persistence/repositories/     Document metadata, scoping, deduplication
-10. ChunkRepository         app/documents/infrastructure/persistence/repositories/     Text chunks, GIN full-text search
-11. ProcessingRunRepository app/documents/infrastructure/persistence/repositories/     State transitions (PENDING->ACTIVE->DONE)
-12. ProcessingConfigRepo    app/documents/infrastructure/persistence/repositories/     Versioned chunking configs & hashing
-13. DocumentElementRepo     app/documents/infrastructure/persistence/repositories/     Multimodal bounding boxes & spans
-14. CleanupJobRepository    app/documents/infrastructure/persistence/repositories/     2PC deletion leases & retry queues
+1. SQLAlchemyUserRepository  app/auth/infrastructure/persistence/repositories/          User CRUD, OAuth sub lookup, verification
+2. SQLAlchemySessionRepo     app/auth/infrastructure/persistence/repositories/          Token rotation, replay attack revocation
+3. KeyManager (Crypto DEK)   app/core/security/key_manager.py                           Wrapped DEK persistence, envelope encryption
+4. EmailVerificationTokenRepoapp/auth/infrastructure/persistence/repositories/          OTP verification, rate-limited attempts
+5. UserSettingsService       app/auth/services/user_settings_service.py                 JSONB preferences, folders, filter presets
+6. ConversationRepository    app/chat/infrastructure/persistence/repositories/          Threads, optimistic locking, archiving
+7. MessageRepository         app/chat/infrastructure/persistence/repositories/          Message history, branch deletions
+8. SummaryRepository         app/chat/infrastructure/persistence/repositories/          Incremental rolling summaries
+9. DocumentRepository        app/documents/infrastructure/persistence/repositories/     Document metadata, scoping, deduplication
+10. ChunkRepository          app/documents/infrastructure/persistence/repositories/     Text chunks, GIN full-text search
+11. ProcessingRunRepository  app/documents/infrastructure/persistence/repositories/     State transitions (PENDING->ACTIVE->DONE)
+12. ProcessingConfigRepo     app/documents/infrastructure/persistence/repositories/     Versioned chunking configs & hashing
+13. DocumentElementRepo      app/documents/infrastructure/persistence/repositories/     Multimodal bounding boxes & spans
+14. SQLAlchemyGraphRepo      app/documents/infrastructure/persistence/repositories/     Unified entities, relations, evidence & mentions
 ========================================================================================================================
 ```
 
@@ -965,12 +983,11 @@ Repository Class            File Location                                       
 - `created_at` (TIMESTAMPTZ, default `now()`)
 
 ### 31.3 `user_encryption_keys` Table
-- `id` (UUID, Primary Key)
-- `user_id` (UUID, Unique, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE)
+- `user_id` (UUID, Primary Key, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE)
 - `wrapped_dek` (TEXT) — AES-256-GCM encrypted Data Encryption Key string
 - `key_version` (INTEGER, default `1`)
 - `created_at` (TIMESTAMPTZ, default `now()`)
-- `rotated_at` (TIMESTAMPTZ, Nullable)
+- `updated_at` (TIMESTAMPTZ, default `now()`, onupdate `now()`)
 
 ### 31.4 `email_verification_tokens` Table
 - `id` (UUID, Primary Key)
@@ -1019,10 +1036,9 @@ Repository Class            File Location                                       
 - `citations` (JSONB, default `'[]'`)
 - `structured_content` (JSONB, default `'{}'`)
 - `tool_calls` (JSONB, default `'[]'`)
-- `metadata` (JSONB, default `'{}'`, ORM alias `metadata_json`)
+- `metadata` (JSONB, default `'{}'`, ORM alias `metadata_json`, captures `execution_duration_ms`, trace IDs, token costs)
 - `prompt_tokens` (INTEGER, default `0`)
 - `completion_tokens` (INTEGER, default `0`)
-- `execution_duration_ms` (FLOAT, default `0.0`)
 - `created_at` (TIMESTAMPTZ, default `now()`, Indexed)
 
 ### 32.3 `conversation_summaries` Table
@@ -1030,8 +1046,8 @@ Repository Class            File Location                                       
 - `conversation_id` (UUID, Unique, Foreign Key $\rightarrow$ `conversations.id` ON DELETE CASCADE)
 - `summary` (TEXT)
 - `summary_version` (INTEGER, default `1`)
-- `covered_from_message_id` (UUID, Nullable, Foreign Key $\rightarrow$ `conversation_messages.id`)
-- `covered_until_message_id` (UUID, Nullable, Foreign Key $\rightarrow$ `conversation_messages.id`)
+- `covered_from_message_id` (UUID, Nullable) — Logical boundary without DB-level constraint to prevent cascade locks
+- `covered_until_message_id` (UUID, Nullable) — Logical boundary without DB-level constraint
 - `message_count` (INTEGER, default `0`)
 - `created_at` (TIMESTAMPTZ, default `now()`)
 
@@ -1081,10 +1097,14 @@ Repository Class            File Location                                       
 ### 33.4 `document_embeddings` Table
 - `id` (UUID, Primary Key)
 - `chunk_id` (UUID, Unique, Foreign Key $\rightarrow$ `document_chunks.id` ON DELETE CASCADE)
-- `embedding_provider` (VARCHAR(50), default `'jina-embeddings-v3'`)
-- `dimensions` (INTEGER, default `768`)
-- `qdrant_point_id` (VARCHAR(64), Indexed)
+- `embedding_provider` (VARCHAR(50), default `'jina'`)
+- `embedding_model` (VARCHAR(100), default `'jina-embeddings-v3'`)
+- `embedding_dimension` (INTEGER, default `768`)
+- `embedding_version` (VARCHAR(50), default `'v1'`)
 - `status` (VARCHAR(50), default `'completed'`)
+- `created_at` (TIMESTAMPTZ, default `now()`)
+- `updated_at` (TIMESTAMPTZ, default `now()`, onupdate `now()`)
+*(Note: Qdrant uses the chunk's UUID directly as the point ID, eliminating point ID sync overhead).*
 
 ### 33.5 `document_elements` Table
 - `id` (UUID, Primary Key)
@@ -1285,14 +1305,28 @@ Located in `backend/app/core/security/malware.py`:
 ## 38. Prompt Injection Defense, Intent Guardrails & AST Sandboxing
 
 Located in `backend/app/core/security/`:
+- **Intent Classifier & Safety Guardrails (`intent_classifier.py`)**:
+  - Deterministic and semantic pre-execution intent guardrails (`IntentClassifier`).
+  - Classifies user inputs into `STANDARD_QUERY`, `PROMPT_INJECTION`, `SYSTEM_OVERRIDE`, `MALICIOUS_EXECUTION`, or `OUT_OF_SCOPE`.
+  - Rejects unsafe queries with HTTP 400 problem details before vector search or LLM consumption.
+- **Prompt Injection Defense (`prompt_injection.py`)**:
+  - Regular expression and rule-based heuristic scanner checking for delimiter escapes (`</retrieved_context>`, `[SYSTEM]`, `Ignore previous instructions`), role hijacking, and jailbreak patterns.
+- **Secret & PII Sanitizer (`secrets.py`, `logger.py`)**:
+  - Comprehensive regex masking intercepting log streams and trace attributes:
+    - Redacts `Bearer <jwt>`, `gemini_api_key`, `jina_api_key`, `postgres://...` credentials, and raw email addresses.
+- **Sliding-Window Rate Limiter (`rate_limiter.py`)**:
+  - Multi-tier sliding-window algorithm backed by Redis with local in-memory fallback.
+  - Supports IP-based rate limiting (60 req/min), user account tier limiting, and sensitive endpoint throttling (account deletion, login).
+- **Distributed Request Idempotency (`idempotency.py`)**:
+  - Uses atomic Redis `SET ... NX EX` locks (`IdempotencyService`) to prevent concurrent duplicate file ingestion jobs and double token streaming requests.
 - **Brute-Force Login Lockout Engine (`auth.py`)**: Tracks attempts keyed by `ip:{ip}:email:{email}` in Redis; locks account for 300s after 5 consecutive failures.
 - **ASGI Security Headers**:
   - `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; object-src 'none';`
   - `X-Frame-Options: DENY`
   - `X-Content-Type-Options: nosniff`
   - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
-- **AST SafeCalculator (`sandboxing.py`)**: Mathematical evaluation parser rejecting all dunder attributes and arbitrary calls.
-- **Global Exception Handlers (`exception_handlers.py`)**: Maps domain exceptions (`AuthenticationError`, `QuotaExceededError`, `MalwareDetectedError`) to RFC-7807 problem details.
+- **AST SafeCalculator (`sandboxing.py`, `backend/app/core/math/sandbox.py`)**: Mathematical evaluation parser rejecting all dunder attributes and arbitrary calls.
+- **Global Exception Handlers (`exception_handlers.py`)**: Maps domain exceptions (`AuthenticationError`, `QuotaExceededError`, `MalwareDetectedError`, `SecurityViolationError`) to RFC-7807 problem details.
 
 ---
 
@@ -1368,7 +1402,7 @@ Located in `backend/app/documents/services/cleanup_worker.py` and `app/documents
 ## 44. Application Lifespan, Startup Hooks & Middleware Cardinality Defense
 
 Located in `backend/app/main.py` and `backend/app/core/startup.py`:
-- **Lifespan Startup Tasks**:
+- **Lifespan Startup Tasks (`startup.py`)**:
   - `seed_admin_user`: Auto-provisions system administrator on initial startup.
   - `cleanup_stale_unverified_signups`: Purges abandoned unverified accounts older than 7 days.
   - `run_durable_cleanup_recovery`: Reclaims orphaned two-phase deletion jobs.
@@ -1390,8 +1424,9 @@ Located in `backend/app/main.py` and `backend/app/core/startup.py`:
 5. **Stage 5 (Embedding Dispatch)**: Enqueues `GENERATE_EMBEDDINGS` task for Qdrant indexing.
 6. **Stage 6 (Cache Invalidation)**: Clears empty knowledge base cache for `user_id`.
 
-### 45.2 Durable Ingestion Reaper
-Runs every 60s (`INGESTION_REAPER_INTERVAL_SECONDS=60.0`), reclaiming expired worker leases and routing failed jobs to `stream:jobs:dead_letter` after 3 attempts.
+### 45.2 Ingestion Lease, Heartbeat & Durable Reaper
+- Ingestion jobs in `document_processing_jobs` use lease tokens (`lease_token`), expiration timestamps (`lease_expires_at`), and active worker heartbeats (`heartbeat_at`).
+- `DurableIngestionReaper` runs every 60s (`INGESTION_REAPER_INTERVAL_SECONDS=60.0`), reclaiming expired worker leases and routing failed jobs to `stream:jobs:dead_letter` after 3 attempts (`QUEUE_MAX_ATTEMPTS=3`).
 
 ---
 
@@ -1428,17 +1463,22 @@ Located in `backend/app/documents/services/`:
   - `OCRService` (`ocr_service.py`): Gemini Vision multimodal OCR with bounding box coordinates.
   - `TableProcessor` (`table_processor.py`): Markdown/CSV table parsing and statistical column metrics.
   - `VisionProcessor` (`vision_processor.py`): Image classification into `FIGURE`, `CHART`, `DIAGRAM`, `TABLE_SNAPSHOT`.
-- **Zero-Downtime Replacement (`PUT /documents/{id}`)**: Increments document `version`, completes background chunking and vector indexing, and atomically swaps `active_version` on completion.
+- **Zero-Downtime Replacement & Promotion Gate (`PUT /documents/{id}`)**: Increments document `version`, completes background chunking and vector indexing, and atomically swaps `active_version` on validation pass (`validation_gate_passed = True`).
 
 ---
 
-## 49. Query Intelligence: Classification, Decomposition, Expansion & HyDE
+## 49. Query Intelligence: Classification, Decomposition, Expansion, HyDE & ContextSelector
 
+Located in `backend/app/documents/services/`:
 - **`DeterministicQueryClassifier` (`query_classifier.py`)**: Regex-based token intent classifier.
 - **`DeterministicQueryDecomposer` (`query_decomposer.py`)**: Compound sub-question splitter.
 - **`QueryExpansionService` (`query_expansion.py`)**: Acronym and synonym enrichment.
 - **`SafeHyDEExecutor` (`hyde.py`)**: Synthetic hypothetical passage generation.
-- **`MMR` (`mmr.py`)**: Maximal Marginal Relevance diversity filtering.
+- **`MMR` (`mmr.py`)**: Maximal Marginal Relevance diversity filtering ($\lambda=0.5$).
+- **`ContextSelector` (`context_selector.py`)**:
+  - Strict token budget manager (`CONTEXT_MAX_TOKENS=6000`, `MAX_RETRIEVAL_CHUNKS=12`).
+  - Resolves Parent-Child relationships to inject parent element contexts for child chunk hits.
+  - Deduplicates retrieved passages across hybrid search branches before prompt construction.
 
 ---
 
@@ -1493,16 +1533,16 @@ Located in `frontend/src/workers/pyodide.worker.ts` and `frontend/src/lib/pyodid
 - `useConversations.ts`: Thread creation, pagination, pinning, and deletion.
 - `useDocuments.ts`: Document library querying, filtering, and deletion.
 - `useSSEChat.ts`: Streaming SSE consumption and citation tagging.
-- `useDrafts.ts`: Message draft persistence across conversation switching via `localStorage`.
-- `useLocalConversationMetadata.tsx`: Optimistic titles and unread indicators.
+- `useDrafts.ts`: Message draft persistence across conversation switching via browser `localStorage`.
+- `useLocalConversationMetadata.tsx`: Optimistic titles, unread badges, and last message timestamps before server sync.
 - `useKeyboardShortcuts.ts`: Global keyboard hotkeys (`Cmd/Ctrl+K`, `Cmd/Ctrl+/`).
-- `useFileValidation.ts`: Client-side magic bytes, MIME, and size validation.
+- `useFileValidation.ts`: Client-side magic bytes, MIME, and size validation before network dispatch.
 - `useOnlineStatus.ts`: Browser navigator online/offline listener.
-- `useMessages.ts`: Message state and branch deletion handlers.
+- `useMessages.ts`: Message state and branch deletion rollback handlers.
 - `useEmbeddingStatus.ts`: Polling vector indexing completion status.
-- `useRecentAttachments.ts`: Recent upload attachments management.
-- `useSidebarState.ts`: Collapsible sidebar layout state.
-- `useUserSettings.ts`: User preferences and theme sync.
+- `useRecentAttachments.ts`: Recent upload attachments management for fast query reuse.
+- `useSidebarState.ts`: Collapsible sidebar layout state and mobile drawer sync.
+- `useUserSettings.ts`: User preferences, folders, filter presets, and theme sync.
 - `useDocumentPipelineSummary.ts` & `useDocumentStatusMap.ts`: Real-time pipeline status aggregation.
 
 ---
@@ -1552,7 +1592,13 @@ stateDiagram-v2
 - **Re-Authentication Modal (`ReauthDialog.tsx`)**: Re-authenticates expired sessions without discarding unsent drafts.
 - **Onboarding Tour (`OnboardingTour.tsx`)**: Interactive onboarding guide for first-time users.
 - **Command Palette (`CommandPalette.tsx`)**: Global `Cmd+K` searchable modal.
-- **Core UI Components**: `ChatInput`, `ChatMessage`, `CitationCard`, `CitationDrawer`, `CodeBlock`, `ToolCallCard`, `StreamingCursor`, `ConversationDocumentChips`, `MobileDrawer`, `OfflineBanner`, `SidebarFolders`, `ErrorBoundary`, `ErrorPage`, `OfflinePage`, `SEOHead`.
+- **Core UI Components**:
+  - **Chat Subsystem**: `ChatInput`, `ChatMessage`, `ChatToolbar`, `ChatWindow`, `CitationCard`, `CitationDrawer`, `CodeBlock` (Shiki syntax highlighting), `CodeInterpreterOutput`, `ConversationDocumentChips`, `EmptyChat`, `MarkdownRenderer`, `MessageList`, `StreamingCursor`, `StreamingRecovery`, `ToolCallCard`.
+  - **Document Subsystem**: `DocumentCard`, `DocumentFilters`, `DocumentGrid`, `UploadDropzone`.
+  - **Layout & Sidebar**: `ChatLayout`, `MobileDrawer`, `OfflineBanner`, `Sidebar`, `SidebarConversationList`, `SidebarFolders`, `SidebarHeader`, `SidebarProfile`, `SidebarUploadIndicator`.
+  - **Auth Forms**: `LoginCard`, `LoginForm`, `ReauthDialog`, `RegisterCard`, `RegisterForm`.
+  - **Shadcn/UI Primitives**: `Avatar`, `Button`, `Dropdown`, `FileTypeBadge`, `Input`, `Modal`, `SearchBox`, `UploadProgress`, `badge`, `card`, `command`, `scroll-area`, `separator`, `sheet`, `skeleton`, `states`, `textarea`, `tooltip`.
+  - **SEO & Error**: `ErrorBoundary`, `ErrorPage`, `OfflinePage`, `SEOHead`.
 - **Dynamic Chunk Retry (`lazyWithRetry.ts`)**: Automatically retries failed dynamic imports on new deployments.
 
 ---
@@ -1689,7 +1735,7 @@ Tracks DAG execution depth, concurrency factors, task success rates, evidence su
 
 ---
 
-## 60. Comprehensive Evaluation Framework: 6 Evaluators, 4 Runners & 33 Metrics
+## 60. Comprehensive Evaluation Framework: 6 Evaluators, 5 Runners & 33 Metrics
 
 ### 60.1 Dedicated Evaluator Services (`app/evaluation/services/`)
 1. **`AgentEvaluator`**: Specialist agent task completion and planning efficiency.
@@ -1700,10 +1746,11 @@ Tracks DAG execution depth, concurrency factors, task success rates, evidence su
 6. **`ToolEvaluator`**: Single-agent tool calling accuracy, argument validation, and necessity.
 
 ### 60.2 Evaluation Runners (`app/evaluation/runners/`)
-- **`RagasProvider`**: Ragas integration for Faithfulness and Answer Relevancy.
-- **`DeepEvalProvider`**: DeepEval and G-Eval frameworks.
-- **`BenchmarkRunner`**: Batch execution across the 4 profiles (`quick`, `standard`, `full`, `nightly`).
-- **`RegressionRunner`**: Dual-Gate PR regression enforcer ($\text{Faithfulness} \ge 0.90, \Delta \le 0.03$).
+- **`EvaluationRunner` (`evaluation_runner.py`)**: Core batch orchestrator running evaluation loops, coordinating providers, and aggregating metrics across datasets.
+- **`RagasProvider` (`ragas_provider.py`)**: Ragas integration for Faithfulness and Answer Relevancy.
+- **`DeepEvalProvider` (`deepeval_provider.py`)**: DeepEval and G-Eval frameworks.
+- **`BenchmarkRunner` (`benchmark_runner.py`)**: Batch execution across the 4 profiles (`quick`, `standard`, `full`, `nightly`).
+- **`RegressionRunner` (`regression_runner.py`)**: Dual-Gate PR regression enforcer ($\text{Faithfulness} \ge 0.90, \Delta \le 0.03$).
 
 ### 60.3 Complete Catalog of All 33 Registered Metrics in `registry.py`
 
@@ -1782,17 +1829,19 @@ Located in `.github/workflows/`:
 
 ## 63. Operational CLI Scripts, Backup/Restore, Test Taxonomy & Verification
 
-### 63.1 Operational CLI Scripts (`backend/scripts/`)
-- `backup_postgres.sh` & `restore_postgres.sh`: Compressed `pg_dump -Fc` database dumps and restore automation.
-- `backup_qdrant.sh` & `restore_qdrant.sh`: Vector snapshot backup via Qdrant REST snapshot API.
-- `benchmark.py`: Synthetic load and retrieval benchmark runner (`--profile`, `--dataset`, `--mock`, `--output-dir`).
-- `evaluate.py`: Standalone CLI to run evaluation against local or remote environments (`--concurrency 4`).
-- `regression.py`: CI PR gate regression verification script (`--threshold-faithfulness 0.90`).
-- `load_test.py`: Asynchronous load testing simulating concurrent chat streams over SSE (50-500 users).
-- `smoke_test.py`: Post-deployment health verification script checking auth, upload, chunking, and streaming.
-- `reset_all_data.py`: Safe data purge and re-seed for PostgreSQL, Redis, and Qdrant collections.
-- `export_openapi.py`: Static `openapi.json` generator without running the web server.
-- `migrate.sh`: Safe Alembic migration wrapper with connectivity verification.
+### 63.1 Complete 12 Operational CLI Scripts (`backend/scripts/`)
+1. `backup_postgres.sh`: Compressed `pg_dump -Fc` database dump with date stamping and retention rotation.
+2. `restore_postgres.sh`: Safe database restoration script targeting PostgreSQL container.
+3. `backup_qdrant.sh`: Vector snapshot backup via Qdrant REST snapshot API to local persistent volume.
+4. `restore_qdrant.sh`: Restores collection points and HNSW index payloads from Qdrant snapshot archives.
+5. `benchmark.py`: Synthetic load and retrieval benchmark runner (`--profile`, `--dataset`, `--mock`, `--output-dir`).
+6. `evaluate.py`: Standalone CLI to run evaluation against local or remote environments (`--concurrency 4`).
+7. `regression.py`: CI PR gate regression verification script (`--threshold-faithfulness 0.90`).
+8. `load_test.py`: Asynchronous load testing simulating concurrent chat streams over SSE (50-500 users).
+9. `smoke_test.py`: Post-deployment health verification script checking auth, upload, chunking, and streaming.
+10. `reset_all_data.py`: Safe data purge and re-seed for PostgreSQL, Redis, and Qdrant collections.
+11. `export_openapi.py`: Generates static `openapi.json` without running the full ASGI web server.
+12. `migrate.sh`: Safe Alembic migration wrapper with connectivity verification and rollback triggers.
 
 ### 63.2 Complete Test Suite Taxonomy
 - **Root Backend Test Suites (`backend/tests/` - 54 Core Suites)**: Comprehensive testing covering `test_adaptive_rag_e2e.py`, `test_advanced_rag_e2e.py`, `test_auth.py`, `test_chat.py`, `test_hybrid_retrieval.py`, `test_ingestion_reaper.py`, `test_queue_dlq.py`, `test_crypto_service.py`, `test_qdrant_store.py`, `test_postgres_sparse_retriever.py`, etc.
