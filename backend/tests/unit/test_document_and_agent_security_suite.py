@@ -121,7 +121,7 @@ async def test_sec_01_cross_user_qdrant_leakage():
             }
         },
     ]
-    retriever = RetrievalService(vector_store=mock_vector_store)
+    retriever = RetrievalService()
     emb_provider = MockTextEmbeddingProvider()
 
     results = await retriever.retrieve_hybrid_multimodal_graph(
@@ -220,7 +220,7 @@ async def test_sec_04_inactive_version_leakage():
             },
         },
     ]
-    retriever = RetrievalService(vector_store=mock_vector_store)
+    retriever = RetrievalService()
     emb_provider = MockTextEmbeddingProvider()
 
     results = await retriever.retrieve_hybrid_multimodal_graph(
@@ -263,7 +263,7 @@ async def test_sec_05_stale_version_vector_leakage():
             },
         },
     ]
-    retriever = RetrievalService(vector_store=mock_vector_store)
+    retriever = RetrievalService()
     emb_provider = MockTextEmbeddingProvider()
 
     results = await retriever.retrieve_hybrid_multimodal_graph(
@@ -282,7 +282,7 @@ async def test_sec_06_empty_authorization_qdrant_query():
     scope_empty = AuthorizedDocumentScope(user_id=user_id, authorized_docs={})
 
     mock_vector_store = AsyncMock()
-    retriever = RetrievalService(vector_store=mock_vector_store)
+    retriever = RetrievalService()
     emb_provider = MockTextEmbeddingProvider()
 
     results = await retriever.retrieve_hybrid_multimodal_graph(
@@ -345,7 +345,7 @@ async def test_sec_08_embedding_contract_isolation():
             },
         },
     ]
-    retriever = RetrievalService(vector_store=mock_vector_store)
+    retriever = RetrievalService()
     emb_provider = MockTextEmbeddingProvider()
 
     results = await retriever.retrieve_hybrid_multimodal_graph(
@@ -1017,7 +1017,7 @@ async def test_sec_39_active_configuration_mismatch_fail_closed():
             },
         },
     ]
-    retriever = RetrievalService(vector_store=mock_vector_store)
+    retriever = RetrievalService()
     emb_provider = MockTextEmbeddingProvider()
 
     results = await retriever.retrieve_hybrid_multimodal_graph(

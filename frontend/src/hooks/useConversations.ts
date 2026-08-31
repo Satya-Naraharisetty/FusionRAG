@@ -6,10 +6,10 @@ import { QUERY_KEYS } from "../lib/constants";
 import { Conversation } from "../types";
 import toast from "react-hot-toast";
 
-export const useConversations = (limit = 100, offset = 0) => {
+export const useConversations = (limit = 100, cursor: string | null = null) => {
   return useQuery({
-    queryKey: [QUERY_KEYS.CONVERSATIONS, limit, offset],
-    queryFn: () => conversationsApi.listConversations(limit, offset),
+    queryKey: [QUERY_KEYS.CONVERSATIONS, limit, cursor],
+    queryFn: () => conversationsApi.listConversations(limit, cursor),
   });
 };
 

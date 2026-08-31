@@ -14,6 +14,7 @@ from app.chat.domain.models import (
     MessageRole,
     Usage,
 )
+from app.core.pagination import CursorPage
 
 
 class TokenEstimator(ABC):
@@ -113,9 +114,12 @@ class ConversationRepository(ABC):
 
     @abstractmethod
     async def list_conversations(
-        self, user_id: UUID, limit: int = 20, offset: int = 0
-    ) -> list[Conversation]:
-        """List conversations belonging to a user with pagination."""
+        self,
+        user_id: UUID,
+        limit: int = 20,
+        cursor: str | None = None,
+    ) -> CursorPage[Conversation]:
+        """List conversations belonging to a user with canonical keyset pagination."""
         pass
 
     @abstractmethod
@@ -137,9 +141,22 @@ class MessageRepository(ABC):
 
     @abstractmethod
     async def get_recent_messages(
-        self, conversation_id: UUID, limit: int, offset: int = 0
+        self,
+        conversation_id: UUID,
+        limit: int = 50,
+        cursor: str | None = None,
     ) -> list[ConversationMessage]:
-        """Retrieve the recent messages for a conversation with pagination."""
+        """Retrieve recent messages for conversation context loading."""
+        pass
+
+    @abstractmethod
+    async def list_messages(
+        self,
+        conversation_id: UUID,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> CursorPage[ConversationMessage]:
+        """Retrieve paginated message history for a conversation with canonical keyset pagination."""
         pass
 
     @abstractmethod

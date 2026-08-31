@@ -71,12 +71,6 @@ class RetrievalService:
         chunk_repo: ChunkRepository | None = None,
         index_cache: IndexCache | None = None,
         empty_kb_cache_ttl_seconds: float | None = None,
-        # Backwards compatible parameters for old construction in tests
-        embedding_generator: Any | None = None,
-        vector_store: Any | None = None,
-        ranker: Any | None = None,
-        similarity_threshold: float = 0.25,
-        search_timeout: float = 3.0,
         # Configurable hybrid parameters
         enable_hybrid_search: bool | None = None,
         enable_mmr: bool | None = None,
@@ -100,28 +94,21 @@ class RetrievalService:
     ) -> None:
         from app.core.config import settings
 
-        # Detect if we are running in legacy/backwards-compatible fallback mode
-        is_legacy = (embedding_generator is not None or vector_store is not None) and (
-            query_processor is None
-        )
-
         # Load configurations with settings fallback
         self._enable_hybrid_search = (
             enable_hybrid_search
             if enable_hybrid_search is not None
-            else (
-                False if is_legacy else getattr(settings, "ENABLE_HYBRID_SEARCH", True)
-            )
+            else getattr(settings, "ENABLE_HYBRID_SEARCH", True)
         )
         self._enable_mmr = (
             enable_mmr
             if enable_mmr is not None
-            else (False if is_legacy else getattr(settings, "ENABLE_MMR", True))
+            else getattr(settings, "ENABLE_MMR", True)
         )
         self._enable_reranker = (
             enable_reranker
             if enable_reranker is not None
-            else (False if is_legacy else getattr(settings, "ENABLE_RERANKER", True))
+            else getattr(settings, "ENABLE_RERANKER", True)
         )
         self._vector_top_k = (
             vector_top_k
@@ -194,9 +181,8 @@ class RetrievalService:
         # 1. Chunk Repository & Index Cache
         self._chunk_repo = chunk_repo
         self._index_cache = index_cache
-        self._vector_store = vector_store
-        self._dense_retriever: DenseRetriever | None = None
-        self._sparse_retriever: SparseRetriever | None = None
+        self._dense_retriever = dense_retriever
+        self._sparse_retriever = sparse_retriever
 
         # 2. Query Processor
         if query_processor:
@@ -206,24 +192,8 @@ class RetrievalService:
 
             self._query_processor = DefaultQueryProcessor()
 
-        # 3. Dense Retriever
-        if dense_retriever:
-            self._dense_retriever = dense_retriever
-        elif embedding_generator and vector_store and chunk_repo:
-            from app.documents.services.dense_retriever import QdrantDenseRetriever
-
-            self._dense_retriever = QdrantDenseRetriever(
-                embedding_generator=embedding_generator,
-                vector_store=vector_store,
-                chunk_repo=chunk_repo,
-                similarity_threshold=similarity_threshold,
-                search_timeout=search_timeout,
-            )
-
-        # 4. Sparse Retriever
-        if sparse_retriever:
-            self._sparse_retriever = sparse_retriever
-        elif chunk_repo:
+        # 3. Sparse Retriever Auto-init if chunk_repo provided
+        if self._sparse_retriever is None and chunk_repo:
             from app.documents.services.index_cache import InMemoryIndexCache
             from app.documents.services.sparse_index import InMemoryBM25Index
             from app.documents.services.sparse_retriever import BM25Retriever
@@ -234,7 +204,7 @@ class RetrievalService:
             sparse_index = InMemoryBM25Index(chunk_repo=chunk_repo, index_cache=cache)
             self._sparse_retriever = BM25Retriever(sparse_index=sparse_index)
 
-        # 5. Fusion Engine (Baseline: ReciprocalRankFusionEngine)
+        # 4. Fusion Engine (Baseline: ReciprocalRankFusionEngine)
         if fusion_engine:
             self._fusion_engine = fusion_engine
         else:
@@ -249,7 +219,7 @@ class RetrievalService:
             sparse_weight=self._sparse_weight,
         )
 
-        # 6. MMR Selector
+        # 5. MMR Selector
         if mmr_selector:
             self._mmr_selector = mmr_selector
         else:
@@ -257,7 +227,7 @@ class RetrievalService:
 
             self._mmr_selector = DefaultMMRSelector()
 
-        # 7. Reranker
+        # 6. Reranker
         if reranker:
             self._reranker = reranker
         else:
@@ -265,7 +235,7 @@ class RetrievalService:
 
             self._reranker = IdentityReranker()
 
-        # 8. Advanced RAG Components
+        # 7. Advanced RAG Components
         self._query_classifier = query_classifier or DeterministicQueryClassifier()
         self._query_expander = query_expander or SafeQueryExpander(
             LexicalQueryExpander(),
@@ -277,9 +247,6 @@ class RetrievalService:
             timeout_ms=getattr(settings, "QUERY_DECOMPOSITION_TIMEOUT_MS", 500),
             max_subtasks=getattr(settings, "MAX_QUERY_SUBTASKS", 3),
         )
-
-        # Backwards compatible ranker fallback
-        self._ranker = ranker
 
     async def user_has_chunks(self, user_id: UUID) -> bool:
         if self._chunk_repo is None:
@@ -545,14 +512,9 @@ class RetrievalService:
                     "retrieval.cross_encoder_rerank"
                 ) as span:
                     t0 = time.perf_counter()
-                    if self._ranker:
-                        reranked_results = self._ranker.rank(
-                            processed_query_obj.cleaned_query, mmr_results
-                        )
-                    else:
-                        reranked_results = await self._reranker.rerank(
-                            processed_query_obj.cleaned_query, mmr_results
-                        )
+                    reranked_results = await self._reranker.rerank(
+                        processed_query_obj.cleaned_query, mmr_results
+                    )
                     reranked_results = reranked_results[: self._rerank_top_k]
                     rerank_latency = time.perf_counter() - t0
                     span.set_attribute("rerank.output_count", len(reranked_results))
@@ -798,14 +760,9 @@ class RetrievalService:
         if self._enable_reranker:
             t0 = time.perf_counter()
             processed_orig = self._query_processor.process(query)
-            if self._ranker:
-                reranked_results = self._ranker.rank(
-                    processed_orig.cleaned_query, mmr_results
-                )
-            else:
-                reranked_results = await self._reranker.rerank(
-                    processed_orig.cleaned_query, mmr_results
-                )
+            reranked_results = await self._reranker.rerank(
+                processed_orig.cleaned_query, mmr_results
+            )
             reranked_results = reranked_results[: self._rerank_top_k]
             rerank_latency = time.perf_counter() - t0
 
@@ -1044,14 +1001,9 @@ class RetrievalService:
         rerank_latency = 0.0
         if self._enable_reranker:
             t0 = time.perf_counter()
-            if self._ranker:
-                reranked_results = self._ranker.rank(
-                    processed_query_obj.cleaned_query, mmr_results
-                )
-            else:
-                reranked_results = await self._reranker.rerank(
-                    processed_query_obj.cleaned_query, mmr_results
-                )
+            reranked_results = await self._reranker.rerank(
+                processed_query_obj.cleaned_query, mmr_results
+            )
             reranked_results = reranked_results[: self._rerank_top_k]
             rerank_latency = time.perf_counter() - t0
 

@@ -166,11 +166,14 @@ class LLMHistoryRewriter(HistoryRewriter):
     def _build_deterministic_fallback(
         self,
         question: str,
-        history: list[ConversationMessage],
-        reason: str,
+        history: list[ConversationMessage] | None,
+        current_state: ConversationTopicState | None = None,
+        reason: str = "Deterministic fallback",
     ) -> HistoryRewriteResult:
-        """Deterministic fallback when LLM resolution fails or returns low confidence."""
-        # Check if question contains obvious conversational follow-up triggers
+        """
+        Deterministic, state-aware fallback when LLM resolution fails or returns low confidence.
+        Resolves context without substring heuristics by leveraging typed ConversationTopicState.
+        """
         q_lower = question.lower().strip()
         pronouns = {
             "it",
@@ -207,34 +210,157 @@ class LLMHistoryRewriter(HistoryRewriter):
             not words.isdisjoint(pronouns) or has_followup_phrase or len(words) <= 2
         )
 
-        rewritten = question
-        action = ContextAction.STANDALONE
-        if is_followup and history:
-            # Extract last user query as anchor
+        # 1. Topic Switch / Standalone Isolation
+        if not is_followup:
+            action = ContextAction.STANDALONE
+            rewritten = question
+            source_mode = SourceMode.DOCUMENT_ONLY
+            domain_ctx = DomainContext(primary="GENERAL")
+            channel_queries = ChannelRetrievalQueries(document_query=question)
+            updated_state = ConversationTopicState(
+                active_subject=None,
+                active_role=None,
+                active_location=None,
+                active_entities=[],
+                active_intent="GENERAL_QUERY",
+            )
+            resolution = ContextResolution(
+                original_query=question,
+                contextualized_query=question,
+                retrieval_queries=channel_queries,
+                is_context_dependent=False,
+                context_action=action,
+                intent="GENERAL_QUERY",
+                source_mode=source_mode,
+                domain_context=domain_ctx,
+                confidence=0.6,
+                rewrite_reason=reason,
+            )
+            return HistoryRewriteResult(
+                original_query=question,
+                rewritten_query=rewritten,
+                rewrite_reason=reason,
+                rewrite_applied=False,
+                context_action=action,
+                intent="GENERAL_QUERY",
+                source_mode=source_mode,
+                domain_context=domain_ctx,
+                retrieval_queries=channel_queries,
+                resolution=resolution,
+                topic_state=updated_state,
+            )
+
+        # 2. Calculation Intent over known_values
+        if current_state and current_state.known_values:
+            math_verbs = {
+                "calculate",
+                "compute",
+                "sum",
+                "multiply",
+                "divide",
+                "add",
+                "subtract",
+                "average",
+                "%",
+                "percent",
+                "times",
+            }
+            if not words.isdisjoint(math_verbs):
+                action = ContextAction.CONTINUE
+                rewritten = question
+                source_mode = SourceMode.CALCULATION_ONLY
+                domain_ctx = DomainContext(primary="CALCULATION")
+                channel_queries = ChannelRetrievalQueries()
+                resolution = ContextResolution(
+                    original_query=question,
+                    contextualized_query=question,
+                    retrieval_queries=channel_queries,
+                    is_context_dependent=True,
+                    context_action=action,
+                    intent="CALCULATION",
+                    source_mode=source_mode,
+                    domain_context=domain_ctx,
+                    confidence=0.6,
+                    rewrite_reason=reason,
+                )
+                return HistoryRewriteResult(
+                    original_query=question,
+                    rewritten_query=rewritten,
+                    rewrite_reason=reason,
+                    rewrite_applied=False,
+                    context_action=action,
+                    intent="CALCULATION",
+                    source_mode=source_mode,
+                    domain_context=domain_ctx,
+                    retrieval_queries=channel_queries,
+                    resolution=resolution,
+                    topic_state=current_state,
+                )
+
+        # 3. Continuation with active ConversationTopicState
+        action = ContextAction.CONTINUE
+        active_role = current_state.active_role if current_state else None
+        active_subject = current_state.active_subject if current_state else None
+        active_location = current_state.active_location if current_state else None
+        active_intent = (
+            current_state.active_intent if current_state else "GENERAL_QUERY"
+        )
+
+        anchor_parts: list[str] = []
+        if active_role:
+            anchor_parts.append(active_role)
+        elif active_subject:
+            anchor_parts.append(active_subject)
+        elif history:
             last_user_msg = next(
                 (m.content for m in reversed(history) if m.role == MessageRole.USER),
                 None,
             )
             if last_user_msg:
-                rewritten = f"{last_user_msg} - {question}"
-                action = ContextAction.CONTINUE
+                anchor_parts.append(last_user_msg)
+
+        if active_location:
+            anchor_parts.append(f"in {active_location}")
+
+        if anchor_parts:
+            context_prefix = " ".join(anchor_parts)
+            rewritten = f"{context_prefix} - {question}"
+        else:
+            rewritten = question
+
+        if active_intent in ("COMPENSATION_QUERY", "MARKET_SALARY_QUERY") or (
+            current_state
+            and "salary" in str(current_state.active_subject or "").lower()
+        ):
+            source_mode = SourceMode.HYBRID
+            domain_ctx = DomainContext(
+                primary="TECH_CAREER",
+                entities=current_state.active_entities if current_state else [],
+            )
+            channel_queries = ChannelRetrievalQueries(
+                document_query=rewritten,
+                web_query=rewritten,
+            )
+        else:
+            source_mode = SourceMode.DOCUMENT_ONLY
+            domain_ctx = DomainContext(
+                primary="GENERAL",
+                entities=current_state.active_entities if current_state else [],
+            )
+            channel_queries = ChannelRetrievalQueries(document_query=rewritten)
 
         resolution = ContextResolution(
             original_query=question,
             contextualized_query=rewritten,
-            retrieval_queries=ChannelRetrievalQueries(
-                document_query=rewritten,
-                web_query=rewritten
-                if "market" in q_lower or "salary" in q_lower
-                else None,
-            ),
-            is_context_dependent=is_followup,
+            retrieval_queries=channel_queries,
+            is_context_dependent=True,
             context_action=action,
-            intent="GENERAL_QUERY",
-            source_mode=SourceMode.HYBRID
-            if "market" in q_lower
-            else SourceMode.DOCUMENT_ONLY,
-            domain_context=DomainContext(primary="GENERAL"),
+            intent=active_intent or "GENERAL_QUERY",
+            source_mode=source_mode,
+            domain_context=domain_ctx,
+            active_subject=active_subject,
+            active_role=active_role,
+            active_location=active_location,
             confidence=0.6,
             rewrite_reason=reason,
         )
@@ -245,12 +371,12 @@ class LLMHistoryRewriter(HistoryRewriter):
             rewrite_reason=reason,
             rewrite_applied=(rewritten != question),
             context_action=action,
-            intent="GENERAL_QUERY",
-            source_mode=resolution.source_mode,
-            domain_context=resolution.domain_context,
-            retrieval_queries=resolution.retrieval_queries,
+            intent=active_intent or "GENERAL_QUERY",
+            source_mode=source_mode,
+            domain_context=domain_ctx,
+            retrieval_queries=channel_queries,
             resolution=resolution,
-            topic_state=ConversationTopicState(),
+            topic_state=current_state or ConversationTopicState(),
         )
 
     def _heuristically_needs_rewrite(self, question: str) -> bool:
@@ -343,8 +469,15 @@ class LLMHistoryRewriter(HistoryRewriter):
         Resolve conversational context, update conversation state lifecycle,
         and generate channel-specific retrieval queries.
         """
-        # 1. Standalone bypass if no history
-        if not history:
+        # 1. Standalone bypass if no history and no active topic state
+        if not history and not (
+            current_state
+            and (
+                current_state.active_role
+                or current_state.active_subject
+                or current_state.known_values
+            )
+        ):
             resolution = ContextResolution(
                 original_query=question,
                 contextualized_query=question,
@@ -374,8 +507,10 @@ class LLMHistoryRewriter(HistoryRewriter):
                 topic_state=ConversationTopicState(),
             )
 
-        # 2. Heuristic pre-filter for obvious standalone queries
-        if not self._heuristically_needs_rewrite(question):
+        # 2. Heuristic pre-filter for obvious standalone queries (when not carrying calculation/known_values state)
+        if not self._heuristically_needs_rewrite(question) and not (
+            current_state and current_state.known_values
+        ):
             resolution = ContextResolution(
                 original_query=question,
                 contextualized_query=question,
@@ -402,55 +537,56 @@ class LLMHistoryRewriter(HistoryRewriter):
                 domain_context=DomainContext(primary="GENERAL"),
                 retrieval_queries=resolution.retrieval_queries,
                 resolution=resolution,
-                topic_state=current_state or ConversationTopicState(),
+                topic_state=ConversationTopicState(),
             )
 
-        # 2. Check Cache
-        last_message = history[-1]
-        cache_key = self._get_cache_key(
-            last_message.conversation_id, last_message.id, question
-        )
+        # 3. Check Cache
+        if history:
+            last_message = history[-1]
+            cache_key = self._get_cache_key(
+                last_message.conversation_id, last_message.id, question
+            )
 
-        try:
-            cached_val = await self._cache.get(cache_key)
-            if cached_val:
-                try:
-                    cached_dict = json.loads(cached_val)
-                    resolution = ContextResolution.model_validate(
-                        cached_dict.get("resolution", cached_dict)
-                    )
-                    return HistoryRewriteResult(
-                        original_query=question,
-                        rewritten_query=resolution.contextualized_query,
-                        rewrite_reason="Cache hit",
-                        rewrite_applied=resolution.is_context_dependent,
-                        context_action=resolution.context_action,
-                        intent=resolution.intent,
-                        source_mode=resolution.source_mode,
-                        domain_context=resolution.domain_context,
-                        retrieval_queries=resolution.retrieval_queries,
-                        resolution=resolution,
-                        topic_state=current_state or ConversationTopicState(),
-                    )
-                except Exception:
-                    # Fallback for plain string cached values
-                    return HistoryRewriteResult(
-                        original_query=question,
-                        rewritten_query=cached_val,
-                        rewrite_reason="Cache hit (legacy format)",
-                        rewrite_applied=True,
-                        context_action=ContextAction.CONTINUE,
-                        intent="GENERAL_QUERY",
-                        source_mode=SourceMode.DOCUMENT_ONLY,
-                        domain_context=DomainContext(primary="GENERAL"),
-                        retrieval_queries=ChannelRetrievalQueries(
-                            document_query=cached_val
-                        ),
-                        resolution=None,
-                        topic_state=current_state or ConversationTopicState(),
-                    )
-        except Exception as e:
-            logger.warning(f"Failed to read from rewrite cache: {e}")
+            try:
+                cached_val = await self._cache.get(cache_key)
+                if cached_val:
+                    try:
+                        cached_dict = json.loads(cached_val)
+                        resolution = ContextResolution.model_validate(
+                            cached_dict.get("resolution", cached_dict)
+                        )
+                        return HistoryRewriteResult(
+                            original_query=question,
+                            rewritten_query=resolution.contextualized_query,
+                            rewrite_reason="Cache hit",
+                            rewrite_applied=resolution.is_context_dependent,
+                            context_action=resolution.context_action,
+                            intent=resolution.intent,
+                            source_mode=resolution.source_mode,
+                            domain_context=resolution.domain_context,
+                            retrieval_queries=resolution.retrieval_queries,
+                            resolution=resolution,
+                            topic_state=current_state or ConversationTopicState(),
+                        )
+                    except Exception:
+                        # Fallback for plain string cached values
+                        return HistoryRewriteResult(
+                            original_query=question,
+                            rewritten_query=cached_val,
+                            rewrite_reason="Cache hit (legacy format)",
+                            rewrite_applied=True,
+                            context_action=ContextAction.CONTINUE,
+                            intent="GENERAL_QUERY",
+                            source_mode=SourceMode.DOCUMENT_ONLY,
+                            domain_context=DomainContext(primary="GENERAL"),
+                            retrieval_queries=ChannelRetrievalQueries(
+                                document_query=cached_val
+                            ),
+                            resolution=None,
+                            topic_state=current_state or ConversationTopicState(),
+                        )
+            except Exception as e:
+                logger.warning(f"Failed to read from rewrite cache: {e}")
 
         # 3. Format context turns
         messages = [
@@ -518,6 +654,7 @@ class LLMHistoryRewriter(HistoryRewriter):
                 return self._build_deterministic_fallback(
                     question=question,
                     history=history,
+                    current_state=current_state,
                     reason=f"LLM confidence {confidence_val:.2f} below threshold (0.60)",
                 )
 
@@ -606,5 +743,6 @@ class LLMHistoryRewriter(HistoryRewriter):
             return self._build_deterministic_fallback(
                 question=question,
                 history=history,
+                current_state=current_state,
                 reason=f"Failed to generate structured resolution: {e}",
             )

@@ -187,6 +187,10 @@ class Settings(BaseSettings):
     # Encryption Configuration
     ENCRYPTION_MASTER_KEY: str | None = None
 
+    # Keyset Cursor Pagination Configuration
+    CURSOR_SIGNING_KEY: str | None = None
+    CURSOR_TTL_SECONDS: int = 7 * 24 * 60 * 60  # 7 days
+
     # Logging Configurations
     LOG_FORMAT: str = "TEXT"
     LOG_LEVEL: str = "INFO"

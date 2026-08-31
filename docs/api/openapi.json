@@ -1,8 +1,10 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Fusion RAG Chatbot",
-    "version": "0.1.0"
+    "title": "FusionRAG",
+    "summary": "FusionRAG (Enterprise Hybrid Retrieval-Augmented Generation) API backend combining dense vectors and BM25 sparse search with cross-encoder reranking.",
+    "description": "\n# FusionRAG API\n\nProduction-ready, highly observable, verifiable AI Document QA and retrieval platform.\n\n## Features\n* **Hybrid Retrieval**: Dense embeddings (Qdrant) + BM25 Sparse Search fused via Reciprocal Rank Fusion (RRF).\n* **Neural Reranking**: Cross-Encoder model scoring for high-precision context relevance.\n* **Evaluation Framework**: Automated Faithfulness, Context Relevancy, and Hallucination metric pipelines.\n* **Streaming QA**: Low-latency token streaming with inline grounded citations.\n    ",
+    "version": "1.0.0"
   },
   "paths": {
     "/api/v1/health/liveness": {
@@ -641,17 +643,41 @@
           "Documents"
         ],
         "summary": "Upload Document",
-        "description": "Upload a document, validating the formats and enqueuing background parsing & chunking.\nAlways scopes the document to LIBRARY.",
+        "description": "Upload a document, validating the formats and enqueuing background parsing & chunking.\nIf conversation_id is provided, scopes the document to CONVERSATION, otherwise LIBRARY.",
         "operationId": "upload_document_api_v1_documents_upload_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Conversation Id"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_upload_document_api_v1_documents_upload_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -674,12 +700,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/documents": {
@@ -688,29 +709,58 @@
           "Documents"
         ],
         "summary": "List Documents",
-        "description": "List uploaded persistent library documents for the currently authenticated user.",
+        "description": "List uploaded persistent documents for the user (scoped to conversation if conversation_id is provided).",
         "operationId": "list_documents_api_v1_documents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Conversation Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/DocumentResponse"
                   },
-                  "type": "array",
                   "title": "Response List Documents Api V1 Documents Get"
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/documents/{id}": {
@@ -1154,7 +1204,7 @@
           "Conversations"
         ],
         "summary": "List Conversations",
-        "description": "List all active conversations for the authenticated user, ordered by last activity.",
+        "description": "List all active conversations for the authenticated user with canonical keyset pagination.",
         "operationId": "list_conversations_api_v1_conversations_get",
         "security": [
           {
@@ -1175,15 +1225,22 @@
             }
           },
           {
-            "name": "offset",
+            "name": "cursor",
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0,
-              "title": "Offset"
-            }
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Signed opaque keyset cursor",
+              "title": "Cursor"
+            },
+            "description": "Signed opaque keyset cursor"
           }
         ],
         "responses": {
@@ -1362,7 +1419,7 @@
           "Conversations"
         ],
         "summary": "List Messages",
-        "description": "Get paginated message history for a conversation.",
+        "description": "Get paginated message history for a conversation with canonical keyset pagination.",
         "operationId": "list_messages_api_v1_conversations__id__messages_get",
         "security": [
           {
@@ -1393,15 +1450,22 @@
             }
           },
           {
-            "name": "offset",
+            "name": "cursor",
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0,
-              "title": "Offset"
-            }
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Signed opaque keyset cursor",
+              "title": "Cursor"
+            },
+            "description": "Signed opaque keyset cursor"
           }
         ],
         "responses": {
@@ -1411,6 +1475,65 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MessagesListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{id}/messages/{message_id}": {
+      "delete": {
+        "tags": [
+          "Conversations"
+        ],
+        "summary": "Delete Messages From",
+        "description": "Delete a message and all subsequent messages in the conversation (ChatGPT-style edit truncation).",
+        "operationId": "delete_messages_from_api_v1_conversations__id__messages__message_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteMessagesResponse"
                 }
               }
             }
@@ -1663,7 +1786,7 @@
           "Evaluation"
         ],
         "summary": "Get Evaluation Report",
-        "description": "Retrieve generated Markdown, JSON, HTML, or CSV report files for a run.",
+        "description": "Retrieve generated Markdown, JSON, HTML, or CSV report files for a run.\nIf the file is missing from disk, regenerates it on-demand from the database record.",
         "operationId": "get_evaluation_report_api_v1_evaluation_reports__run_id__get",
         "security": [
           {
@@ -1980,10 +2103,22 @@
         }
       }
     },
+    "/robots.txt": {
+      "get": {
+        "summary": "Backend Robots Txt",
+        "description": "Robots exclusion policy for FastAPI Render backend.",
+        "operationId": "backend_robots_txt_robots_txt_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Root Route",
-        "operationId": "root_route_health_get",
+        "operationId": "root_route_health_head",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1997,7 +2132,7 @@
       },
       "head": {
         "summary": "Root Route",
-        "operationId": "root_route_health_get",
+        "operationId": "root_route_health_head",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2013,7 +2148,7 @@
     "/": {
       "get": {
         "summary": "Root Route",
-        "operationId": "root_route__get",
+        "operationId": "root_route__head",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2027,7 +2162,7 @@
       },
       "head": {
         "summary": "Root Route",
-        "operationId": "root_route__get",
+        "operationId": "root_route__head",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2249,6 +2384,83 @@
           "chunk_index": {
             "type": "integer",
             "title": "Chunk Index"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Number"
+          },
+          "line_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Number"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "element_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Element Type"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "entailment_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entailment Status"
           }
         },
         "type": "object",
@@ -2563,6 +2775,13 @@
       },
       "ConversationsListResponse": {
         "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Conversation"
+            },
+            "type": "array",
+            "title": "Items"
+          },
           "conversations": {
             "items": {
               "$ref": "#/components/schemas/Conversation"
@@ -2574,16 +2793,47 @@
             "type": "integer",
             "title": "Limit"
           },
-          "offset": {
-            "type": "integer",
-            "title": "Offset"
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "prev_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Cursor"
+          },
+          "has_next_page": {
+            "type": "boolean",
+            "title": "Has Next Page",
+            "default": false
+          },
+          "has_prev_page": {
+            "type": "boolean",
+            "title": "Has Prev Page",
+            "default": false
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false
           }
         },
         "type": "object",
         "required": [
-          "conversations",
-          "limit",
-          "offset"
+          "limit"
         ],
         "title": "ConversationsListResponse"
       },
@@ -2675,6 +2925,19 @@
         "type": "object",
         "title": "DeleteAccountSchema",
         "description": "Body for DELETE /auth/account.\n\nRequires the account password to be re-entered if the user has one,\nso that a stolen access token alone cannot destroy the account (account-takeover protection)."
+      },
+      "DeleteMessagesResponse": {
+        "properties": {
+          "deleted_count": {
+            "type": "integer",
+            "title": "Deleted Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted_count"
+        ],
+        "title": "DeleteMessagesResponse"
       },
       "DocumentResponse": {
         "properties": {
@@ -2960,6 +3223,13 @@
       },
       "MessagesListResponse": {
         "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationMessage"
+            },
+            "type": "array",
+            "title": "Items"
+          },
           "messages": {
             "items": {
               "$ref": "#/components/schemas/ConversationMessage"
@@ -2971,16 +3241,47 @@
             "type": "integer",
             "title": "Limit"
           },
-          "offset": {
-            "type": "integer",
-            "title": "Offset"
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "prev_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Cursor"
+          },
+          "has_next_page": {
+            "type": "boolean",
+            "title": "Has Next Page",
+            "default": false
+          },
+          "has_prev_page": {
+            "type": "boolean",
+            "title": "Has Prev Page",
+            "default": false
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false
           }
         },
         "type": "object",
         "required": [
-          "messages",
-          "limit",
-          "offset"
+          "limit"
         ],
         "title": "MessagesListResponse"
       },

@@ -26,6 +26,7 @@ from app.documents.infrastructure.persistence.models import (
 from app.documents.infrastructure.persistence.repositories.chunk_repository import (
     SQLAlchemyChunkRepository,
 )
+from app.documents.services.dense_retriever import QdrantDenseRetriever
 from app.documents.services.ranking import SemanticSearchRanker
 from app.documents.services.retrieval_service import RetrievalService
 from tests.db import TEST_DATABASE_URL
@@ -249,16 +250,21 @@ async def test_retrieval_service_success(mocker):
 
     repo.batch_lookup = mocker.AsyncMock(return_value=[c1, c2])
 
-    ranker = mocker.MagicMock()
-    ranker.rank.side_effect = lambda _q, chunks: chunks
+    ranker = mocker.AsyncMock()
+    ranker.rerank = mocker.AsyncMock(side_effect=lambda _q, chunks: chunks)
 
-    service = RetrievalService(
+    dense = QdrantDenseRetriever(
         embedding_generator=gen,
         vector_store=store,
         chunk_repo=repo,
-        ranker=ranker,
         similarity_threshold=0.25,
         search_timeout=3.0,
+    )
+    service = RetrievalService(
+        dense_retriever=dense,
+        chunk_repo=repo,
+        reranker=ranker,
+        enable_hybrid_search=False,
     )
 
     result = await service.retrieve(query="test query", user_id=uuid4(), top_k=10)
@@ -281,11 +287,16 @@ async def test_retrieval_service_ownership_violation(mocker):
     repo.get_allowed_document_ids = mocker.AsyncMock(return_value=[])
     ranker = mocker.MagicMock()
 
-    service = RetrievalService(
+    dense = QdrantDenseRetriever(
         embedding_generator=gen,
         vector_store=store,
         chunk_repo=repo,
-        ranker=ranker,
+    )
+    service = RetrievalService(
+        dense_retriever=dense,
+        chunk_repo=repo,
+        reranker=ranker,
+        enable_hybrid_search=False,
     )
 
     with pytest.raises(UnauthorizedDocumentAccess):
@@ -301,52 +312,55 @@ async def test_retrieval_service_ownership_violation(mocker):
 async def test_retrieval_service_similarity_threshold(mocker):
     gen = mocker.MagicMock()
     gen.generate.return_value = [0.1]
-
     store = mocker.MagicMock()
-    # Mocking two scores: one above threshold (0.8), one below (0.1)
+    c1_id = uuid4()
+    c2_id = uuid4()
     store.search = mocker.AsyncMock(
         return_value=[
-            {"id": UUID("11111111-1111-1111-1111-111111111111"), "score": 0.8},
-            {"id": UUID("22222222-2222-2222-2222-222222222222"), "score": 0.1},
+            {"id": c1_id, "score": 0.8},  # Above threshold
+            {"id": c2_id, "score": 0.1},  # Below threshold
         ]
     )
-
     repo = mocker.MagicMock()
-    doc1_id = uuid4()
-    doc2_id = uuid4()
-    repo.get_allowed_document_ids = mocker.AsyncMock(return_value=[doc1_id, doc2_id])
     c1 = Chunk(
-        id=UUID("11111111-1111-1111-1111-111111111111"),
-        document_id=doc1_id,
+        id=c1_id,
+        document_id=uuid4(),
         chunk_index=0,
-        text="text 1",
+        text="chunk 1",
         character_start=0,
-        character_end=5,
-        token_estimate=1,
+        character_end=7,
+        token_estimate=2,
         created_at=datetime.now(UTC),
     )
     c2 = Chunk(
-        id=UUID("22222222-2222-2222-2222-222222222222"),
-        document_id=doc2_id,
+        id=c2_id,
+        document_id=uuid4(),
         chunk_index=1,
-        text="text 2",
-        character_start=5,
-        character_end=10,
-        token_estimate=1,
+        text="chunk 2",
+        character_start=0,
+        character_end=7,
+        token_estimate=2,
         created_at=datetime.now(UTC),
     )
     repo.batch_lookup = mocker.AsyncMock(return_value=[c1, c2])
-
-    ranker = mocker.MagicMock()
-    ranker.rank.side_effect = lambda _q, chunks: chunks
+    repo.get_allowed_document_ids = mocker.AsyncMock(
+        return_value=[c1.document_id, c2.document_id]
+    )
+    ranker = mocker.AsyncMock()
+    ranker.rerank = mocker.AsyncMock(side_effect=lambda _q, chunks: chunks)
 
     # Set SIMILARITY_THRESHOLD = 0.5
-    service = RetrievalService(
+    dense = QdrantDenseRetriever(
         embedding_generator=gen,
         vector_store=store,
         chunk_repo=repo,
-        ranker=ranker,
         similarity_threshold=0.5,
+    )
+    service = RetrievalService(
+        dense_retriever=dense,
+        chunk_repo=repo,
+        reranker=ranker,
+        enable_hybrid_search=False,
     )
 
     result = await service.retrieve(query="test", user_id=uuid4(), top_k=10)
@@ -364,13 +378,19 @@ async def test_retrieval_service_empty_results(mocker):
     store.search = mocker.AsyncMock(return_value=[])  # No matches
     repo = mocker.MagicMock()
     repo.get_allowed_document_ids = mocker.AsyncMock(return_value=[uuid4()])
-    ranker = mocker.MagicMock()
+    ranker = mocker.AsyncMock()
+    ranker.rerank = mocker.AsyncMock(side_effect=lambda _q, chunks: chunks)
 
-    service = RetrievalService(
+    dense = QdrantDenseRetriever(
         embedding_generator=gen,
         vector_store=store,
         chunk_repo=repo,
-        ranker=ranker,
+    )
+    service = RetrievalService(
+        dense_retriever=dense,
+        chunk_repo=repo,
+        reranker=ranker,
+        enable_hybrid_search=False,
     )
 
     result = await service.retrieve(query="test", user_id=uuid4(), top_k=10)

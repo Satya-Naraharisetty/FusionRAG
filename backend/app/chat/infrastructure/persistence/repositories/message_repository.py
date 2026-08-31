@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, literal, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat.domain.interfaces import MessageRepository
@@ -12,6 +12,7 @@ from app.chat.domain.models import (
     MessageStatus,
 )
 from app.chat.infrastructure.persistence.models import ConversationMessageORM
+from app.core.pagination import CursorDirection, CursorPage, CursorSigner
 
 
 class SQLAlchemyMessageRepository(MessageRepository):
@@ -23,23 +24,22 @@ class SQLAlchemyMessageRepository(MessageRepository):
     ) -> datetime:
         """
         Returns a strictly increasing timestamp for the conversation.
-
-        Messages created within the same microsecond would otherwise tie on
-        created_at, making their relative order ambiguous (and the message
-        history ordering nondeterministic). Bump the timestamp forward when it
-        does not strictly exceed the newest existing message.
+        Guarantees that each message has a unique and monotonic created_at
+        so that ordering is strictly deterministic without depending on ID ties.
         """
-        if proposed is None:
-            proposed = datetime.now(UTC)
+        now = datetime.now(UTC)
+        base = proposed if proposed is not None else now
         result = await self._db.execute(
             select(func.max(ConversationMessageORM.created_at)).where(
                 ConversationMessageORM.conversation_id == conversation_id
             )
         )
-        latest = result.scalar()
-        if latest is not None and proposed <= latest:
-            proposed = latest + timedelta(microseconds=1)
-        return proposed
+        max_existing = result.scalar_one_or_none()
+        if max_existing is None:
+            return base
+        if base <= max_existing:
+            return max_existing + timedelta(microseconds=1)
+        return base
 
     def _to_domain(self, orm: ConversationMessageORM) -> ConversationMessage:
         return ConversationMessage(
@@ -83,7 +83,10 @@ class SQLAlchemyMessageRepository(MessageRepository):
         return self._to_domain(orm)
 
     async def get_recent_messages(
-        self, conversation_id: UUID, limit: int, offset: int = 0
+        self,
+        conversation_id: UUID,
+        limit: int = 50,
+        cursor: str | None = None,
     ) -> list[ConversationMessage]:
         result = await self._db.execute(
             select(ConversationMessageORM)
@@ -93,13 +96,176 @@ class SQLAlchemyMessageRepository(MessageRepository):
                 ConversationMessageORM.id.desc(),
             )
             .limit(limit)
-            .offset(offset)
         )
-        orms = result.scalars().all()
-        # We fetch in descending order, but let's reverse them so they are in chronological order
+        orms = list(result.scalars().all())
         result_list = [self._to_domain(orm) for orm in orms]
         result_list.reverse()
         return result_list
+
+    async def list_messages(
+        self,
+        conversation_id: UUID,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> CursorPage[ConversationMessage]:
+        base_where = [ConversationMessageORM.conversation_id == conversation_id]
+
+        if cursor:
+            cursor_ts, cursor_id, direction = CursorSigner.parse_boundary(
+                token=cursor,
+                expected_resource_type="msg",
+                expected_context_id=conversation_id,
+            )
+
+            if direction == CursorDirection.NEXT:
+                stmt = (
+                    select(ConversationMessageORM)
+                    .where(
+                        *base_where,
+                        tuple_(
+                            ConversationMessageORM.created_at, ConversationMessageORM.id
+                        )
+                        < tuple_(literal(cursor_ts), literal(cursor_id)),
+                    )
+                    .order_by(
+                        ConversationMessageORM.created_at.desc(),
+                        ConversationMessageORM.id.desc(),
+                    )
+                    .limit(limit + 1)
+                )
+                result = await self._db.execute(stmt)
+                orms = list(result.scalars().all())
+                has_next_page = len(orms) > limit
+                items_orm = orms[:limit]
+                items = [self._to_domain(o) for o in items_orm]
+
+                next_cursor = (
+                    CursorSigner.encode(
+                        created_at=items_orm[-1].created_at,
+                        record_id=items_orm[-1].id,
+                        direction=CursorDirection.NEXT,
+                        resource_type="msg",
+                        context_id=conversation_id,
+                    )
+                    if has_next_page and items_orm
+                    else None
+                )
+                prev_cursor = (
+                    CursorSigner.encode(
+                        created_at=items_orm[0].created_at,
+                        record_id=items_orm[0].id,
+                        direction=CursorDirection.PREV,
+                        resource_type="msg",
+                        context_id=conversation_id,
+                    )
+                    if items_orm
+                    else None
+                )
+
+                return CursorPage[ConversationMessage](
+                    items=items,
+                    limit=limit,
+                    next_cursor=next_cursor,
+                    prev_cursor=prev_cursor,
+                    has_next_page=has_next_page,
+                    has_prev_page=True,
+                    has_more=has_next_page,
+                )
+
+            else:  # CursorDirection.PREV
+                stmt = (
+                    select(ConversationMessageORM)
+                    .where(
+                        *base_where,
+                        tuple_(
+                            ConversationMessageORM.created_at, ConversationMessageORM.id
+                        )
+                        > tuple_(literal(cursor_ts), literal(cursor_id)),
+                    )
+                    .order_by(
+                        ConversationMessageORM.created_at.asc(),
+                        ConversationMessageORM.id.asc(),
+                    )
+                    .limit(limit + 1)
+                )
+                result = await self._db.execute(stmt)
+                orms = list(result.scalars().all())
+                has_prev_page = len(orms) > limit
+                items_orm = orms[:limit]
+                # Reorder ASC slice back to canonical DESC order
+                items_orm.reverse()
+                items = [self._to_domain(o) for o in items_orm]
+
+                next_cursor = (
+                    CursorSigner.encode(
+                        created_at=items_orm[-1].created_at,
+                        record_id=items_orm[-1].id,
+                        direction=CursorDirection.NEXT,
+                        resource_type="msg",
+                        context_id=conversation_id,
+                    )
+                    if items_orm
+                    else None
+                )
+                prev_cursor = (
+                    CursorSigner.encode(
+                        created_at=items_orm[0].created_at,
+                        record_id=items_orm[0].id,
+                        direction=CursorDirection.PREV,
+                        resource_type="msg",
+                        context_id=conversation_id,
+                    )
+                    if has_prev_page and items_orm
+                    else None
+                )
+
+                return CursorPage[ConversationMessage](
+                    items=items,
+                    limit=limit,
+                    next_cursor=next_cursor,
+                    prev_cursor=prev_cursor,
+                    has_next_page=True,
+                    has_prev_page=has_prev_page,
+                    has_more=True,
+                )
+
+        # Canonical first page
+        stmt = (
+            select(ConversationMessageORM)
+            .where(*base_where)
+            .order_by(
+                ConversationMessageORM.created_at.desc(),
+                ConversationMessageORM.id.desc(),
+            )
+            .limit(limit + 1)
+        )
+        result = await self._db.execute(stmt)
+        orms = list(result.scalars().all())
+        has_next_page = len(orms) > limit
+        items_orm = orms[:limit]
+        items = [self._to_domain(o) for o in items_orm]
+
+        next_cursor = (
+            CursorSigner.encode(
+                created_at=items_orm[-1].created_at,
+                record_id=items_orm[-1].id,
+                direction=CursorDirection.NEXT,
+                resource_type="msg",
+                context_id=conversation_id,
+            )
+            if has_next_page and items_orm
+            else None
+        )
+
+        return CursorPage[ConversationMessage](
+            items=items,
+            limit=limit,
+            next_cursor=next_cursor,
+            prev_cursor=None,
+            has_next_page=has_next_page,
+            has_prev_page=False,
+            has_more=has_next_page,
+        )
 
     async def count_messages(self, conversation_id: UUID) -> int:
         result = await self._db.execute(

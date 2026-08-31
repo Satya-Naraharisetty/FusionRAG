@@ -92,7 +92,7 @@ async def test_failure_injection_validation_gate_rejection_and_cutover_immunity(
     try:
         await pg_session.execute(
             text(
-                "INSERT INTO users (id, email, hashed_password, role, is_active) VALUES (:id, :email, 'hash', 'user', true)"
+                "INSERT INTO users (id, email, hashed_password, role, is_active, is_verified) VALUES (:id, :email, 'hash', 'user', true, true)"
             ),
             {"id": user_id, "email": f"fail_{user_id}@test.com"},
         )
@@ -202,7 +202,7 @@ async def test_projection_rebuild_deterministic_equivalence(pg_session: AsyncSes
     try:
         await pg_session.execute(
             text(
-                "INSERT INTO users (id, email, hashed_password, role, is_active) VALUES (:id, :email, 'hash', 'user', true)"
+                "INSERT INTO users (id, email, hashed_password, role, is_active, is_verified) VALUES (:id, :email, 'hash', 'user', true, true)"
             ),
             {"id": user_id, "email": f"rebuild_{user_id}@test.com"},
         )

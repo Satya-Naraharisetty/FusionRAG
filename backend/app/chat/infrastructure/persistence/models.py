@@ -5,10 +5,12 @@ from sqlalchemy import (
     JSON,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -42,6 +44,16 @@ class ConversationORM(Base):
     )
     last_message_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_conversations_user_last_msg_id",
+            "user_id",
+            text("last_message_at DESC"),
+            text("id DESC"),
+            postgresql_where=text("state <> 'deleted'"),
+        ),
     )
 
     # Enable optimistic locking
@@ -78,6 +90,15 @@ class ConversationMessageORM(Base):
     structured_content: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_conv_messages_conv_created_id",
+            "conversation_id",
+            text("created_at DESC"),
+            text("id DESC"),
+        ),
     )
 
     # Relationships

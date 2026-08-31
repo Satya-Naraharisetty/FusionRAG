@@ -104,7 +104,7 @@ async def test_end_to_end_ingestion_cutover_and_retrieval(pg_session: AsyncSessi
         # 1. Insert User and immutable ProcessingConfigVersion
         await pg_session.execute(
             text(
-                "INSERT INTO users (id, email, hashed_password, role, is_active) VALUES (:id, :email, 'hash', 'user', true)"
+                "INSERT INTO users (id, email, hashed_password, role, is_active, is_verified) VALUES (:id, :email, 'hash', 'user', true, true)"
             ),
             {"id": user_id, "email": f"e2e_{user_id}@test.com"},
         )

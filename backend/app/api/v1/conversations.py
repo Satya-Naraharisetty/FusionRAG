@@ -22,6 +22,7 @@ from app.chat.domain.models import (
     ConversationState,
 )
 from app.chat.services.conversation_manager import ConversationManager
+from app.core.pagination import InvalidCursorException
 from app.documents.services.document_service import DocumentService
 
 router = APIRouter(tags=["Conversations"])
@@ -37,15 +38,25 @@ class ConversationPatchRequest(BaseModel):
 
 
 class ConversationsListResponse(BaseModel):
-    conversations: list[Conversation]
+    items: list[Conversation] = Field(default_factory=list)
+    conversations: list[Conversation] = Field(default_factory=list)
     limit: int
-    offset: int
+    next_cursor: str | None = None
+    prev_cursor: str | None = None
+    has_next_page: bool = False
+    has_prev_page: bool = False
+    has_more: bool = False
 
 
 class MessagesListResponse(BaseModel):
-    messages: list[ConversationMessage]
+    items: list[ConversationMessage] = Field(default_factory=list)
+    messages: list[ConversationMessage] = Field(default_factory=list)
     limit: int
-    offset: int
+    next_cursor: str | None = None
+    prev_cursor: str | None = None
+    has_next_page: bool = False
+    has_prev_page: bool = False
+    has_more: bool = False
 
 
 class DeleteMessagesResponse(BaseModel):
@@ -57,22 +68,43 @@ class DeleteMessagesResponse(BaseModel):
 )
 async def list_conversations(
     limit: int = Query(default=20, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
+    cursor: str | None = Query(default=None, description="Signed opaque keyset cursor"),
+    offset: int | None = Query(
+        default=None,
+        description="Deprecated legacy offset - explicitly rejected",
+        include_in_schema=False,
+    ),
     user_context: dict[str, Any] = Depends(get_current_user_context),
     manager: ConversationManager = Depends(get_conversation_manager),
 ) -> ConversationsListResponse:
     """
-    List all active conversations for the authenticated user, ordered by last activity.
+    List all active conversations for the authenticated user with canonical keyset pagination.
     """
+    if offset is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Legacy offset pagination is not supported. Use keyset cursor pagination.",
+        )
     user_id = UUID(user_context["user_id"])
-    conversations = await manager.list_conversations(
-        user_id=user_id, limit=limit, offset=offset
-    )
-    return ConversationsListResponse(
-        conversations=conversations,
-        limit=limit,
-        offset=offset,
-    )
+    try:
+        page = await manager.list_conversations(
+            user_id=user_id, limit=limit, cursor=cursor
+        )
+        return ConversationsListResponse(
+            items=page.items,
+            conversations=page.items,
+            limit=page.limit,
+            next_cursor=page.next_cursor,
+            prev_cursor=page.prev_cursor,
+            has_next_page=page.has_next_page,
+            has_prev_page=page.has_prev_page,
+            has_more=page.has_more,
+        )
+    except InvalidCursorException as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
 
 
 @router.get("/{id}", response_model=Conversation, status_code=status.HTTP_200_OK)
@@ -164,22 +196,45 @@ async def delete_conversation(
 async def list_messages(
     id: UUID,
     limit: int = Query(default=50, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
+    cursor: str | None = Query(default=None, description="Signed opaque keyset cursor"),
+    offset: int | None = Query(
+        default=None,
+        description="Deprecated legacy offset - explicitly rejected",
+        include_in_schema=False,
+    ),
     user_context: dict[str, Any] = Depends(get_current_user_context),
     manager: ConversationManager = Depends(get_conversation_manager),
 ) -> MessagesListResponse:
     """
-    Get paginated message history for a conversation.
+    Get paginated message history for a conversation with canonical keyset pagination.
     """
+    if offset is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Legacy offset pagination is not supported. Use keyset cursor pagination.",
+        )
     user_id = UUID(user_context["user_id"])
     try:
-        messages = await manager.list_messages(
-            conversation_id=id, user_id=user_id, limit=limit, offset=offset
+        page = await manager.list_messages(
+            conversation_id=id,
+            user_id=user_id,
+            limit=limit,
+            cursor=cursor,
         )
         return MessagesListResponse(
-            messages=messages,
-            limit=limit,
-            offset=offset,
+            items=page.items,
+            messages=page.items,
+            limit=page.limit,
+            next_cursor=page.next_cursor,
+            prev_cursor=page.prev_cursor,
+            has_next_page=page.has_next_page,
+            has_prev_page=page.has_prev_page,
+            has_more=page.has_more,
+        )
+    except InvalidCursorException as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
         )
     except ConversationNotFoundException as e:
         raise HTTPException(

@@ -97,7 +97,11 @@ const handlers = [
         },
       ],
       limit: 20,
-      offset: 0,
+      next_cursor: null,
+      prev_cursor: null,
+      has_next_page: false,
+      has_prev_page: false,
+      has_more: false,
     });
   }),
 
@@ -122,7 +126,11 @@ const handlers = [
         },
       ],
       limit: 50,
-      offset: 0,
+      next_cursor: null,
+      prev_cursor: null,
+      has_next_page: false,
+      has_prev_page: false,
+      has_more: false,
     });
   }),
 

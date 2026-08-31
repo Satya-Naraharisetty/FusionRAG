@@ -355,3 +355,142 @@ def test_heuristic_planner_uses_context_resolution():
         web_task.parameters["query"]
         == "Backend GenAI Engineer salary market estimate India 2026"
     )
+
+
+@pytest.mark.asyncio
+async def test_scenario_a_continuation_with_active_state_on_llm_failure():
+    # LLM throws exception to force fallback
+    from unittest.mock import AsyncMock
+
+    mock_llm = AsyncMock()
+    mock_llm.generate.side_effect = RuntimeError("LLM rate limit / timeout")
+    rewriter = LLMHistoryRewriter(
+        mock_llm, "gemini-3.5-flash-lite", InMemoryRewriteCache()
+    )
+
+    state = ConversationTopicState(
+        active_role="Senior AI Engineer",
+        active_location="India",
+        active_intent="COMPENSATION_QUERY",
+        active_entities=["FastAPI", "PyTorch"],
+    )
+
+    history = [
+        ConversationMessage(
+            id=uuid4(),
+            conversation_id=uuid4(),
+            role=MessageRole.USER,
+            content="Can you evaluate my profile for Senior AI Engineer?",
+            created_at=datetime.now(UTC),
+        )
+    ]
+
+    result = await rewriter.rewrite(
+        question="what is the expected compensation for this?",
+        history=history,
+        current_state=state,
+    )
+
+    assert result.context_action == ContextAction.CONTINUE
+    assert "Senior AI Engineer" in result.rewritten_query
+    assert "in India" in result.rewritten_query
+    assert result.source_mode == SourceMode.HYBRID
+    assert result.domain_context.primary == "TECH_CAREER"
+    assert result.retrieval_queries.web_query is not None
+
+
+@pytest.mark.asyncio
+async def test_scenario_b_topic_switch_isolation_on_llm_failure():
+    from unittest.mock import AsyncMock
+
+    mock_llm = AsyncMock()
+    mock_llm.generate.side_effect = RuntimeError("LLM service unavailable")
+    rewriter = LLMHistoryRewriter(
+        mock_llm, "gemini-3.5-flash-lite", InMemoryRewriteCache()
+    )
+
+    state = ConversationTopicState(
+        active_role="Senior AI Engineer",
+        active_location="India",
+        active_intent="COMPENSATION_QUERY",
+    )
+
+    history = [
+        ConversationMessage(
+            id=uuid4(),
+            conversation_id=uuid4(),
+            role=MessageRole.USER,
+            content="Can you evaluate my profile for Senior AI Engineer?",
+            created_at=datetime.now(UTC),
+        )
+    ]
+
+    result = await rewriter.rewrite(
+        question="What is the capital of Japan?",
+        history=history,
+        current_state=state,
+    )
+
+    # Clean isolation from prior AI engineer / compensation context
+    assert result.context_action == ContextAction.STANDALONE
+    assert result.rewritten_query == "What is the capital of Japan?"
+    assert result.source_mode == SourceMode.DOCUMENT_ONLY
+    assert "Senior AI Engineer" not in result.rewritten_query
+    assert result.topic_state.active_role is None
+
+
+@pytest.mark.asyncio
+async def test_scenario_c_calculation_fallback_with_known_values():
+    from unittest.mock import AsyncMock
+
+    from app.chat.domain.models import KnownValue
+
+    mock_llm = AsyncMock()
+    mock_llm.generate.side_effect = RuntimeError("LLM failure")
+    rewriter = LLMHistoryRewriter(
+        mock_llm, "gemini-3.5-flash-lite", InMemoryRewriteCache()
+    )
+
+    state = ConversationTopicState(
+        active_role="Staff Engineer",
+        known_values={
+            "base_salary": KnownValue(value=150000, currency="USD"),
+        },
+    )
+
+    result = await rewriter.rewrite(
+        question="Calculate a 20% bonus on that",
+        history=[],
+        current_state=state,
+    )
+
+    assert result.source_mode == SourceMode.CALCULATION_ONLY
+    assert result.intent == "CALCULATION"
+    assert result.domain_context.primary == "CALCULATION"
+
+
+@pytest.mark.asyncio
+async def test_scenario_d_low_confidence_fallback_routing():
+    # LLM returns confidence 0.40 (< 0.60 threshold)
+    low_conf_payload = {
+        "context_action": "CONTINUE",
+        "contextualized_query": "Some query",
+        "confidence": 0.40,
+        "reasoning": "Uncertain resolution",
+    }
+    llm = MockJSONLLMProvider(low_conf_payload)
+    rewriter = LLMHistoryRewriter(llm, "gemini-3.5-flash-lite", InMemoryRewriteCache())
+
+    state = ConversationTopicState(
+        active_role="Data Scientist",
+    )
+
+    result = await rewriter.rewrite(
+        question="what about the salary for this role?",
+        history=[],
+        current_state=state,
+    )
+
+    assert result.context_action == ContextAction.CONTINUE
+    assert "Data Scientist" in result.rewritten_query
+    assert "below threshold" in result.rewrite_reason

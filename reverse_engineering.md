@@ -287,7 +287,7 @@ FusionRAG/                           # Repository root
     pyproject.toml                   # Python dependencies and build metadata
     requirements.txt                 # Pinned production dependencies
     alembic.ini                      # Database migration configuration
-    alembic/versions/                # 14 versioned migration scripts
+    alembic/versions/                # 15 versioned migration scripts (including keyset pagination composite indexes)
     scripts/                         # 12 Operational scripts (backup, restore, eval, benchmark, openapi, etc.)
     .env.example                     # Environment template with all 150+ variables
 
@@ -302,6 +302,7 @@ FusionRAG/                           # Repository root
       documents/                     # Ingestion, extractors, chunking, embeddings, hybrid retrieval, graph
       core/
         config.py                    # 150+ Pydantic settings
+        pagination.py                # Cryptographic CursorSigner, CursorPage[T], CursorDirection, HMAC-SHA256 tokens
         startup.py                   # Lifespan startup hooks (admin seeding, unverified cleanup, 2PC recovery)
         prompts/                     # System prompt templates (system_prompt.txt)
         cost/                        # YAMLPricingProvider, token cost calculator & pricing.yaml
@@ -859,13 +860,30 @@ Located in `backend/app/chat/services/`:
 
 ---
 
-## 28. Multi-Agent & Chat Operational Subsystems: Access Control, Memory & LLM Failover
+## 28. Multi-Agent & Chat Operational Subsystems: Keyset Pagination, Memory & LLM Failover
 
+- **Cryptographic Keyset / Cursor-Based Pagination (`app/core/pagination.py`)**:
+  - Replaces fragile, high-latency `OFFSET / LIMIT` pagination with tamper-evident HMAC-SHA256 signed opaque cursor tokens (`CursorSigner`).
+  - **Wire Token Format**: `base64url(canonical_json) + "." + base64url(hmac_sha256(canonical_json, CURSOR_SIGNING_KEY))`.
+  - **Payload Structure (`CursorPayload`)**: Encodes `{ v: 1, ts: "<ISO-8601 UTC>", id: "<UUID>", dir: "next"|"prev", res: "conv"|"msg", ctx: "<user_id|conv_id>", iat: <int>, exp: <int> }` with TTL validation (`CURSOR_TTL_SECONDS=604800` / 7 days).
+  - **Bidirectional Row-Value Tuple Comparisons**:
+    - Descending / Next: `tuple_(created_at, id) < tuple_(literal(cursor_ts), literal(cursor_id))` with `ORDER BY created_at DESC, id DESC LIMIT :limit + 1`.
+    - Ascending / Prev: `tuple_(created_at, id) > tuple_(literal(cursor_ts), literal(cursor_id))` with `ORDER BY created_at ASC, id ASC LIMIT :limit + 1` (results re-reversed in memory).
+  - **Envelope Model (`CursorPage[T]`)**: Standardized pagination envelope exposing `items: list[T]`, `limit: int`, `next_cursor: str | None`, `prev_cursor: str | None`, `has_next_page: bool`, `has_prev_page: bool`, `has_more: bool`.
+- **`TokenEstimator` (`token_estimator.py`)**:
+  - Pre-flight prompt assembly validation and multi-modal token budgeting prior to LLM dispatch.
+  - Calculates accurate token bounds across:
+    - Text: Character-to-BPE approximation with special framing tokens (`<|im_start|>`, `<|im_end|>`).
+    - Tool Definitions: Gemini Function Declaration JSON schema serialization footprint.
+    - Citations: Formatted XML/Markdown bracket markers and source metadata overhead.
+    - Vision Images: Multi-tile bounding box formula ($N = \lceil \text{width}/512 \rceil \times \lceil \text{height}/512 \rceil \times 258$ tokens).
+- **`HistoryRewriter` (`history_rewriter.py`)**:
+  - Coreference and pronoun resolution engine transforming conversational follow-up questions (e.g., *"What were its total assets in 2024?"*) into self-contained standalone search queries prior to hybrid retrieval.
+  - Leverages rolling conversation summaries and recent message turns to resolve ambiguous entity mentions without polluting vector search queries.
 - **`ProviderFailoverProxy` (`app/chat/infrastructure/failover_proxy.py`)**: Subclasses `LLMProviderRouter` with circuit breaker integration. Intercepts `429 Too Many Requests` or `5xx Server Error` on primary `GEMINI_API_KEY` and transparently fails over to `GEMINI_FALLBACK_API_KEY` without breaking active client streams.
 - **`ConversationAccessService` (`access_service.py`)**: Centralized ownership & authorization verification protecting conversations and scoped document attachments.
 - **`ConversationSummarizer` & `RollingMemoryManager` (`conversation_summarizer.py`, `rolling_memory.py`)**: Triggered when active conversation length exceeds `SUMMARY_TRIGGER_MESSAGES=20`, producing incremental records in `conversation_summaries`.
 - **Message Branching & Edit Truncation (`delete_messages_from`)**: ChatGPT-style message editing where deleting or modifying a message cascades and deletes all subsequent replies.
-- **`TokenEstimator` (`token_estimator.py`)**: Context overflow prevention before external LLM calls.
 - **`AnswerGenerationService` (`answer_generation_service.py`)**: Non-streaming answer generator with citation grounding.
 - **Multi-Agent Health Diagnostics (`health_diagnostics.py`)**: Monitors background specialist health and marks degraded agents for automatic bypass.
 - **Automated Title Generation (`title_generator.py`)**: Non-blocking background extraction and LLM summarization for conversation titles.
@@ -1025,6 +1043,9 @@ Persistence / Repo Class     File Location                                      
 - `last_message_at` (TIMESTAMPTZ, default `now()`, Indexed)
 - `created_at` (TIMESTAMPTZ, default `now()`)
 - `updated_at` (TIMESTAMPTZ, default `now()`, Indexed)
+- **Indexes**:
+  - `idx_conversations_user_created_id` ON `(user_id, created_at DESC, id DESC)` — Composite index for $O(1)$ keyset cursor pagination.
+  - `ix_conversations_user_id`, `ix_conversations_state`, `ix_conversations_last_message_at`, `ix_conversations_updated_at`.
 
 ### 32.2 `conversation_messages` Table
 - `id` (UUID, Primary Key)
@@ -1040,6 +1061,9 @@ Persistence / Repo Class     File Location                                      
 - `prompt_tokens` (INTEGER, default `0`)
 - `completion_tokens` (INTEGER, default `0`)
 - `created_at` (TIMESTAMPTZ, default `now()`, Indexed)
+- **Indexes**:
+  - `idx_messages_conv_created_id` ON `(conversation_id, created_at DESC, id DESC)` — Composite index for keyset cursor pagination.
+  - `ix_conversation_messages_conversation_id`, `ix_conversation_messages_created_at`.
 
 ### 32.3 `conversation_summaries` Table
 - `id` (UUID, Primary Key)
@@ -1530,7 +1554,7 @@ Located in `frontend/src/workers/pyodide.worker.ts` and `frontend/src/lib/pyodid
 
 ### 53.2 Complete Custom Hook Inventory
 - `useAuth.ts`: Authentication actions, login/logout, and user profile state.
-- `useConversations.ts`: Thread creation, pagination, pinning, and deletion.
+- `useConversations.ts`: Thread creation, keyset cursor pagination (`next_cursor`, `prev_cursor`, `has_more`), pinning, and deletion.
 - `useDocuments.ts`: Document library querying, filtering, and deletion.
 - `useSSEChat.ts`: Streaming SSE consumption and citation tagging.
 - `useDrafts.ts`: Message draft persistence across conversation switching via browser `localStorage`.
@@ -1538,7 +1562,7 @@ Located in `frontend/src/workers/pyodide.worker.ts` and `frontend/src/lib/pyodid
 - `useKeyboardShortcuts.ts`: Global keyboard hotkeys (`Cmd/Ctrl+K`, `Cmd/Ctrl+/`).
 - `useFileValidation.ts`: Client-side magic bytes, MIME, and size validation before network dispatch.
 - `useOnlineStatus.ts`: Browser navigator online/offline listener.
-- `useMessages.ts`: Message state and branch deletion rollback handlers.
+- `useMessages.ts`: Message state with bidirectional cursor pagination (`next_cursor`, `prev_cursor`), streaming tokens assembly, and branch deletion rollback handlers.
 - `useEmbeddingStatus.ts`: Polling vector indexing completion status.
 - `useRecentAttachments.ts`: Recent upload attachments management for fast query reuse.
 - `useSidebarState.ts`: Collapsible sidebar layout state and mobile drawer sync.
@@ -1608,6 +1632,7 @@ stateDiagram-v2
 ## 57. Exhaustive Route Specifications Across All 10 Routers & Root App
 
 ### 57.1 Core Pydantic DTO Schema Definitions
+- **`CursorPage[T]`**: `{ items: list[T], limit: int, next_cursor: str | None, prev_cursor: str | None, has_next_page: bool, has_prev_page: bool, has_more: bool }`
 - **`VerifyEmailSchema`**: `{ email: str, token: str | None, otp: str | None }`
 - **`ResendVerificationSchema`**: `{ email: str }`
 - **`MagicLinkRequestSchema`**: `{ email: str }`
@@ -1656,11 +1681,11 @@ POST         /api/v1/chat                                       Yes            S
 POST         /api/v1/search                                     Yes            Unified hybrid retrieval (Dense + Sparse + RRF + MMR)
 
 5. Conversations Router (app/api/v1/conversations.py)
-GET          /api/v1/conversations                              Yes            List user conversations with pagination (skip, limit)
+GET          /api/v1/conversations                              Yes            List user conversations with keyset pagination (?cursor=, ?limit=50) -> CursorPage
 GET          /api/v1/conversations/{id}                         Yes            Get conversation details and active document filters
 PATCH        /api/v1/conversations/{id}                         Yes            Update title, pinned status, or folder metadata
 DELETE       /api/v1/conversations/{id}                         Yes            Delete conversation and schedule cleanup
-GET          /api/v1/conversations/{id}/messages                Yes            Paginated conversation messages (before_id, limit)
+GET          /api/v1/conversations/{id}/messages                Yes            Paginated messages with keyset pagination (?cursor=, ?limit=50) -> CursorPage
 DELETE       /api/v1/conversations/{id}/messages/{message_id}   Yes            Message rollback/branching deletion
 POST         /api/v1/conversations/{conversation_id}/documents  Yes            Upload document scoped directly to conversation
 GET          /api/v1/conversations/{conversation_id}/documents  Yes            List documents scoped to conversation
@@ -2120,6 +2145,8 @@ LOGIN_RATE_LIMIT_WINDOW_SECONDS  300                                 Lockout win
 ACCOUNT_DELETE_RATE_LIMIT_PER_MINUTE 10                              Rate limit on account deletion endpoint
 UNVERIFIED_USER_CLEANUP_DAYS     7                                   Days before purging unverified user records
 MAGIC_LINK_EXPIRE_MINUTES        10                                  Expiry window for passwordless magic links
+CURSOR_SIGNING_KEY                 ""                                  HMAC-SHA256 signing secret for keyset pagination tokens
+CURSOR_TTL_SECONDS                 604800                              7 days TTL for opaque pagination cursor tokens
 ADMIN_EMAIL                      ""                                  Auto-seeded administrator email
 ADMIN_PASSWORD                   ""                                  Auto-seeded administrator password
 OAUTH_REDIRECT_BASE_URL          ""                                  Base redirect URI for OAuth callbacks

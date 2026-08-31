@@ -26,6 +26,7 @@ from app.chat.domain.models import (
     MessageStatus,
 )
 from app.chat.services.access_service import ConversationAccessService
+from app.core.pagination import CursorPage
 from app.documents.domain.events import EventDispatcher
 from app.documents.services.document_service import DocumentService
 
@@ -269,13 +270,16 @@ class ConversationManager:
         )
 
     async def list_conversations(
-        self, user_id: UUID, limit: int, offset: int
-    ) -> list[Conversation]:
+        self,
+        user_id: UUID,
+        limit: int = 20,
+        cursor: str | None = None,
+    ) -> CursorPage[Conversation]:
         """
-        List all active conversations for the authenticated user, ordered by last activity.
+        List all active conversations for the authenticated user with canonical keyset pagination.
         """
         return await self._conversation_repo.list_conversations(
-            user_id=user_id, limit=limit, offset=offset
+            user_id=user_id, limit=limit, cursor=cursor
         )
 
     async def get_conversation(
@@ -321,14 +325,20 @@ class ConversationManager:
         return updated
 
     async def list_messages(
-        self, conversation_id: UUID, user_id: UUID, limit: int, offset: int
-    ) -> list[ConversationMessage]:
+        self,
+        conversation_id: UUID,
+        user_id: UUID,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> CursorPage[ConversationMessage]:
         """
-        Retrieve message history for a conversation, verifying ownership.
+        Retrieve message history for a conversation with canonical keyset pagination, verifying ownership.
         """
         await self._access_service.verify_owner(conversation_id, user_id)
-        return await self._message_repo.get_recent_messages(
-            conversation_id=conversation_id, limit=limit, offset=offset
+        return await self._message_repo.list_messages(
+            conversation_id=conversation_id,
+            limit=limit,
+            cursor=cursor,
         )
 
     async def delete_messages_from(

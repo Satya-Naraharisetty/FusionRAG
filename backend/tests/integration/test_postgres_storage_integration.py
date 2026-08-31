@@ -60,13 +60,13 @@ async def test_live_postgres_composite_fk_enforcement(pg_session: AsyncSession):
     try:
         await pg_session.execute(
             text(
-                "INSERT INTO users (id, email, hashed_password, role, is_active) VALUES (:id, :email, 'hash', 'user', true)"
+                "INSERT INTO users (id, email, hashed_password, role, is_active, is_verified) VALUES (:id, :email, 'hash', 'user', true, true)"
             ),
             {"id": user_a, "email": f"user_a_{user_a}@test.com"},
         )
         await pg_session.execute(
             text(
-                "INSERT INTO users (id, email, hashed_password, role, is_active) VALUES (:id, :email, 'hash', 'user', true)"
+                "INSERT INTO users (id, email, hashed_password, role, is_active, is_verified) VALUES (:id, :email, 'hash', 'user', true, true)"
             ),
             {"id": user_b, "email": f"user_b_{user_b}@test.com"},
         )
@@ -124,7 +124,7 @@ async def test_live_postgres_check_constraints(pg_session: AsyncSession):
     try:
         await pg_session.execute(
             text(
-                "INSERT INTO users (id, email, hashed_password, role, is_active) VALUES (:id, :email, 'hash', 'user', true)"
+                "INSERT INTO users (id, email, hashed_password, role, is_active, is_verified) VALUES (:id, :email, 'hash', 'user', true, true)"
             ),
             {"id": user_id, "email": f"user_{user_id}@test.com"},
         )
@@ -174,7 +174,7 @@ async def test_live_postgres_partial_unique_index_active_run(pg_session: AsyncSe
     try:
         await pg_session.execute(
             text(
-                "INSERT INTO users (id, email, hashed_password, role, is_active) VALUES (:id, :email, 'hash', 'user', true)"
+                "INSERT INTO users (id, email, hashed_password, role, is_active, is_verified) VALUES (:id, :email, 'hash', 'user', true, true)"
             ),
             {"id": user_id, "email": f"user_{user_id}@test.com"},
         )
@@ -232,7 +232,7 @@ async def test_live_postgres_gin_search_and_version_isolation(pg_session: AsyncS
     try:
         await pg_session.execute(
             text(
-                "INSERT INTO users (id, email, hashed_password, role, is_active) VALUES (:id, :email, 'hash', 'user', true)"
+                "INSERT INTO users (id, email, hashed_password, role, is_active, is_verified) VALUES (:id, :email, 'hash', 'user', true, true)"
             ),
             {"id": user_id, "email": f"user_{user_id}@test.com"},
         )
