@@ -33,9 +33,26 @@ export const MessageList: React.FC<MessageListProps> = ({
   const isUserScrolling = useRef(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout>();
 
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => MESSAGE_HEIGHT_ESTIMATE,
+    overscan: OVERSAM,
+  });
+
   const scrollToBottom = useCallback((smooth = true) => {
+    if (messages.length > 0) {
+      try {
+        virtualizer.scrollToIndex(messages.length - 1, {
+          align: "end",
+          behavior: smooth ? "smooth" : "auto",
+        });
+      } catch {
+        // Fallback to scrollIntoView
+      }
+    }
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
-  }, []);
+  }, [messages.length, virtualizer]);
 
   const handleScroll = useCallback(() => {
     const container = parentRef.current;
@@ -72,22 +89,16 @@ export const MessageList: React.FC<MessageListProps> = ({
     isUserScrolling.current = true;
   }, []);
 
+  // When a new message is added or while streaming, keep view scrolled to latest
   useEffect(() => {
-    if (isStreaming && !isUserScrolling.current) {
-      scrollToBottom();
+    if (!isUserScrolling.current) {
+      scrollToBottom(true);
     }
-  }, [messages, isStreaming, scrollToBottom]);
+  }, [messages.length, isStreaming, scrollToBottom]);
 
   useEffect(() => {
     scrollToBottom(false);
   }, [scrollToBottom]);
-
-  const virtualizer = useVirtualizer({
-    count: messages.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => MESSAGE_HEIGHT_ESTIMATE,
-    overscan: OVERSAM,
-  });
 
   const virtualItems = virtualizer.getVirtualItems();
 

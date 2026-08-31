@@ -281,16 +281,21 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
             >
               {answer ? (
                 <MarkdownRenderer content={answer} />
-              ) : message.status === "pending" ? (
+              ) : message.status === "pending" || (message.status === "streaming" && !answer) ? (
                 /* Typing indicator */
-                <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-xs py-2">
-                  {[0, 150, 300].map((delay) => (
-                    <span
-                      key={delay}
-                      className="h-1.5 w-1.5 rounded-full bg-[var(--text-muted)] animate-bounce"
-                      style={{ animationDelay: `${delay}ms` }}
-                    />
-                  ))}
+                <div className="flex items-center gap-2 text-[var(--text-muted)] text-xs py-2 animate-fade-in">
+                  <div className="flex items-center gap-1.5">
+                    {[0, 150, 300].map((delay) => (
+                      <span
+                        key={delay}
+                        className="h-1.5 w-1.5 rounded-full bg-[var(--accent-primary)] animate-bounce"
+                        style={{ animationDelay: `${delay}ms` }}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-[12px] font-mono text-[var(--text-secondary)] opacity-90 pl-1">
+                    Analyzing documents and generating response...
+                  </span>
                 </div>
               ) : message.status === "failed" && message.error ? (
                 /* Error state */
