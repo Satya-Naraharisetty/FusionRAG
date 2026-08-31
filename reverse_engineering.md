@@ -22,7 +22,7 @@ This document is the **definitive, exhaustive technical specification, data flow
 * Dual Orchestration:   1. Lightweight Adaptive RAG (app/rag/orchestration/) for single-turn intent routing
                         2. Full Multi-Agent DAG (app/chat/services/multi_agent/) for complex wave reasoning
 * Observability:        OpenTelemetry SDK + Jaeger (OTLP gRPC) + Prometheus + Grafana + PII Sanitizer
-* Evaluation Engine:    Ragas + DeepEval + 6 Evaluator Services + 33 Registered Metrics + Dual-Gate CI/CD
+* Evaluation Engine:    Ragas + DeepEval + 6 Evaluator Services + 4 Runners + 33 Registered Metrics Suite
 * Frontend Architecture:React 18 + Vite 5 + TypeScript + Vanilla CSS Tokens + Pyodide WebAssembly (WASM)
 * Security & Crypto:    Envelope Encryption (AES-256-GCM + DEK/KEK), ClamAV Antivirus, AST Sandboxing
 * Reliability:          Bulkheads, Circuit Breakers, Exponential Full-Jitter Retries, Outbox Pattern
@@ -81,13 +81,13 @@ This document is the **definitive, exhaustive technical specification, data flow
   - [40. Reliability Framework: Bulkheads, Circuit Breakers, Exponential Jitter Retries & Timeouts](#40-reliability-framework-bulkheads-circuit-breakers-exponential-jitter-retries--timeouts)
   - [41. Transactional Outbox Pattern, Event Bus & JobDispatcher Engine](#41-transactional-outbox-pattern-event-bus--jobdispatcher-engine)
   - [42. Storage Provider Abstraction & Two-Phase Durable Cleanup Worker](#42-storage-provider-abstraction--two-phase-durable-cleanup-worker)
-  - [43. Pricing Engine, Request Context, Structured Logging & Resource Quotas](#43-pricing-engine-request-context-structured-logging--resource-quotas)
+  - [43. Transactional Email, Request Idempotency, Pricing Engine & Resource Quotas](#43-transactional-email-request-idempotency-pricing-engine--resource-quotas)
   - [44. Application Lifespan, Startup Hooks & Middleware Cardinality Defense](#44-application-lifespan-startup-hooks--middleware-cardinality-defense)
 - [Part VI: Document Ingestion, Advanced Chunking & Retrieval Intelligence](#part-vi-document-ingestion-advanced-chunking--retrieval-intelligence)
   - [45. Ingestion Worker Lease Protocol, Multi-Phase Pipeline & Durable Reaper](#45-ingestion-worker-lease-protocol-multi-phase-pipeline--durable-reaper)
   - [46. Advanced Chunking Strategies: Recursive, Parent-Child & Sentence-Window](#46-advanced-chunking-strategies-recursive-parent-child--sentence-window)
   - [47. Empty Knowledge Base Index Cache & Weighted RRF Fusion](#47-empty-knowledge-base-index-cache--weighted-rrf-fusion)
-  - [48. Document Parsers, Multimodal OCR & Metadata Extractors](#48-document-parsers-multimodal-ocr--metadata-extractors)
+  - [48. Document Parsers, Multimodal OCR, Tables & Metadata Extractors](#48-document-parsers-multimodal-ocr-tables--metadata-extractors)
   - [49. Query Intelligence: Classification, Decomposition, Expansion & HyDE](#49-query-intelligence-classification-decomposition-expansion--hyde)
   - [50. Ingestion-Time NER, Relationship Extraction & BFS Knowledge Graph Retrieval](#50-ingestion-time-ner-relationship-extraction--bfs-knowledge-graph-retrieval)
   - [51. Adaptive RAG Orchestration State Machine (DIRECT, HYDE, MULTI_HOP, SPECIALIST)](#51-adaptive-rag-orchestration-state-machine-direct-hyde-multi_hop-specialist)
@@ -106,7 +106,7 @@ This document is the **definitive, exhaustive technical specification, data flow
   - [61. Golden Corpora, Benchmark Profiles, Drift Tracking & Report Generators](#61-golden-corpora-benchmark-profiles-drift-tracking--report-generators)
 - [Part X: DevOps, CI/CD Automation, Operational Tooling & Edge Deployment](#part-x-devops-cicd-automation-operational-tooling--edge-deployment)
   - [62. The 4 GitHub Actions Workflows (CI, E2E Playwright, Eval Gate, Nightly Benchmark)](#62-the-4-github-actions-workflows-ci-e2e-playwright-eval-gate-nightly-benchmark)
-  - [63. Operational CLI Scripts, Backup/Restore & Smoke Testing](#63-operational-cli-scripts-backuprestore--smoke-testing)
+  - [63. Operational CLI Scripts, Backup/Restore, Test Taxonomy & Verification](#63-operational-cli-scripts-backuprestore-test-taxonomy--verification)
   - [64. Docker Compose Topologies, Alembic Lineage, Nginx Reverse Proxy & Runbooks](#64-docker-compose-topologies-alembic-lineage-nginx-reverse-proxy--runbooks)
 - [Part XI: Real-World Engineering Case Studies (DaveAI Production Challenges)](#part-xi-real-world-engineering-case-studies-daveai-production-challenges)
   - [65. Case Study 1: The Asynchronous Streaming Transaction Race Condition (EarlyCommit Fix)](#65-case-study-1-the-asynchronous-streaming-transaction-race-condition-earlycommit-fix)
@@ -300,14 +300,15 @@ FusionRAG/                           # Repository root
         config.py                    # 150+ Pydantic settings
         cost/                        # YAMLPricingProvider, token cost calculator & pricing.yaml
         context/                     # RequestContext dataclass and ContextVar propagation
+        email/                       # ResendEmailService with HTML templates & OTP generators
+        feature_flags/               # Dynamic runtime feature flag engine (flags.py)
         logger.py                    # Structured logging, JSON formatting, PII maskers
-        security/                    # Envelope encryption, ClamAV malware, prompt injection, quotas
+        security/                    # Envelope encryption, ClamAV malware, prompt injection, quotas, idempotency
         reliability/                 # Bulkheads, Circuit Breakers, Exponential Retries, Timeouts
-        cache/                       # L1 Memory + L2 Redis Multi-Tier Cache, Distributed Mutex
+        cache/                       # L1 Memory + L2 Redis Multi-Tier Cache, Repositories Caching, Mutex
         events/                      # Transactional Outbox Dispatcher, Redis Event Bus & PubSub
         queue/                       # Redis Stream Task Queue, JobDispatcher, Handlers & QueueWorker
         telemetry/                   # OpenTelemetry setup, Prometheus metrics, TelemetrySanitizer
-        feature_flags/               # Dynamic runtime feature flag engine
         math/                        # Deterministic MathEngine, FinancialMath, Statistical, LaTeX
       db/                            # Async SQLAlchemy sessionmaker, ORM Base, and 25 Model mappings
       evaluation/                    # 6 Evaluators, 4 Runners, 33 Metrics, Golden Datasets, Regression Gate
@@ -598,9 +599,9 @@ sequenceDiagram
     Note over Worker,DB: Ingestion Phase
     Worker->>Extractor: extract_entities_and_relationships(chunk_text, doc_id)
     Extractor->>Extractor: LLM NER & Triplet Extraction (Subject, Predicate, Object)
-    Extractor->>DB: INSERT INTO graph_entities (name, category, confidence) ON CONFLICT DO UPDATE
-    Extractor->>DB: INSERT INTO graph_relationships (source_id, target_id, relation_type, confidence)
-    Extractor->>DB: INSERT INTO graph_relationship_evidence (relationship_id, chunk_id, source_span)
+    Extractor->>DB: INSERT INTO graph_entities (normalized_name, entity_type, confidence) ON CONFLICT DO UPDATE
+    Extractor->>DB: INSERT INTO graph_relationships (source_id, target_id, normalized_relation_type, weight)
+    Extractor->>DB: INSERT INTO graph_relationship_evidence (relationship_id, source_element_id, source_span)
 
     Note over GraphAgent,Retriever: Query Phase (Multi-Hop Traversal)
     GraphAgent->>Retriever: retrieve_candidates(query="How is Entity A related to Entity C?", scope)
@@ -830,13 +831,13 @@ Located in `backend/app/chat/services/`:
 - **`ToolRegistry` (`tool_registry.py`)**:
   - Case-insensitive tool lookup and alias mapping engine (`register(tool, aliases=['calc', 'math'])`).
 - **7 Core Registered Tools (`app/chat/services/tools/`)**:
-  1. `SafeCalculator`: AST arithmetic evaluator.
-  2. `WebSearchTool`: Live internet search.
-  3. `SemanticSearchTool`: Qdrant dense vector search.
-  4. `ChunkRetrievalTool`: Direct chunk fetch by UUID.
-  5. `DocumentRetrievalTool`: Document metadata fetch.
-  6. `CitationLookupTool`: Source verification.
-  7. `DateTimeTool`: Current UTC/local timestamps.
+  1. `SafeCalculator`: AST arithmetic evaluator (`expression: str`).
+  2. `WebSearchTool`: Live internet search (`query: str, max_results: int = 5`).
+  3. `SemanticSearchTool`: Qdrant dense vector search (`query: str, limit: int = 10`).
+  4. `ChunkRetrievalTool`: Direct chunk fetch by UUID (`chunk_id: UUID`).
+  5. `DocumentRetrievalTool`: Document metadata fetch (`document_id: UUID`).
+  6. `CitationLookupTool`: Source verification (`citation_id: str`).
+  7. `DateTimeTool`: Current UTC/local timestamps (`timezone: str = "UTC"`).
 
 ---
 
@@ -861,6 +862,10 @@ Located in `backend/app/chat/services/`:
 ### 29.1 Composite Foreign Keys, Partial Indexes & SQLite Variants
 - **Composite Tenant Fencing**: Tables (`document_processing_runs`, `document_processing_jobs`, `document_elements`, `graph_relationship_evidence`, `graph_entity_mentions`) enforce composite FKs on `["user_id", "document_id"]` referencing `documents(user_id, id)` with `ON DELETE CASCADE`.
 - **Partial Unique Index**: `CREATE UNIQUE INDEX uq_processing_runs_doc_active ON document_processing_runs(document_id) WHERE state = 'ACTIVE';` ensures a single active pipeline run per document.
+- **Table Constraints**:
+  - `documents`: `uq_documents_user_checksum (user_id, checksum)`, `ck_documents_active_version_nonneg (active_version >= 0)`, `ck_documents_version_ge_active (version >= active_version)`.
+  - `outbox_events`: `uq_outbox_event_idempotency (user_id, document_id, document_version, event_type)`.
+  - `durable_cleanup_jobs`: `uq_cleanup_resource (resource_type, resource_id)`.
 - **Column Alias Mapping**: SQLAlchemy model attribute aliases map directly to raw DB column names:
   - `settings_json` $\rightarrow$ DB column `"settings"`
   - `metadata_json` $\rightarrow$ DB column `"metadata"`
@@ -893,8 +898,8 @@ erDiagram
     processing_config_versions ||--o{ document_processing_runs : "configures (1:N)"
     
     document_chunks ||--|| document_embeddings : "indexed in Qdrant (1:1)"
-    document_chunks ||--o{ graph_relationship_evidence : "evidences (1:N)"
-    document_chunks ||--o{ graph_entity_mentions : "mentions (1:N)"
+    document_elements ||--o{ graph_relationship_evidence : "evidences (1:N)"
+    document_elements ||--o{ graph_entity_mentions : "mentions (1:N)"
     
     graph_entities ||--o{ graph_relationships : "source/target (1:N)"
     graph_relationships ||--o{ graph_relationship_evidence : "supported by (1:N)"
@@ -1084,6 +1089,8 @@ Repository Class            File Location                                       
 ### 33.5 `document_elements` Table
 - `id` (UUID, Primary Key)
 - `document_id` (UUID, Foreign Key $\rightarrow$ `documents.id` ON DELETE CASCADE, Indexed)
+- `user_id` (UUID, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE, Indexed)
+- `document_version` (INTEGER, default `1`)
 - `element_index` (INTEGER)
 - `parent_element_id` (UUID, Nullable)
 - `element_type` (VARCHAR(50)) — `table`, `figure`, `image`, `header`
@@ -1102,14 +1109,21 @@ Repository Class            File Location                                       
 
 ### 33.7 `document_processing_runs` Table
 - `id` (UUID, Primary Key)
+- `user_id` (UUID, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE, Indexed)
 - `document_id` (UUID, Foreign Key $\rightarrow$ `documents.id` ON DELETE CASCADE, Indexed)
-- `config_version_id` (UUID, Foreign Key $\rightarrow$ `processing_config_versions.id`)
-- `status` (VARCHAR(50))
-- `duration_ms` (FLOAT)
+- `document_version` (INTEGER, default `1`)
+- `processing_config_version_id` (UUID, Foreign Key $\rightarrow$ `processing_config_versions.id`)
+- `state` (VARCHAR(50)) — `PENDING`, `ACTIVE`, `COMPLETED`, `FAILED`
+- `validation_gate_passed` (BOOLEAN, default `FALSE`)
+- `completed_at` (TIMESTAMPTZ, Nullable)
+- `superseded_at` (TIMESTAMPTZ, Nullable)
 
 ### 33.8 `document_processing_jobs` Table
 - `id` (UUID, Primary Key)
 - `run_id` (UUID, Foreign Key $\rightarrow$ `document_processing_runs.id` ON DELETE CASCADE, Indexed)
+- `user_id` (UUID, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE, Indexed)
+- `document_id` (UUID, Foreign Key $\rightarrow$ `documents.id` ON DELETE CASCADE, Indexed)
+- `document_version` (INTEGER, default `1`)
 - `job_type` (VARCHAR(50)) — `extraction`, `chunking`, `embedding`, `graph_ner`
 - `idempotency_key` (VARCHAR(255), Unique, Indexed)
 - `lease_token` (VARCHAR(64), Nullable)
@@ -1137,32 +1151,43 @@ Repository Class            File Location                                       
 ### 34.1 `graph_entities` Table
 - `id` (UUID, Primary Key)
 - `name` (VARCHAR(255), Indexed)
-- `category` (VARCHAR(100), Indexed) — `PERSON`, `ORGANIZATION`, `METRIC`, `LOCATION`, `CONCEPT`
+- `normalized_name` (VARCHAR(255), Indexed)
+- `entity_type` (VARCHAR(100), Indexed) — `PERSON`, `ORGANIZATION`, `METRIC`, `LOCATION`, `CONCEPT`
+- `normalized_type` (VARCHAR(100), Indexed)
+- `description` (TEXT, Nullable)
+- `properties` (JSONB, default `'{}'`, ORM alias `properties_json`)
 - `confidence` (FLOAT, default `1.0`)
 - `user_id` (UUID, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE, Indexed)
+- `created_at` (TIMESTAMPTZ, default `now()`)
+- `updated_at` (TIMESTAMPTZ, default `now()`)
 
 ### 34.2 `graph_relationships` Table
 - `id` (UUID, Primary Key)
 - `source_entity_id` (UUID, Foreign Key $\rightarrow$ `graph_entities.id` ON DELETE CASCADE, Indexed)
 - `target_entity_id` (UUID, Foreign Key $\rightarrow$ `graph_entities.id` ON DELETE CASCADE, Indexed)
 - `relation_type` (VARCHAR(100), Indexed) — `OWNS`, `CALCULATES`, `COMPARES`, `PART_OF`
-- `confidence` (FLOAT, default `1.0`)
+- `normalized_relation_type` (VARCHAR(100), Indexed)
+- `weight` (FLOAT, default `1.0`)
 - `user_id` (UUID, Foreign Key $\rightarrow$ `users.id` ON DELETE CASCADE, Indexed)
 
 ### 34.3 `graph_relationship_evidence` Table
 - `id` (UUID, Primary Key)
 - `relationship_id` (UUID, Foreign Key $\rightarrow$ `graph_relationships.id` ON DELETE CASCADE, Indexed)
-- `chunk_id` (UUID, Foreign Key $\rightarrow$ `document_chunks.id` ON DELETE CASCADE, Indexed)
+- `source_element_id` (UUID, Foreign Key $\rightarrow$ `document_elements.id` ON DELETE CASCADE, Indexed)
 - `document_id` (UUID, Foreign Key $\rightarrow$ `documents.id` ON DELETE CASCADE, Indexed)
+- `document_version` (INTEGER, default `1`)
+- `status` (VARCHAR(50), default `'active'`)
 - `source_span` (TEXT)
 - `confidence` (FLOAT, default `1.0`)
 
 ### 34.4 `graph_entity_mentions` Table
 - `id` (UUID, Primary Key)
 - `entity_id` (UUID, Foreign Key $\rightarrow$ `graph_entities.id` ON DELETE CASCADE, Indexed)
-- `chunk_id` (UUID, Foreign Key $\rightarrow$ `document_chunks.id` ON DELETE CASCADE, Indexed)
-- `start_offset` (INTEGER)
-- `end_offset` (INTEGER)
+- `element_id` (UUID, Foreign Key $\rightarrow$ `document_elements.id` ON DELETE CASCADE, Indexed)
+- `document_version` (INTEGER, default `1`)
+- `confidence` (FLOAT, default `1.0`)
+- `status` (VARCHAR(50), default `'active'`)
+- `source_span` (TEXT)
 
 ---
 
@@ -1328,12 +1353,15 @@ Located in `backend/app/documents/services/cleanup_worker.py` and `app/documents
 
 ---
 
-## 43. Pricing Engine, Request Context, Structured Logging & Resource Quotas
+## 43. Transactional Email, Request Idempotency, Pricing Engine & Resource Quotas
 
+- **Transactional Email (`resend_service.py`)**: Integration with Resend REST API with styled HTML templates (`_build_magic_link_html`, `_build_verification_email_html`) and 6-digit OTP delivery.
+- **Distributed Idempotency (`idempotency.py`)**: Redis-backed fingerprinting (`IdempotencyService`) preventing duplicate uploads and redundant LLM executions.
 - **Real-Time Pricing Engine (`pricing_provider.py`, `pricing.yaml`)**: `YAMLPricingProvider` parses model token rates (e.g. `gemini-3.5-flash-lite`: $0.075 / $0.30 per 1M tokens) and calculates USD consumption on every stream completion.
 - **Request Context Propagation (`request_context.py`)**: `RequestContext` dataclass (`user_id`, `role`, `request_id`, `client_ip`) propagated via `contextvars.ContextVar` across async tasks.
 - **Structured Logging (`logger.py`)**: Contextual log filters with JSON/TEXT switch and automatic masking of API keys, Authorization headers, and emails.
 - **Resource Quotas (`quotas.py`)**: Sliding-window tracking of `USER_DAILY_TOKEN_LIMIT` (1M tokens) and `USER_MAX_STORAGE_BYTES` (500MB).
+- **Dynamic Feature Flags (`flags.py`)**: Runtime feature flag engine evaluating environment overrides (`ENABLE_PARENT_CHILD_RAG`, `ENABLE_WEIGHTED_RRF`, `ENABLE_INTENT_GUARDRAILS`).
 
 ---
 
@@ -1384,7 +1412,7 @@ Located in `backend/app/documents/services/chunking.py`:
 
 ---
 
-## 48. Document Parsers, Multimodal OCR & Metadata Extractors
+## 48. Document Parsers, Multimodal OCR, Tables & Metadata Extractors
 
 Located in `backend/app/documents/services/`:
 - **Magic Byte Signatures**:
@@ -1396,6 +1424,10 @@ Located in `backend/app/documents/services/`:
   - `PDFExtractor`: Digital extraction via `pypdf` with automated OCR failover.
   - `DocxExtractor`: Structured heading and table extraction.
   - `ImageVisionExtractor`: Multimodal OCR via Gemini Vision converting screenshots into markdown tables/text.
+- **Specialized Processors**:
+  - `OCRService` (`ocr_service.py`): Gemini Vision multimodal OCR with bounding box coordinates.
+  - `TableProcessor` (`table_processor.py`): Markdown/CSV table parsing and statistical column metrics.
+  - `VisionProcessor` (`vision_processor.py`): Image classification into `FIGURE`, `CHART`, `DIAGRAM`, `TABLE_SNAPSHOT`.
 - **Zero-Downtime Replacement (`PUT /documents/{id}`)**: Increments document `version`, completes background chunking and vector indexing, and atomically swaps `active_version` on completion.
 
 ---
@@ -1461,7 +1493,7 @@ Located in `frontend/src/workers/pyodide.worker.ts` and `frontend/src/lib/pyodid
 - `useConversations.ts`: Thread creation, pagination, pinning, and deletion.
 - `useDocuments.ts`: Document library querying, filtering, and deletion.
 - `useSSEChat.ts`: Streaming SSE consumption and citation tagging.
-- `useDrafts.ts`: Message draft persistence across conversation switching.
+- `useDrafts.ts`: Message draft persistence across conversation switching via `localStorage`.
 - `useLocalConversationMetadata.tsx`: Optimistic titles and unread indicators.
 - `useKeyboardShortcuts.ts`: Global keyboard hotkeys (`Cmd/Ctrl+K`, `Cmd/Ctrl+/`).
 - `useFileValidation.ts`: Client-side magic bytes, MIME, and size validation.
@@ -1517,7 +1549,10 @@ stateDiagram-v2
 - **Axios HTTP Client (`frontend/src/api/client.ts`)**: Global interceptors attaching `X-Request-ID`, bearer tokens, 401 token refresh queue with in-flight buffering, and RFC-7807 problem details parsing.
 - **Code Interpreter Output (`CodeInterpreterOutput.tsx`)**: Displays WASM status, execution duration, terminal stdout/stderr, and renders interactive Matplotlib base64 PNG charts.
 - **Stream Interruption Recovery (`StreamingRecovery.tsx`)**: Buffers tokens during network drops and provides an inline resume action.
-- **Core UI Components**: `ChatInput`, `ChatMessage`, `CitationCard`, `CitationDrawer`, `CodeBlock`, `ToolCallCard`, `StreamingCursor`, `ConversationDocumentChips`, `OnboardingTour`, `CommandPalette`, `MobileDrawer`, `OfflineBanner`, `SidebarFolders`, `ErrorBoundary`, `ErrorPage`, `OfflinePage`, `SEOHead`.
+- **Re-Authentication Modal (`ReauthDialog.tsx`)**: Re-authenticates expired sessions without discarding unsent drafts.
+- **Onboarding Tour (`OnboardingTour.tsx`)**: Interactive onboarding guide for first-time users.
+- **Command Palette (`CommandPalette.tsx`)**: Global `Cmd+K` searchable modal.
+- **Core UI Components**: `ChatInput`, `ChatMessage`, `CitationCard`, `CitationDrawer`, `CodeBlock`, `ToolCallCard`, `StreamingCursor`, `ConversationDocumentChips`, `MobileDrawer`, `OfflineBanner`, `SidebarFolders`, `ErrorBoundary`, `ErrorPage`, `OfflinePage`, `SEOHead`.
 - **Dynamic Chunk Retry (`lazyWithRetry.ts`)**: Automatically retries failed dynamic imports on new deployments.
 
 ---
@@ -1570,24 +1605,28 @@ DELETE       /api/v1/auth/account                               Yes            A
 
 3. Chat & Streaming Router (app/api/v1/chat.py)
 POST         /api/v1/chat/chat                                  Yes            Server-Sent Events (SSE) streaming chat endpoint
+POST         /api/v1/chat/token-estimate                        Yes            Calculate token count & budget before streaming
 
 4. Search Router (app/api/v1/search.py)
 POST         /api/v1/search/search                              Yes            Unified hybrid retrieval (Dense + Sparse + RRF + MMR)
 
 5. Conversations Router (app/api/v1/conversations.py)
-GET          /api/v1/conversations                              Yes            List user conversations with pagination
+GET          /api/v1/conversations                              Yes            List user conversations with pagination (skip, limit)
 GET          /api/v1/conversations/{id}                         Yes            Get conversation details and active document filters
 PATCH        /api/v1/conversations/{id}                         Yes            Update title, pinned status, or folder metadata
 DELETE       /api/v1/conversations/{id}                         Yes            Delete conversation and schedule cleanup
-GET          /api/v1/conversations/{id}/messages                Yes            Paginated conversation message history
+GET          /api/v1/conversations/{id}/messages                Yes            Paginated conversation messages (before_id, limit)
 DELETE       /api/v1/conversations/{id}/messages/{message_id}   Yes            Message rollback/branching deletion
+GET          /api/v1/conversations/{id}/summary                 Yes            Fetch current incremental conversation summary
 POST         /api/v1/conversations/{conversation_id}/documents  Yes            Upload document scoped directly to conversation
 GET          /api/v1/conversations/{conversation_id}/documents  Yes            List documents scoped to conversation
 
 6. Documents Router (app/api/v1/documents.py)
 POST         /api/v1/documents/upload                           Yes            Multipart file upload (PDF/DOCX/TXT/MD/PNG)
-GET          /api/v1/documents                                  Yes            List library/conversation documents with filters
+POST         /api/v1/documents/bulk-delete                      Yes            Batch document deletion with cascade cleanup
+GET          /api/v1/documents                                  Yes            List documents with filters (skip, limit, scope)
 GET          /api/v1/documents/{id}                             Yes            Get document metadata, status, and chunk statistics
+GET          /api/v1/documents/{id}/download                    Yes            Download original encrypted/raw file bytes
 PUT          /api/v1/documents/{id}                             Yes            Replace document with automated version bumping
 DELETE       /api/v1/documents/{id}                             Yes            Delete document and queue cascade cleanup
 POST         /api/v1/documents/{id}/reprocess                   Yes            Trigger re-chunking and re-indexing
@@ -1604,6 +1643,7 @@ GET          /api/v1/evaluation/reports/{run_id}                Admin          G
 8. Observability Router (app/api/v1/observability.py)
 GET          /api/v1/observability/metrics                      Admin          Retrieve aggregated multi-agent & quality metrics
 GET          /api/v1/observability/traces                       Admin          List recent multi-agent execution traces
+GET          /api/v1/observability/agents/health                Admin          Real-time specialist agent circuit breaker status
 
 9. Health & Diagnostics Router (app/api/v1/health.py)
 GET          /api/v1/health/liveness                            No             Kubernetes liveness probe (Process alive)
@@ -1612,11 +1652,14 @@ GET          /api/v1/health/deep                                No             D
 
 10. User Settings Router (app/api/v1/user_settings.py)
 GET          /api/v1/user/settings                              Yes            Get user JSONB settings, folders, and preferences
+PUT          /api/v1/user/settings                              Yes            Full replacement of user settings JSONB
 PATCH        /api/v1/user/settings                              Yes            Update theme, folders, presets, and preferences
 
 11. Admin Router (app/api/v1/admin.py)
 POST         /api/v1/admin/cache/clear                          Admin          Dynamic cache clearing (?namespace=) across 6 pools
 GET          /api/v1/admin/operational-status                   Admin          Real-time system diagnostics and worker status
+GET          /api/v1/admin/queue-status                         Admin          Redis Stream lag, pending tasks, dead letter counts
+GET          /api/v1/admin/stats                                Admin          System-wide storage, active users, token usage
 ========================================================================================================================
 ```
 
@@ -1718,8 +1761,12 @@ Metric Name                     Registry Decorator Key             Category & Te
 
 ## 61. Golden Corpora, Benchmark Profiles, Drift Tracking & Report Generators
 
-- **4 Versioned Golden Datasets (`datasets/golden/`)**: `golden_v1.yaml`, `golden_v2.yaml`, `golden_v3.yaml`, `golden_multi_agent.yaml`.
-- **4 Golden Documents (`datasets/golden/documents/`)**: `api_specifications.md`, `cloud_architecture.md`, `engineering_policies.md`, `financial_report_2025.md`.
+- **4 Versioned Golden Datasets (`datasets/golden/`)**: `golden_v1.yaml`, `golden_v2.yaml`, `golden_v3.yaml`, `golden_multi_agent.yaml` (`sample_id`, `question`, `golden_answer`, `relevant_document_ids`, `expected_tools`, `required_evidence`).
+- **4 Golden Documents (`datasets/golden/documents/`)**:
+  - `api_specifications.md`: API routing, authentication schemas, and parameter validation.
+  - `cloud_architecture.md`: Distributed topologies, caching tiers, and bulkhead patterns.
+  - `engineering_policies.md`: SLA targets, PR review rules, and data retention windows.
+  - `financial_report_2025.md`: Complex multi-year financial statements testing AnalysisAgent math.
 - **4 Benchmark Execution Profiles (`benchmark_profiles.yaml`)**:
   - `quick`: 10 samples for rapid sanity verification.
   - `standard`: 50 samples evaluating standard hybrid RAG.
@@ -1741,9 +1788,9 @@ Located in `.github/workflows/`:
 
 ---
 
-## 63. Operational CLI Scripts, Backup/Restore & Smoke Testing
+## 63. Operational CLI Scripts, Backup/Restore, Test Taxonomy & Verification
 
-Located in `backend/scripts/`:
+### 63.1 Operational CLI Scripts (`backend/scripts/`)
 - `backup_postgres.sh` & `restore_postgres.sh`: Compressed `pg_dump -Fc` database dumps and restore automation.
 - `backup_qdrant.sh` & `restore_qdrant.sh`: Vector snapshot backup via Qdrant REST snapshot API.
 - `benchmark.py`: Synthetic load and retrieval benchmark runner (`--profile`, `--dataset`, `--mock`, `--output-dir`).
@@ -1754,6 +1801,14 @@ Located in `backend/scripts/`:
 - `reset_all_data.py`: Safe data purge and re-seed for PostgreSQL, Redis, and Qdrant collections.
 - `export_openapi.py`: Static `openapi.json` generator without running the web server.
 - `migrate.sh`: Safe Alembic migration wrapper with connectivity verification.
+
+### 63.2 Complete Test Suite Taxonomy
+- **`backend/tests/unit/` (16 Suites)**: AST math sandbox, crypto envelope encryption, token estimators, telemetry sanitizers, and JWT token rotation.
+- **`backend/tests/integration/` (15 Suites)**: Distributed trace propagation, dead-letter queue isolation, outbox publishing, and crash recovery.
+- **`backend/tests/benchmarks/` (2 Suites)**: Agent execution performance and sparse retriever latency.
+- **`backend/tests/evaluation/` (6 JSON Datasets)**: `agent_dataset.json`, `conversation_dataset.json`, `hallucination_dataset.json`, `retrieval_dataset.json`, `simple_rag_dataset.json`, `tool_dataset.json`.
+- **`frontend/src/tests/` (18 Suites)**: Component rendering, custom hooks, and mock SSE stream readers.
+- **`frontend/e2e/` (4 Playwright Suites)**: `login-flow.js`, `account-delete.js`, `verify-two-tier.js`, `redis-fallback.js`.
 
 ---
 
@@ -1784,7 +1839,8 @@ Revision Hash    Migration File Name                                          Sc
 ========================================================================================================================
 ```
 
-### 64.2 Nginx Reverse Proxy & Operational Documentation
+### 64.2 Observability Ports & Edge Configuration
+- **`docker-compose.observability.yml`**: Jaeger OTLP gRPC (4317), HTTP (4318), UI (16686); Prometheus (9090); Grafana (3001).
 - **Nginx Reverse Proxy (`deployment/nginx/nginx.conf`)**: `proxy_buffering off;`, `proxy_cache off;`, `proxy_read_timeout 120s;`.
 - **Grafana Dashboards (`observability/grafana/dashboards/`)**: `http-slo.json`, `llm-provider.json`, `queue-worker.json`, `rag-retrieval.json`.
 - **Operational Guides & Runbooks (`docs/`)**:
