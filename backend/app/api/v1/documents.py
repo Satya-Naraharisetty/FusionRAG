@@ -5,6 +5,8 @@ from fastapi import (
     APIRouter,
     Depends,
     File,
+    HTTPException,
+    Query,
     UploadFile,
     status,
 )
@@ -12,11 +14,18 @@ from pydantic import BaseModel, ConfigDict
 
 from app.api.dependencies import (
     check_rate_limit,
+    get_conversation_manager,
     get_current_user_context,
     get_document_service,
     get_durable_task_queue,
     get_embedding_service,
 )
+from app.chat.domain.exceptions import (
+    ConversationNotFoundException,
+    UnauthorizedConversationAccessException,
+)
+from app.chat.domain.models import ConversationState
+from app.chat.services.conversation_manager import ConversationManager
 from app.core.queue.interfaces import DurableTaskQueue
 from app.documents.domain.models import DocumentScope, EmbeddingStatus
 from app.documents.services.document_service import DocumentService
@@ -60,37 +69,71 @@ class DocumentResponse(BaseModel):
 )
 async def upload_document(
     file: UploadFile = File(...),
+    conversation_id: UUID | None = Query(default=None),
     current_user: dict = Depends(get_current_user_context),
     document_service: DocumentService = Depends(get_document_service),
+    manager: ConversationManager = Depends(get_conversation_manager),
 ):
     """
     Upload a document, validating the formats and enqueuing background parsing & chunking.
-    Always scopes the document to LIBRARY.
+    If conversation_id is provided, scopes the document to CONVERSATION, otherwise LIBRARY.
     """
     user_id = UUID(current_user["user_id"])
+
+    scope = DocumentScope.LIBRARY
+    if conversation_id:
+        try:
+            conv = await manager.get_conversation(conversation_id, user_id)
+            if conv.state in (ConversationState.DELETED, ConversationState.ARCHIVED):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot upload documents to a deleted or archived conversation.",
+                )
+            scope = DocumentScope.CONVERSATION
+        except ConversationNotFoundException as e:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        except UnauthorizedConversationAccessException as e:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
     file_bytes = await file.read()
 
-    # Delegate orchestration to DocumentService with scope=LIBRARY and no conversation
-    document = await document_service.upload_document(
-        original_filename=file.filename or "unnamed",
-        content_type=file.content_type or "application/octet-stream",
-        file_bytes=file_bytes,
-        user_id=user_id,
-        scope=DocumentScope.LIBRARY,
-        conversation_id=None,
-    )
-    return document
+    try:
+        document = await document_service.upload_document(
+            original_filename=file.filename or "unnamed",
+            content_type=file.content_type or "application/octet-stream",
+            file_bytes=file_bytes,
+            user_id=user_id,
+            scope=scope,
+            conversation_id=conversation_id
+            if scope == DocumentScope.CONVERSATION
+            else None,
+        )
+        return document
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.get("", response_model=list[DocumentResponse])
 async def list_documents(
+    conversation_id: UUID | None = Query(default=None),
     current_user: dict = Depends(get_current_user_context),
     document_service: DocumentService = Depends(get_document_service),
+    manager: ConversationManager = Depends(get_conversation_manager),
 ):
     """
-    List uploaded persistent library documents for the currently authenticated user.
+    List uploaded persistent documents for the user (scoped to conversation if conversation_id is provided).
     """
     user_id = UUID(current_user["user_id"])
+    if conversation_id is not None:
+        try:
+            await manager._access_service.verify_owner(conversation_id, user_id)
+        except UnauthorizedConversationAccessException as e:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        except ConversationNotFoundException as e:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        return await document_service.list_documents_by_conversation(
+            conversation_id, user_id
+        )
     return await document_service.list_documents(user_id)
 
 

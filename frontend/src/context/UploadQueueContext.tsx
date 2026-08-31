@@ -7,15 +7,17 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../hooks/useAuth";
 import { useDocuments, useUploadDocument } from "../hooks/useDocuments";
 import { useEmbeddingStatus } from "../hooks/useEmbeddingStatus";
 import { useDocumentStatusMap } from "../hooks/useDocumentStatusMap";
+import { documentsApi } from "../api/documents";
 import {
   STALE_DOC_GRACE_MS,
   VECTORIZATION_FAILED_MESSAGE,
 } from "../lib/uploadStages";
-import { UPLOAD_LIMITS } from "../lib/constants";
+import { QUERY_KEYS, UPLOAD_LIMITS } from "../lib/constants";
 import { type EmbeddingStatus } from "../types";
 import toast from "react-hot-toast";
 
@@ -216,6 +218,7 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
   children,
   completedRowTtlMs = 5000,
 }) => {
+  const queryClient = useQueryClient();
   const uploadMutation = useUploadDocument();
   // Shares the same query/cache as the Documents page and sidebar: refetches
   // every 5s while any document is pending/processing, so rows track the
@@ -624,12 +627,24 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
     }
   }, []);
 
-  const cancelUpload = useCallback((itemId: string) => {
-    const item = queueRef.current.find((q) => q.id === itemId);
-    item?.controller?.abort();
-    if (item) revokePreview(item);
-    setQueue((prev) => prev.filter((q) => q.id !== itemId));
-  }, []);
+  const cancelUpload = useCallback(
+    (itemId: string) => {
+      const item = queueRef.current.find((q) => q.id === itemId);
+      item?.controller?.abort();
+      if (item) revokePreview(item);
+      if (item?.documentId) {
+        void documentsApi.deleteDocument(item.documentId).catch(() => {});
+        queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.DOCUMENTS] });
+        if (item.conversationId) {
+          queryClient.invalidateQueries({
+            queryKey: [QUERY_KEYS.DOCUMENTS, "conversation", item.conversationId],
+          });
+        }
+      }
+      setQueue((prev) => prev.filter((q) => q.id !== itemId));
+    },
+    [queryClient]
+  );
 
   const removeItems = useCallback((itemIds: string[]) => {
     const idSet = new Set(itemIds);

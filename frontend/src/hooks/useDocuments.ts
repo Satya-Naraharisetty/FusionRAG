@@ -144,6 +144,15 @@ export const useDeleteDocument = () => {
         return old.filter((d) => d.id !== id);
       });
 
+      // Optimistically remove from all conversation-scoped queries
+      queryClient.setQueriesData<Document[]>(
+        { queryKey: [QUERY_KEYS.DOCUMENTS, "conversation"] },
+        (old) => {
+          if (!old) return [];
+          return old.filter((d) => d.id !== id);
+        }
+      );
+
       return { previousDocs };
     },
     onError: (_err, _id, context) => {
