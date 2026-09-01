@@ -593,10 +593,15 @@ _last_metrics_timestamp: float = 0.0
 async def metrics_endpoint(request: Request):
     """
     Prometheus scraping endpoint backed by live prometheus-client registry.
-    Protected by sliding-window rate limiting and short in-memory micro-caching to prevent scraping DoS.
+    Protected by optional bearer token auth, sliding-window rate limiting, and short in-memory micro-caching.
     """
-    from app.api.dependencies import check_metrics_rate_limit, get_metrics_rate_limiter
+    from app.api.dependencies import (
+        check_metrics_rate_limit,
+        get_metrics_rate_limiter,
+        verify_metrics_auth,
+    )
 
+    await verify_metrics_auth(request)
     limiter = get_metrics_rate_limiter(request)
     await check_metrics_rate_limit(request, rate_limiter=limiter)
 

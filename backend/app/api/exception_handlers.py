@@ -46,11 +46,16 @@ logger = logging.getLogger(__name__)
 
 
 def format_error_response(
-    code: str, message: str, details: Any = None, status_code: int = 500
+    code: str,
+    message: str,
+    details: Any = None,
+    status_code: int = 500,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     req_id = request_id_ctx.get() or "N/A"
     return JSONResponse(
         status_code=status_code,
+        headers=headers,
         content={
             "error": {
                 "code": code,
@@ -69,7 +74,10 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(_request: Request, exc: StarletteHTTPException):
         return format_error_response(
-            code="HTTP_ERROR", message=exc.detail, status_code=exc.status_code
+            code="HTTP_ERROR",
+            message=exc.detail,
+            status_code=exc.status_code,
+            headers=getattr(exc, "headers", None),
         )
 
     @app.exception_handler(RequestValidationError)

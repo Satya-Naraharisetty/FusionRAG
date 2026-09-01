@@ -207,6 +207,7 @@ class Settings(BaseSettings):
     ENABLE_TELEMETRY: bool = True
     ENABLE_TRACING: bool = True
     ENABLE_PROMETHEUS_METRICS: bool = True
+    METRICS_BEARER_TOKEN: str | None = None
     OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://localhost:4317"
     OTEL_EXPORTER_OTLP_HEADERS: str | None = None
     OTEL_SERVICE_NAME: str = "fusion-rag-backend"

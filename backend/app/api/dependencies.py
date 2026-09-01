@@ -306,6 +306,34 @@ async def check_metrics_rate_limit(
         )
 
 
+async def verify_metrics_auth(request: Request) -> None:
+    """
+    Verifies Bearer token for /metrics if METRICS_BEARER_TOKEN is configured in settings.
+    Uses constant-time comparison to prevent timing side-channel attacks.
+    """
+    token_expected = getattr(settings, "METRICS_BEARER_TOKEN", None)
+    if not token_expected:
+        return
+
+    import secrets
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized: Missing or invalid Bearer token for metrics scraping.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    provided_token = auth_header[7:].strip()
+    if not secrets.compare_digest(provided_token, token_expected.strip()):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized: Invalid Bearer token for metrics scraping.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
 def get_login_failed_attempts_tracker(request: Request) -> Any:
     """
     Tracker for consecutive failed login attempts (5 wrong attempts -> 5-minute lockout).
