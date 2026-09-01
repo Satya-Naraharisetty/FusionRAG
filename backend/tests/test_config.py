@@ -72,12 +72,16 @@ def test_cors_origins_accepts_env_override():
         POSTGRES_DB="test_database",
         REDIS_HOST="localhost",
         QDRANT_HOST="localhost",
-        BACKEND_CORS_ORIGINS="https://a.example.com,https://b.example.com",
+        BACKEND_CORS_ORIGINS="https://a.example.com/,https://b.example.com///",
+        FRONTEND_URL="https://fusionrag.vercel.app///",
+        OAUTH_REDIRECT_BASE_URL="https://fusionrag-yzvt.onrender.com/",
     )
     assert settings.BACKEND_CORS_ORIGINS == [
         "https://a.example.com",
         "https://b.example.com",
     ]
+    assert settings.FRONTEND_URL == "https://fusionrag.vercel.app"
+    assert settings.OAUTH_REDIRECT_BASE_URL == "https://fusionrag-yzvt.onrender.com"
 
 
 def test_supabase_url_parsing_and_pgbouncer_strip():

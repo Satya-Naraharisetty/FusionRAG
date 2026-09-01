@@ -141,12 +141,26 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             if v.startswith("[") and v.endswith("]"):
                 try:
-                    return json.loads(v)
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return [
+                            str(x).strip().rstrip("/")
+                            for x in parsed
+                            if str(x).strip().rstrip("/")
+                        ]
                 except json.JSONDecodeError:
                     pass
-            return [x.strip() for x in v.split(",") if x.strip()]
+            return [
+                x.strip().rstrip("/")
+                for x in v.split(",")
+                if x.strip().rstrip("/")
+            ]
         elif isinstance(v, (list, set, tuple)):
-            return [str(x) for x in v]
+            return [
+                str(x).strip().rstrip("/")
+                for x in v
+                if str(x).strip().rstrip("/")
+            ]
         return ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     @field_validator("COOKIE_DOMAIN", mode="before")
@@ -358,6 +372,13 @@ class Settings(BaseSettings):
     # Base URL of the frontend used to redirect after OAuth success/failure.
     # Local: http://localhost:5173 | Production: https://fusionrag.vercel.app
     FRONTEND_URL: str = "http://localhost:5173"
+
+    @field_validator("FRONTEND_URL", "OAUTH_REDIRECT_BASE_URL", mode="before")
+    @classmethod
+    def normalize_base_urls(cls, v: Any) -> str:
+        if isinstance(v, str):
+            return v.strip().rstrip("/")
+        return v
 
     # Transactional Email (Resend) & Magic Link & Email Verification
     RESEND_API_KEY: str = ""
