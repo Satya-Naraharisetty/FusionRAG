@@ -20,7 +20,14 @@ class DummyLLMProvider(LLMProvider):
     def __init__(self, should_fail: bool = False):
         self.should_fail = should_fail
 
-    async def generate(self, messages, model="gemini-3.5-flash-lite", temperature=0.0, max_tokens=1000, **kwargs):
+    async def generate(
+        self,
+        messages,
+        model="gemini-3.5-flash-lite",
+        temperature=0.0,
+        max_tokens=1000,
+        **kwargs,
+    ):
         if self.should_fail:
             raise RuntimeError("Simulated LLM Provider Timeout/Failure")
         return ProviderResponse(
@@ -28,7 +35,14 @@ class DummyLLMProvider(LLMProvider):
             usage=Usage(prompt_tokens=10, completion_tokens=10, total_tokens=20),
         )
 
-    async def stream(self, messages, model="gemini-3.5-flash-lite", temperature=0.0, max_tokens=1000, **kwargs):
+    async def stream(
+        self,
+        messages,
+        model="gemini-3.5-flash-lite",
+        temperature=0.0,
+        max_tokens=1000,
+        **kwargs,
+    ):
         raise NotImplementedError()
 
 
@@ -63,7 +77,9 @@ async def test_planner_selection_scenario_1_text_factual(master_agent: MasterAge
     plan: ExecutionPlan = await master_agent.create_plan(query, ctx)
 
     agent_types = [t.agent_type for t in plan.tasks]
-    print(f"\n[Scenario 1 Plan Tasks]: {[(t.task_id, t.agent_type.value, t.dependencies) for t in plan.tasks]}")
+    print(
+        f"\n[Scenario 1 Plan Tasks]: {[(t.task_id, t.agent_type.value, t.dependencies) for t in plan.tasks]}"
+    )
 
     assert AgentType.RESEARCH in agent_types or AgentType.DOCUMENT in agent_types
     assert AgentType.TABLE not in agent_types
@@ -92,7 +108,9 @@ async def test_planner_selection_scenario_2_cagr_table_math(master_agent: Master
     plan: ExecutionPlan = await master_agent.create_plan(query, ctx)
 
     agent_types = [t.agent_type for t in plan.tasks]
-    print(f"\n[Scenario 2 Plan Tasks]: {[(t.task_id, t.agent_type.value, t.dependencies) for t in plan.tasks]}")
+    print(
+        f"\n[Scenario 2 Plan Tasks]: {[(t.task_id, t.agent_type.value, t.dependencies) for t in plan.tasks]}"
+    )
 
     assert AgentType.TABLE in agent_types
     assert AgentType.ANALYSIS in agent_types
@@ -123,7 +141,9 @@ async def test_planner_selection_scenario_3_visual_chart(master_agent: MasterAge
     plan: ExecutionPlan = await master_agent.create_plan(query, ctx)
 
     agent_types = [t.agent_type for t in plan.tasks]
-    print(f"\n[Scenario 3 Plan Tasks]: {[(t.task_id, t.agent_type.value, t.dependencies) for t in plan.tasks]}")
+    print(
+        f"\n[Scenario 3 Plan Tasks]: {[(t.task_id, t.agent_type.value, t.dependencies) for t in plan.tasks]}"
+    )
 
     assert AgentType.VISION in agent_types
     assert AgentType.GRAPH not in agent_types
@@ -131,7 +151,9 @@ async def test_planner_selection_scenario_3_visual_chart(master_agent: MasterAge
 
 
 @pytest.mark.asyncio
-async def test_planner_selection_scenario_4_graph_relationship(master_agent: MasterAgent):
+async def test_planner_selection_scenario_4_graph_relationship(
+    master_agent: MasterAgent,
+):
     """
     Scenario 4: Knowledge Graph Relationship
     Query: 'How is Company A related to Company B in my uploaded documents?'
@@ -150,7 +172,9 @@ async def test_planner_selection_scenario_4_graph_relationship(master_agent: Mas
     plan: ExecutionPlan = await master_agent.create_plan(query, ctx)
 
     agent_types = [t.agent_type for t in plan.tasks]
-    print(f"\n[Scenario 4 Plan Tasks]: {[(t.task_id, t.agent_type.value, t.dependencies) for t in plan.tasks]}")
+    print(
+        f"\n[Scenario 4 Plan Tasks]: {[(t.task_id, t.agent_type.value, t.dependencies) for t in plan.tasks]}"
+    )
 
     assert AgentType.GRAPH in agent_types
     assert AgentType.VISION not in agent_types
@@ -158,7 +182,9 @@ async def test_planner_selection_scenario_4_graph_relationship(master_agent: Mas
 
 
 @pytest.mark.asyncio
-async def test_planner_selection_scenario_5_hybrid_doc_web_math(master_agent: MasterAgent):
+async def test_planner_selection_scenario_5_hybrid_doc_web_math(
+    master_agent: MasterAgent,
+):
     """
     Scenario 5: Hybrid Document + Live Web + Calculation
     Query: 'Compare the revenue in my document with online market data and calculate the difference.'
@@ -177,7 +203,9 @@ async def test_planner_selection_scenario_5_hybrid_doc_web_math(master_agent: Ma
     plan: ExecutionPlan = await master_agent.create_plan(query, ctx)
 
     agent_types = [t.agent_type for t in plan.tasks]
-    print(f"\n[Scenario 5 Plan Tasks]: {[(t.task_id, t.agent_type.value, t.dependencies) for t in plan.tasks]}")
+    print(
+        f"\n[Scenario 5 Plan Tasks]: {[(t.task_id, t.agent_type.value, t.dependencies) for t in plan.tasks]}"
+    )
 
     assert AgentType.RESEARCH in agent_types or AgentType.TABLE in agent_types
     assert AgentType.WEB_SEARCH in agent_types
@@ -189,7 +217,9 @@ async def test_planner_selection_scenario_5_hybrid_doc_web_math(master_agent: Ma
 
 
 @pytest.mark.asyncio
-async def test_planner_selection_scenario_6_complex_multi_specialist(master_agent: MasterAgent):
+async def test_planner_selection_scenario_6_complex_multi_specialist(
+    master_agent: MasterAgent,
+):
     """
     Scenario 6: Complex Multi-Specialist Request
     Query: 'Extract the table from my document, calculate the totals, and explain the relationships between entities.'
@@ -208,7 +238,9 @@ async def test_planner_selection_scenario_6_complex_multi_specialist(master_agen
     plan: ExecutionPlan = await master_agent.create_plan(query, ctx)
 
     agent_types = [t.agent_type for t in plan.tasks]
-    print(f"\n[Scenario 6 Plan Tasks]: {[(t.task_id, t.agent_type.value, t.dependencies) for t in plan.tasks]}")
+    print(
+        f"\n[Scenario 6 Plan Tasks]: {[(t.task_id, t.agent_type.value, t.dependencies) for t in plan.tasks]}"
+    )
 
     assert AgentType.TABLE in agent_types
     assert AgentType.ANALYSIS in agent_types
@@ -221,8 +253,16 @@ async def test_llm_planner_json_schema_parsing():
     Tests that when an LLM provider returns a valid multi-agent DAG JSON,
     MasterAgent parses, validates, and constructs the exact multi-agent ExecutionPlan.
     """
+
     class MockLLMPlanProvider(LLMProvider):
-        async def generate(self, messages, model="gemini-3.5-flash-lite", temperature=0.0, max_tokens=1000, **kwargs):
+        async def generate(
+            self,
+            messages,
+            model="gemini-3.5-flash-lite",
+            temperature=0.0,
+            max_tokens=1000,
+            **kwargs,
+        ):
             plan_json = """{
                 "reasoning_summary": "Comprehensive multi-specialist investigation plan",
                 "tasks": [
@@ -261,7 +301,14 @@ async def test_llm_planner_json_schema_parsing():
                 usage=Usage(prompt_tokens=50, completion_tokens=80, total_tokens=130),
             )
 
-        async def stream(self, messages, model="gemini-3.5-flash-lite", temperature=0.0, max_tokens=1000, **kwargs):
+        async def stream(
+            self,
+            messages,
+            model="gemini-3.5-flash-lite",
+            temperature=0.0,
+            max_tokens=1000,
+            **kwargs,
+        ):
             raise NotImplementedError()
 
     engine = AgentExecutionEngine(specialist_agents=[])
@@ -273,7 +320,9 @@ async def test_llm_planner_json_schema_parsing():
     )
 
     ctx = AgentExecutionContext(request_id="llm_plan_test", user_id=uuid4())
-    plan = await master.create_plan("Analyze company financials, ownership, and revenue table", ctx)
+    plan = await master.create_plan(
+        "Analyze company financials, ownership, and revenue table", ctx
+    )
 
     print(f"\n[LLM Generated Plan Tasks ({len(plan.tasks)})]:")
     for t in plan.tasks:
@@ -281,7 +330,12 @@ async def test_llm_planner_json_schema_parsing():
 
     assert len(plan.tasks) == 4
     task_types = [t.agent_type for t in plan.tasks]
-    assert task_types == [AgentType.RESEARCH, AgentType.TABLE, AgentType.GRAPH, AgentType.ANALYSIS]
+    assert task_types == [
+        AgentType.RESEARCH,
+        AgentType.TABLE,
+        AgentType.GRAPH,
+        AgentType.ANALYSIS,
+    ]
 
     # Verify topological wave structure
     task_map = {t.task_id: t for t in plan.tasks}

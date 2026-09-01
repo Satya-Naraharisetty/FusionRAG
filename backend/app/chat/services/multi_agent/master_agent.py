@@ -380,7 +380,9 @@ class MasterAgent:
             req_lower,
         )
         req_no_uuid = re.sub(
-            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "", req_lower
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            "",
+            req_lower,
         )
         has_math = any(
             op in req_no_uuid
@@ -469,10 +471,27 @@ class MasterAgent:
                 )
             )
         else:
-            table_keywords = ["table", "csv", "tabular", "rows", "columns", "revenue table", "spreadsheet"]
+            table_keywords = [
+                "table",
+                "csv",
+                "tabular",
+                "rows",
+                "columns",
+                "revenue table",
+                "spreadsheet",
+            ]
             is_table_query = any(w in req_lower for w in table_keywords)
 
-            vision_keywords = ["image", "chart", "diagram", "figure", "visual", "picture", "plot", "screenshot"]
+            vision_keywords = [
+                "image",
+                "chart",
+                "diagram",
+                "figure",
+                "visual",
+                "picture",
+                "plot",
+                "screenshot",
+            ]
             is_vision_query = any(w in req_lower for w in vision_keywords)
 
             graph_keywords = [
@@ -571,7 +590,9 @@ class MasterAgent:
                             agent_type=AgentType.RESEARCH,
                             dependencies=[],
                             parameters={"query": request, "top_k": 5},
-                            expected_outputs=["Contextual document text for visual element"],
+                            expected_outputs=[
+                                "Contextual document text for visual element"
+                            ],
                         )
                     )
             elif is_graph_query:
@@ -592,7 +613,9 @@ class MasterAgent:
                         agent_type=AgentType.RESEARCH,
                         dependencies=[],
                         parameters={"query": request, "top_k": 5},
-                        expected_outputs=["Supporting text evidence for graph entities"],
+                        expected_outputs=[
+                            "Supporting text evidence for graph entities"
+                        ],
                     )
                 )
             elif is_web_query and has_doc_context:

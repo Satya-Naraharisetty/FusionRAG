@@ -47,9 +47,12 @@ class VisionAgent(BaseSpecialistAgent):
         t0 = time.perf_counter()
         query = task.request
         image_bytes = task.parameters.get("image_bytes")
-        image_b64 = task.parameters.get("image_bytes_b64") or task.parameters.get("image_base64")
+        image_b64 = task.parameters.get("image_bytes_b64") or task.parameters.get(
+            "image_base64"
+        )
         if not image_bytes and image_b64 and isinstance(image_b64, str):
             import base64
+
             try:
                 image_bytes = base64.b64decode(image_b64)
             except Exception as b64_err:
@@ -71,12 +74,15 @@ class VisionAgent(BaseSpecialistAgent):
                     )
                     for el in elements:
                         if el.element_type in (ElementType.FIGURE, ElementType.CHART):
-                            caption = el.metadata.get("caption") or caption or "Chart/Figure"
+                            caption = (
+                                el.metadata.get("caption") or caption or "Chart/Figure"
+                            )
                             element_type = el.element_type.value
                             repo_visual_desc = el.content
                             if el.content.startswith("iVBOR") or len(el.content) > 100:
                                 try:
                                     import base64
+
                                     image_bytes = base64.b64decode(el.content)
                                 except Exception:
                                     pass

@@ -60,19 +60,27 @@ class GraphAgent(BaseSpecialistAgent):
                     from app.documents.infrastructure.persistence.models import (
                         SQLAlchemyRelationshipEvidence,
                     )
+
                     if hasattr(self.graph_retriever.graph_repo, "_db"):
-                        stmt = select(
-                            SQLAlchemyRelationshipEvidence.document_id,
-                            SQLAlchemyRelationshipEvidence.document_version
-                        ).where(
-                            SQLAlchemyRelationshipEvidence.user_id == context.user_id,
-                            SQLAlchemyRelationshipEvidence.status == "VALID"
-                        ).distinct()
+                        stmt = (
+                            select(
+                                SQLAlchemyRelationshipEvidence.document_id,
+                                SQLAlchemyRelationshipEvidence.document_version,
+                            )
+                            .where(
+                                SQLAlchemyRelationshipEvidence.user_id
+                                == context.user_id,
+                                SQLAlchemyRelationshipEvidence.status == "VALID",
+                            )
+                            .distinct()
+                        )
                         res = await self.graph_retriever.graph_repo._db.execute(stmt)
                         for doc_id, doc_ver in res.all():
                             auth_docs[doc_id] = AuthorizedDocumentVersion(
                                 active_version=doc_ver,
-                                active_config_id=UUID("00000000-0000-0000-0000-000000000000"),
+                                active_config_id=UUID(
+                                    "00000000-0000-0000-0000-000000000000"
+                                ),
                                 active_embedding_contract_id="contract_default",
                             )
                 except Exception:

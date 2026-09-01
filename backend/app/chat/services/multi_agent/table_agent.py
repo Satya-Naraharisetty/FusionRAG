@@ -131,7 +131,9 @@ class TableAgent(BaseSpecialistAgent):
                 if len(nums) >= 2:
                     v_first = nums[0]
                     v_last = nums[-1]
-                    growth_pct = ((v_last - v_first) / v_first) * 100.0 if v_first != 0 else 0.0
+                    growth_pct = (
+                        ((v_last - v_first) / v_first) * 100.0 if v_first != 0 else 0.0
+                    )
                     output_text = f"Calculated growth rate from {v_first} to {v_last}: {growth_pct:.2f}%"
                 else:
                     output_text = f"Table summary: {parsed_table.summary}\n\n{self.table_processor.to_markdown(parsed_table)}"

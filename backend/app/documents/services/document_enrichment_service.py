@@ -107,6 +107,7 @@ class DocumentEnrichmentService:
                 from app.documents.infrastructure.persistence.repositories.chunk_repository import (
                     SQLAlchemyChunkRepository,
                 )
+
                 c_repo = SQLAlchemyChunkRepository(self.document_repo._db)
                 chunks = await c_repo.list_by_document(document_id)
 
@@ -193,9 +194,29 @@ class DocumentEnrichmentService:
             # Fallback heuristic extraction for named entities if LLM returned empty (e.g. Acme Corp, Beta AI)
             if not extracted_pairs and full_text.strip():
                 # Heuristic capitalization pattern: "Acme Corp", "Beta AI", "Vector DB"
-                cap_matches = re.findall(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b", full_text)
+                cap_matches = re.findall(
+                    r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b", full_text
+                )
                 seen_names: set[str] = set()
-                common_stop = {"The", "This", "That", "There", "When", "What", "Where", "Why", "How", "And", "For", "With", "From", "Division", "Revenue", "Cloud", "Hardware"}
+                common_stop = {
+                    "The",
+                    "This",
+                    "That",
+                    "There",
+                    "When",
+                    "What",
+                    "Where",
+                    "Why",
+                    "How",
+                    "And",
+                    "For",
+                    "With",
+                    "From",
+                    "Division",
+                    "Revenue",
+                    "Cloud",
+                    "Hardware",
+                }
 
                 for raw_name in cap_matches:
                     raw_name_clean = raw_name.strip()
