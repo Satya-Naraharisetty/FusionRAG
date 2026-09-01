@@ -1,6 +1,6 @@
-# Production-Grade Fusion RAG Chatbot
+# Production-Grade Fusion RAG Platform
 
-A high-performance, observable, and modular reference implementation of an enterprise-grade **Fusion RAG (Retrieval-Augmented Generation) Platform** built with **FastAPI (Python 3.12+)**, **React + Vite + TypeScript**, **PostgreSQL**, **Qdrant**, **Redis 7**, **Jina AI**, and **Google Gemini**.
+A high-performance, observable, and modular reference implementation of an enterprise-grade **Fusion RAG (Retrieval-Augmented Generation) Platform** built with **FastAPI (Python 3.12+)**, **React 18 + Vite 5 + TypeScript + Tailwind CSS v4**, **PostgreSQL 16**, **Qdrant**, **Redis 7**, **Jina AI**, and **Google Gemini**.
 
 ---
 
@@ -22,20 +22,23 @@ A high-performance, observable, and modular reference implementation of an enter
 
 * **Asynchronous Multimodal & Knowledge Graph Ingestion**:
   * **Decoupled Enrichment**: Synchronous upload commits fast; background `DocumentEnrichmentService` executes non-blocking extraction.
+  * **Durable Task Queue**: Redis Streams with consumer groups (`group:document_workers`), retry sorted sets (`queue:jobs:retry`), dead-letter streams (`stream:jobs:dead_letter`), and background `DurableIngestionReaper`.
   * **Multimodal Element Storage**: Persists Markdown/CSV tables and figure/chart elements in `document_elements`.
   * **Knowledge Graph Triples**: Extracts named entities, normalized types, mentions, relationship edges, and confidence evidence with versioned idempotency (`delete_by_version`).
 
 * **Advanced Hybrid Retrieval Pipeline**:
   * **Multi-Branch Search**: Combines Dense Vector ANN search (Qdrant with cosine similarity), Sparse Lexical search (native PostgreSQL Full-Text Search with GIN indexes), Structured Table filtering, and Subgraph Traversal.
+  * **Adaptive Preprocessing**: HyDE (Hypothetical Document Embeddings), `QueryClassifier`, `QueryExpansion`, and `QueryDecomposer`.
   * **Reciprocal Rank Fusion (RRF)**: Merges rank positions from candidate sets ($k=60$).
   * **Maximal Marginal Relevance (MMR)**: Eliminates redundant information to select a diverse candidate pool ($\lambda=0.5$).
-  * **Cross-Encoder Reranking**: REST API-driven joint cross-attention reranking via Jina AI (`jina-reranker-v2-base-multilingual`), bounded by asynchronous semaphores.
+  * **Cross-Encoder Reranking**: REST API-driven joint cross-attention reranking via Jina AI (`jina-reranker-v2-base-multilingual`), bounded by asynchronous semaphores (`asyncio.Semaphore=4`).
   * **Context Selector & Token Budgeting**: Enforces strict token ceilings (default 6,000 tokens) with parent-child and sentence-window context expansion.
 
 * **Two-Tier Document Management**:
   * **Global Library Documents**: Uploaded via the Documents manager, shared across sessions, and addressable via `@documents` mentions.
   * **Conversation-Scoped Attachments**: Attached directly in the chat composer, automatically scoped to the active conversation, and cascade-deleted when the conversation is deleted.
   * **Multi-Format Ingestion**: Supports PDF, DOCX, TXT, Markdown (`.md`), HTML, CSV, and Images (PNG, JPG, JPEG, WEBP via Gemini Vision OCR).
+  * **Multi-Target Storage**: Supports PostgreSQL binary BLOB, Local filesystem, or S3 / MinIO Object Storage.
   * **Security & Sanitization**: Magic-byte signature verification, zip-bomb expansion ratio checks (< 100x), SHA-256 deduplication, and streaming ClamAV antivirus socket integration.
 
 * **Production Security & Authentication**:
@@ -72,7 +75,7 @@ A high-performance, observable, and modular reference implementation of an enter
 | **Cross-Encoder Reranker** | Jina AI REST API | `jina-reranker-v2-base-multilingual` with asynchronous semaphore concurrency bounding |
 | **LLM Generation** | Google Gemini | `gemini-3.5-flash-lite` for streaming SSE chat completion, vision parsing, and query rewriting |
 | **Transactional Email** | Resend API | User email verification and magic link authentication flows |
-| **Frontend Framework** | React 18, Vite 5, TypeScript | Responsive SPA with Vanilla CSS tokens, dark/light themes, Shiki syntax highlighting, and SSE streaming |
+| **Frontend SPA** | React 18, Vite 5, TypeScript, Tailwind CSS v4 | Responsive UI with TanStack Query v5, Radix UI primitives, Shiki syntax highlighting, KaTeX math, and PWA |
 | **Telemetry & Metrics** | OpenTelemetry, Prometheus, Jaeger, Grafana | Distributed tracing and time-series metrics with privacy sanitization |
 | **Malware Defense** | ClamAV Daemon | Antivirus stream scanning over clamd TCP port 3310 (fail-closed in production) |
 
@@ -82,24 +85,26 @@ A high-performance, observable, and modular reference implementation of an enter
 
 ```mermaid
 graph TD
-    User["Web Browser Client (React SPA)"]
+    User["Web Browser Client (React 18 + Vite 5 + Tailwind v4 SPA)"]
     Nginx["Nginx Reverse Proxy (:80 / :443)"]
     FastAPI["FastAPI Web Application (:8000)"]
-    Postgres["PostgreSQL DB (Metadata & FTS)"]
-    Redis["Redis 7 (Cache, Limiter & Streams)"]
-    Qdrant["Qdrant Vector DB (Dense Vectors)"]
+    Postgres["PostgreSQL DB (Metadata, FTS & Graph)"]
+    Redis["Redis 7 (Cache, Limiter & Streams Queue)"]
+    Qdrant["Qdrant Vector DB (Dense Vectors, 768-dim)"]
     Jina["Jina AI API (Embeddings & Reranker)"]
-    Gemini["Google Gemini API (Chat & Vision LLM)"]
+    Gemini["Google Gemini API (Chat, Vision & Planner)"]
     Resend["Resend API (Transactional Email)"]
+    ClamAV["ClamAV Daemon (:3310 Socket)"]
 
     User -->|HTTP / SSE / Static Assets| Nginx
     Nginx -->|Proxy REST/SSE /api/v1| FastAPI
-    FastAPI -->|Async Sessions / FTS| Postgres
-    FastAPI -->|Cache / Rate Limits / Task Queue| Redis
+    FastAPI -->|Async Sessions, FTS & KG| Postgres
+    FastAPI -->|Cache, Rate Limits & Task Queue| Redis
     FastAPI -->|HNSW ANN Search| Qdrant
     FastAPI -->|768-dim Vectors & Reranking| Jina
     FastAPI -->|Streaming Generation & Vision| Gemini
     FastAPI -->|Send Verification & Magic Links| Resend
+    FastAPI -->|Stream Uploaded Bytes| ClamAV
 ```
 
 ---
@@ -115,7 +120,7 @@ graph TD
 
 ```bash
 git clone <repository-url>
-cd fusion_rag
+cd FusionRAG
 
 # Copy environment template
 cp backend/.env.example backend/.env
@@ -145,92 +150,38 @@ Expected JSON response:
 ```json
 {
   "status": "healthy",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "services": {
     "postgres": "connected",
-    "vector_db": "connected",
-    "redis": "connected"
+    "redis": "connected",
+    "qdrant": "connected"
   }
 }
 ```
 
-### 4. Access the Application
+---
 
-* **Frontend UI**: [http://localhost:5173](http://localhost:5173) (or [http://localhost](http://localhost) via Nginx)
-* **API Documentation (Swagger)**: [http://localhost:8000/docs](http://localhost:8000/docs)
-* **Prometheus Metrics**: [http://localhost:8000/api/v1/observability/metrics](http://localhost:8000/api/v1/observability/metrics)
+## Testing & Quality Assurance
+
+```bash
+# Run backend test suite
+docker compose exec backend pytest
+
+# Run frontend tests
+cd frontend && npm test
+
+# Run multi-agent quality benchmark
+docker compose exec backend uv run python scripts/benchmark.py --profile multi_agent --mock
+```
 
 ---
 
-## Observability Stack (Optional)
+## Documentation Index
 
-To start Prometheus, Jaeger distributed tracing, and Grafana dashboards:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
-```
-
-| Service | URL | Credentials |
-|---|---|---|
-| **Grafana Dashboards** | [http://localhost:3000](http://localhost:3000) | `admin` / `admin` |
-| **Jaeger Trace Explorer** | [http://localhost:16686](http://localhost:16686) | None (Public) |
-| **Prometheus Scraper** | [http://localhost:9090](http://localhost:9090) | None (Public) |
-
----
-
-## Admin Console & LLM Observability
-
-The application includes an **Admin Console** at `/admin/dashboard` in the React frontend:
-
-* **LLM Observability**: Live KPI cards, daily token consumption, latency breakdowns, and detailed execution trace waterfalls.
-* **RAG Evaluations**: Run automated evaluation benchmarks, prevent quality regressions against baseline metrics, and review rendered HTML test reports.
-
-### Single Admin Account Invariant
-
-The application enforces a **single-admin invariant** configured declaratively via `backend/.env`:
-
-```env
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=admin_secure_password_123
-```
-
-On startup, the system automatically promotes the user matching `ADMIN_EMAIL` to the `"admin"` role and demotes all other database accounts to `"user"`.
-
----
-
-## Local Development & Testing
-
-### Running Backend Tests
-
-```bash
-cd backend
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv sync --extra dev
-pytest
-```
-
-### Formatting and Linting
-
-```bash
-# Backend linting & formatting checks
-cd backend
-ruff check .
-ruff format --check .
-
-# Frontend linting & type checks
-cd ../frontend
-npm run lint
-npm run build
-```
-
-### Performance & Load Testing
-
-To benchmark concurrent retrieval throughput and latency percentiles:
-
-```bash
-cd backend
-uv run python scripts/load_test.py --concurrency 10,25,50 --duration 5 --runs 3
-```
-
-
+* [ARCHITECTURE.md](ARCHITECTURE.md) — Comprehensive System Architecture Manual
+* [prd.md](prd.md) — Product Requirements Document & Master Project Plan
+* [frontend/README.md](frontend/README.md) — Frontend Architecture & Component Guide
+* [docs/EVALUATION.md](docs/EVALUATION.md) — Quality Evaluation Framework & Regression Governance
+* [docs/SECURITY.md](docs/SECURITY.md) — Security Policy, Secrets Management & Threat Blueprint
+* [docs/architecture/deployment-architecture.md](docs/architecture/deployment-architecture.md) — Production Deployment Blueprint
+* [observability/README.md](observability/README.md) — Observability, Metrics & Distributed Tracing

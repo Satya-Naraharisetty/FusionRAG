@@ -1,57 +1,73 @@
-# System Architecture Manual - Fusion RAG Chatbot
+# System Architecture Manual - Fusion RAG Platform
 
-This document provides a comprehensive architectural specification of the design, pipelines, workflows, and protocols implemented across the **Fusion RAG Chatbot** platform.
+This document provides an exhaustive architectural specification of the design, pipelines, workflows, and protocols implemented across the **Fusion RAG Platform**.
 
 ---
 
 ## 1. High-Level System Architecture
 
-The application is structured into decoupled, modular layers: a responsive React SPA frontend, an Nginx reverse proxy gateway, a FastAPI (Python 3.12+) asynchronous application server, authoritative PostgreSQL transactional storage, ephemeral Redis 7 cache and Streams queue, Qdrant vector database, and upstream REST AI inference providers (Jina AI, Google Gemini, Resend).
+The application is structured into decoupled, modular layers: a responsive React SPA frontend (React 18 + Vite 5 + TypeScript + Tailwind CSS v4 + TanStack Query v5), an Nginx reverse proxy gateway, a FastAPI (Python 3.12+) asynchronous application server, authoritative PostgreSQL 16 transactional storage, ephemeral Redis 7 cache and Streams queue, Qdrant vector database, ClamAV antivirus daemon, and upstream REST AI inference providers (Jina AI, Google Gemini, Resend, SerpAPI/Firecrawl).
 
 ```mermaid
 graph TD
-    Browser["React SPA (Client UI)"]
+    Browser["React SPA (Client UI: React 18, Vite 5, Tailwind v4, TanStack)"]
     Nginx["Nginx Reverse Proxy (:80 / :443)"]
     FastAPI["FastAPI Web Application (:8000)"]
-    Postgres["PostgreSQL Database (Async SQLAlchemy)"]
-    Redis["Redis 7 (Cache, Rate Limiter & Streams Queue)"]
-    Qdrant["Qdrant Vector Database (Cosine ANN)"]
+    Postgres["PostgreSQL Database (Async SQLAlchemy + asyncpg)"]
+    Redis["Redis 7 (Cache, Rate Limiter & Streams Task Queue)"]
+    Qdrant["Qdrant Vector Database (Cosine ANN, 768-dim)"]
     Jina["Jina AI API (Embeddings & Cross-Encoder Reranker)"]
-    Gemini["Google Gemini API (Chat Completion & Vision)"]
-    Resend["Resend API (Transactional Email)"]
+    Gemini["Google Gemini API (Chat Completion, Vision & Rewrite)"]
+    Resend["Resend API (Transactional Email & Magic Links)"]
     ClamAV["ClamAV Daemon (:3310 Antivirus Socket)"]
+    WebSearch["Web Search APIs (SerpAPI / Firecrawl / DuckDuckGo)"]
+    Storage["Object Storage (S3 / MinIO / Local FS / DB BLOB)"]
 
     Browser -->|HTTPS / WSS / SSE| Nginx
-    Nginx -->|Static UI Assets| Browser
+    Nginx -->|Static UI Assets & PWA| Browser
     Nginx -->|Proxy REST/SSE /api/v1| FastAPI
-    FastAPI -->|Credentials, Metadata, FTS| Postgres
+    FastAPI -->|Credentials, Metadata, FTS, Graph| Postgres
     FastAPI -->|Sliding Rate, Cache, Job Stream| Redis
     FastAPI -->|ANN Dense Vector Search| Qdrant
     FastAPI -->|Dense Vectors & Rerank Scores| Jina
-    FastAPI -->|Streaming LLM & OCR Parsing| Gemini
+    FastAPI -->|Streaming LLM, Planner, OCR| Gemini
     FastAPI -->|Verification & Magic Link Emails| Resend
     FastAPI -->|Stream Uploaded Bytes| ClamAV
+    FastAPI -->|Real-Time Internet Search| WebSearch
+    FastAPI -->|Document Binary File I/O| Storage
 ```
 
 ---
 
 ## 2. Ingestion & Document Processing Pipeline
 
-The ingestion architecture uses a decoupled two-tier design: fast primary synchronous chunking & text indexing, followed immediately by non-blocking, idempotent asynchronous enrichment for multimodal elements (tables, figures) and Knowledge Graph construction.
+The ingestion architecture uses a decoupled two-tier design: fast primary synchronous validation and chunking, followed immediately by asynchronous durable background processing via Redis Streams (`RedisStreamTaskQueue`) for dense embedding generation, multimodal element extraction (tables, figures), and Knowledge Graph construction.
 
 ```mermaid
 flowchart TD
     Upload["1. POST /api/v1/documents/upload"] --> Magic["2. MagicByteValidator (Signature & Zip-Bomb Check)"]
     Magic --> Malware["3. ClamAVScanner (Fail-Closed Antivirus Scan)"]
     Malware --> Checksum["4. SHA-256 Checksum Deduplication"]
-    Checksum --> Storage["5. StorageProvider (PostgreSQL BLOB or Local)"]
+    Checksum --> Storage["5. StorageProvider (Database BLOB, Local FS, or S3)"]
     Storage --> PrimaryProc["6. DocumentProcessingService (Extract & Clean Text)"]
     PrimaryProc --> Chunk["7. ChunkingService (Recursive / Semantic / Parent-Child / Sentence-Window)"]
     Chunk --> SaveDB["8. Batch Insert Chunks into PostgreSQL (document_chunks)"]
-    SaveDB --> Complete["9. Commit Primary Transaction & Dispatch DocumentProcessingCompleted"]
+    SaveDB --> Complete["9. Commit Primary Transaction & Invalidate Index Cache"]
     
-    Complete --> EmbedJob["10a. Background Task: Generate Dense Embeddings (Qdrant)"]
-    Complete --> EnrichJob["10b. Background Task: DocumentEnrichmentService (Idempotent)"]
+    Complete --> DispatchQueue["10. DurableTaskQueue: Enqueue PROCESS_DOCUMENT / GENERATE_EMBEDDINGS"]
+    
+    subgraph QueueWorkerArchitecture ["Durable Redis Stream Architecture"]
+        DispatchQueue --> Stream["Redis Stream (stream:jobs:document_processing)"]
+        Stream --> ConsumerGroup["Consumer Group (group:document_workers)"]
+        ConsumerGroup --> Worker["QueueWorker (concurrency=4, visibility_timeout=180s)"]
+        Worker -->|Failure & Retry <= 3| RetryQueue["Retry Sorted Set (queue:jobs:retry, backoff=2s..60s)"]
+        RetryQueue --> Stream
+        Worker -->|Exhausted Retries| DeadLetter["Dead Letter Stream (stream:jobs:dead_letter)"]
+        Reaper["DurableIngestionReaper"] -->|Recover Stale Ingestion Jobs| Stream
+    end
+
+    Worker --> EmbedJob["11a. Embed Chunks (Jina / Gemini -> Qdrant)"]
+    Worker --> EnrichJob["11b. DocumentEnrichmentService (Idempotent Multimodal Extraction)"]
     
     subgraph AsyncEnrichment ["Downstream Enrichment Pipeline"]
         EnrichJob --> ExtractTables["Extract Markdown & CSV Tables -> document_elements (TABLE)"]
@@ -63,15 +79,16 @@ flowchart TD
 
 ---
 
-## 3. Hybrid Retrieval Pipeline
+## 3. Advanced Hybrid Retrieval Pipeline
 
-The retrieval engine coordinates parallel lexical, semantic, tabular, and graph traversal search channels, combines candidate sets with Reciprocal Rank Fusion (RRF), filters redundant information using MMR, applies Cross-Encoder joint cross-attention reranking, and budgets context to token limits.
+The retrieval engine coordinates parallel lexical, semantic, tabular, and knowledge graph traversal channels. It supports query preprocessing (HyDE, Query Classification, Expansion, Decomposition), merges candidate sets with Reciprocal Rank Fusion (RRF), filters redundant information using Maximal Marginal Relevance (MMR), applies Cross-Encoder joint cross-attention reranking, and applies hierarchical context expansion (Parent-Child, Sentence-Window).
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Client as ChatOrchestrator
     participant Cache as InMemoryIndexCache
+    participant QProc as QueryProcessor (Classifier / HyDE / Decomposer)
     participant Retrieval as RetrievalService
     participant FTS as PostgresSparseRetriever / BM25
     participant Qdrant as QdrantDenseRetriever
@@ -84,7 +101,14 @@ sequenceDiagram
 
     Client->>Cache: Check if user has indexed chunks
     Cache-->>Client: Has chunks (proceed) or Empty (skip retrieval)
-    Client->>Retrieval: retrieve(query, user_id, scope, conversation_id)
+    Client->>QProc: Process Query (Classify intent: Direct / HyDE / Multi-Hop)
+    alt HyDE Enabled & Applicable
+        QProc->>QProc: Generate Hypothetical Document Passage
+    else Query Decomposition Enabled
+        QProc->>QProc: Decompose into Sub-Queries (max 3)
+    end
+    QProc-->>Retrieval: Prepared Retrieval Query Payload
+    Retrieval->>Retrieval: retrieve(query, user_id, scope, conversation_id)
     par Lexical Sparse Search
         Retrieval->>FTS: search(query) via websearch_to_tsquery / BM25
         FTS-->>Retrieval: Top-K Sparse Candidates (lexical scores)
@@ -104,8 +128,8 @@ sequenceDiagram
     MMR-->>Retrieval: Diverse Candidate Pool
     Retrieval->>Rerank: rerank(query, candidates) via Jina API (Semaphore=4)
     Rerank-->>Retrieval: Reordered Chunks (rerank relevance scores)
-    Retrieval->>Context: apply_token_budget(chunks, max_tokens=6000)
-    Context-->>Client: Final Bounded SearchResult Payload
+    Retrieval->>Context: apply_token_budget & window_expansion (max_tokens=6000)
+    Context-->>Client: Final Bounded SearchResult Payload with Citations
 ```
 
 ---
@@ -138,7 +162,7 @@ sequenceDiagram
     end
 
     User->>API: POST /auth/login (Email, Password)
-    API->>API: Rate limit check (5/300s window)
+    API->>API: Rate limit check (5 attempts / 300s window)
     API->>API: Verify Password (Argon2id)
     API->>DB: Create Refresh Session (token_hash, expires_at)
     API-->>User: HTTP-Only Cookie (Refresh Token) + Access Token (JWT, 15m)
@@ -200,7 +224,7 @@ flowchart TD
     Master --> Validator["PlanValidator (Kahn's Algorithm Cycle & Dependency Check)"]
     Validator -->|Invalid| Regenerate["Regenerate Plan (Bounded Iterations)"]
     Regenerate --> Validator
-    Validator -->|Valid| Router["TaskRouter: Capability, Budget & Latency Match"]
+    Validator -->|Valid| Router["TaskRouter: CapabilityRegistry, Budget & Latency Match"]
     Router --> Engine["AgentExecutionEngine (Topological Wave Execution)"]
 
     subgraph Wave0 ["Topological Wave 0: Independent Concurrent Tasks (asyncio.gather)"]
@@ -231,30 +255,58 @@ flowchart TD
 
 ---
 
+## 7. Security, Isolation & Attack Mitigation Subsystem
+
+Fusion RAG applies defense-in-depth across all system entry points:
+
+1. **Prompt Injection & Jailbreak Defense**:
+   - `PromptInjectionScanner`: Pre-flight heuristic detection of role-play instructions, system prompt extraction, delimiter escaping, and override tokens on `/chat` and `/search`.
+   - Structured security logging: `PROMPT_INJECTION_BLOCKED` events logged without echoing payload text to stdout.
+2. **Context Isolation & Untrusted Framing**:
+   - `PromptBuilder` wraps retrieved document chunks strictly inside `<retrieved_context>` XML tags.
+   - System prompts instruct the LLM that retrieved text is **strictly untrusted data** and must never be interpreted as instructions.
+3. **AST Arithmetic Sandboxing**:
+   - `SafeCalculator`: Restricted Abstract Syntax Tree (AST) evaluator for `AnalysisAgent`.
+   - Blocks `__import__`, `eval`, `exec`, OS calls, and prevents exponential Denial-of-Service (`base <= 10000`, `exp <= 15`).
+4. **Malware Scanning & File Upload Validation**:
+   - `MagicByteValidator`: Binary signature checking against MIME types; blocks disguised executables.
+   - Zip-bomb defense: Blocks nested archives exceeding 25 MB or an expansion ratio $> 100\times$.
+   - `ClamAVScanner`: Streams uploaded bytes to ClamAV daemon (`clamd` TCP 3310), failing closed in production.
+5. **Cryptographic Protection & Cursor Signing**:
+   - Argon2id password hashing with random per-user salts.
+   - Cryptographic envelope encryption: Master Key (`ENCRYPTION_MASTER_KEY`) wraps per-user Data Encryption Keys (`user_encryption_keys`).
+   - HMAC SHA-256 keyset cursor signing (`CURSOR_SIGNING_KEY`) prevents pagination tampering.
+6. **Multi-Tier Rate Limiting**:
+   - Sliding-window Redis rate limiter (`60 req/min`, burst `10`).
+   - Strict brute-force guard on `/auth/login`: max 5 attempts per 5-minute window (`300s`).
+   - Password-gated account deletion rate limit (`10 req/min`).
+
+---
+
 ## 8. Evaluation Framework & Operational Confidence Governance
 
 To prevent regressions, validate complex agentic workflows, and monitor live operations, Fusion RAG enforces a formal multi-tier evaluation system.
 
 ### Operational Confidence Categories
-1. **Benchmark-Proven**: Offline evaluation over versioned golden datasets measuring quality scores under deterministic execution
-2. **Repository-Proven**: Verified via automated pytest test suites (66+ test files) covering retrieval pipelines, agent DAG execution, timeouts, failure cascades, and telemetry sanitization
-3. **Production-Observable**: Fully instrumented with low-cardinality Prometheus metrics (AGENT_LLM_TOKENS, AGENT_LLM_DURATION, AGENT_REPLANS, AGENT_TASKS_EXECUTED), OpenTelemetry distributed traces, and sanitized structured JSON logs
+1. **Benchmark-Proven**: Offline evaluation over versioned golden datasets (`golden_rag_dataset`, `golden_multi_agent_v1`) measuring quality scores under deterministic execution.
+2. **Repository-Proven**: Verified via automated pytest test suites covering retrieval pipelines, agent DAG execution, timeouts, failure cascades, and telemetry sanitization.
+3. **Production-Observable**: Fully instrumented with low-cardinality Prometheus metrics (`AGENT_LLM_TOKENS`, `AGENT_LLM_DURATION`, `AGENT_REPLANS`, `AGENT_TASKS_EXECUTED`), OpenTelemetry distributed traces, and sanitized structured JSON logs.
 
 ### 10-Dimension Multi-Agent Quality Evaluation
-* **Planning & Routing**: Validates correct specialist selection and capability policy enforcement
-* **DAG Execution**: Ensures topological dependency execution and bounded replanning (<= 2 iterations)
-* **Deterministic Calculation**: Sandboxed arithmetic without LLM numeric hallucinations
-* **Refusal Faithfulness**: Explicit refusal on missing evidence without ungrounded extrapolation
-* **Contradiction Detection**: Identifies conflicting claims across documents, references all sources
-* **Injection Resistance**: Document text treated strictly as untrusted data
-* **Replanning Exhaustion**: Graceful halt at max iterations with diagnostic notices
-* **Web Search Integration**: Accurate real-time information retrieval and result formatting
-* **Capability Routing**: Budget and latency constraint enforcement in TaskRouter
-* **Result Synthesis**: Coherent, citation-grounded final answer quality via SynthesisAgent
+* **Planning & Routing**: Validates correct specialist selection and capability policy enforcement.
+* **DAG Execution**: Ensures topological dependency execution and bounded replanning ($\le 2$ iterations).
+* **Deterministic Calculation**: Sandboxed arithmetic without LLM numeric hallucinations.
+* **Refusal Faithfulness**: Explicit refusal on missing evidence without ungrounded extrapolation.
+* **Contradiction Detection**: Identifies conflicting claims across documents, references all sources.
+* **Injection Resistance**: Document text treated strictly as untrusted data.
+* **Replanning Exhaustion**: Graceful halt at max iterations with diagnostic notices.
+* **Web Search Integration**: Accurate real-time information retrieval and result formatting.
+* **Capability Routing**: Budget and latency constraint enforcement in `TaskRouter`.
+* **Result Synthesis**: Coherent, citation-grounded final answer quality via `SynthesisAgent`.
 
 ### Regression Governance (Floor + Maximum Degradation)
-* **Dual Gate**: Absolute minimum floor per metric (e.g. faithfulness >= 0.90) AND maximum allowed degradation from versioned baselines (max_score_drop <= 0.03)
-* **CI Integration**: Automated CLI (backend/scripts/regression.py) runs on pull requests to block regressions before merging
+* **Dual Gate**: Absolute minimum floor per metric (e.g. faithfulness $\ge 0.90$) AND maximum allowed degradation from versioned baselines (`max_score_drop <= 0.03`).
+* **CI Integration**: Automated CLI (`backend/scripts/regression.py`) runs on pull requests to block regressions before merging.
 
 ---
 
@@ -282,14 +334,15 @@ flowchart TD
 
 ## 10. Scalability & Resilience
 
-1. **Connection-Pooled Async Redis**: Native `redis.asyncio` connection pooling handles rate limiting, ephemeral caching, and job queuing without blocking the FastAPI event loop
-2. **Thread-Pool Starvation Prevention**: SQLAlchemy database connection pool parameters (`pool_size=50`, `max_overflow=50`) exceed anyio worker thread limits, eliminating pool starvation deadlocks under heavy concurrency
-3. **Batch DB Ingestion Queries**: Bulk chunk lookups using SQL `.in_()` operations eliminate N+1 database queries during document ingestion
-4. **Shared BM25 Pre-Tokenization Caching**: Class-level tokenization cache reuses CPU-intensive text tokenizations across requests, invalidating selectively on document changes
-5. **Durable Ingestion Reaper**: Non-blocking background asyncio task that periodically recovers stale processing jobs and re-enqueues them
-6. **Durable Cleanup Worker**: Processes `durable_cleanup_jobs` for orphan Qdrant vector and file purging after document deletion
-7. **InMemoryIndexCache**: LRU cache tracking whether a user has any indexed document chunks; prevents unnecessary Qdrant API calls when the knowledge base is empty
-8. **Multi-key Gemini Workload Isolation**: Three separate Gemini API keys (LLM, Planner, Fallback) prevent rate-limit cascades under concurrent agent operations
+1. **Connection-Pooled Async Redis**: Native `redis.asyncio` connection pooling handles rate limiting, ephemeral caching, and job queuing without blocking the FastAPI event loop.
+2. **Thread-Pool Starvation Prevention**: SQLAlchemy database connection pool parameters exceed anyio worker thread limits, eliminating pool starvation deadlocks under heavy concurrency.
+3. **Batch DB Ingestion Queries**: Bulk chunk lookups using SQL `.in_()` operations eliminate N+1 database queries during document ingestion.
+4. **Shared BM25 Pre-Tokenization Caching**: Class-level tokenization cache reuses CPU-intensive text tokenizations across requests, invalidating selectively on document changes.
+5. **Durable Ingestion Reaper**: Non-blocking background asyncio task that periodically recovers stale processing jobs and re-enqueues them.
+6. **Durable Cleanup Worker**: Processes `durable_cleanup_jobs` for orphan Qdrant vector and file purging after document deletion.
+7. **InMemoryIndexCache**: LRU cache tracking whether a user has any indexed document chunks; prevents unnecessary Qdrant API calls when the knowledge base is empty.
+8. **Multi-key Gemini Workload Isolation**: Three separate Gemini API keys (LLM, Planner, Fallback) prevent rate-limit cascades under concurrent agent operations.
+9. **Multi-Target Storage Providers**: Supports PostgreSQL binary BLOB, local filesystem, and cloud Object Storage (S3 / MinIO) configured via `STORAGE_PROVIDER`.
 
 ---
 
@@ -297,10 +350,10 @@ flowchart TD
 
 All deep learning inference runs via optimized external REST APIs:
 
-1. **Bi-Encoder Dense Vectors**: Jina AI API (`jina-embeddings-v3`, 768 dimensions) with explicit task flags (`retrieval.passage` for chunks, `retrieval.query` for search queries), or Google Gemini (`text-embedding-004`)
-2. **Cross-Encoder Reranking**: Jina AI REST API (`jina-reranker-v2-base-multilingual`) with HTTP connection reuse, bounded concurrency semaphores (asyncio.Semaphore=4), and exponential backoff retries
-3. **LLM Generation**: Google Gemini (`gemini-3.5-flash-lite`) for streaming SSE chat completion, Vision OCR, query rewriting, planning, and evaluation
+1. **Bi-Encoder Dense Vectors**: Jina AI API (`jina-embeddings-v3`, 768 dimensions) with explicit task flags (`retrieval.passage` for chunks, `retrieval.query` for search queries), or Google Gemini (`text-embedding-004`).
+2. **Cross-Encoder Reranking**: Jina AI REST API (`jina-reranker-v2-base-multilingual`) with HTTP connection reuse, bounded concurrency semaphores (`asyncio.Semaphore=4`), and exponential backoff retries.
+3. **LLM Generation**: Google Gemini (`gemini-3.5-flash-lite`) for streaming SSE chat completion, Vision OCR, query rewriting, planning, and evaluation.
 4. **Runtime Benefits**:
-   - Zero PyTorch / CUDA overhead: Backend container image < 450 MB
-   - Instant server startup: sub-second cold start
-   - Zero host GPU dependency: fully operational on standard CPU hardware or free-tier cloud containers (Render, Vercel, Supabase)
+   - Zero PyTorch / CUDA overhead: Backend container image < 450 MB.
+   - Instant server startup: sub-second cold start.
+   - Zero host GPU dependency: fully operational on standard CPU hardware or free-tier cloud containers (Render, Vercel, Supabase, Upstash).

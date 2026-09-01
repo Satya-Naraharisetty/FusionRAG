@@ -1,6 +1,6 @@
 # Fusion RAG — Frontend Client
 
-The frontend Single Page Application (SPA) for the **Fusion RAG Platform**, built with **React 18**, **Vite 5**, **TypeScript**, and **Vanilla CSS**.
+The frontend Single Page Application (SPA) for the **Fusion RAG Platform**, built with **React 18**, **Vite 5**, **TypeScript**, **Tailwind CSS v4**, **TanStack Query v5**, and **Radix UI**.
 
 ---
 
@@ -19,13 +19,13 @@ frontend/
 │   │   ├── documents/           # DocumentCard, UploadDropzone, DocumentFilterBar
 │   │   ├── layout/              # Header, Navigation, MainLayout
 │   │   ├── sidebar/             # ConversationList, ConversationItem, FolderTree, SidebarUploadIndicator
-│   │   └── ui/                  # Accessible buttons, badges, modals, spinners, tooltips
+│   │   └── ui/                  # Radix UI primitives, accessible buttons, badges, modals, spinners, tooltips
 │   ├── context/                 # Global Context Providers
 │   │   ├── AuthContext.tsx      # Authentication state, silent token refresh timer, user session
 │   │   ├── ThemeContext.tsx     # Light/Dark mode state management and CSS custom properties
 │   │   └── UploadQueueContext.tsx # Persistent background file upload queue and stage tracking
 │   ├── hooks/                   # Custom React hooks (useAuth, useConversations, useDocuments, useSSEChat, useDrafts, etc.)
-│   ├── lib/                     # Utilities, Shiki syntax highlighter, notifications, password strength evaluator
+│   ├── lib/                     # Utilities, Shiki syntax highlighter, KaTeX math formatter, notifications
 │   ├── pages/                   # Top-level view routes
 │   │   ├── AdminDashboardPage.tsx # Observability KPIs, execution traces, evaluation benchmark runner
 │   │   ├── ChatPage.tsx         # Conversational chat interface with SSE streaming
@@ -33,10 +33,10 @@ frontend/
 │   │   ├── OAuthCallbackPage.tsx # Google / GitHub OAuth callback handler
 │   │   ├── SettingsPage.tsx     # Account settings, theme preferences, password-gated deletion
 │   │   └── VerifyEmailPage.tsx  # Resend email verification code confirmation
-│   ├── routes/                  # ProtectedRoute and PublicRoute boundary components
-│   └── tests/                   # Vitest unit and integration test suite
-├── e2e/                         # Playwright/Puppeteer smoke tests for live authentication and document flows
-├── vite.config.ts               # Vite bundler configuration with build optimizations
+│   ├── routes/                  # ProtectedRoute and PublicRoute boundary components (React Router v7)
+│   └── tests/                   # Vitest unit and integration test suite with MSW mocks
+├── e2e/                         # E2E test scripts for live authentication and document flows
+├── vite.config.ts               # Vite bundler configuration with @tailwindcss/vite & vite-plugin-pwa
 └── package.json                 # Dependencies and scripts
 ```
 
@@ -46,16 +46,17 @@ frontend/
 
 1. **Real-Time Streaming Chat (`/chat`)**:
    - Server-Sent Events (SSE) consumer streaming tokens, citations, and metadata.
-   - Markdown rendering with **Shiki** syntax highlighting, copy code buttons, and math rendering.
+   - Markdown rendering with **Shiki** syntax highlighting, copy code buttons, and **KaTeX** math formulas.
    - Inline citation badges (`[1]`, `[2]`) opening an interactive drawer highlighting source sentences.
    - Message draft persistence across conversation switches (`useDrafts`).
+   - Virtualized message list with **TanStack Virtual** for high-performance rendering of long conversations.
    - Chat export to Markdown or JSON.
 
 2. **Two-Tier Document Management (`/documents`)**:
    - Drag-and-drop file upload (`UploadDropzone`) with multi-stage progress tracking (Validating $\rightarrow$ Scanning $\rightarrow$ Uploading $\rightarrow$ Chunking $\rightarrow$ Vectorizing).
    - Global Library documents addressable across chats via `@documents` mentions.
    - Conversation-scoped attachments uploaded directly in the composer.
-   - Tagging, folder organization, search, and deletion.
+   - Tagging, folder organization, search, and cascade deletion.
 
 3. **In-App Admin Console (`/admin/dashboard`)**:
    - Real-time observability dashboard displaying request throughput, token volume, and estimated dollar costs.
@@ -68,9 +69,10 @@ frontend/
    - Re-authentication security modal for sensitive operations.
    - Password-gated account deletion (`DELETE /api/v1/auth/account`).
 
-5. **Design System & Aesthetics**:
-   - Vanilla CSS design tokens with full light and dark mode support.
-   - Glassmorphism, smooth animations, responsive drawer sidebar, and WCAG AA accessible contrast ratios.
+5. **Design System, UI & PWA**:
+   - **Tailwind CSS v4** styling with curated dark and light mode themes.
+   - Accessible UI primitives built on **Radix UI**.
+   - Progressive Web App (PWA) offline asset caching via **`vite-plugin-pwa`** and **`workbox-window`**.
 
 ---
 
@@ -106,6 +108,7 @@ npm run test
 npm run test:watch
 
 # Linting & TypeScript verification
+npm run typecheck
 npm run lint
 npm run build
 
