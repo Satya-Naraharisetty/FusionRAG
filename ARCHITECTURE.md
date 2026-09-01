@@ -37,7 +37,7 @@ graph TD
 
 ## 2. Ingestion & Document Processing Pipeline
 
-The ingestion pipeline securely ingests multi-format documents, validates signatures, scans for malware, normalizes text, generates hierarchical chunks, computes dense embeddings, and writes to both SQL and vector stores.
+The ingestion architecture uses a decoupled two-tier design: fast primary synchronous chunking & text indexing, followed immediately by non-blocking, idempotent asynchronous enrichment for multimodal elements (tables, figures) and Knowledge Graph construction.
 
 ```mermaid
 flowchart TD
@@ -45,22 +45,27 @@ flowchart TD
     Magic --> Malware["3. ClamAVScanner (Fail-Closed Antivirus Scan)"]
     Malware --> Checksum["4. SHA-256 Checksum Deduplication"]
     Checksum --> Storage["5. StorageProvider (PostgreSQL BLOB or Local)"]
-    Storage --> Queue["6. Enqueue Job via RedisStreamTaskQueue"]
-    Queue --> Worker["7. Background QueueWorker Consumer"]
-    Worker --> Extractor["8. ExtractorFactory (PDF, DOCX, TXT, MD, HTML, CSV, Images)"]
-    Extractor --> Clean["9. TextCleaner (Whitespace, Boilerplate & Hyphens)"]
-    Clean --> Chunk["10. ChunkingService (Recursive / Semantic / Parent-Child / Sentence-Window)"]
-    Chunk --> SaveDB["11. Batch Insert Chunks into PostgreSQL (document_chunks)"]
-    SaveDB --> BatchEmbed["12. JinaEmbeddingGenerator (jina-embeddings-v3, 768-dim, task=retrieval.passage)"]
-    BatchEmbed --> QdrantUpsert["13. Upsert Points into Qdrant (documents collection)"]
-    QdrantUpsert --> Complete["14. Update Status COMPLETED & Invalidate InMemoryIndexCache"]
+    Storage --> PrimaryProc["6. DocumentProcessingService (Extract & Clean Text)"]
+    PrimaryProc --> Chunk["7. ChunkingService (Recursive / Semantic / Parent-Child / Sentence-Window)"]
+    Chunk --> SaveDB["8. Batch Insert Chunks into PostgreSQL (document_chunks)"]
+    SaveDB --> Complete["9. Commit Primary Transaction & Dispatch DocumentProcessingCompleted"]
+    
+    Complete --> EmbedJob["10a. Background Task: Generate Dense Embeddings (Qdrant)"]
+    Complete --> EnrichJob["10b. Background Task: DocumentEnrichmentService (Idempotent)"]
+    
+    subgraph AsyncEnrichment ["Downstream Enrichment Pipeline"]
+        EnrichJob --> ExtractTables["Extract Markdown & CSV Tables -> document_elements (TABLE)"]
+        EnrichJob --> ExtractFigures["Extract Images & Diagrams -> document_elements (FIGURE/CHART)"]
+        EnrichJob --> ExtractEntities["Extract Named Entities & Mentions -> graph_entities, entity_mentions"]
+        ExtractEntities --> ExtractTriples["Construct Relationship Triples -> graph_relationships, relationship_evidence"]
+    end
 ```
 
 ---
 
 ## 3. Hybrid Retrieval Pipeline
 
-The retrieval engine coordinates parallel lexical and semantic search, combines candidate sets with Reciprocal Rank Fusion (RRF), filters redundant information using MMR, applies Cross-Encoder joint cross-attention reranking, and budgets context to token limits.
+The retrieval engine coordinates parallel lexical, semantic, tabular, and graph traversal search channels, combines candidate sets with Reciprocal Rank Fusion (RRF), filters redundant information using MMR, applies Cross-Encoder joint cross-attention reranking, and budgets context to token limits.
 
 ```mermaid
 sequenceDiagram
@@ -70,6 +75,8 @@ sequenceDiagram
     participant Retrieval as RetrievalService
     participant FTS as PostgresSparseRetriever / BM25
     participant Qdrant as QdrantDenseRetriever
+    participant Graph as PostgresGraphRetriever
+    participant Table as DocumentElementRepository
     participant Fusion as ReciprocalRankFusionEngine
     participant MMR as DefaultMMRSelector
     participant Rerank as JinaCrossEncoderReranker (API)
@@ -84,6 +91,12 @@ sequenceDiagram
     and Semantic Dense Search
         Retrieval->>Qdrant: search(query_embedding, user_id_filter)
         Qdrant-->>Retrieval: Top-K Dense Candidates (cosine scores)
+    and Knowledge Graph Traversal
+        Retrieval->>Graph: retrieve_subgraph(query, user_id)
+        Graph-->>Retrieval: Entity Relationship Triples & Evidence
+    and Structured Tabular Search
+        Retrieval->>Table: search_sparse(query, user_id, type=TABLE)
+        Table-->>Retrieval: Matching Structured Table Elements
     end
     Retrieval->>Fusion: fuse(dense_results, sparse_results, rrf_k=60)
     Fusion-->>Retrieval: Ranked Candidate List
@@ -148,7 +161,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    Question["Incoming User Question"] --> MentionCheck{"Contains @documents?"\}
+    Question["Incoming User Question"] --> MentionCheck{"Contains @documents?"}
     MentionCheck -->|Yes| StripMention["Strip @documents, set documents_priority=True"]
     MentionCheck -->|No| StickyCheck{"Prior turn has citations?"}
     StripMention --> StickyCheck
@@ -176,73 +189,44 @@ flowchart TD
 
 ---
 
-## 6. Adaptive RAG & Multi-Agent Orchestration
+## 6. Hierarchical Multi-Agent Orchestration Subsystem
 
-When queries require multi-step reasoning, hypothetical formulation, or external tools, the system executes a dynamic agentic control loop.
-
-```mermaid
-flowchart TD
-    Query["Standalone User Query"] --> Classify["QueryClassifier (direct / hyde / multi_hop / specialist)"]
-    Classify --> Route{Routing Strategy}
-    Route -->|direct| DirectRet["Direct Hybrid Retrieval"]
-    Route -->|hyde| HyDE["SafeHyDEExecutor (Generate Pseudo-Passage -> Dense Search)"]
-    Route -->|multi_hop| Decompose["QueryDecomposer (Split Subtasks -> Sequential Retrieval)"]
-    Route -->|specialist| MultiAgent["MasterAgent (DAG Planning -> AgentExecutionEngine)"]
-
-    DirectRet --> Evidence
-    HyDE --> Evidence
-    Decompose --> Evidence
-    MultiAgent --> Evidence["EvidenceSufficiencyEvaluator"]
-
-    Evidence --> Sufficient{Evidence Adequate?}
-    Sufficient -->|No & Replans Remaining| Replan["Replanner (Refine / Expand / Escalate)"]
-    Replan --> Route
-    Sufficient -->|Yes or Timeout| ToolCheck{Tool Calls Required?}
-
-    ToolCheck -->|Math| SafeCalc["SafeCalculator (AST-Sandboxed)"]
-    ToolCheck -->|Web| WebSearch["WebSearchTool (SerpAPI / Firecrawl / DuckDuckGo)"]
-    ToolCheck -->|RAG| SemanticSearch["SemanticSearchTool"]
-    SafeCalc --> Synthesis
-    WebSearch --> Synthesis
-    SemanticSearch --> Synthesis
-    ToolCheck -->|Direct| Synthesis["PromptBuilder (retrieved_context XML Fencing)"]
-
-    Synthesis --> Gemini["Google Gemini (gemini-3.5-flash-lite)"]
-    Gemini --> SSE["Server-Sent Events (SSE Stream to Client)"]
-```
-
----
-
-## 7. Hierarchical Multi-Agent Execution
-
-The MasterAgent decomposes complex user requests into a typed DAG of specialist tasks executed concurrently by the AgentExecutionEngine.
+The multi-agent execution pipeline orchestrates 7 registered specialist agents via dynamic DAG construction, parallel wave concurrency ($4.00\times$ measured speedup), dependency data propagation, and grounded streaming synthesis.
 
 ```mermaid
 flowchart TD
-    UserQuery["Complex User Query"] --> Master["MasterAgent: LLM Plan Generation"]
-    Master --> Validator["PlanValidator (schema + cycle check + policy)"]
-    Validator -->|Invalid| Regenerate["Regenerate Plan"]
+    UserQuery["User Query via POST /api/v1/chat"] --> Scan["PromptInjectionScanner (Injection & Role Defense)"]
+    Scan --> Master["MasterAgent: LLM Plan Generation (Fallback to Heuristic)"]
+    Master --> Validator["PlanValidator (Kahn's Algorithm Cycle & Dependency Check)"]
+    Validator -->|Invalid| Regenerate["Regenerate Plan (Bounded Iterations)"]
     Regenerate --> Validator
-    Validator -->|Valid| Engine["AgentExecutionEngine (Topological Sort)"]
+    Validator -->|Valid| Router["TaskRouter: Capability, Budget & Latency Match"]
+    Router --> Engine["AgentExecutionEngine (Topological Wave Execution)"]
 
-    Engine --> Wave0["Wave 0: Independent Tasks (asyncio.gather)"]
-    Wave0 --> Research["RESEARCH: ResearchAgent + ResearchPlanner"]
-    Wave0 --> WebS["WEB_SEARCH: WebSearchAgent"]
-    Wave0 --> DocA["DOCUMENT: DocumentAgent"]
+    subgraph Wave0 ["Topological Wave 0: Independent Concurrent Tasks (asyncio.gather)"]
+        Research["RESEARCH: ResearchAgent (Dense + Sparse + Reranker)"]
+        WebS["WEB_SEARCH: WebSearchAgent (Live Web)"]
+        DocA["DOCUMENT: DocumentAgent (Chunk/Metadata Inspection)"]
+        VisA["VISION: VisionAgent (Diagrams, Figures & OCR)"]
+        GraphA["GRAPH: GraphAgent (Knowledge Graph Traversal)"]
+    end
 
-    Wave0 --> Wave1["Wave 1: Dependent Tasks"]
-    Wave1 --> Analysis["ANALYSIS: AnalysisAgent"]
+    subgraph Wave1 ["Topological Wave 1: Downstream Dependent Tasks"]
+        TableA["TABLE: TableAgent (Markdown/CSV Extraction & Aggregation)"]
+        Analysis["ANALYSIS: AnalysisAgent (AST SafeCalculator & MathEngine)"]
+    end
 
-    Research --> Evaluator
-    WebS --> Evaluator
-    DocA --> Evaluator
-    Analysis --> Evaluator["ResultEvaluator (score vs required_evidence)"]
+    Engine --> Wave0
+    Wave0 -->|Propagate Upstream Results| Wave1
 
-    Evaluator --> Adequate{All Tasks Passed?}
-    Adequate -->|No & Iterations Left| Replan["MasterAgent: Regenerate Plan for Failed Tasks"]
+    Wave0 & Wave1 --> Evaluator["ResultEvaluator (Evidence Sufficiency & Contradiction Check)"]
+
+    Evaluator --> Adequate{Evidence Adequate?}
+    Adequate -->|No & Iterations Left| Replan["MasterAgent: Targeted Replanning (Preserves Success Fingerprints)"]
     Replan --> Engine
-    Adequate -->|Yes or Max Iterations| Synthesis["SynthesisAgent: Final Citation-Grounded Answer"]
-    Synthesis --> SSE["SSE Stream to Client"]
+    Adequate -->|Yes or Max Iterations| Gate["Evidence Relevance Gate (Domain Context Filtering)"]
+    Gate --> Synthesis["SynthesisAgent: Grounded Synthesis with XML Context Fencing"]
+    Synthesis --> SSE["Server-Sent Events (SSE Stream to Client)"]
 ```
 
 ---

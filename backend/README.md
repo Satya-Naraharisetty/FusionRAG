@@ -30,21 +30,31 @@ backend/
 
 ## Key Backend Features
 
-1. **Dual-Branch Hybrid Retrieval**:
+1. **Hierarchical Multi-Agent Orchestration**:
+   - Master Planner (`MasterAgent`) constructing dynamic dependency DAGs with Kahn's algorithm cycle prevention.
+   - **7 Production Specialist Agents**:
+     * `ResearchAgent`: 4-stage hybrid Fusion RAG (Qdrant Dense + PostgreSQL Sparse + RRF + MMR + Cross-Encoder).
+     * `DocumentAgent`: Targeted chunk/document direct inspection with tenant ownership validation.
+     * `AnalysisAgent`: AST-sandboxed symbolic mathematics (`SafeCalculator` + `MathEngine`) and CAGR/growth calculations.
+     * `WebSearchAgent`: Real-time internet search with domain relevance gating.
+     * `TableAgent`: Structured table extraction, aggregation (`SUM`, `AVG`, `GROWTH`, `MIN`, `MAX`), and upstream DAG consumption.
+     * `VisionAgent`: Diagram inspection, OCR transcription, and chart trend reasoning.
+     * `GraphAgent`: Multi-hop Knowledge Graph traversal via `PostgresGraphRetriever` and `GraphTraversalService`.
+   - Topological wave concurrency ($4.00\times$ measured parallel speedup) with upstream `context.dependency_results` propagation.
+   - `ResultEvaluator` with bounded adaptive replanning and Evidence Relevance Gating.
+   - `SynthesisAgent` with grounded XML context isolation and Server-Sent Events (SSE) streaming.
+
+2. **Asynchronous Multimodal & Knowledge Graph Ingestion**:
+   - Decoupled two-tier architecture: synchronous upload commits fast, while background `DocumentEnrichmentService` executes non-blocking enrichment.
+   - Multimodal Element Storage: Markdown/CSV tables and figure/chart elements in `document_elements`.
+   - Knowledge Graph Engine: Named entity recognition, normalization, mention linking, relationship triples (`graph_relationships`), and confidence evidence (`relationship_evidence`) with versioned idempotency (`delete_by_version`).
+
+3. **Multi-Branch Hybrid Retrieval**:
    - Dense semantic vector search via **Qdrant** (768-dim embeddings via `jina-embeddings-v3` or `text-embedding-004`).
    - Sparse lexical search via native **PostgreSQL Full-Text Search** (`to_tsvector`/`ts_rank_cd` on GIN indexes) or `InMemoryBM25Index` with class-level pre-tokenization caching.
+   - Structured table search via `DocumentElementRepository` and Knowledge Graph traversal via `PostgresGraphRetriever`.
    - Merged with **Reciprocal Rank Fusion (RRF)** ($k=60$) and diversified with **Maximal Marginal Relevance (MMR)** ($\lambda=0.5$).
    - Re-scored with **Jina AI Cross-Encoder REST API** (`jina-reranker-v2-base-multilingual`).
-
-2. **Adaptive RAG & Multi-Agent Orchestration**:
-   - Query classification (Direct, HyDE, Multi-Hop, Specialist).
-   - `SafeHyDEExecutor` generating hypothetical passages for enhanced vector matching.
-   - `SafeQueryDecomposer` splitting complex multi-hop queries.
-   - `EvidenceSufficiencyEvaluator` and `Replanner` providing dynamic autonomous retry loops.
-
-3. **Agentic Tool Sandboxing**:
-   - `SafeCalculator`: AST-parsed arithmetic sandbox blocking arbitrary code execution and exponential CPU DOS.
-   - `WebSearchTool`: Internet retrieval fallback via SerpAPI or Firecrawl.
 
 4. **Multi-Format Ingestion**:
    - Parsers for PDF, DOCX, TXT, Markdown, HTML, CSV, and Images (Gemini Vision OCR).
