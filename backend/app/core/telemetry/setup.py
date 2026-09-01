@@ -115,12 +115,15 @@ def init_telemetry(app: Any = None) -> None:
                             OTLPSpanExporter as HTTPSpanExporter,
                         )
 
-                        target_url = (
-                            endpoint_str
-                            if "/v1/traces" in endpoint_str
-                            or not endpoint_str.endswith("/otlp")
-                            else f"{endpoint_str.rstrip('/')}/v1/traces"
-                        )
+                        if "/v1/traces" in endpoint_str:
+                            target_url = endpoint_str
+                        elif endpoint_str.endswith("/otlp"):
+                            target_url = f"{endpoint_str}/v1/traces"
+                        elif "grafana.net" in endpoint_str:
+                            target_url = f"{endpoint_str.rstrip('/')}/otlp/v1/traces"
+                        else:
+                            target_url = f"{endpoint_str.rstrip('/')}/v1/traces"
+
                         exporter: Any = HTTPSpanExporter(
                             endpoint=target_url,
                             headers=headers_dict if headers_dict else None,
