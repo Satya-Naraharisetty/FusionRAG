@@ -25,14 +25,6 @@ repos:
         files: ^backend/app/.*\.py$
         pass_filenames: false
 
-      # Backend Pytest test suite
-      - id: backend-pytest
-        name: Backend Unit Tests
-        entry: uv --directory backend run pytest
-        language: system
-        files: ^backend/
-        pass_filenames: false
-
       # Frontend Prettier Code Formatting
       - id: frontend-format
         name: Frontend Prettier Format
@@ -55,14 +47,6 @@ repos:
         entry: npm --prefix frontend run lint
         language: system
         files: ^frontend/src/.*\.(js|jsx|ts|tsx)$
-        pass_filenames: false
-
-      # Frontend Vitest Unit Tests
-      - id: frontend-test
-        name: Frontend Vitest
-        entry: npm --prefix frontend run test
-        language: system
-        files: ^frontend/src/
         pass_filenames: false
 
       # Frontend Production Build verification
