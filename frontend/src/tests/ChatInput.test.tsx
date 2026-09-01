@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-} from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -45,12 +39,7 @@ afterEach(() => {
 describe("ChatInput", () => {
   it("renders textarea correctly", () => {
     renderWithQueryClient(
-      <ChatInput
-        conversationId={null}
-        onSend={() => {}}
-        onStop={() => {}}
-        isStreaming={false}
-      />
+      <ChatInput conversationId={null} onSend={() => {}} onStop={() => {}} isStreaming={false} />,
     );
     expect(screen.getByPlaceholderText(/Message FusionRAG/i)).toBeInTheDocument();
     // Brand-new chat, nothing attached yet — the lifecycle note is visible so
@@ -61,17 +50,12 @@ describe("ChatInput", () => {
   it("triggers onSend when submitting text", () => {
     const handleSend = vi.fn();
     renderWithQueryClient(
-      <ChatInput
-        conversationId={null}
-        onSend={handleSend}
-        onStop={() => {}}
-        isStreaming={false}
-      />
+      <ChatInput conversationId={null} onSend={handleSend} onStop={() => {}} isStreaming={false} />,
     );
 
     const textarea = screen.getByPlaceholderText(/Message FusionRAG/i);
     fireEvent.change(textarea, { target: { value: "Hello assistant" } });
-    
+
     const form = textarea.closest("form");
     if (form) {
       fireEvent.submit(form);
@@ -82,12 +66,7 @@ describe("ChatInput", () => {
 
   it("shows the document-mode indicator when @documents is typed", () => {
     renderWithQueryClient(
-      <ChatInput
-        conversationId={null}
-        onSend={() => {}}
-        onStop={() => {}}
-        isStreaming={false}
-      />
+      <ChatInput conversationId={null} onSend={() => {}} onStop={() => {}} isStreaming={false} />,
     );
 
     const textarea = screen.getByPlaceholderText(/Message FusionRAG/i);
@@ -105,17 +84,12 @@ describe("ChatInput", () => {
   it("renders stop button instead of send when streaming", () => {
     const handleStop = vi.fn();
     renderWithQueryClient(
-      <ChatInput
-        conversationId={null}
-        onSend={() => {}}
-        onStop={handleStop}
-        isStreaming={true}
-      />
+      <ChatInput conversationId={null} onSend={() => {}} onStop={handleStop} isStreaming={true} />,
     );
 
     const stopBtn = screen.getByRole("button", { name: /Stop generation/i });
     expect(stopBtn).toBeInTheDocument();
-    
+
     fireEvent.click(stopBtn);
     expect(handleStop).toHaveBeenCalled();
   });
@@ -124,9 +98,7 @@ describe("ChatInput", () => {
   // the completed doc-1), after which the row enters "processing" and derives
   // the live pipeline step from the shared documents + embedding-status caches.
   const uploadFile = () => {
-    const input = document.getElementById(
-      "chat-file-input"
-    ) as HTMLInputElement;
+    const input = document.getElementById("chat-file-input") as HTMLInputElement;
     fireEvent.change(input, {
       target: { files: [new File(["test"], "test.pdf", { type: "application/pdf" })] },
     });
@@ -143,17 +115,12 @@ describe("ChatInput", () => {
           failed_chunks: 0,
           provider: "mock",
           model: "mock",
-        })
-      )
+        }),
+      ),
     );
 
     renderWithQueryClient(
-      <ChatInput
-        conversationId="conv-1"
-        onSend={() => {}}
-        onStop={() => {}}
-        isStreaming={false}
-      />
+      <ChatInput conversationId="conv-1" onSend={() => {}} onStop={() => {}} isStreaming={false} />,
     );
 
     uploadFile();
@@ -161,26 +128,19 @@ describe("ChatInput", () => {
     // The upload resolves, the row enters processing, and the shared
     // embedding-status poll resolves to "generating" → real step footer.
     expect(
-      await screen.findByText(
-        "Indexing into vector DB — 3 of 5 chunks embedded"
-      )
+      await screen.findByText("Indexing into vector DB — 3 of 5 chunks embedded"),
     ).toBeInTheDocument();
     expect(screen.getByText("test.pdf")).toBeInTheDocument();
     // The in-flight row carries the same lifecycle hint as the chips strip.
     expect(
-      screen.getByText(/Only usable in this chat — deleted with the conversation/)
+      screen.getByText(/Only usable in this chat — deleted with the conversation/),
     ).toBeInTheDocument();
   });
 
   it("marks the attachment done once the document is fully indexed", async () => {
     // Default handler: embedding status resolves to completed immediately.
     renderWithQueryClient(
-      <ChatInput
-        conversationId="conv-1"
-        onSend={() => {}}
-        onStop={() => {}}
-        isStreaming={false}
-      />
+      <ChatInput conversationId="conv-1" onSend={() => {}} onStop={() => {}} isStreaming={false} />,
     );
 
     uploadFile();
@@ -194,15 +154,11 @@ describe("ChatInput", () => {
       .closest("div");
     expect(row).not.toBeNull();
     await waitFor(() =>
-      expect(
-        row!.querySelector("svg polyline[points='20 6 9 17 4 12']")
-      ).not.toBeNull()
+      expect(row!.querySelector("svg polyline[points='20 6 9 17 4 12']")).not.toBeNull(),
     );
     // The pipeline step footer is cleared, not left behind.
     expect(
-      screen.queryByText(
-        /Indexing into vector DB|Preparing to index|Extracting text|Chunking/
-      )
+      screen.queryByText(/Indexing into vector DB|Preparing to index|Extracting text|Chunking/),
     ).toBeNull();
   });
 
@@ -217,20 +173,15 @@ describe("ChatInput", () => {
           failed_chunks: 0,
           provider: "mock",
           model: "mock",
-        })
-      )
+        }),
+      ),
     );
 
   it("keeps chat attachments when the composer unmounts and remounts", async () => {
     stayGenerating();
 
     const { unmount } = renderWithQueryClient(
-      <ChatInput
-        conversationId="conv-1"
-        onSend={() => {}}
-        onStop={() => {}}
-        isStreaming={false}
-      />
+      <ChatInput conversationId="conv-1" onSend={() => {}} onStop={() => {}} isStreaming={false} />,
     );
     uploadFile();
     expect(await screen.findByText("test.pdf")).toBeInTheDocument();
@@ -239,12 +190,7 @@ describe("ChatInput", () => {
     // snapshot restores the in-flight row on the way back.
     unmount();
     renderWithQueryClient(
-      <ChatInput
-        conversationId="conv-1"
-        onSend={() => {}}
-        onStop={() => {}}
-        isStreaming={false}
-      />
+      <ChatInput conversationId="conv-1" onSend={() => {}} onStop={() => {}} isStreaming={false} />,
     );
     expect(await screen.findByText("test.pdf")).toBeInTheDocument();
     await act(async () => {});
@@ -254,35 +200,20 @@ describe("ChatInput", () => {
     stayGenerating();
 
     const { rerender } = renderWithQueryClient(
-      <ChatInput
-        conversationId="conv-1"
-        onSend={() => {}}
-        onStop={() => {}}
-        isStreaming={false}
-      />
+      <ChatInput conversationId="conv-1" onSend={() => {}} onStop={() => {}} isStreaming={false} />,
     );
     uploadFile();
     expect(await screen.findByText("test.pdf")).toBeInTheDocument();
 
     // A different conversation doesn't see conv-1's attachments…
     rerender(
-      <ChatInput
-        conversationId="conv-2"
-        onSend={() => {}}
-        onStop={() => {}}
-        isStreaming={false}
-      />
+      <ChatInput conversationId="conv-2" onSend={() => {}} onStop={() => {}} isStreaming={false} />,
     );
     expect(screen.queryByText("test.pdf")).not.toBeInTheDocument();
 
     // …but they're still there when the user comes back.
     rerender(
-      <ChatInput
-        conversationId="conv-1"
-        onSend={() => {}}
-        onStop={() => {}}
-        isStreaming={false}
-      />
+      <ChatInput conversationId="conv-1" onSend={() => {}} onStop={() => {}} isStreaming={false} />,
     );
     expect(await screen.findByText("test.pdf")).toBeInTheDocument();
     await act(async () => {});
@@ -298,7 +229,7 @@ describe("ChatInput", () => {
         onSend={handleSend}
         onStop={() => {}}
         isStreaming={false}
-      />
+      />,
     );
     uploadFile();
     expect(await screen.findByText("test.pdf")).toBeInTheDocument();
@@ -308,9 +239,7 @@ describe("ChatInput", () => {
     const form = textarea.closest("form");
     if (form) fireEvent.submit(form);
 
-    await waitFor(() =>
-      expect(screen.queryByText("test.pdf")).not.toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.queryByText("test.pdf")).not.toBeInTheDocument());
     // Existing conversation: once the tray clears, no caption lingers here
     // (the chips strip owns the hint for existing chats).
     expect(screen.queryByText(/Only usable in this chat/)).not.toBeInTheDocument();
@@ -340,26 +269,19 @@ describe("ChatInput", () => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
-      })
+      }),
     );
     const handleSend = vi.fn();
 
     renderWithQueryClient(
-      <ChatInput
-        conversationId={null}
-        onSend={handleSend}
-        onStop={() => {}}
-        isStreaming={false}
-      />
+      <ChatInput conversationId={null} onSend={handleSend} onStop={() => {}} isStreaming={false} />,
     );
     uploadFile();
     expect(await screen.findByText("test.pdf")).toBeInTheDocument();
 
     // No conversation yet → the row stays queued instead of uploading (a
     // conversation-less upload would leak the file into the global library).
-    await act(
-      async () => await new Promise((r) => setTimeout(r, 50))
-    );
+    await act(async () => await new Promise((r) => setTimeout(r, 50)));
     expect(uploadCalled).toBe(false);
 
     // Sending keeps the deferred rows in the tray — they're handed to the
@@ -369,11 +291,8 @@ describe("ChatInput", () => {
     const form = textarea.closest("form");
     if (form) fireEvent.submit(form);
 
-    expect(handleSend).toHaveBeenCalledWith("with attachment", [
-      expect.any(File),
-    ]);
+    expect(handleSend).toHaveBeenCalledWith("with attachment", [expect.any(File)]);
     expect(screen.getByText("test.pdf")).toBeInTheDocument();
     await act(async () => {});
   });
 });
-

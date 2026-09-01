@@ -59,14 +59,14 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   onRegenerate,
   onSelectCitation,
 }) => {
-  const [copied, setCopied]           = useState(false);
+  const [copied, setCopied] = useState(false);
   const [showActions, setShowActions] = useState(false);
-  const [isEditing, setIsEditing]     = useState(false);
-  const [editText, setEditText]       = useState(message.content || "");
-  const [isSpeaking, setIsSpeaking]   = useState(false);
-  const contentRef                    = useRef<HTMLDivElement>(null);
-  const textareaRef                   = useRef<HTMLTextAreaElement>(null);
-  const isUser                        = message.role === "user";
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(message.content || "");
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isUser = message.role === "user";
 
   useEffect(() => {
     setEditText(message.content || "");
@@ -110,7 +110,10 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
     }
 
     const { answer } = parseThinkingContent(message.content || "");
-    const cleanText = answer.replace(/[#*`_~[\]()]/g, " ").replace(/\s+/g, " ").trim();
+    const cleanText = answer
+      .replace(/[#*`_~[\]()]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     if (!cleanText) return;
 
     window.speechSynthesis.cancel();
@@ -124,9 +127,9 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
     window.speechSynthesis.speak(utterance);
   };
 
-  const messageTime    = message.created_at ? new Date(message.created_at) : new Date();
-  const formattedTime  = messageTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const fullTime       = messageTime.toLocaleString();
+  const messageTime = message.created_at ? new Date(message.created_at) : new Date();
+  const formattedTime = messageTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const fullTime = messageTime.toLocaleString();
 
   /* ── User message ── */
   if (isUser) {
@@ -196,7 +199,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                           className={cn(
                             actionBtn,
                             "opacity-0 group-hover/bubble:opacity-100 sm:group-hover:opacity-100 transition-opacity",
-                            showActions && "opacity-100"
+                            showActions && "opacity-100",
                           )}
                           aria-label="Edit message"
                         >
@@ -220,7 +223,9 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                     {formattedTime}
                   </span>
                 </TooltipTrigger>
-                <TooltipContent side="top" align="center">{fullTime}</TooltipContent>
+                <TooltipContent side="top" align="center">
+                  {fullTime}
+                </TooltipContent>
               </Tooltip>
             </div>
           </div>
@@ -267,7 +272,10 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                 <summary className="flex cursor-pointer items-center gap-2 px-3.5 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/50 select-none transition-colors">
                   <Brain size={13} className="text-[var(--accent-primary)]" />
                   <span>Thought Process</span>
-                  <ChevronDown size={13} className="ml-auto transition-transform duration-200 group-open/think:rotate-180 text-[var(--text-muted)]" />
+                  <ChevronDown
+                    size={13}
+                    className="ml-auto transition-transform duration-200 group-open/think:rotate-180 text-[var(--text-muted)]"
+                  />
                 </summary>
                 <div className="px-3.5 pb-3 pt-2 border-t border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] font-mono leading-relaxed whitespace-pre-wrap bg-[var(--bg-secondary)]/40">
                   {thinking}
@@ -276,9 +284,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
             )}
 
             {/* Markdown content */}
-            <div
-              className="flex flex-col gap-1.5 select-text text-[var(--text-primary)] text-[15px] leading-[1.65]"
-            >
+            <div className="flex flex-col gap-1.5 select-text text-[var(--text-primary)] text-[15px] leading-[1.65]">
               {answer ? (
                 <MarkdownRenderer content={answer} />
               ) : message.status === "pending" || (message.status === "streaming" && !answer) ? (
@@ -322,7 +328,10 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
               (message.status === "streaming" || message.status === "completed") && (
                 <div className="flex items-center gap-1.5 w-fit rounded-full border border-[var(--border-default)] bg-[var(--bg-tertiary)] px-2.5 py-1 text-[11px] text-[var(--text-muted)] mt-1 select-text animate-fade-in">
                   <FileQuestion size={12} className="flex-shrink-0 text-[var(--text-secondary)]" />
-                  <span>Answering from general knowledge — attach files here or use @documents for your library</span>
+                  <span>
+                    Answering from general knowledge — attach files here or use @documents for your
+                    library
+                  </span>
                 </div>
               )}
 
@@ -344,7 +353,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
             <div
               className={cn(
                 "flex items-center justify-between gap-2 mt-2 pt-1 border-t border-transparent transition-opacity duration-200",
-                showActions ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                showActions ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100",
               )}
             >
               {/* Left: timestamp + reactions + read aloud */}
@@ -356,7 +365,9 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                       {formattedTime}
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent side="top" align="center">{fullTime}</TooltipContent>
+                  <TooltipContent side="top" align="center">
+                    {fullTime}
+                  </TooltipContent>
                 </Tooltip>
 
                 {message.status !== "streaming" && (
@@ -393,14 +404,17 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                           onClick={handleToggleSpeak}
                           className={cn(
                             actionBtn,
-                            isSpeaking && "text-[var(--accent-primary)] bg-[var(--accent-primary)]/10"
+                            isSpeaking &&
+                              "text-[var(--accent-primary)] bg-[var(--accent-primary)]/10",
                           )}
                           aria-label={isSpeaking ? "Stop reading" : "Read aloud"}
                         >
                           {isSpeaking ? <VolumeX size={11} /> : <Volume2 size={11} />}
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="top">{isSpeaking ? "Stop speech" : "Read aloud"}</TooltipContent>
+                      <TooltipContent side="top">
+                        {isSpeaking ? "Stop speech" : "Read aloud"}
+                      </TooltipContent>
                     </Tooltip>
                   </>
                 )}
@@ -442,7 +456,9 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                         )}
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="top">{copied ? "Copied!" : "Copy response"}</TooltipContent>
+                    <TooltipContent side="top">
+                      {copied ? "Copied!" : "Copy response"}
+                    </TooltipContent>
                   </Tooltip>
                 )}
 
@@ -470,7 +486,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                           "flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] transition-colors text-[10px] font-medium cursor-pointer",
                           message.status === "failed"
                             ? "text-red-400 hover:bg-red-500/10"
-                            : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+                            : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]",
                         )}
                         aria-label="Retry query"
                       >
@@ -494,4 +510,3 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
 export const ChatMessage = React.memo(ChatMessageComponent);
 
 export default ChatMessage;
-

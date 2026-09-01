@@ -44,7 +44,8 @@ const en = {
 
   // Empty chat view
   "chat.emptyHeading": "How can I help you today?",
-  "chat.emptySub": "Upload PDF, TXT, DOCX, MD, or image files to your library, then ask questions to retrieve grounded insights.",
+  "chat.emptySub":
+    "Upload PDF, TXT, DOCX, MD, or image files to your library, then ask questions to retrieve grounded insights.",
   "chat.example1": "Summarize my documents",
   "chat.example1Prompt": "Can you provide a comprehensive summary of my uploaded documents?",
   "chat.example2": "Explain this concept",
@@ -113,7 +114,8 @@ const en = {
   "settings.conversation.title": "Conversation Defaults",
   "settings.conversation.desc": "Adjust how models and retrieval algorithms behave.",
   "settings.conversation.temperature": "Temperature",
-  "settings.conversation.temperatureDesc": "Controls randomness: lower is deterministic, higher is creative.",
+  "settings.conversation.temperatureDesc":
+    "Controls randomness: lower is deterministic, higher is creative.",
   "settings.conversation.strict": "Strict",
   "settings.conversation.creative": "Creative",
   "settings.conversation.topK": "Retrieval Top K",
@@ -217,10 +219,7 @@ export function useLocale(): {
   return { locale, setLocale, t };
 }
 
-export function t(
-  key: MessageKey,
-  params?: Record<string, string | number>
-): string {
+export function t(key: MessageKey, params?: Record<string, string | number>): string {
   let str = MESSAGES[activeLocale]?.[key] ?? MESSAGES.en[key] ?? String(key);
   if (params) {
     for (const [name, value] of Object.entries(params)) {

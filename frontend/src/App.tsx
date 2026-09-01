@@ -36,7 +36,7 @@ function App() {
             staleTime: 5 * 60 * 1000, // 5 minutes
           },
         },
-      })
+      }),
   );
 
   return (
@@ -48,101 +48,104 @@ function App() {
                 survives navigation — in-flight uploads keep processing in the
                 background wherever the user goes. */}
             <UploadQueueProvider>
-            <ConversationMetadataProvider>
-            <Suspense
-              fallback={
-                <div className="flex h-dvh w-dvw items-center justify-center bg-[var(--bg-primary)] text-[var(--text-primary)]">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent-primary)] border-t-transparent"></div>
-                    <p className="text-xs text-[var(--text-secondary)] font-medium">Loading FusionRAG...</p>
-                  </div>
-                </div>
-              }
-            >
-              <Routes>
-                {/* Public indexable landing page */}
-                <Route path="/" element={<LandingPage />} />
+              <ConversationMetadataProvider>
+                <Suspense
+                  fallback={
+                    <div className="flex h-dvh w-dvw items-center justify-center bg-[var(--bg-primary)] text-[var(--text-primary)]">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent-primary)] border-t-transparent"></div>
+                        <p className="text-xs text-[var(--text-secondary)] font-medium">
+                          Loading FusionRAG...
+                        </p>
+                      </div>
+                    </div>
+                  }
+                >
+                  <Routes>
+                    {/* Public indexable landing page */}
+                    <Route path="/" element={<LandingPage />} />
 
-                {/* Public guest-only routes */}
-                <Route element={<PublicRoute />}>
-                  <Route path="/login" element={<LoginForm />} />
-                  <Route path="/register" element={<RegisterForm />} />
-                  <Route path="/verify-email" element={<VerifyEmailPage />} />
-                </Route>
-
-                {/* Secure application routes */}
-                <Route element={<ProtectedRoute />}>
-                  <Route element={<ChatLayout />}>
-                    <Route
-                      path="/chat"
-                      element={
-                        <ErrorBoundary>
-                          <ChatPage />
-                        </ErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="/chat/:conversationId"
-                      element={
-                        <ErrorBoundary>
-                          <ChatPage />
-                        </ErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="/documents"
-                      element={
-                        <ErrorBoundary>
-                          <DocumentsPage />
-                        </ErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="/projects"
-                      element={
-                        <ErrorBoundary>
-                          <ProjectsPage />
-                        </ErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="/settings"
-                      element={
-                        <ErrorBoundary>
-                          <SettingsPage />
-                        </ErrorBoundary>
-                      }
-                    />
-                    <Route element={<AdminRoute />}>
-                      <Route
-                        path="/admin/dashboard"
-                        element={
-                          <ErrorBoundary>
-                            <AdminDashboardPage />
-                          </ErrorBoundary>
-                        }
-                      />
+                    {/* Public guest-only routes */}
+                    <Route element={<PublicRoute />}>
+                      <Route path="/login" element={<LoginForm />} />
+                      <Route path="/register" element={<RegisterForm />} />
+                      <Route path="/verify-email" element={<VerifyEmailPage />} />
                     </Route>
-                  </Route>
-                </Route>
 
-                {/* OAuth callback — must be outside both Public and Protected
+                    {/* Secure application routes */}
+                    <Route element={<ProtectedRoute />}>
+                      <Route element={<ChatLayout />}>
+                        <Route
+                          path="/chat"
+                          element={
+                            <ErrorBoundary>
+                              <ChatPage />
+                            </ErrorBoundary>
+                          }
+                        />
+                        <Route
+                          path="/chat/:conversationId"
+                          element={
+                            <ErrorBoundary>
+                              <ChatPage />
+                            </ErrorBoundary>
+                          }
+                        />
+                        <Route
+                          path="/documents"
+                          element={
+                            <ErrorBoundary>
+                              <DocumentsPage />
+                            </ErrorBoundary>
+                          }
+                        />
+                        <Route
+                          path="/projects"
+                          element={
+                            <ErrorBoundary>
+                              <ProjectsPage />
+                            </ErrorBoundary>
+                          }
+                        />
+                        <Route
+                          path="/settings"
+                          element={
+                            <ErrorBoundary>
+                              <SettingsPage />
+                            </ErrorBoundary>
+                          }
+                        />
+                        <Route element={<AdminRoute />}>
+                          <Route
+                            path="/admin/dashboard"
+                            element={
+                              <ErrorBoundary>
+                                <AdminDashboardPage />
+                              </ErrorBoundary>
+                            }
+                          />
+                        </Route>
+                      </Route>
+                    </Route>
+
+                    {/* OAuth callback — must be outside both Public and Protected
                     guards so it is reachable immediately after redirect */}
-                <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
+                    <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
 
-                {/* Fallbacks */}
-                <Route path="/401" element={<ErrorPage status={401} />} />
-                <Route path="/403" element={<ErrorPage status={403} />} />
-                <Route path="/500" element={<ErrorPage status={500} />} />
-                <Route path="*" element={<ErrorPage status={404} />} />
-              </Routes>
-            </Suspense>
-            </ConversationMetadataProvider>
+                    {/* Fallbacks */}
+                    <Route path="/401" element={<ErrorPage status={401} />} />
+                    <Route path="/403" element={<ErrorPage status={403} />} />
+                    <Route path="/500" element={<ErrorPage status={500} />} />
+                    <Route path="*" element={<ErrorPage status={404} />} />
+                  </Routes>
+                </Suspense>
+              </ConversationMetadataProvider>
             </UploadQueueProvider>
             <Toaster
               position="bottom-right"
               toastOptions={{
-                className: "bg-[var(--bg-elevated)] border border-[var(--border-default)] text-[var(--text-primary)] text-xs font-medium shadow-sm",
+                className:
+                  "bg-[var(--bg-elevated)] border border-[var(--border-default)] text-[var(--text-primary)] text-xs font-medium shadow-sm",
                 duration: 4000,
               }}
             />

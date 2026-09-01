@@ -47,18 +47,15 @@ export class ErrorBoundary extends Component<Props, State> {
             Something went wrong
           </h3>
           <p className="text-xs text-[var(--text-secondary)] max-w-sm mb-4 leading-relaxed">
-            An unexpected error occurred rendering this component. Let's try reloading the interface.
+            An unexpected error occurred rendering this component. Let's try reloading the
+            interface.
           </p>
           {import.meta.env.DEV && this.state.error && (
             <pre className="p-3 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[11px] font-mono text-red-400 rounded-[var(--radius-md)] max-w-lg overflow-x-auto text-left mb-4 w-full">
               {this.state.error.toString()}
             </pre>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={this.handleReset}
-          >
+          <Button variant="secondary" size="sm" onClick={this.handleReset}>
             Reload Interface
           </Button>
         </div>

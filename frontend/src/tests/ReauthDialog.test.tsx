@@ -67,7 +67,12 @@ describe("ReauthDialog", () => {
     const onConfirm = vi.fn().mockResolvedValue(undefined);
     const onOpenChange = vi.fn();
     const onSuccess = vi.fn();
-    renderDialog({ onConfirm, onOpenChange, onSuccess, successMessage: "Your account has been deleted." });
+    renderDialog({
+      onConfirm,
+      onOpenChange,
+      onSuccess,
+      successMessage: "Your account has been deleted.",
+    });
 
     fireEvent.change(screen.getByLabelText(/Type your email to confirm/i), {
       target: { value: "test@example.com" },
@@ -101,12 +106,10 @@ describe("ReauthDialog", () => {
   });
 
   it("keeps the dialog open and clears the password on INVALID_CREDENTIALS", async () => {
-    const onConfirm = vi
-      .fn()
-      .mockRejectedValue({
-        data: { error: { code: "INVALID_CREDENTIALS" } },
-        status: 401,
-      });
+    const onConfirm = vi.fn().mockRejectedValue({
+      data: { error: { code: "INVALID_CREDENTIALS" } },
+      status: 401,
+    });
     const onOpenChange = vi.fn();
     renderDialog({ onConfirm, onOpenChange });
 
@@ -117,7 +120,9 @@ describe("ReauthDialog", () => {
     fireEvent.change(passwordInput, { target: { value: "wrong-password" } });
     fireEvent.click(screen.getByRole("button", { name: /^Confirm$/i }));
 
-    await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith("Incorrect password. Please try again."));
+    await vi.waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Incorrect password. Please try again."),
+    );
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect((passwordInput as HTMLInputElement).value).toBe("");
   });
@@ -134,7 +139,9 @@ describe("ReauthDialog", () => {
     fireEvent.change(passwordInput, { target: { value: "password123" } });
     fireEvent.click(screen.getByRole("button", { name: /^Confirm$/i }));
 
-    await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith("Too many attempts. Please try again in a minute."));
+    await vi.waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Too many attempts. Please try again in a minute."),
+    );
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect((passwordInput as HTMLInputElement).value).toBe("password123");
   });
@@ -156,7 +163,7 @@ describe("ReauthDialog", () => {
         description="d"
         accountEmail="test@example.com"
         onConfirm={vi.fn()}
-      />
+      />,
     );
     rerender(
       <ReauthDialog
@@ -166,7 +173,7 @@ describe("ReauthDialog", () => {
         description="d"
         accountEmail="test@example.com"
         onConfirm={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByLabelText(/Type your email to confirm/i)).toHaveValue("");

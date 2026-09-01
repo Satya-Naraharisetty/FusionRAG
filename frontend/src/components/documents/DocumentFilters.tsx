@@ -36,11 +36,11 @@ interface DocumentFiltersProps {
 }
 
 const STATUS_TABS: { label: string; value: DocumentFilterType }[] = [
-  { label: "All",        value: "all" },
-  { label: "Chat",       value: "chat" },
-  { label: "Completed",  value: "completed" },
+  { label: "All", value: "all" },
+  { label: "Chat", value: "chat" },
+  { label: "Completed", value: "completed" },
   { label: "Processing", value: "processing" },
-  { label: "Failed",     value: "failed" },
+  { label: "Failed", value: "failed" },
 ];
 
 export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
@@ -66,20 +66,24 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
   onDeletePreset,
   onLoadPreset,
 }) => {
-  const [presetInput, setPresetInput]       = useState("");
+  const [presetInput, setPresetInput] = useState("");
   const [showPresetsMenu, setShowPresetsMenu] = useState(false);
 
   const toggleLanguage = (lang: string) => {
     onSelectedLanguagesChange(
       selectedLanguages.includes(lang)
         ? selectedLanguages.filter((l) => l !== lang)
-        : [...selectedLanguages, lang]
+        : [...selectedLanguages, lang],
     );
   };
 
   const isAnyFilterActive =
-    !!search || filter !== "all" || selectedFolderId !== null ||
-    selectedLanguages.length > 0 || !!dateRange.start || !!dateRange.end;
+    !!search ||
+    filter !== "all" ||
+    selectedFolderId !== null ||
+    selectedLanguages.length > 0 ||
+    !!dateRange.start ||
+    !!dateRange.end;
 
   return (
     <div className="space-y-3">
@@ -133,7 +137,9 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
                 </div>
 
                 {Object.keys(savedPresets).length === 0 ? (
-                  <p className="text-[11px] text-[var(--text-muted)] italic">No saved presets yet.</p>
+                  <p className="text-[11px] text-[var(--text-muted)] italic">
+                    No saved presets yet.
+                  </p>
                 ) : (
                   <div className="space-y-1 max-h-36 overflow-y-auto">
                     {Object.keys(savedPresets).map((name) => (
@@ -142,7 +148,10 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
                         className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-[var(--radius-md)] hover:bg-[var(--bg-tertiary)] transition-colors"
                       >
                         <button
-                          onClick={() => { onLoadPreset(name); setShowPresetsMenu(false); }}
+                          onClick={() => {
+                            onLoadPreset(name);
+                            setShowPresetsMenu(false);
+                          }}
                           className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-left truncate flex-1 cursor-pointer transition-colors"
                         >
                           {name}
@@ -165,7 +174,9 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
                     placeholder="New preset name…"
                     value={presetInput}
                     onChange={(e) => setPresetInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && presetInput.trim() && onSavePreset(presetInput.trim())}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && presetInput.trim() && onSavePreset(presetInput.trim())
+                    }
                     className="flex-1 h-8 bg-[var(--bg-input)] border border-[var(--border-default)] rounded-[var(--radius-md)] text-[11px] px-2 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent-primary)]/50 transition-colors"
                   />
                   <Button
@@ -198,7 +209,9 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           >
             <option value="">All Folders</option>
             {folders.map((f) => (
-              <option key={f.id} value={f.id}>{f.name}</option>
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
             ))}
           </select>
         </div>
@@ -233,7 +246,9 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
         <div className="flex flex-wrap gap-1.5 items-center">
           {availableLanguages.length > 0 && (
             <>
-              <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Lang:</span>
+              <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                Lang:
+              </span>
               {availableLanguages.map((lang) => {
                 const isSelected = selectedLanguages.includes(lang);
                 return (
@@ -244,7 +259,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
                       "px-2 py-0.5 rounded-[var(--radius-pill)] text-[10px] font-medium border transition-all duration-150 cursor-pointer",
                       isSelected
                         ? "bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] border-[var(--accent-primary)]/30"
-                        : "bg-transparent text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-secondary)] hover:border-[var(--border-default)]"
+                        : "bg-transparent text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-secondary)] hover:border-[var(--border-default)]",
                     )}
                   >
                     {lang.toUpperCase()}
@@ -265,7 +280,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
                 "px-2.5 py-1 rounded-[var(--radius-md)] text-[11px] font-medium transition-all duration-150 cursor-pointer",
                 filter === tab.value
                   ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)]"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-transparent"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-transparent",
               )}
             >
               {tab.label}

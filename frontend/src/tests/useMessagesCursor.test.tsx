@@ -108,7 +108,11 @@ describe("useMessages Cursor Pagination Hook", () => {
     await result.current.fetchNextPage();
     await waitFor(() => expect(result.current.data?.pages).toHaveLength(2));
 
-    expect(conversationsApi.listMessages).toHaveBeenCalledWith("conv-123", 2, "cursor_token_page_2");
+    expect(conversationsApi.listMessages).toHaveBeenCalledWith(
+      "conv-123",
+      2,
+      "cursor_token_page_2",
+    );
     expect(result.current.hasNextPage).toBe(false);
 
     // 3. Page Flattening & Duplicate Verification
@@ -159,7 +163,7 @@ describe("useMessages Cursor Pagination Hook", () => {
     expect(conversationsApi.listMessages).toHaveBeenCalledWith(
       "conv-123",
       1,
-      "prev_cursor_token_for_page_1"
+      "prev_cursor_token_for_page_1",
     );
   });
 

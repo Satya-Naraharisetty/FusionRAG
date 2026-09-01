@@ -25,14 +25,14 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
 }) => {
   useEffect(() => {
     // 1. Update Document Title
-    const fullTitle = title
-      ? `${title} | FusionRAG`
-      : DEFAULT_TITLE;
+    const fullTitle = title ? `${title} | FusionRAG` : DEFAULT_TITLE;
     document.title = fullTitle;
 
     // Helper to safely set or create meta elements
     const setMetaTag = (attributeName: string, attributeValue: string, content: string) => {
-      let tag = document.querySelector(`meta[${attributeName}="${attributeValue}"]`) as HTMLMetaElement;
+      let tag = document.querySelector(
+        `meta[${attributeName}="${attributeValue}"]`,
+      ) as HTMLMetaElement;
       if (!tag) {
         tag = document.createElement("meta");
         tag.setAttribute(attributeName, attributeValue);

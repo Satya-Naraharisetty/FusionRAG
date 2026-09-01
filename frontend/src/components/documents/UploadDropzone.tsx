@@ -11,10 +11,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useDocuments } from "../../hooks/useDocuments";
-import {
-  useUploadQueue,
-  type QueueFile,
-} from "../../context/UploadQueueContext";
+import { useUploadQueue, type QueueFile } from "../../context/UploadQueueContext";
 import { deriveUploadStage, rowProgress } from "../../lib/uploadStages";
 import { UPLOAD_LIMITS } from "../../lib/constants";
 import { type Document, type EmbeddingStatus } from "../../types";
@@ -77,22 +74,16 @@ export const UploadDropzone: React.FC = () => {
   const { data: documents = [] } = useDocuments();
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
 
-  const docById = useMemo(
-    () => new Map(documents.map((d) => [d.id, d])),
-    [documents]
-  );
+  const docById = useMemo(() => new Map(documents.map((d) => [d.id, d])), [documents]);
 
   // Chat-composer attachments share the same app-level queue (so they survive
   // navigation), but this Documents queue only renders document rows.
-  const docQueue = useMemo(
-    () => queue.filter((q) => q.source !== "chat"),
-    [queue]
-  );
+  const docQueue = useMemo(() => queue.filter((q) => q.source !== "chat"), [queue]);
   // The sidebar indicator counts chat uploads too and links here — surface
   // them so a click-through never lands on a confusingly empty queue.
   const activeChatCount = useMemo(
     () => queue.filter((q) => q.source === "chat" && q.status !== "completed").length,
-    [queue]
+    [queue],
   );
 
   // An error row without `detail` is a plain upload failure (safe to retry);
@@ -102,7 +93,7 @@ export const UploadDropzone: React.FC = () => {
 
   const uploadAll = () => {
     const pending = docQueue.filter(
-      (q) => q.status === "queued" || q.status === "paused" || isRetryableError(q)
+      (q) => q.status === "queued" || q.status === "paused" || isRetryableError(q),
     );
     if (pending.length === 0) {
       toast.error("No pending files to upload.");
@@ -119,7 +110,11 @@ export const UploadDropzone: React.FC = () => {
       const emb = q.documentId ? embeddingStatus[q.documentId] : undefined;
       return sum + rowProgress(q.status, q.progress, doc, emb, q.startedAt ?? null);
     }, 0);
-    return { completed, total: docQueue.length, overallProgress: Math.round(totalProgress / docQueue.length) };
+    return {
+      completed,
+      total: docQueue.length,
+      overallProgress: Math.round(totalProgress / docQueue.length),
+    };
   }, [docQueue, docById, embeddingStatus]);
 
   const handleDragStart = (idx: number) => setDraggedIdx(idx);
@@ -200,7 +195,8 @@ export const UploadDropzone: React.FC = () => {
                 )}
               </div>
               <p className="text-[11px] text-[var(--text-muted)] font-mono mt-0.5">
-                {batchSummary.completed}/{batchSummary.total} completed · {batchSummary.overallProgress}%
+                {batchSummary.completed}/{batchSummary.total} completed ·{" "}
+                {batchSummary.overallProgress}%
               </p>
             </div>
             <div className="flex items-center gap-1.5">
@@ -215,7 +211,9 @@ export const UploadDropzone: React.FC = () => {
                   Clear done
                 </Button>
               )}
-              {docQueue.some((q) => ["queued", "paused"].includes(q.status) || isRetryableError(q)) && (
+              {docQueue.some(
+                (q) => ["queued", "paused"].includes(q.status) || isRetryableError(q),
+              ) && (
                 <Button size="sm" onClick={uploadAll} className="gap-1.5 text-xs">
                   <ArrowUp size={12} />
                   Upload All
@@ -251,14 +249,23 @@ export const UploadDropzone: React.FC = () => {
                     <GripVertical size={13} />
                   </div>
 
-                  <FileTypeBadge filename={item.fileName} variant="card" className="w-8 h-8 flex-shrink-0" />
+                  <FileTypeBadge
+                    filename={item.fileName}
+                    variant="card"
+                    className="w-8 h-8 flex-shrink-0"
+                  />
 
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-medium text-[var(--text-primary)] truncate">
                         {item.fileName}
                       </p>
-                      <FileTypeBadge filename={item.fileName} variant="minimal" size="sm" className="flex-shrink-0" />
+                      <FileTypeBadge
+                        filename={item.fileName}
+                        variant="minimal"
+                        size="sm"
+                        className="flex-shrink-0"
+                      />
                     </div>
                     <UploadRowProgress
                       item={item}

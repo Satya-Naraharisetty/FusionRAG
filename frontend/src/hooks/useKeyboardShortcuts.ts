@@ -5,9 +5,7 @@ export const useKeyboardShortcuts = (shortcuts: Record<string, () => void>) => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       const isInput =
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable;
+        target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
 
       const key = e.key.toLowerCase();
       const ctrl = e.ctrlKey || e.metaKey;

@@ -71,9 +71,29 @@ describe("upload queue snapshot helpers", () => {
       v: 1 as const,
       userId: "user-123",
       items: [
-        { id: "q2", fileName: "b.pdf", status: "processing" as const, progress: 15, documentId: "doc-2", startedAt: 123 },
-        { id: "q3", fileName: "c.pdf", status: "completed" as const, progress: 100, documentId: "doc-3" },
-        { id: "q4", fileName: "d.pdf", status: "error" as const, progress: 100, documentId: "doc-4", detail: "Vectorization failed" },
+        {
+          id: "q2",
+          fileName: "b.pdf",
+          status: "processing" as const,
+          progress: 15,
+          documentId: "doc-2",
+          startedAt: 123,
+        },
+        {
+          id: "q3",
+          fileName: "c.pdf",
+          status: "completed" as const,
+          progress: 100,
+          documentId: "doc-3",
+        },
+        {
+          id: "q4",
+          fileName: "d.pdf",
+          status: "error" as const,
+          progress: 100,
+          documentId: "doc-4",
+          detail: "Vectorization failed",
+        },
         { id: "q5", fileName: "e.pdf", status: "queued" as const, progress: 0 },
       ],
     };
@@ -96,15 +116,10 @@ function Probe() {
     uploadQueuedChatRows,
     discardQueuedNewChatRows,
   } = useUploadQueue();
-  const chatPdf = (name: string) =>
-    new File(["x"], name, { type: "application/pdf" });
+  const chatPdf = (name: string) => new File(["x"], name, { type: "application/pdf" });
   return (
     <div>
-      <button
-        onClick={() =>
-          addFiles([new File(["x"], "ok.pdf", { type: "application/pdf" })])
-        }
-      >
+      <button onClick={() => addFiles([new File(["x"], "ok.pdf", { type: "application/pdf" })])}>
         add
       </button>
       <button
@@ -169,18 +184,10 @@ function Probe() {
       >
         add-chat-queued-none
       </button>
-      <button onClick={() => discardConversationRows("conv-1")}>
-        discard-conv1
-      </button>
-      <button onClick={() => uploadQueuedChatRows("conv-9")}>
-        flush-conv9
-      </button>
-      <button onClick={discardQueuedNewChatRows}>
-        discard-queued-none
-      </button>
-      <button onClick={() => removeItems(queue.map((q) => q.id))}>
-        remove-all
-      </button>
+      <button onClick={() => discardConversationRows("conv-1")}>discard-conv1</button>
+      <button onClick={() => uploadQueuedChatRows("conv-9")}>flush-conv9</button>
+      <button onClick={discardQueuedNewChatRows}>discard-queued-none</button>
+      <button onClick={() => removeItems(queue.map((q) => q.id))}>remove-all</button>
       <button onClick={clearCompleted}>clear-done</button>
       <ul>
         {queue.map((q) => (
@@ -212,7 +219,7 @@ const renderQueue = (props?: { completedRowTtlMs?: number }) =>
           <Probe />
         </UploadQueueProvider>
       </AuthProvider>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 
 describe("UploadQueueProvider", () => {
@@ -226,8 +233,8 @@ describe("UploadQueueProvider", () => {
           failed_chunks: 0,
           provider: "mock",
           model: "mock",
-        })
-      )
+        }),
+      ),
     );
     // The mocked auth user is user-123 and the mocked documents list has a
     // completed doc-1, so a restored processing row for doc-1 should reconcile
@@ -247,18 +254,15 @@ describe("UploadQueueProvider", () => {
             startedAt: Date.now(),
           },
         ],
-      })
+      }),
     );
 
     renderQueue();
 
     await waitFor(() => expect(screen.getByText("b.pdf")).toBeInTheDocument());
     await waitFor(
-      () =>
-        expect(screen.getByText("b.pdf").getAttribute("data-status")).toBe(
-          "completed"
-        ),
-      { timeout: 5000 }
+      () => expect(screen.getByText("b.pdf").getAttribute("data-status")).toBe("completed"),
+      { timeout: 5000 },
     );
 
     // Completed rows can be dismissed with the clear action.
@@ -284,7 +288,7 @@ describe("UploadQueueProvider", () => {
             startedAt: Date.now(),
           },
         ],
-      })
+      }),
     );
 
     renderQueue();
@@ -299,9 +303,7 @@ describe("UploadQueueProvider", () => {
     renderQueue();
     screen.getByText("add").click();
     await waitFor(() =>
-      expect(screen.getByText("ok.pdf").getAttribute("data-status")).toBe(
-        "queued"
-      )
+      expect(screen.getByText("ok.pdf").getAttribute("data-status")).toBe("queued"),
     );
     await act(async () => {});
   });
@@ -313,9 +315,7 @@ describe("UploadQueueProvider", () => {
     expect(row.getAttribute("data-source")).toBe("chat");
     expect(row.getAttribute("data-conv")).toBe("conv-1");
     // autoUpload starts the upload immediately (mock resolves to processing).
-    await waitFor(() =>
-      expect(row.getAttribute("data-status")).not.toBe("queued")
-    );
+    await waitFor(() => expect(row.getAttribute("data-status")).not.toBe("queued"));
     await act(async () => {});
   });
 
@@ -337,7 +337,7 @@ describe("UploadQueueProvider", () => {
             conversationId: "conv-1",
           },
         ],
-      })
+      }),
     );
 
     renderQueue();
@@ -356,20 +356,14 @@ describe("UploadQueueProvider", () => {
     screen.getByText("add-doc-auto").click();
 
     await waitFor(() =>
-      expect(screen.getByText("chat.png").getAttribute("data-status")).toBe(
-        "completed"
-      )
+      expect(screen.getByText("chat.png").getAttribute("data-status")).toBe("completed"),
     );
     await waitFor(() =>
-      expect(screen.getByText("doc.pdf").getAttribute("data-status")).toBe(
-        "completed"
-      )
+      expect(screen.getByText("doc.pdf").getAttribute("data-status")).toBe("completed"),
     );
 
     fireEvent.click(screen.getByText("clear-done"));
-    await waitFor(() =>
-      expect(screen.queryByText("doc.pdf")).not.toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.queryByText("doc.pdf")).not.toBeInTheDocument());
     expect(screen.getByText("chat.png")).toBeInTheDocument();
     await act(async () => {});
   });
@@ -379,9 +373,7 @@ describe("UploadQueueProvider", () => {
     screen.getByText("add").click();
     await waitFor(() => expect(screen.getByText("ok.pdf")).toBeInTheDocument());
     screen.getByText("remove-all").click();
-    await waitFor(() =>
-      expect(screen.queryByText("ok.pdf")).not.toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.queryByText("ok.pdf")).not.toBeInTheDocument());
     await act(async () => {});
   });
 
@@ -391,22 +383,17 @@ describe("UploadQueueProvider", () => {
     screen.getByText("add-chat").click();
     screen.getByText("add-doc-auto").click();
     await waitFor(() =>
-      expect(screen.getByText("doc.pdf").getAttribute("data-status")).toBe(
-        "completed"
-      )
+      expect(screen.getByText("doc.pdf").getAttribute("data-status")).toBe("completed"),
     );
     await waitFor(() =>
-      expect(screen.getByText("chat.png").getAttribute("data-status")).toBe(
-        "completed"
-      )
+      expect(screen.getByText("chat.png").getAttribute("data-status")).toBe("completed"),
     );
 
     // The completed document row is dropped moments later (automated "Clear
     // done")…
-    await waitFor(
-      () => expect(screen.queryByText("doc.pdf")).not.toBeInTheDocument(),
-      { timeout: 2000 }
-    );
+    await waitFor(() => expect(screen.queryByText("doc.pdf")).not.toBeInTheDocument(), {
+      timeout: 2000,
+    });
     // …while the chat row keeps its composer lifecycle until sent/cancelled.
     expect(screen.getByText("chat.png")).toBeInTheDocument();
     await act(async () => {});
@@ -436,19 +423,15 @@ describe("UploadQueueProvider", () => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
-      })
+      }),
     );
 
     renderQueue();
     screen.getByText("add-chat").click();
     const row = await screen.findByText("chat.png");
-    await waitFor(() =>
-      expect(capturedUrl).toContain("conversation_id=conv-1")
-    );
+    await waitFor(() => expect(capturedUrl).toContain("conversation_id=conv-1"));
     // The upload actually started (left the queued state).
-    await waitFor(() =>
-      expect(row.getAttribute("data-status")).not.toBe("queued")
-    );
+    await waitFor(() => expect(row.getAttribute("data-status")).not.toBe("queued"));
     await act(async () => {});
   });
 
@@ -472,18 +455,16 @@ describe("UploadQueueProvider", () => {
             conversationId: "conv-1",
           },
         ],
-      })
+      }),
     );
 
     renderQueue();
 
     const row = await screen.findByText("chat.png");
     expect(row.getAttribute("data-source")).toBe("chat");
-    await waitFor(
-      () =>
-        expect(row.getAttribute("data-status")).toBe("completed"),
-      { timeout: 5000 }
-    );
+    await waitFor(() => expect(row.getAttribute("data-status")).toBe("completed"), {
+      timeout: 5000,
+    });
     await act(async () => {});
   });
 
@@ -498,9 +479,7 @@ describe("UploadQueueProvider", () => {
     // Deleting conv-1 drops its chat rows (and any in-flight uploads) while
     // conv-2's attachments stay queued.
     screen.getByText("discard-conv1").click();
-    await waitFor(() =>
-      expect(screen.queryByText("c1.pdf")).not.toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.queryByText("c1.pdf")).not.toBeInTheDocument());
     expect(screen.getByText("c2.pdf")).toBeInTheDocument();
     await act(async () => {});
   });
@@ -528,7 +507,7 @@ describe("UploadQueueProvider", () => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
-      })
+      }),
     );
 
     renderQueue();
@@ -541,12 +520,8 @@ describe("UploadQueueProvider", () => {
     // The conversation is created server-side; the queue hands the deferred
     // rows to it (scoped upload starts) and dismisses them from the tray.
     screen.getByText("flush-conv9").click();
-    await waitFor(() =>
-      expect(screen.queryByText("new.pdf")).not.toBeInTheDocument()
-    );
-    await waitFor(() =>
-      expect(capturedUrl).toContain("conversation_id=conv-9")
-    );
+    await waitFor(() => expect(screen.queryByText("new.pdf")).not.toBeInTheDocument());
+    await waitFor(() => expect(capturedUrl).toContain("conversation_id=conv-9"));
     await act(async () => {});
   });
 
@@ -559,9 +534,7 @@ describe("UploadQueueProvider", () => {
     // The user left the brand-new chat without sending — the abandoned draft's
     // rows are cleared so they can't leak into a different conversation.
     screen.getByText("discard-queued-none").click();
-    await waitFor(() =>
-      expect(screen.queryByText("new.pdf")).not.toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.queryByText("new.pdf")).not.toBeInTheDocument());
     await act(async () => {});
   });
 });

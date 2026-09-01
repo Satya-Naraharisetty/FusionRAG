@@ -23,7 +23,11 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
   const isPython =
     langLower === "python" ||
     langLower === "py" ||
-    (!language && (code.includes("import pandas") || code.includes("import matplotlib") || code.includes("import numpy") || code.includes("plt.")));
+    (!language &&
+      (code.includes("import pandas") ||
+        code.includes("import matplotlib") ||
+        code.includes("import numpy") ||
+        code.includes("plt.")));
 
   useEffect(() => {
     let active = true;
@@ -33,7 +37,8 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
         if (active) setHtml(out);
       } catch {
         // highlightCode falls back internally; this guards against unforeseen failures.
-        if (active) setHtml(`<pre class="shiki" tabindex="0"><code>${escapeHtml(code)}</code></pre>`);
+        if (active)
+          setHtml(`<pre class="shiki" tabindex="0"><code>${escapeHtml(code)}</code></pre>`);
       }
     }
     highlight();
@@ -82,7 +87,9 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
         {/* Header bar */}
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-tertiary)]/80 px-3.5 py-2 text-[10px] font-medium tracking-wide text-[var(--text-muted)]">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-[var(--text-secondary)] uppercase">{language || (isPython ? "python" : "text")}</span>
+            <span className="font-semibold text-[var(--text-secondary)] uppercase">
+              {language || (isPython ? "python" : "text")}
+            </span>
             {isPython && (
               <span className="rounded bg-[var(--accent-primary)]/15 px-1.5 py-0.5 text-[8px] font-medium text-[var(--accent-primary)] lowercase">
                 wasm sandbox
@@ -96,7 +103,9 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
               onClick={() => setShowLineNumbers(!showLineNumbers)}
               className={cn(
                 "p-1 rounded-[var(--radius-sm)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] cursor-pointer",
-                showLineNumbers ? "text-[var(--accent-primary)]" : "text-[var(--text-muted)] opacity-60 group-hover:opacity-100"
+                showLineNumbers
+                  ? "text-[var(--accent-primary)]"
+                  : "text-[var(--text-muted)] opacity-60 group-hover:opacity-100",
               )}
               title={showLineNumbers ? "Hide Line Numbers" : "Show Line Numbers"}
             >
@@ -108,7 +117,9 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
               onClick={() => setWrapLines(!wrapLines)}
               className={cn(
                 "p-1 rounded-[var(--radius-sm)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] cursor-pointer",
-                wrapLines ? "text-[var(--accent-primary)]" : "text-[var(--text-muted)] opacity-60 group-hover:opacity-100"
+                wrapLines
+                  ? "text-[var(--accent-primary)]"
+                  : "text-[var(--text-muted)] opacity-60 group-hover:opacity-100",
               )}
               title={wrapLines ? "Disable Line Wrap" : "Enable Line Wrap"}
             >
@@ -122,7 +133,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
                 disabled={isRunning}
                 className={cn(
                   "flex cursor-pointer items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--accent-primary)]/20 px-2 py-0.5 text-[10px] font-medium text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/30 transition-all duration-200 border border-[var(--accent-primary)]/30",
-                  isRunning && "opacity-70 cursor-not-allowed"
+                  isRunning && "opacity-70 cursor-not-allowed",
                 )}
                 title="Execute Python in Browser WebAssembly"
               >
@@ -162,17 +173,19 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
         </div>
 
         {/* Code Content */}
-        <div className={cn(
-          "p-3 max-h-[480px] leading-relaxed",
-          wrapLines ? "whitespace-pre-wrap break-words overflow-y-auto" : "overflow-x-auto"
-        )}>
+        <div
+          className={cn(
+            "p-3 max-h-[480px] leading-relaxed",
+            wrapLines ? "whitespace-pre-wrap break-words overflow-y-auto" : "overflow-x-auto",
+          )}
+        >
           {html ? (
             <div
               dangerouslySetInnerHTML={{ __html: html }}
               className={cn(
                 "shiki-wrapper",
                 showLineNumbers && lineCount > 1 && "has-line-numbers",
-                wrapLines && "break-words"
+                wrapLines && "break-words",
               )}
             />
           ) : (

@@ -16,17 +16,12 @@ import { cn } from "../../lib/utils";
  * derive their stage from server state, same as the dropzone's batch summary).
  * Collapsed: a dedicated icon button with a count badge.
  */
-export const SidebarUploadIndicator: React.FC<{ collapsed: boolean }> = ({
-  collapsed,
-}) => {
+export const SidebarUploadIndicator: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
   const navigate = useNavigate();
   const { queue, embeddingStatus } = useUploadQueue();
   const { data: documents = [] } = useDocuments();
 
-  const docById = useMemo(
-    () => new Map(documents.map((d) => [d.id, d])),
-    [documents]
-  );
+  const docById = useMemo(() => new Map(documents.map((d) => [d.id, d])), [documents]);
 
   const summary = useMemo(() => {
     // Everything not yet done needs attention: queued/uploading/paused rows,
@@ -95,7 +90,7 @@ export const SidebarUploadIndicator: React.FC<{ collapsed: boolean }> = ({
             "h-1 rounded-full transition-all duration-300",
             summary.hasError
               ? "bg-[var(--accent-error)]"
-              : "bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-success)]"
+              : "bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-success)]",
           )}
           style={{ width: `${summary.progress}%` }}
         />

@@ -12,7 +12,7 @@ import { ComponentType, lazy } from "react";
  * latest index.html with new chunk hashes, and recovers smoothly.
  */
 export function lazyWithRetry<T extends ComponentType<any>>(
-  factory: () => Promise<{ default: T }>
+  factory: () => Promise<{ default: T }>,
 ) {
   return lazy(async () => {
     try {

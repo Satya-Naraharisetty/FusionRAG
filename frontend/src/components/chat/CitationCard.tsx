@@ -14,7 +14,7 @@ export const CitationCard: React.FC<CitationCardProps> = ({ citation, index, onS
   const isWeb = Boolean(
     citation.url ||
     citation.document_name.startsWith("[Web]") ||
-    citation.document_name.toLowerCase().startsWith("http")
+    citation.document_name.toLowerCase().startsWith("http"),
   );
 
   const cleanDocName = citation.document_name.replace(/^\[Web\]\s*/i, "");
@@ -67,23 +67,63 @@ export const CitationCard: React.FC<CitationCardProps> = ({ citation, index, onS
           </span>
         )}
         {citation.element_type && (
-          <span className={`px-1 py-0.2 rounded text-[8px] border ${getElementBadgeColor(citation.element_type)}`}>
+          <span
+            className={`px-1 py-0.2 rounded text-[8px] border ${getElementBadgeColor(citation.element_type)}`}
+          >
             {citation.element_type === "GRAPH_RELATIONSHIP" ? "GRAPH" : citation.element_type}
           </span>
         )}
         {citation.entailment_status === "ENTAILED" && (
-          <span className="text-emerald-400 text-[9px] font-bold" title="Verified by Citation Entailment Gate">✓</span>
+          <span
+            className="text-emerald-400 text-[9px] font-bold"
+            title="Verified by Citation Entailment Gate"
+          >
+            ✓
+          </span>
         )}
       </div>
       {expanded && (
         <div className="mt-0.5 pt-1.5 border-t border-[var(--border-subtle)] text-[9px] text-[var(--text-muted)] flex flex-col gap-0.5 animate-in fade-in duration-150">
-          <div><span className="font-semibold text-[var(--text-secondary)]">Source:</span> {cleanDocName}</div>
-          {citation.url && <div><span className="font-semibold text-[var(--text-secondary)]">URL:</span> {citation.url}</div>}
-          {citation.page_number && <div><span className="font-semibold text-[var(--text-secondary)]">Page:</span> {citation.page_number}</div>}
-          {citation.line_number && <div><span className="font-semibold text-[var(--text-secondary)]">Line:</span> {citation.line_number}</div>}
-          {citation.version !== undefined && <div><span className="font-semibold text-[var(--text-secondary)]">Version:</span> v{citation.version}</div>}
-          {citation.element_type && <div><span className="font-semibold text-[var(--text-secondary)]">Element Type:</span> {citation.element_type}</div>}
-          {citation.confidence !== undefined && <div><span className="font-semibold text-[var(--text-secondary)]">Confidence:</span> {(citation.confidence * 100).toFixed(1)}%</div>}
+          <div>
+            <span className="font-semibold text-[var(--text-secondary)]">Source:</span>{" "}
+            {cleanDocName}
+          </div>
+          {citation.url && (
+            <div>
+              <span className="font-semibold text-[var(--text-secondary)]">URL:</span>{" "}
+              {citation.url}
+            </div>
+          )}
+          {citation.page_number && (
+            <div>
+              <span className="font-semibold text-[var(--text-secondary)]">Page:</span>{" "}
+              {citation.page_number}
+            </div>
+          )}
+          {citation.line_number && (
+            <div>
+              <span className="font-semibold text-[var(--text-secondary)]">Line:</span>{" "}
+              {citation.line_number}
+            </div>
+          )}
+          {citation.version !== undefined && (
+            <div>
+              <span className="font-semibold text-[var(--text-secondary)]">Version:</span> v
+              {citation.version}
+            </div>
+          )}
+          {citation.element_type && (
+            <div>
+              <span className="font-semibold text-[var(--text-secondary)]">Element Type:</span>{" "}
+              {citation.element_type}
+            </div>
+          )}
+          {citation.confidence !== undefined && (
+            <div>
+              <span className="font-semibold text-[var(--text-secondary)]">Confidence:</span>{" "}
+              {(citation.confidence * 100).toFixed(1)}%
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -27,14 +27,11 @@ import { useDocuments } from "./useDocuments";
  * amber banner until reload.
  */
 export function useEmbeddingStatus(
-  extraDocumentIds: string[] = []
+  extraDocumentIds: string[] = [],
 ): Record<string, EmbeddingStatus> {
   const { data: documents = [] } = useDocuments();
 
-  const extraIds = useMemo(
-    () => [...new Set(extraDocumentIds)],
-    [extraDocumentIds]
-  );
+  const extraIds = useMemo(() => [...new Set(extraDocumentIds)], [extraDocumentIds]);
 
   // Targets = documents from the global library whose chunking finished, plus
   // any explicitly-listed ids — chat-scoped uploads aren't part of the global
@@ -67,9 +64,7 @@ export function useEmbeddingStatus(
       // `.map()` breaks contextual typing into useQueries' generic options,
       // so the callback parameter needs an explicit Query annotation.
       refetchInterval: (query: Query<EmbeddingStatus>) =>
-        query.state.data?.status === "completed"
-          ? false
-          : EMBEDDING_POLL_INTERVAL_MS,
+        query.state.data?.status === "completed" ? false : EMBEDDING_POLL_INTERVAL_MS,
     })),
   });
 

@@ -12,7 +12,7 @@ export const useOnlineStatus = () => {
       toast.success("Connection restored. You're back online.", {
         id: "offline-reconnect",
       });
-      
+
       const timer = setTimeout(() => {
         setWasOffline(false);
       }, 3000);

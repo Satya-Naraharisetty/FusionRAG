@@ -37,11 +37,11 @@ interface ConversationMenuProps {
 }
 
 const COLOR_OPTIONS = [
-  { name: "Violet",  color: "bg-violet-500" },
+  { name: "Violet", color: "bg-violet-500" },
   { name: "Emerald", color: "bg-emerald-500" },
-  { name: "Rose",    color: "bg-rose-500" },
-  { name: "Amber",   color: "bg-amber-500" },
-  { name: "Blue",    color: "bg-blue-500" },
+  { name: "Rose", color: "bg-rose-500" },
+  { name: "Amber", color: "bg-amber-500" },
+  { name: "Blue", color: "bg-blue-500" },
 ];
 
 export const ConversationMenu: React.FC<ConversationMenuProps> = ({
@@ -71,17 +71,26 @@ export const ConversationMenu: React.FC<ConversationMenuProps> = ({
       <DropdownMenuContent align="end" className="w-52">
         {/* Pin / Unpin */}
         <DropdownMenuItem
-          onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTogglePin();
+          }}
           className="gap-2 cursor-pointer"
         >
-          <Pin size={13} className={isPinned ? "fill-[var(--accent-primary)] text-[var(--accent-primary)]" : ""} />
+          <Pin
+            size={13}
+            className={isPinned ? "fill-[var(--accent-primary)] text-[var(--accent-primary)]" : ""}
+          />
           <span>{isPinned ? "Unpin" : "Pin"}</span>
         </DropdownMenuItem>
 
         {/* Direct Remove from Folder ONLY if currently foldered */}
         {Boolean(currentFolderId) && (
           <DropdownMenuItem
-            onClick={(e) => { e.stopPropagation(); onMoveToFolder(null); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveToFolder(null);
+            }}
             className="gap-2 cursor-pointer text-amber-500 dark:text-amber-400"
           >
             <FolderOpen size={13} />
@@ -99,7 +108,10 @@ export const ConversationMenu: React.FC<ConversationMenuProps> = ({
             {Boolean(currentFolderId) && (
               <>
                 <DropdownMenuItem
-                  onClick={(e) => { e.stopPropagation(); onMoveToFolder(null); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveToFolder(null);
+                  }}
                   className="cursor-pointer text-amber-500 dark:text-amber-400"
                 >
                   <span>Remove from folder</span>
@@ -115,10 +127,19 @@ export const ConversationMenu: React.FC<ConversationMenuProps> = ({
               folders.map((folder) => (
                 <DropdownMenuItem
                   key={folder.id}
-                  onClick={(e) => { e.stopPropagation(); onMoveToFolder(folder.id); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveToFolder(folder.id);
+                  }}
                   className="cursor-pointer"
                 >
-                  <span className={currentFolderId === folder.id ? "font-semibold text-[var(--accent-primary)]" : ""}>
+                  <span
+                    className={
+                      currentFolderId === folder.id
+                        ? "font-semibold text-[var(--accent-primary)]"
+                        : ""
+                    }
+                  >
                     {folder.name}
                   </span>
                 </DropdownMenuItem>
@@ -153,7 +174,9 @@ export const ConversationMenu: React.FC<ConversationMenuProps> = ({
                     <span>{opt.name}</span>
                   </div>
                   {hasTag && (
-                    <span className="text-[10px] text-[var(--accent-primary)] font-semibold">Applied</span>
+                    <span className="text-[10px] text-[var(--accent-primary)] font-semibold">
+                      Applied
+                    </span>
                   )}
                 </DropdownMenuItem>
               );
@@ -164,7 +187,10 @@ export const ConversationMenu: React.FC<ConversationMenuProps> = ({
         <DropdownMenuSeparator />
 
         <DropdownMenuItem
-          onClick={(e) => { e.stopPropagation(); onRename(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRename();
+          }}
           className="gap-2 cursor-pointer"
         >
           <Pencil size={13} />
@@ -172,7 +198,10 @@ export const ConversationMenu: React.FC<ConversationMenuProps> = ({
         </DropdownMenuItem>
 
         <DropdownMenuItem
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
           className="gap-2 text-[var(--accent-error)] focus:bg-red-500/10 focus:text-red-400 cursor-pointer"
         >
           <Trash size={13} />

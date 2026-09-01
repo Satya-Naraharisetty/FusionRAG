@@ -33,7 +33,7 @@ describe("highlightCode", () => {
 
   it("escapes HTML entities", () => {
     expect(escapeHtml(`<a href="x">'&'</a>`)).toBe(
-      "&lt;a href=&quot;x&quot;&gt;&#039;&amp;&#039;&lt;/a&gt;"
+      "&lt;a href=&quot;x&quot;&gt;&#039;&amp;&#039;&lt;/a&gt;",
     );
   });
 

@@ -60,7 +60,7 @@ export const useFileValidation = (options: FileValidationOptions = {}) => {
           (f) =>
             f.file.name === file.name &&
             f.file.size === file.size &&
-            f.file.lastModified === file.lastModified
+            f.file.lastModified === file.lastModified,
         );
         if (duplicate) {
           return {
@@ -73,7 +73,7 @@ export const useFileValidation = (options: FileValidationOptions = {}) => {
 
       return { isValid: true };
     },
-    [maxSize, acceptedExtensions, existingFiles, checkDuplicates]
+    [maxSize, acceptedExtensions, existingFiles, checkDuplicates],
   );
 
   const validateFiles = useCallback(
@@ -95,7 +95,7 @@ export const useFileValidation = (options: FileValidationOptions = {}) => {
 
       return { valid, invalid };
     },
-    [validateFile]
+    [validateFile],
   );
 
   return { validateFile, validateFiles };

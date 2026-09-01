@@ -90,14 +90,12 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({ open, onOpenChange }
       <div
         ref={sheetRef}
         style={{
-          transform: open
-            ? `translateY(${translateY}px)`
-            : "translateY(100%)",
+          transform: open ? `translateY(${translateY}px)` : "translateY(100%)",
           transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
         }}
         className={cn(
           "fixed bottom-0 left-0 right-0 h-[85vh] bg-[var(--bg-elevated)] border-t border-[var(--border-subtle)] rounded-t-[20px] shadow-sm z-50 md:hidden flex flex-col overflow-hidden select-none",
-          !open && "pointer-events-none"
+          !open && "pointer-events-none",
         )}
       >
         {/* Drag Handle Area */}

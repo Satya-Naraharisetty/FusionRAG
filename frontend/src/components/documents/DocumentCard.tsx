@@ -63,10 +63,10 @@ interface DocumentCardProps {
 }
 
 const STATUS_CLASSES: Record<Document["status"], string> = {
-  pending:    "bg-amber-500/10   text-amber-400   border border-amber-500/20",
+  pending: "bg-amber-500/10   text-amber-400   border border-amber-500/20",
   processing: "bg-blue-500/10    text-blue-400    border border-blue-500/20",
-  completed:  "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
-  failed:     "bg-red-500/10     text-red-400     border border-red-500/20",
+  completed: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+  failed: "bg-red-500/10     text-red-400     border border-red-500/20",
 };
 
 export const DocumentCard: React.FC<DocumentCardProps> = ({
@@ -89,9 +89,9 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
   onDrop,
 }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting]             = useState(false);
-  const [isRegenerating, setIsRegenerating]     = useState(false);
-  const fileInputRef                            = useRef<HTMLInputElement>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -135,7 +135,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           "group flex flex-col bg-[var(--bg-secondary)] border rounded-[var(--radius-xl)] transition-all duration-200 overflow-hidden select-none",
           isSelected
             ? "border-[var(--accent-primary)]/40 ring-1 ring-[var(--accent-primary)]/20"
-            : "border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-tertiary)]/40"
+            : "border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-tertiary)]/40",
         )}
       >
         <div className="p-[calc(var(--space-factor,1)*16px)] flex flex-col gap-[calc(var(--space-factor,1)*12px)] h-full">
@@ -150,14 +150,18 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               </div>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); onSelectToggle(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectToggle();
+                }}
                 className="text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer p-0.5 transition-colors"
                 aria-label={isSelected ? "Deselect document" : "Select document"}
               >
-                {isSelected
-                  ? <CheckSquare size={14} className="text-[var(--accent-primary)]" />
-                  : <Square size={14} />
-                }
+                {isSelected ? (
+                  <CheckSquare size={14} className="text-[var(--accent-primary)]" />
+                ) : (
+                  <Square size={14} />
+                )}
               </button>
             </div>
 
@@ -203,7 +207,11 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                       onClick={() => onMoveToFolder(null)}
                       className="cursor-pointer"
                     >
-                      <span className={!currentFolderId ? "font-semibold text-[var(--accent-primary)]" : ""}>
+                      <span
+                        className={
+                          !currentFolderId ? "font-semibold text-[var(--accent-primary)]" : ""
+                        }
+                      >
                         No Folder
                       </span>
                     </DropdownMenuItem>
@@ -213,7 +221,13 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                         onClick={() => onMoveToFolder(folder.id)}
                         className="cursor-pointer"
                       >
-                        <span className={currentFolderId === folder.id ? "font-semibold text-[var(--accent-primary)]" : ""}>
+                        <span
+                          className={
+                            currentFolderId === folder.id
+                              ? "font-semibold text-[var(--accent-primary)]"
+                              : ""
+                          }
+                        >
                           {folder.name}
                         </span>
                       </DropdownMenuItem>
@@ -306,10 +320,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               role="alert"
             >
               <AlertTriangle size={13} className="shrink-0" />
-              <span
-                className="min-w-0 flex-1 truncate"
-                title={VECTORIZATION_FAILED_MESSAGE}
-              >
+              <span className="min-w-0 flex-1 truncate" title={VECTORIZATION_FAILED_MESSAGE}>
                 {VECTORIZATION_FAILED_MESSAGE}
               </span>
               <button
@@ -318,10 +329,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                 disabled={isRegenerating}
                 className="shrink-0 inline-flex items-center gap-1 rounded-md border border-amber-500/30 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider cursor-pointer transition-colors hover:bg-amber-500/15 disabled:opacity-50"
               >
-                <RefreshCw
-                  size={10}
-                  className={isRegenerating ? "animate-spin" : undefined}
-                />
+                <RefreshCw size={10} className={isRegenerating ? "animate-spin" : undefined} />
                 {isRegenerating ? "Queuing…" : "Regenerate"}
               </button>
             </div>
@@ -347,7 +355,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             <span
               className={cn(
                 "inline-flex items-center text-[9px] px-2 py-0.5 rounded-[var(--radius-pill)] font-bold uppercase tracking-wider",
-                STATUS_CLASSES[document.status]
+                STATUS_CLASSES[document.status],
               )}
             >
               {document.status}
@@ -393,7 +401,8 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               <span>Delete Document?</span>
             </DialogTitle>
             <DialogDescription>
-              Permanently remove "{document.original_filename}"? This will delete all text chunks and embedding vectors. This action cannot be undone.
+              Permanently remove "{document.original_filename}"? This will delete all text chunks
+              and embedding vectors. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 pt-2">

@@ -48,14 +48,13 @@ export const ErrorPage: React.FC<ErrorPageProps> = ({ status }) => {
       <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         {current.icon}
       </div>
-      <h1 className="mb-1 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">{current.title}</h1>
-      <p className="mb-6 max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">{current.desc}</p>
-      <Button
-        variant="default"
-        size="sm"
-        onClick={current.action}
-        className="gap-1.5"
-      >
+      <h1 className="mb-1 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+        {current.title}
+      </h1>
+      <p className="mb-6 max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">
+        {current.desc}
+      </p>
+      <Button variant="default" size="sm" onClick={current.action} className="gap-1.5">
         {status === 500 ? <RefreshCw size={14} /> : <Home size={14} />}
         <span>{current.label}</span>
       </Button>

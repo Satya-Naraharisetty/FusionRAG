@@ -1,8 +1,7 @@
 import api, { getAccessToken } from "./client";
 import { Document, EmbeddingStatus } from "../types";
 
-const BASE_URL =
-  (import.meta.env.VITE_API_URL || "http://localhost:8000") + "/api/v1";
+const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000") + "/api/v1";
 
 /**
  * Upload via XMLHttpRequest: fetch has no upload-progress events, and the
@@ -15,7 +14,7 @@ function uploadWithProgress(
   onProgress?: (progressEvent: { loaded: number; total: number }) => void,
   signal?: AbortSignal,
   query = "",
-  method = "POST"
+  method = "POST",
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -79,22 +78,20 @@ export const documentsApi = {
     file: File,
     onUploadProgress?: (progressEvent: unknown) => void,
     signal?: AbortSignal,
-    conversationId?: string | null
+    conversationId?: string | null,
   ): Promise<Document> {
     const formData = new FormData();
     formData.append("file", file);
     // Chat-composer uploads are scoped to their conversation: the document
     // only participates in that chat's retrieval and is deleted with it.
-    const query = conversationId
-      ? `conversation_id=${encodeURIComponent(conversationId)}`
-      : "";
+    const query = conversationId ? `conversation_id=${encodeURIComponent(conversationId)}` : "";
     // (unknown) => void is assignable to ({loaded,total}) => void, so no cast needed.
     return uploadWithProgress(
       "/documents/upload",
       formData,
       onUploadProgress,
       signal,
-      query
+      query,
     ) as Promise<Document>;
   },
 
@@ -102,7 +99,7 @@ export const documentsApi = {
     id: string,
     file: File,
     onUploadProgress?: (progressEvent: unknown) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<Document> {
     const formData = new FormData();
     formData.append("file", file);
@@ -112,7 +109,7 @@ export const documentsApi = {
       onUploadProgress,
       signal,
       "",
-      "PUT"
+      "PUT",
     ) as Promise<Document>;
   },
 

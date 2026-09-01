@@ -17,10 +17,7 @@ interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export const CommandPalette: React.FC<CommandPaletteProps> = ({
-  open,
-  onOpenChange,
-}) => {
+export const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onOpenChange }) => {
   const navigate = useNavigate();
   const { data: listData } = useConversations();
   const { logout } = useAuth();
@@ -36,7 +33,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput placeholder="Type a command or search conversations..." />
       <CommandList className="bg-[var(--bg-elevated)] text-[var(--text-primary)] border-[var(--border-subtle)]">
-        <CommandEmpty className="py-6 text-center text-xs text-[var(--text-muted)]">No results found.</CommandEmpty>
+        <CommandEmpty className="py-6 text-center text-xs text-[var(--text-muted)]">
+          No results found.
+        </CommandEmpty>
         <CommandGroup heading="Actions">
           <CommandItem
             onSelect={() => handleSelect(() => navigate("/chat"))}

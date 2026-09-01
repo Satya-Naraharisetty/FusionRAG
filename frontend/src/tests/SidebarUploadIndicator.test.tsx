@@ -14,11 +14,7 @@ afterEach(() => {
 function Probe() {
   const { addFiles } = useUploadQueue();
   return (
-    <button
-      onClick={() =>
-        addFiles([new File(["x"], "a.pdf", { type: "application/pdf" })])
-      }
-    >
+    <button onClick={() => addFiles([new File(["x"], "a.pdf", { type: "application/pdf" })])}>
       add
     </button>
   );
@@ -49,7 +45,7 @@ const renderIndicator = (collapsed: boolean) =>
         />
         <Route path="/documents" element={<div>documents page</div>} />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 
 describe("SidebarUploadIndicator", () => {
@@ -57,9 +53,7 @@ describe("SidebarUploadIndicator", () => {
     renderIndicator(false);
 
     expect(screen.queryByText("Uploads")).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /in the queue/i })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /in the queue/i })).not.toBeInTheDocument();
     await act(async () => {});
   });
 

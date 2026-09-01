@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { X, ChevronLeft, ChevronRight, HelpCircle, Sparkles, FileText, Keyboard, MessageSquare } from "lucide-react";
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  HelpCircle,
+  Sparkles,
+  FileText,
+  Keyboard,
+  MessageSquare,
+} from "lucide-react";
 import { Button } from "../ui/Button";
 
 interface TooltipConfig {
@@ -70,7 +79,10 @@ export const OnboardingTour: React.FC = () => {
         if (spaceRight >= tooltipWidth + 16) {
           // Position to the right of the target element
           const targetCenterY = rect.top + rect.height / 2;
-          const top = Math.max(16, Math.min(targetCenterY - 36, window.innerHeight - tooltipHeight - 16));
+          const top = Math.max(
+            16,
+            Math.min(targetCenterY - 36, window.innerHeight - tooltipHeight - 16),
+          );
           const left = rect.right + 12;
           setTooltipLayout({
             top,
@@ -195,9 +207,12 @@ export const OnboardingTour: React.FC = () => {
                   <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/20">
                     <Sparkles size={18} />
                   </div>
-                  <h3 className="text-base font-semibold text-[var(--text-primary)] font-title">Welcome to FusionRAG</h3>
+                  <h3 className="text-base font-semibold text-[var(--text-primary)] font-title">
+                    Welcome to FusionRAG
+                  </h3>
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-sm mx-auto">
-                    Ground your AI answers with precision using hybrid sparse + dense vector retrieval for verified, accurate responses.
+                    Ground your AI answers with precision using hybrid sparse + dense vector
+                    retrieval for verified, accurate responses.
                   </p>
                 </div>
               )}
@@ -206,9 +221,12 @@ export const OnboardingTour: React.FC = () => {
                   <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
                     <FileText size={18} />
                   </div>
-                  <h3 className="text-base font-semibold text-[var(--text-primary)] font-title">Document Library</h3>
+                  <h3 className="text-base font-semibold text-[var(--text-primary)] font-title">
+                    Document Library
+                  </h3>
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-sm mx-auto">
-                    Upload PDF, TXT, DOCX, MD, and image files. Chunks are extracted, vectorized, and retrieved automatically when you ask questions.
+                    Upload PDF, TXT, DOCX, MD, and image files. Chunks are extracted, vectorized,
+                    and retrieved automatically when you ask questions.
                   </p>
                 </div>
               )}
@@ -217,9 +235,15 @@ export const OnboardingTour: React.FC = () => {
                   <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent-secondary)]/10 text-[var(--accent-secondary)] border border-[var(--accent-secondary)]/20">
                     <MessageSquare size={18} />
                   </div>
-                  <h3 className="text-base font-semibold text-[var(--text-primary)] font-title">Rich Chat Inputs</h3>
+                  <h3 className="text-base font-semibold text-[var(--text-primary)] font-title">
+                    Rich Chat Inputs
+                  </h3>
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-sm mx-auto">
-                    Attach files, use voice prompts, or type slash commands like <code className="text-[var(--accent-primary)] bg-[var(--bg-tertiary)] px-1 py-0.5 rounded text-[10px]">/settings</code> inside the chat.
+                    Attach files, use voice prompts, or type slash commands like{" "}
+                    <code className="text-[var(--accent-primary)] bg-[var(--bg-tertiary)] px-1 py-0.5 rounded text-[10px]">
+                      /settings
+                    </code>{" "}
+                    inside the chat.
                   </p>
                 </div>
               )}
@@ -228,9 +252,13 @@ export const OnboardingTour: React.FC = () => {
                   <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
                     <Keyboard size={18} />
                   </div>
-                  <h3 className="text-base font-semibold text-[var(--text-primary)] font-title">Keyboard Navigation</h3>
+                  <h3 className="text-base font-semibold text-[var(--text-primary)] font-title">
+                    Keyboard Navigation
+                  </h3>
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-sm mx-auto">
-                    Navigate with <kbd className={kbd}>↑</kbd> <kbd className={kbd}>↓</kbd>, pin with <kbd className={kbd}>Ctrl+P</kbd>, and focus search with <kbd className={kbd}>/</kbd>.
+                    Navigate with <kbd className={kbd}>↑</kbd> <kbd className={kbd}>↓</kbd>, pin
+                    with <kbd className={kbd}>Ctrl+P</kbd>, and focus search with{" "}
+                    <kbd className={kbd}>/</kbd>.
                   </p>
                 </div>
               )}
@@ -321,12 +349,7 @@ export const OnboardingTour: React.FC = () => {
                 Back
               </Button>
             )}
-            <Button
-              size="sm"
-              onClick={handleNextTooltip}
-              fullWidth
-              className="h-7 text-[10px]"
-            >
+            <Button size="sm" onClick={handleNextTooltip} fullWidth className="h-7 text-[10px]">
               {showTooltipStep === tooltipConfigs.length - 1 ? "Finish Tour" : "Got it"}
             </Button>
           </div>
@@ -335,4 +358,3 @@ export const OnboardingTour: React.FC = () => {
     </>
   );
 };
-

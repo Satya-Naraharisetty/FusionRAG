@@ -23,11 +23,7 @@ interface CitationDrawerProps {
   onClose: () => void;
 }
 
-export const CitationDrawer: React.FC<CitationDrawerProps> = ({
-  citation,
-  isOpen,
-  onClose,
-}) => {
+export const CitationDrawer: React.FC<CitationDrawerProps> = ({ citation, isOpen, onClose }) => {
   const navigate = useNavigate();
   const [copied, setCopied] = React.useState(false);
   const [showTechnicalDetails, setShowTechnicalDetails] = React.useState(false);
@@ -37,7 +33,7 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
   const isWeb = Boolean(
     citation.url ||
     citation.document_name.startsWith("[Web]") ||
-    citation.document_name.toLowerCase().startsWith("http")
+    citation.document_name.toLowerCase().startsWith("http"),
   );
 
   const cleanDocName = citation.document_name.replace(/^\[Web\]\s*/i, "");
@@ -84,9 +80,7 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
               <h2 className="text-sm font-semibold text-[var(--text-primary)] truncate">
                 {isWeb ? "Web Source Citation" : "Document Citation"}
               </h2>
-              <p className="text-[11px] text-[var(--text-muted)] truncate">
-                {cleanDocName}
-              </p>
+              <p className="text-[11px] text-[var(--text-muted)] truncate">{cleanDocName}</p>
             </div>
           </div>
 
@@ -126,7 +120,10 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-md)] bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 hover:text-sky-300 text-xs font-medium transition-colors break-all group w-full"
                 >
-                  <ExternalLink size={13} className="flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                  <ExternalLink
+                    size={13}
+                    className="flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
+                  />
                   <span className="truncate">{citation.url}</span>
                 </a>
               </div>
@@ -212,7 +209,9 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
             {showTechnicalDetails && (
               <div className="p-3.5 bg-[var(--bg-tertiary)]/10 border-t border-[var(--border-subtle)] flex flex-col gap-2 animate-in fade-in duration-150">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-[var(--text-muted)] font-mono">Chunk Reference</span>
+                  <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                    Chunk Reference
+                  </span>
                   <button
                     onClick={handleCopyChunkId}
                     className="flex items-center gap-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
@@ -252,12 +251,7 @@ export const CitationDrawer: React.FC<CitationDrawerProps> = ({
               <span>Open in Library</span>
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="text-xs"
-          >
+          <Button variant="ghost" size="sm" onClick={onClose} className="text-xs">
             Close
           </Button>
         </div>

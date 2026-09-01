@@ -48,7 +48,10 @@ const TableWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   };
 
   return (
-    <div ref={tableRef} className="my-3 group/table relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-sm">
+    <div
+      ref={tableRef}
+      className="my-3 group/table relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-sm"
+    >
       <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--bg-tertiary)]/70 border-b border-[var(--border-subtle)] text-[10px] text-[var(--text-muted)]">
         <span className="font-medium">Table</span>
         <button
@@ -70,7 +73,9 @@ const TableWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         </button>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-[var(--border-subtle)] text-[12px]">{children}</table>
+        <table className="min-w-full divide-y divide-[var(--border-subtle)] text-[12px]">
+          {children}
+        </table>
       </div>
     </div>
   );
@@ -86,7 +91,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
           code({ className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || "");
             const isInline = !match && !String(children).includes("\n");
-            
+
             return !isInline ? (
               <CodeBlock
                 code={String(children).replace(/\n$/, "")}
@@ -105,10 +110,18 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
             return <TableWrapper>{children}</TableWrapper>;
           },
           th({ children }) {
-            return <th className="bg-[var(--bg-tertiary)]/80 px-3.5 py-2.5 text-left font-semibold text-[var(--text-primary)] border-b border-[var(--border-subtle)]">{children}</th>;
+            return (
+              <th className="bg-[var(--bg-tertiary)]/80 px-3.5 py-2.5 text-left font-semibold text-[var(--text-primary)] border-b border-[var(--border-subtle)]">
+                {children}
+              </th>
+            );
           },
           td({ children }) {
-            return <td className="border-t border-[var(--border-subtle)] px-3.5 py-2 text-[var(--text-secondary)]">{children}</td>;
+            return (
+              <td className="border-t border-[var(--border-subtle)] px-3.5 py-2 text-[var(--text-secondary)]">
+                {children}
+              </td>
+            );
           },
           blockquote({ children }) {
             return (

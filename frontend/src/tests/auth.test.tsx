@@ -15,7 +15,7 @@ describe("Login Flow Integration", () => {
         <AuthProvider>
           <LoginForm />
         </AuthProvider>
-      </BrowserRouter>
+      </BrowserRouter>,
     );
     expect(screen.getByPlaceholderText(/Email address/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Password/i)).toBeInTheDocument();
@@ -30,7 +30,7 @@ describe("deleteAccount", () => {
       http.delete("*/api/v1/auth/account", () => {
         deleteCalled = true;
         return new HttpResponse(null, { status: 204 });
-      })
+      }),
     );
 
     const wrapper = ({ children }: { children: ReactNode }) => (

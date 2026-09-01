@@ -46,7 +46,7 @@ describe("ConversationItem", () => {
         tags={[]}
         onAddTag={() => {}}
         onRemoveTag={() => {}}
-      />
+      />,
     );
     expect(screen.getByText("Mock Conversation")).toBeInTheDocument();
   });
@@ -67,7 +67,7 @@ describe("ConversationItem", () => {
         tags={[]}
         onAddTag={() => {}}
         onRemoveTag={() => {}}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByText("Mock Conversation"));

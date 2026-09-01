@@ -18,7 +18,7 @@ export function relativeTime(dateString: string | Date): string {
   try {
     const date = typeof dateString === "string" ? new Date(dateString) : dateString;
     if (isNaN(date.getTime())) return "Unknown date";
-    
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffSecs = Math.floor(diffMs / 1000);
@@ -31,7 +31,7 @@ export function relativeTime(dateString: string | Date): string {
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays === 1) return "yesterday";
     if (diffDays < 7) return `${diffDays}d ago`;
-    
+
     return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   } catch (_e) {
     return "Unknown date";

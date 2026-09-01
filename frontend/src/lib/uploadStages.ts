@@ -7,8 +7,7 @@ export const EMBEDDING_POLL_INTERVAL_MS = 4000;
  * Shared failure copy for the vector-DB stage, so the queue rows, grid cards,
  * and chat attachments all show the same guidance.
  */
-export const VECTORIZATION_FAILED_MESSAGE =
-  "Vectorization failed — try regenerating embeddings.";
+export const VECTORIZATION_FAILED_MESSAGE = "Vectorization failed — try regenerating embeddings.";
 
 /**
  * Progress of a single queue row: `processing` rows derive their value from
@@ -21,7 +20,7 @@ export function rowProgress(
   progress: number,
   doc: Document | undefined,
   embedding: EmbeddingStatus | undefined,
-  startedAt: number | null
+  startedAt: number | null,
 ): number {
   if (status === "processing") {
     return deriveUploadStage(doc?.status, embedding, startedAt).progress;
@@ -38,7 +37,7 @@ export function rowProgress(
  */
 export function isVectorizationFailed(
   doc: Document,
-  embedding: EmbeddingStatus | undefined
+  embedding: EmbeddingStatus | undefined,
 ): boolean {
   return doc.status === "completed" && embedding?.status === "failed";
 }
@@ -80,10 +79,7 @@ function chunkingStep(startedAt: number | null): string {
   // CHUNKING_STEPS[-1] and render "undefined".
   const idx = Math.max(
     0,
-    Math.min(
-      Math.floor(elapsed / STEP_DURATION_MS),
-      CHUNKING_STEPS.length - 1
-    )
+    Math.min(Math.floor(elapsed / STEP_DURATION_MS), CHUNKING_STEPS.length - 1),
   );
   return CHUNKING_STEPS[idx];
 }
@@ -98,7 +94,7 @@ function chunkingStep(startedAt: number | null): string {
 export function deriveUploadStage(
   docStatus: DocumentStatus | undefined,
   embedding: EmbeddingStatus | undefined,
-  startedAt: number | null
+  startedAt: number | null,
 ): UploadStage {
   // Upload resolved, but the document hasn't surfaced in the list cache yet.
   if (!docStatus) {
@@ -140,10 +136,7 @@ export function deriveUploadStage(
 
   if (embedding.status === "generating") {
     const total = embedding.chunks_total || 1;
-    const pct = Math.min(
-      95,
-      Math.round(70 + 25 * (embedding.embedded_chunks / total))
-    );
+    const pct = Math.min(95, Math.round(70 + 25 * (embedding.embedded_chunks / total)));
     return {
       progress: pct,
       detail: `Indexing into vector DB — ${embedding.embedded_chunks} of ${embedding.chunks_total} chunks embedded`,
@@ -172,23 +165,19 @@ export function deriveUploadStage(
  */
 export function getDocumentProcessingStep(
   doc: Document,
-  embedding: EmbeddingStatus | undefined
+  embedding: EmbeddingStatus | undefined,
 ): UploadStage | null {
   const isBusy =
     doc.status === "pending" ||
     doc.status === "processing" ||
     (doc.status === "completed" &&
-      (!embedding ||
-        embedding.status === "pending" ||
-        embedding.status === "generating"));
+      (!embedding || embedding.status === "pending" || embedding.status === "generating"));
   if (!isBusy) return null;
 
   return deriveUploadStage(
     doc.status,
     doc.status === "completed" ? embedding : undefined,
-    doc.processing_started_at
-      ? new Date(doc.processing_started_at).getTime()
-      : null
+    doc.processing_started_at ? new Date(doc.processing_started_at).getTime() : null,
   );
 }
 
@@ -209,7 +198,7 @@ export interface PipelineSummary {
  */
 export function summarizeDocumentPipeline(
   documents: Document[],
-  embeddingStatus: Record<string, EmbeddingStatus>
+  embeddingStatus: Record<string, EmbeddingStatus>,
 ): PipelineSummary {
   const active: UploadStage[] = [];
 
@@ -225,10 +214,9 @@ export function summarizeDocumentPipeline(
 
   const current = active.reduce((a, b) => (b.progress > a.progress ? b : a));
   const progress = Math.round(
-    active.reduce((sum, stage) => sum + stage.progress, 0) / active.length
+    active.reduce((sum, stage) => sum + stage.progress, 0) / active.length,
   );
-  const prefix =
-    active.length > 1 ? `${active.length} files processing · ` : "";
+  const prefix = active.length > 1 ? `${active.length} files processing · ` : "";
 
   return {
     processing: active.length,

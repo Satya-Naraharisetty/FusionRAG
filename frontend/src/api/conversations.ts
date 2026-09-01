@@ -24,10 +24,7 @@ export interface MessagesListResponse {
 }
 
 export const conversationsApi = {
-  listConversations(
-    limit = 20,
-    cursor?: string | null
-  ): Promise<ConversationsListResponse> {
+  listConversations(limit = 20, cursor?: string | null): Promise<ConversationsListResponse> {
     const params: Record<string, string | number> = { limit };
     if (cursor) params.cursor = cursor;
 
@@ -40,7 +37,7 @@ export const conversationsApi = {
 
   patchConversation(
     id: string,
-    payload: { title?: string; settings?: Partial<Conversation["settings"]> }
+    payload: { title?: string; settings?: Partial<Conversation["settings"]> },
   ): Promise<Conversation> {
     return api.patch<Conversation>(`/conversations/${id}`, payload);
   },
@@ -49,11 +46,7 @@ export const conversationsApi = {
     return api.delete(`/conversations/${id}`);
   },
 
-  listMessages(
-    id: string,
-    limit = 50,
-    cursor?: string | null
-  ): Promise<MessagesListResponse> {
+  listMessages(id: string, limit = 50, cursor?: string | null): Promise<MessagesListResponse> {
     const params: Record<string, string | number> = { limit };
     if (cursor) params.cursor = cursor;
 
@@ -62,13 +55,7 @@ export const conversationsApi = {
     });
   },
 
-  deleteMessagesFrom(
-    id: string,
-    messageId: string
-  ): Promise<{ deleted_count: number }> {
-    return api.delete<{ deleted_count: number }>(
-      `/conversations/${id}/messages/${messageId}`
-    );
+  deleteMessagesFrom(id: string, messageId: string): Promise<{ deleted_count: number }> {
+    return api.delete<{ deleted_count: number }>(`/conversations/${id}/messages/${messageId}`);
   },
 };
-

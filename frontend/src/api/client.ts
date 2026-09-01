@@ -2,7 +2,13 @@ import { SSEEvent, SSEEventType } from "../types";
 
 // Base API configuration
 const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
-const rawBase = (envUrl !== undefined && envUrl !== "" ? envUrl : (import.meta.env.DEV ? "http://localhost:8000" : "")).replace(/\/$/, "");
+const rawBase = (
+  envUrl !== undefined && envUrl !== ""
+    ? envUrl
+    : import.meta.env.DEV
+      ? "http://localhost:8000"
+      : ""
+).replace(/\/$/, "");
 const BASE_URL = rawBase.endsWith("/api/v1") ? rawBase : `${rawBase}/api/v1`;
 
 export interface TokenResponse {
@@ -246,7 +252,7 @@ export default api;
 export async function* createSSEStream(
   path: string,
   body: object,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): AsyncGenerator<SSEEvent> {
   const url = BASE_URL + path;
 

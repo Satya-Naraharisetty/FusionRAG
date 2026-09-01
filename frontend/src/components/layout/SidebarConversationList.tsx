@@ -1,7 +1,11 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Conversation } from "../../types";
 import { ConversationItem } from "../sidebar/ConversationItem";
-import { Folder, Tag, useLocalConversationMetadata } from "../../hooks/useLocalConversationMetadata";
+import {
+  Folder,
+  Tag,
+  useLocalConversationMetadata,
+} from "../../hooks/useLocalConversationMetadata";
 import { useLocale } from "../../lib/messages";
 import { X, Tag as TagIcon } from "lucide-react";
 
@@ -42,7 +46,7 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
 
   const conversationMap = useMemo(
     () => new Map(conversations.map((c) => [c.id, c])),
-    [conversations]
+    [conversations],
   );
 
   // Collect unique applied tags
@@ -65,7 +69,7 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
     if (activeFilterTag) {
       const filterLower = activeFilterTag.toLowerCase();
       result = result.filter((c) =>
-        tags[c.id]?.some((t) => (t?.name || "").toLowerCase() === filterLower)
+        tags[c.id]?.some((t) => (t?.name || "").toLowerCase() === filterLower),
       );
     }
     return result;
@@ -85,20 +89,22 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
     return set;
   }, [folders]);
 
-  const pinned = useMemo(() =>
-    pinnedIds
-      .map((id) => conversationMap.get(id))
-      .filter((c): c is Conversation =>
-        !!c && (!searchQuery.trim() || (c.title || "").toLowerCase().includes(searchQuery.toLowerCase()))
-      ),
-    [pinnedIds, conversationMap, searchQuery]
+  const pinned = useMemo(
+    () =>
+      pinnedIds
+        .map((id) => conversationMap.get(id))
+        .filter(
+          (c): c is Conversation =>
+            !!c &&
+            (!searchQuery.trim() ||
+              (c.title || "").toLowerCase().includes(searchQuery.toLowerCase())),
+        ),
+    [pinnedIds, conversationMap, searchQuery],
   );
 
   const recents = useMemo(() => {
     // Show only un-pinned AND un-foldered conversations sorted by latest activity descending
-    return sortedConversations.filter(
-      (c) => !pinnedIds.includes(c.id) && !folderedIds.has(c.id)
-    );
+    return sortedConversations.filter((c) => !pinnedIds.includes(c.id) && !folderedIds.has(c.id));
   }, [sortedConversations, pinnedIds, folderedIds]);
 
   const flatVisible = useMemo(() => {
@@ -109,7 +115,8 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+        return;
       if (flatVisible.length === 0) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -143,7 +150,8 @@ export const SidebarConversationList: React.FC<SidebarConversationListProps> = (
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5 px-1">
           <TagIcon size={11} className="text-[var(--text-muted)] flex-shrink-0" />
           {appliedTags.map((t) => {
-            const isSelected = (activeFilterTag || "").toLowerCase() === (t.name || "").toLowerCase();
+            const isSelected =
+              (activeFilterTag || "").toLowerCase() === (t.name || "").toLowerCase();
             return (
               <button
                 key={t.name}

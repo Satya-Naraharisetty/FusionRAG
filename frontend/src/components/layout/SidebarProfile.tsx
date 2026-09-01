@@ -40,7 +40,7 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, co
           <button
             className={cn(
               "flex items-center w-full rounded-[var(--radius-lg)] px-2 py-2 hover:bg-[var(--bg-tertiary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 cursor-pointer text-left min-h-[44px]",
-              collapsed ? "justify-center" : "gap-3"
+              collapsed ? "justify-center" : "gap-3",
             )}
             aria-label="User profile menu"
           >
@@ -59,12 +59,14 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, co
                   <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] mt-0.5 leading-tight">
                     <span className="capitalize">{user.role === "admin" ? "Admin" : "User"}</span>
                     <span>•</span>
-                    <span className={cn(
-                      "flex items-center gap-0.5 text-[10px]",
-                      syncStatus === "saving" && "text-amber-500",
-                      syncStatus === "error" && "text-red-400",
-                      syncStatus === "synced" && "text-emerald-500 dark:text-emerald-400"
-                    )}>
+                    <span
+                      className={cn(
+                        "flex items-center gap-0.5 text-[10px]",
+                        syncStatus === "saving" && "text-amber-500",
+                        syncStatus === "error" && "text-red-400",
+                        syncStatus === "synced" && "text-emerald-500 dark:text-emerald-400",
+                      )}
+                    >
                       {syncStatus === "saving" ? (
                         <>
                           <Loader2 size={10} className="animate-spin" />
@@ -84,7 +86,10 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, co
                     </span>
                   </div>
                 </div>
-                <ChevronUp size={14} className="flex-shrink-0 text-[var(--text-muted)] opacity-70" />
+                <ChevronUp
+                  size={14}
+                  className="flex-shrink-0 text-[var(--text-muted)] opacity-70"
+                />
               </>
             )}
           </button>
@@ -94,15 +99,14 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ user, logout, co
           {/* User info header */}
           {user && (
             <div className="px-2.5 py-2 mb-1">
-              <p className="text-xs font-medium text-[var(--text-primary)] truncate">{user.email}</p>
+              <p className="text-xs font-medium text-[var(--text-primary)] truncate">
+                {user.email}
+              </p>
               <p className="text-[11px] text-[var(--text-muted)] capitalize mt-0.5">{user.role}</p>
             </div>
           )}
 
-          <DropdownMenuItem
-            onClick={() => navigate("/settings")}
-            className="gap-2 cursor-pointer"
-          >
+          <DropdownMenuItem onClick={() => navigate("/settings")} className="gap-2 cursor-pointer">
             <Settings size={13} />
             <span>{t("nav.settings")}</span>
           </DropdownMenuItem>

@@ -36,13 +36,8 @@ type FilterTab = "all" | "created" | "shared";
 export const ProjectsPage: React.FC = () => {
   const navigate = useNavigate();
   const { data: convData } = useConversations();
-  const {
-    folders,
-    createFolder,
-    renameFolder,
-    deleteFolder,
-    moveConversationToFolder,
-  } = useLocalConversationMetadata();
+  const { folders, createFolder, renameFolder, deleteFolder, moveConversationToFolder } =
+    useLocalConversationMetadata();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
@@ -154,7 +149,7 @@ export const ProjectsPage: React.FC = () => {
                 "px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer",
                 activeTab === tab.id
                   ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-subtle)] font-semibold"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/50"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/50",
               )}
             >
               {tab.label}
@@ -172,8 +167,8 @@ export const ProjectsPage: React.FC = () => {
               {activeTab === "shared"
                 ? "No shared projects yet"
                 : searchQuery
-                ? "No matching projects found"
-                : "No projects yet"}
+                  ? "No matching projects found"
+                  : "No projects yet"}
             </p>
             <p className="text-xs text-[var(--text-muted)] max-w-sm">
               {activeTab === "shared"
@@ -259,7 +254,10 @@ export const ProjectsPage: React.FC = () => {
                               onClick={() => navigate(`/chat/${c!.id}`)}
                               className="flex items-center gap-2 truncate flex-1 min-w-0"
                             >
-                              <MessageSquare size={12} className="text-[var(--text-muted)] flex-shrink-0" />
+                              <MessageSquare
+                                size={12}
+                                className="text-[var(--text-muted)] flex-shrink-0"
+                              />
                               <span className="truncate">{c!.title}</span>
                             </div>
                             <div className="flex items-center gap-1">
@@ -331,11 +329,7 @@ export const ProjectsPage: React.FC = () => {
             />
           </div>
           <DialogFooter className="gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowModal(false)}
-            >
+            <Button variant="secondary" size="sm" onClick={() => setShowModal(false)}>
               Cancel
             </Button>
             <Button variant="default" size="sm" onClick={handleSubmitModal}>

@@ -10,13 +10,7 @@ import {
 import { Conversation } from "../../types";
 import { ConversationItem } from "../sidebar/ConversationItem";
 import { Folder, Tag } from "../../hooks/useLocalConversationMetadata";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "../ui/Modal";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { cn } from "@/lib/utils";
@@ -63,20 +57,22 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
 }) => {
   const { t } = useLocale();
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
-    "folder-general":  true,
+    "folder-general": true,
     "folder-research": true,
   });
   const [draggedOverFolderId, setDraggedOverFolderId] = useState<string | null>(null);
-  const [showFolderModal, setShowFolderModal]         = useState(false);
-  const [newFolderName, setNewFolderName]             = useState("");
-  const [renamingFolderId, setRenamingFolderId]       = useState<string | null>(null);
+  const [showFolderModal, setShowFolderModal] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
 
-  const toggleExpand = (id: string) =>
-    setExpandedFolders((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggleExpand = (id: string) => setExpandedFolders((prev) => ({ ...prev, [id]: !prev[id] }));
 
-  const handleDragOver  = (e: React.DragEvent, id: string) => { e.preventDefault(); setDraggedOverFolderId(id); };
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    setDraggedOverFolderId(id);
+  };
   const handleDragLeave = () => setDraggedOverFolderId(null);
-  const handleDrop      = (e: React.DragEvent, folderId: string | null) => {
+  const handleDrop = (e: React.DragEvent, folderId: string | null) => {
     e.preventDefault();
     setDraggedOverFolderId(null);
     const convId = e.dataTransfer.getData("text/plain");
@@ -87,7 +83,7 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
     const trimmed = newFolderName.trim();
     if (!trimmed) return;
     if (renamingFolderId) renameFolder(renamingFolderId, trimmed);
-    else                  createFolder(trimmed);
+    else createFolder(trimmed);
     setNewFolderName("");
     setRenamingFolderId(null);
     setShowFolderModal(false);
@@ -104,7 +100,11 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
             Projects
           </span>
           <button
-            onClick={() => { setRenamingFolderId(null); setNewFolderName(""); setShowFolderModal(true); }}
+            onClick={() => {
+              setRenamingFolderId(null);
+              setNewFolderName("");
+              setShowFolderModal(true);
+            }}
             className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-0.5 rounded cursor-pointer transition-colors"
             title="New Project / Folder"
             aria-label="New Project / Folder"
@@ -116,7 +116,7 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
         {/* Folder list */}
         <div className="flex flex-col gap-0.5">
           {folders.map((folder) => {
-            const nested     = folderConversations[folder.id] || [];
+            const nested = folderConversations[folder.id] || [];
             const isExpanded = expandedFolders[folder.id];
             const isDragOver = draggedOverFolderId === folder.id;
 
@@ -128,7 +128,7 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
                 onDrop={(e) => handleDrop(e, folder.id)}
                 className={cn(
                   "rounded-[var(--radius-md)] transition-colors",
-                  isDragOver && "bg-[var(--bg-tertiary)] ring-1 ring-[var(--border-hover)]"
+                  isDragOver && "bg-[var(--bg-tertiary)] ring-1 ring-[var(--border-hover)]",
                 )}
               >
                 {/* Folder row */}
@@ -141,9 +141,7 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
                 >
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     <span className="text-[var(--text-muted)] flex-shrink-0">
-                      {isExpanded
-                        ? <ChevronDown size={12} />
-                        : <ChevronRight size={12} />}
+                      {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                     </span>
                     <FolderIcon size={12} className="text-[var(--text-muted)] flex-shrink-0" />
                     <span className="text-[13px] font-medium truncate">{folder.name}</span>
@@ -170,7 +168,10 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
                       <Edit size={11} />
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteFolder(folder.id);
+                      }}
                       className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent-error)] hover:bg-red-500/10 cursor-pointer transition-colors"
                       title={t("nav.delete")}
                       aria-label={`${t("nav.delete")} ${folder.name}`}
@@ -233,7 +234,9 @@ export const SidebarFolders: React.FC<SidebarFoldersProps> = ({
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               placeholder="Folder name"
-              onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSubmit();
+              }}
               autoFocus
             />
           </div>

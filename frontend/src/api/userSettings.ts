@@ -56,7 +56,7 @@ export const getUserSettings = async (): Promise<UserSettingsResponse> => {
 };
 
 export const patchUserSettings = async (
-  data: UserSettingsPatchRequest
+  data: UserSettingsPatchRequest,
 ): Promise<UserSettingsResponse> => {
   return api.patch<UserSettingsResponse>("/user/settings", data);
 };

@@ -31,15 +31,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
   const renameMutation = useRenameConversation();
   const deleteMutation = useDeleteConversation();
 
-  const {
-    pinnedIds,
-    folders,
-    tags,
-    togglePin,
-    moveConversationToFolder,
-    addTag,
-    removeTag,
-  } = useLocalConversationMetadata();
+  const { pinnedIds, folders, tags, togglePin, moveConversationToFolder, addTag, removeTag } =
+    useLocalConversationMetadata();
 
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
@@ -82,14 +75,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       className={cn(
         "flex flex-col h-full bg-[var(--bg-secondary)] transition-all duration-200 relative z-20 select-none",
         collapsed ? "w-16" : "w-[272px]",
-        className
+        className,
       )}
     >
       {/* Sidebar Header & Toggle Section */}
       <div
         className={cn(
           "flex items-center px-3 shrink-0 h-14",
-          collapsed ? "justify-center" : "justify-between"
+          collapsed ? "justify-center" : "justify-between",
         )}
       >
         {!collapsed && (
@@ -100,7 +93,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
             <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-xs font-semibold text-[var(--text-primary)] shadow-none">
               <span className="font-title">F</span>
             </div>
-            <span className="font-title text-sm font-semibold tracking-tight text-[var(--text-primary)]">FusionRAG</span>
+            <span className="font-title text-sm font-semibold tracking-tight text-[var(--text-primary)]">
+              FusionRAG
+            </span>
           </div>
         )}
         <Button
@@ -109,7 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
             "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]",
-            collapsed && "mx-auto"
+            collapsed && "mx-auto",
           )}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
@@ -164,11 +159,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
       )}
 
       {/* Bottom Profile dropdown block */}
-      <SidebarProfile
-        user={user}
-        logout={logout}
-        collapsed={collapsed}
-      />
+      <SidebarProfile user={user} logout={logout} collapsed={collapsed} />
     </aside>
   );
 };

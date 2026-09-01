@@ -31,8 +31,7 @@ if (typeof window !== "undefined" && !("BroadcastChannel" in window)) {
       return true;
     }
   }
-  (window as unknown as { BroadcastChannel: unknown }).BroadcastChannel =
-    MockBroadcastChannel;
+  (window as unknown as { BroadcastChannel: unknown }).BroadcastChannel = MockBroadcastChannel;
 }
 
 // Mocking window.matchMedia

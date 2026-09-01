@@ -16,7 +16,7 @@ export const useDraft = (conversationId: string | null) => {
         localStorage.removeItem(key);
       }
     },
-    [key]
+    [key],
   );
 
   const clearDraft = useCallback(() => {

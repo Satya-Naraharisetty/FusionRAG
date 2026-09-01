@@ -1,21 +1,74 @@
 repos:
+  # Secret Leak Detection
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.2
+    hooks:
+      - id: gitleaks
+
+  # Backend Ruff Linter & Formatter
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.3.0
     hooks:
-      # Run the Ruff linter and auto-fix simple violations
       - id: ruff
         args: [ --fix ]
         files: ^backend/
-      # Run the Ruff formatter
       - id: ruff-format
         files: ^backend/
 
   - repo: local
     hooks:
-      # Run frontend ESLint check using system npm
+      # Backend Mypy static type checking
+      - id: backend-mypy
+        name: Backend Mypy Check
+        entry: uv --directory backend run mypy app
+        language: system
+        files: ^backend/app/.*\.py$
+        pass_filenames: false
+
+      # Backend Pytest test suite
+      - id: backend-pytest
+        name: Backend Unit Tests
+        entry: uv --directory backend run pytest
+        language: system
+        files: ^backend/
+        pass_filenames: false
+
+      # Frontend Prettier Code Formatting
+      - id: frontend-format
+        name: Frontend Prettier Format
+        entry: npm --prefix frontend run format
+        language: system
+        files: ^frontend/src/.*\.(js|jsx|ts|tsx|css|json|html|md)$
+        pass_filenames: false
+
+      # Frontend TypeScript type checking
+      - id: frontend-typecheck
+        name: Frontend TypeScript Check
+        entry: npm --prefix frontend run typecheck
+        language: system
+        files: ^frontend/src/.*\.(ts|tsx)$
+        pass_filenames: false
+
+      # Frontend ESLint check
       - id: frontend-lint
         name: Frontend ESLint
         entry: npm --prefix frontend run lint
         language: system
         files: ^frontend/src/.*\.(js|jsx|ts|tsx)$
+        pass_filenames: false
+
+      # Frontend Vitest Unit Tests
+      - id: frontend-test
+        name: Frontend Vitest
+        entry: npm --prefix frontend run test
+        language: system
+        files: ^frontend/src/
+        pass_filenames: false
+
+      # Frontend Production Build verification
+      - id: frontend-build
+        name: Frontend Build Check
+        entry: npm --prefix frontend run build
+        language: system
+        files: ^frontend/
         pass_filenames: false

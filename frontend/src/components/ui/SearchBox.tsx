@@ -21,7 +21,10 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
 }) => {
   return (
     <div className="relative flex items-center w-full group">
-      <Search size={14} className="absolute left-3 text-[var(--text-muted)] pointer-events-none group-focus-within:text-[var(--text-secondary)] transition-colors" />
+      <Search
+        size={14}
+        className="absolute left-3 text-[var(--text-muted)] pointer-events-none group-focus-within:text-[var(--text-secondary)] transition-colors"
+      />
       <Input
         id={id}
         placeholder={placeholder}

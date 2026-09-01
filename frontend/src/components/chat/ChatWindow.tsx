@@ -34,7 +34,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
       uploadQueuedChatRows(newId);
       navigate(`/chat/${newId}`, { replace: true });
     },
-    [navigate, uploadQueuedChatRows]
+    [navigate, uploadQueuedChatRows],
   );
 
   const {
@@ -70,7 +70,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
     // clear the previous conversation's messages so we don't flash old chat content
     if (conversationId === null && !isStreaming) {
       clearChat();
-    } else if (previous !== null && conversationId !== null && previous !== conversationId && !isStreaming) {
+    } else if (
+      previous !== null &&
+      conversationId !== null &&
+      previous !== conversationId &&
+      !isStreaming
+    ) {
       setChatMessages([]);
     }
   }, [conversationId, discardQueuedNewChatRows, isStreaming, setChatMessages, clearChat]);
@@ -97,7 +102,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
               return {
                 id: String(tc["id"] || tc["tool_call_id"] || Math.random().toString()),
                 name: String(tc["name"] || func?.["name"] || "unknown"),
-                arguments: (tc["arguments"] || func?.["arguments"] || {}) as Record<string, unknown>,
+                arguments: (tc["arguments"] || func?.["arguments"] || {}) as Record<
+                  string,
+                  unknown
+                >,
                 result: tc["result"] || tc["output"],
                 status: (tc["status"] || "done") as "running" | "done" | "failed",
               };
@@ -117,7 +125,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
 
       // Sort chronological ascending
       mapped.sort((a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime());
-      
+
       setChatMessages((prev) => {
         // Prevent stale server cache from temporarily wiping out freshly completed in-memory messages
         // while the background query refetch is in-flight.
@@ -187,17 +195,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/12 text-[var(--accent-primary)] animate-bounce">
             <Upload size={30} />
           </div>
-          <h3 className="mb-1 text-base font-semibold text-[var(--text-primary)]">Drop files here to attach</h3>
-          <p className="text-xs text-[var(--text-secondary)]">Files will be uploaded and attached to your next prompt</p>
+          <h3 className="mb-1 text-base font-semibold text-[var(--text-primary)]">
+            Drop files here to attach
+          </h3>
+          <p className="text-xs text-[var(--text-secondary)]">
+            Files will be uploaded and attached to your next prompt
+          </p>
         </div>
       )}
 
       {/* Top Header toolbar */}
-      <ChatToolbar
-        title={activeTitle}
-        model={activeModel}
-        connectionLost={connectionLost}
-      />
+      <ChatToolbar title={activeTitle} model={activeModel} connectionLost={connectionLost} />
 
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-hidden flex flex-col h-full w-full">
@@ -261,8 +269,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
 
       {/* Fixed bottom input wrapper — the conversation's chat-scoped files sit
           above the composer as removable chips, then the composer itself. */}
-      <div className="w-full flex-shrink-0 flex justify-center z-10 pt-10 pb-5"
-        style={{ background: "linear-gradient(to top, var(--bg-primary) 0%, var(--bg-primary) 65%, transparent 100%)" }}
+      <div
+        className="w-full flex-shrink-0 flex justify-center z-10 pt-10 pb-5"
+        style={{
+          background:
+            "linear-gradient(to top, var(--bg-primary) 0%, var(--bg-primary) 65%, transparent 100%)",
+        }}
       >
         <div className="flex w-full flex-col items-center gap-2.5">
           <ConversationDocumentChips conversationId={conversationId} />
@@ -279,4 +291,3 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversationId }) => {
   );
 };
 export default ChatWindow;
-

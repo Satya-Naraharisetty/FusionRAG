@@ -53,9 +53,7 @@ export interface ReauthDialogProps {
   /** Extra behavior after a successful confirmation (e.g. navigation). */
   onSuccess?: () => void;
   /** Per-error-code toast message overrides. */
-  errorMessages?: Partial<
-    Record<"INVALID_CREDENTIALS" | "RATE_LIMITED" | "UNKNOWN", string>
-  >;
+  errorMessages?: Partial<Record<"INVALID_CREDENTIALS" | "RATE_LIMITED" | "UNKNOWN", string>>;
   /** Stable input ids (defaults keep label association + e2e selectors). */
   emailInputId?: string;
   passwordInputId?: string;
@@ -98,7 +96,7 @@ const ReauthDialog: React.FC<ReauthDialogProps> = ({
   // sensitive action.
   useEffect(() => {
     if (open) {
-      const target = requireEmail ? emailRef.current : (requirePassword ? passwordRef.current : null);
+      const target = requireEmail ? emailRef.current : requirePassword ? passwordRef.current : null;
       target?.focus();
     } else {
       setConfirmEmail("");
@@ -110,10 +108,7 @@ const ReauthDialog: React.FC<ReauthDialogProps> = ({
     !requireEmail ||
     Boolean(accountEmail && confirmEmail.trim().toLowerCase() === accountEmail.toLowerCase());
 
-  const canConfirm =
-    !isSubmitting &&
-    emailMatches &&
-    (!requirePassword || password.length > 0);
+  const canConfirm = !isSubmitting && emailMatches && (!requirePassword || password.length > 0);
 
   const handleClose = () => {
     if (!isSubmitting) onOpenChange(false);

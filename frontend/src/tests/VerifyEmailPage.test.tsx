@@ -31,7 +31,7 @@ describe("VerifyEmailPage", () => {
         <Routes>
           <Route path="/verify-email" element={<VerifyEmailPage />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByText(/Verify your email/i)).toBeInTheDocument();
@@ -48,7 +48,7 @@ describe("VerifyEmailPage", () => {
         <Routes>
           <Route path="/verify-email" element={<VerifyEmailPage />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     const digitInputs = screen.getAllByRole("textbox", { name: /Digit/i });
@@ -75,7 +75,7 @@ describe("VerifyEmailPage", () => {
         <Routes>
           <Route path="/verify-email" element={<VerifyEmailPage />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -92,7 +92,7 @@ describe("VerifyEmailPage", () => {
         <Routes>
           <Route path="/verify-email" element={<VerifyEmailPage />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     const resendBtn = screen.getByRole("button", { name: /Resend Code/i });

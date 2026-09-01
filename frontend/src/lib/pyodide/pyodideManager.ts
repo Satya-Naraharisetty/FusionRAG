@@ -26,10 +26,9 @@ class PyodideManager {
   private getWorker(): Worker {
     if (!this.worker) {
       // Initialize web worker via Vite's standard module worker syntax
-      this.worker = new Worker(
-        new URL("../../workers/pyodide.worker.ts", import.meta.url),
-        { type: "module" }
-      );
+      this.worker = new Worker(new URL("../../workers/pyodide.worker.ts", import.meta.url), {
+        type: "module",
+      });
 
       this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
         const msg = e.data;
@@ -78,7 +77,7 @@ class PyodideManager {
     code: string,
     files?: Record<string, string>,
     onStatus?: StatusCallback,
-    timeoutMs = 45000
+    timeoutMs = 45000,
   ): Promise<ExecutionResult> {
     const worker = this.getWorker();
     const id = `exec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;

@@ -41,7 +41,7 @@ export const ChatLayout: React.FC = () => {
     "ctrl+shift+s": () => {
       navigate("/settings");
     },
-    "escape": () => {
+    escape: () => {
       setCommandPaletteOpen(false);
       setMobileOpen(false);
     },

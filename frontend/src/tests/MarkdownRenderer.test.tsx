@@ -16,7 +16,7 @@ describe("MarkdownRenderer with KaTeX", () => {
 
   it("renders display block math with katex display mode", () => {
     const { container } = render(
-      <MarkdownRenderer content={"$$\n\\int_0^\\infty e^{-x} \\, dx = 1\n$$"} />
+      <MarkdownRenderer content={"$$\n\\int_0^\\infty e^{-x} \\, dx = 1\n$$"} />,
     );
     const katexDisplay = container.querySelector(".katex-display");
     expect(katexDisplay).toBeInTheDocument();

@@ -1,6 +1,16 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Square, AlertCircle, Paperclip, Mic, X, ArrowUp, History, Trash2, FileText } from "lucide-react";
+import {
+  Square,
+  AlertCircle,
+  Paperclip,
+  Mic,
+  X,
+  ArrowUp,
+  History,
+  Trash2,
+  FileText,
+} from "lucide-react";
 import { Button } from "../ui/Button";
 import { useDraft } from "../../hooks/useDrafts";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus";
@@ -17,10 +27,7 @@ import { UploadProgress } from "../ui/UploadProgress";
 import { useFileValidation } from "../../hooks/useFileValidation";
 import { useRecentAttachments } from "../../hooks/useRecentAttachments";
 import { useDocuments } from "../../hooks/useDocuments";
-import {
-  useUploadQueue,
-  type QueueFile,
-} from "../../context/UploadQueueContext";
+import { useUploadQueue, type QueueFile } from "../../context/UploadQueueContext";
 import { getDocumentProcessingStep } from "../../lib/uploadStages";
 import { QUERY_KEYS, UPLOAD_LIMITS } from "../../lib/constants";
 import { t } from "../../lib/messages";
@@ -41,13 +48,55 @@ interface ChatInputProps {
 // the slashCommands map in the component) so a locale change is reflected
 // immediately.
 const SLASH_COMMAND_DEFS = [
-  { id: "documents", labelKey: "commands.documents.label", descriptionKey: "commands.documents.description", icon: "📎", shortcut: "@documents" },
-  { id: "search", labelKey: "commands.search.label", descriptionKey: "commands.search.description", icon: "🔍", shortcut: "/search" },
-  { id: "summarize", labelKey: "commands.summarize.label", descriptionKey: "commands.summarize.description", icon: "📄", shortcut: "/summarize" },
-  { id: "explain", labelKey: "commands.explain.label", descriptionKey: "commands.explain.description", icon: "💡", shortcut: "/explain" },
-  { id: "compare", labelKey: "commands.compare.label", descriptionKey: "commands.compare.description", icon: "⚖️", shortcut: "/compare" },
-  { id: "code", labelKey: "commands.code.label", descriptionKey: "commands.code.description", icon: "💻", shortcut: "/code" },
-  { id: "settings", labelKey: "commands.settings.label", descriptionKey: "commands.settings.description", icon: "⚙️", shortcut: "/settings" },
+  {
+    id: "documents",
+    labelKey: "commands.documents.label",
+    descriptionKey: "commands.documents.description",
+    icon: "📎",
+    shortcut: "@documents",
+  },
+  {
+    id: "search",
+    labelKey: "commands.search.label",
+    descriptionKey: "commands.search.description",
+    icon: "🔍",
+    shortcut: "/search",
+  },
+  {
+    id: "summarize",
+    labelKey: "commands.summarize.label",
+    descriptionKey: "commands.summarize.description",
+    icon: "📄",
+    shortcut: "/summarize",
+  },
+  {
+    id: "explain",
+    labelKey: "commands.explain.label",
+    descriptionKey: "commands.explain.description",
+    icon: "💡",
+    shortcut: "/explain",
+  },
+  {
+    id: "compare",
+    labelKey: "commands.compare.label",
+    descriptionKey: "commands.compare.description",
+    icon: "⚖️",
+    shortcut: "/compare",
+  },
+  {
+    id: "code",
+    labelKey: "commands.code.label",
+    descriptionKey: "commands.code.description",
+    icon: "💻",
+    shortcut: "/code",
+  },
+  {
+    id: "settings",
+    labelKey: "commands.settings.label",
+    descriptionKey: "commands.settings.description",
+    icon: "⚙️",
+    shortcut: "/settings",
+  },
 ] as const;
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -74,13 +123,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   // The queue (app-level) owns the uploads — progress, the processing→done
   // flip, and persistence across navigation — so this tray is a scoped view
   // of its rows for the current conversation.
-  const {
-    queue,
-    embeddingStatus,
-    addFiles,
-    cancelUpload,
-    removeItems,
-  } = useUploadQueue();
+  const { queue, embeddingStatus, addFiles, cancelUpload, removeItems } = useUploadQueue();
   // Shared cache (deduped with the Documents page/sidebar): refetches every 5s
   // while documents are pending/processing, plus the embedding-status poll.
   const { data: documents = [] } = useDocuments();
@@ -89,11 +132,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const chatRows = useMemo(
     () =>
       queue.filter(
-        (q) =>
-          q.source === "chat" &&
-          (q.conversationId ?? null) === (conversationId ?? null)
+        (q) => q.source === "chat" && (q.conversationId ?? null) === (conversationId ?? null),
       ),
-    [queue, conversationId]
+    [queue, conversationId],
   );
 
   const chatExtensions = useMemo(
@@ -101,7 +142,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       Object.values(UPLOAD_LIMITS.CHAT_ACCEPTED_TYPES)
         .flat()
         .map((ext) => ext.replace(/^\./, "")),
-    []
+    [],
   );
 
   const { validateFiles } = useFileValidation({
@@ -121,9 +162,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       if (valid.length === 0) return;
       const room = UPLOAD_LIMITS.CHAT_MAX_ATTACHMENTS - chatRows.length;
       if (room <= 0) {
-        toast.error(
-          t("chat.uploadLimit", { max: UPLOAD_LIMITS.CHAT_MAX_ATTACHMENTS })
-        );
+        toast.error(t("chat.uploadLimit", { max: UPLOAD_LIMITS.CHAT_MAX_ATTACHMENTS }));
         return;
       }
       if (valid.length > room) {
@@ -131,7 +170,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           t(room === 1 ? "chat.uploadRoomOne" : "chat.uploadRoomOther", {
             room,
             max: UPLOAD_LIMITS.CHAT_MAX_ATTACHMENTS,
-          })
+          }),
         );
       }
       addFiles(valid.slice(0, room), {
@@ -150,7 +189,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         onUploaded: addRecent,
       });
     },
-    [validateFiles, chatRows.length, conversationId, chatExtensions, addFiles, addRecent]
+    [validateFiles, chatRows.length, conversationId, chatExtensions, addFiles, addRecent],
   );
 
   useEffect(() => {
@@ -162,10 +201,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   // Shared documents cache, used to derive the live pipeline step for rows
   // currently ingesting server-side. (The processing→done flip itself lives
   // in the queue provider.)
-  const docById = useMemo(
-    () => new Map(documents.map((d) => [d.id, d])),
-    [documents]
-  );
+  const docById = useMemo(() => new Map(documents.map((d) => [d.id, d])), [documents]);
 
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
@@ -182,9 +218,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const trimmed = text.trim();
     if ((!trimmed && chatRows.length === 0) || isStreaming || !isOnline) return;
 
-    const rawFiles = chatRows
-      .map((a) => a.file)
-      .filter((f): f is File => Boolean(f));
+    const rawFiles = chatRows.map((a) => a.file).filter((f): f is File => Boolean(f));
     onSend(trimmed, rawFiles.length > 0 ? rawFiles : undefined);
 
     setText("");
@@ -256,7 +290,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
 
     if (isRecording) {
-      if (recognitionRef.current && typeof (recognitionRef.current as ISpeechRecognition).stop === "function") {
+      if (
+        recognitionRef.current &&
+        typeof (recognitionRef.current as ISpeechRecognition).stop === "function"
+      ) {
         (recognitionRef.current as ISpeechRecognition).stop();
       }
       setIsRecording(false);
@@ -342,7 +379,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     ? slashCommands.filter(
         (c) =>
           c.label.toLowerCase().includes(commandSearch.toLowerCase()) ||
-          c.description.toLowerCase().includes(commandSearch.toLowerCase())
+          c.description.toLowerCase().includes(commandSearch.toLowerCase()),
       )
     : slashCommands;
 
@@ -427,79 +464,81 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             uploads keep running (and stay visible) after navigating away. */}
         {chatRows.length > 0 && (
           <div className="space-y-1.5">
-          <div className="flex flex-wrap gap-2 px-1">
-            {chatRows.map((att) => {
-              // While the document ingests server-side, derive the live
-              // pipeline step (Extracting/Chunking/Indexing) from shared state.
-              const docId = att.documentId;
-              const doc = docId ? docById.get(docId) : undefined;
-              const stage =
-                att.status === "processing" && doc && docId
-                  ? getDocumentProcessingStep(doc, embeddingStatus[docId])
-                  : null;
-              return (
-                <div
-                  key={att.id}
-                  className="flex items-center gap-2 rounded-xl border border-(--border-default) bg-(--bg-tertiary) p-1.5 pr-2.5 transition-colors"
-                >
-                  {att.preview ? (
-                    <img
-                      src={att.preview}
-                      alt={att.fileName}
-                      className="h-8 w-8 shrink-0 rounded-md border border-(--border-subtle) object-cover"
-                    />
-                  ) : (
-                    <FileTypeBadge filename={att.fileName} variant="card" className="h-8 w-8 text-[8px]" />
-                  )}
-
-                  <div className="min-w-0 max-w-32.5 space-y-0.5">
-                    <p className="truncate text-xs font-medium leading-none text-(--text-primary)">
-                      {att.fileName}
-                    </p>
-                    {att.file && (
-                      <p className="font-mono text-[10px] leading-none text-(--text-muted)">
-                        {(att.file.size / 1024).toFixed(0)} KB
-                      </p>
-                    )}
-                  </div>
-
-                  <UploadProgress
-                    progress={stage ? stage.progress : att.progress}
-                    status={stage ? "processing" : att.status}
-                    size="sm"
-                    showLabel={
-                      att.status === "uploading" || att.status === "processing"
-                    }
-                    footer={
-                      stage
-                        ? stage.detail
-                        : att.status === "error" && !att.detail
-                        ? t("chat.uploadFailed")
-                        : att.detail
-                    }
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => removeAttachment(att.id)}
-                    className="ml-0.5 cursor-pointer rounded-sm p-1 text-(--text-muted) transition-colors hover:text-(--accent-error)"
-                    aria-label={t("chatFiles.removeAria", {
-                      filename: att.fileName,
-                    })}
+            <div className="flex flex-wrap gap-2 px-1">
+              {chatRows.map((att) => {
+                // While the document ingests server-side, derive the live
+                // pipeline step (Extracting/Chunking/Indexing) from shared state.
+                const docId = att.documentId;
+                const doc = docId ? docById.get(docId) : undefined;
+                const stage =
+                  att.status === "processing" && doc && docId
+                    ? getDocumentProcessingStep(doc, embeddingStatus[docId])
+                    : null;
+                return (
+                  <div
+                    key={att.id}
+                    className="flex items-center gap-2 rounded-xl border border-(--border-default) bg-(--bg-tertiary) p-1.5 pr-2.5 transition-colors"
                   >
-                    <X size={12} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-          {/* Same lifecycle hint as the persisted chips strip: these files are
+                    {att.preview ? (
+                      <img
+                        src={att.preview}
+                        alt={att.fileName}
+                        className="h-8 w-8 shrink-0 rounded-md border border-(--border-subtle) object-cover"
+                      />
+                    ) : (
+                      <FileTypeBadge
+                        filename={att.fileName}
+                        variant="card"
+                        className="h-8 w-8 text-[8px]"
+                      />
+                    )}
+
+                    <div className="min-w-0 max-w-32.5 space-y-0.5">
+                      <p className="truncate text-xs font-medium leading-none text-(--text-primary)">
+                        {att.fileName}
+                      </p>
+                      {att.file && (
+                        <p className="font-mono text-[10px] leading-none text-(--text-muted)">
+                          {(att.file.size / 1024).toFixed(0)} KB
+                        </p>
+                      )}
+                    </div>
+
+                    <UploadProgress
+                      progress={stage ? stage.progress : att.progress}
+                      status={stage ? "processing" : att.status}
+                      size="sm"
+                      showLabel={att.status === "uploading" || att.status === "processing"}
+                      footer={
+                        stage
+                          ? stage.detail
+                          : att.status === "error" && !att.detail
+                            ? t("chat.uploadFailed")
+                            : att.detail
+                      }
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(att.id)}
+                      className="ml-0.5 cursor-pointer rounded-sm p-1 text-(--text-muted) transition-colors hover:text-(--accent-error)"
+                      aria-label={t("chatFiles.removeAria", {
+                        filename: att.fileName,
+                      })}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Same lifecycle hint as the persisted chips strip: these files are
               scoped to this chat, never the global library, and die with the
               conversation. */}
-          <div className="flex items-center gap-1.5 px-2 pb-0.5 text-[11px] font-medium leading-snug text-[var(--text-muted)]">
-            <Paperclip size={11} className="flex-shrink-0 opacity-60" />
-            <span>{t("chatFiles.caption")}</span>
-          </div>
+            <div className="flex items-center gap-1.5 px-2 pb-0.5 text-[11px] font-medium leading-snug text-[var(--text-muted)]">
+              <Paperclip size={11} className="flex-shrink-0 opacity-60" />
+              <span>{t("chatFiles.caption")}</span>
+            </div>
           </div>
         )}
 
@@ -522,7 +561,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             isDraggingOver
               ? "border-dashed border-[var(--accent-primary)]/70 bg-[var(--accent-primary)]/8"
               : "border-[var(--border-default)] hover:border-[var(--border-hover)]",
-            isRecording && "border-[var(--accent-error)]/45 bg-red-950/10"
+            isRecording && "border-[var(--accent-error)]/45 bg-red-950/10",
           )}
         >
           {/* Paperclip button with Recent Attachments dropdown */}
@@ -533,10 +572,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  disabled={
-                    isStreaming ||
-                    chatRows.length >= UPLOAD_LIMITS.CHAT_MAX_ATTACHMENTS
-                  }
+                  disabled={isStreaming || chatRows.length >= UPLOAD_LIMITS.CHAT_MAX_ATTACHMENTS}
                   className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
                   aria-label="Attach files options"
                 >
@@ -561,7 +597,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                       </span>
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); clearRecents(); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          clearRecents();
+                        }}
                         className="cursor-pointer p-0.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--accent-error)]"
                         title="Clear recent list"
                       >
@@ -572,7 +611,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     {recents.slice(0, 5).map((rec, idx) => (
                       <DropdownMenuItem
                         key={rec.name + idx}
-                        onClick={() => { toast.success(`Selected: "${rec.name}"`); }}
+                        onClick={() => {
+                          toast.success(`Selected: "${rec.name}"`);
+                        }}
                         className="flex items-center justify-between cursor-pointer py-1.5"
                       >
                         <span className="truncate max-w-32.5 font-medium">{rec.name}</span>
@@ -597,8 +638,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 isDraggingOver
                   ? t("chat.placeholderDrop")
                   : isStreaming
-                  ? t("chat.placeholderStreaming")
-                  : t("chat.placeholderDefault")
+                    ? t("chat.placeholderStreaming")
+                    : t("chat.placeholderDefault")
               }
               rows={1}
               disabled={!isOnline || isStreaming}
@@ -627,8 +668,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     >
                       <span className="shrink-0 text-base">{cmd.icon}</span>
                       <div className="flex-1 text-left min-w-0">
-                        <div className="truncate text-sm font-medium text-[var(--text-primary)]">{cmd.label}</div>
-                        <div className="truncate text-xs text-[var(--text-muted)]">{cmd.description}</div>
+                        <div className="truncate text-sm font-medium text-[var(--text-primary)]">
+                          {cmd.label}
+                        </div>
+                        <div className="truncate text-xs text-[var(--text-muted)]">
+                          {cmd.description}
+                        </div>
                       </div>
                       <kbd className="shrink-0 rounded-sm border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-muted)]">
                         {cmd.shortcut}
@@ -656,7 +701,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 "h-10 w-10 shrink-0 rounded-full border transition-colors cursor-pointer",
                 isRecording
                   ? "border-[var(--accent-error)]/20 bg-[var(--accent-error)]/12 text-[var(--accent-error)] animate-pulse"
-                  : "border-transparent text-[var(--text-muted)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                  : "border-transparent text-[var(--text-muted)] hover:border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
               )}
               aria-label={isRecording ? "Stop recording" : "Record voice"}
               data-pressed={isRecording}
@@ -684,7 +729,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   "h-10 w-10 shrink-0 rounded-full border transition-all duration-150 active:scale-95",
                   hasContent && isOnline
                     ? "border-transparent bg-[image:var(--gradient-main)] text-slate-950 font-semibold shadow-[0_0_16px_rgba(0,210,253,0.3)] hover:brightness-110"
-                    : "border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed opacity-60"
+                    : "border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed opacity-60",
                 )}
                 aria-label="Send query"
               >
@@ -696,10 +741,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         {/* Character count */}
         {(isNearingLimit || chatRows.length > 0) && (
-          <div className={cn(
-            "self-end px-1 text-right font-mono text-[11px] transition-colors",
-            isOverLimit ? "font-semibold text-(--accent-error)" : "text-(--text-muted)"
-          )}>
+          <div
+            className={cn(
+              "self-end px-1 text-right font-mono text-[11px] transition-colors",
+              isOverLimit ? "font-semibold text-(--accent-error)" : "text-(--text-muted)",
+            )}
+          >
             {charCount} / 4000 {chatRows.length > 0 && `· ${chatRows.length} files`}
           </div>
         )}

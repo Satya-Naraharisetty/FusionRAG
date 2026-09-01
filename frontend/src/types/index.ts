@@ -135,7 +135,8 @@ export interface EmbeddingStatus {
 }
 
 // SSE
-export type SSEEventType = "metadata" | "text" | "tool_call_started" | "tool_call_completed" | "done" | "error";
+export type SSEEventType =
+  "metadata" | "text" | "tool_call_started" | "tool_call_completed" | "done" | "error";
 
 export interface SSEEvent {
   event: SSEEventType;
@@ -165,4 +166,3 @@ export interface ToolCallEvent {
   error?: string;
   status: "running" | "done" | "failed";
 }
-

@@ -2,10 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "../context/AuthContext";
-import {
-  UploadQueueProvider,
-  useUploadQueue,
-} from "../context/UploadQueueContext";
+import { UploadQueueProvider, useUploadQueue } from "../context/UploadQueueContext";
 import { UploadDropzone } from "../components/documents/UploadDropzone";
 
 afterEach(() => {
@@ -30,11 +27,7 @@ function Probe() {
       >
         add-chat
       </button>
-      <button
-        onClick={() =>
-          addFiles([new File(["x"], "ok.pdf", { type: "application/pdf" })])
-        }
-      >
+      <button onClick={() => addFiles([new File(["x"], "ok.pdf", { type: "application/pdf" })])}>
         add-doc
       </button>
     </div>
@@ -56,7 +49,7 @@ const renderDropzone = () =>
           <Probe />
         </UploadQueueProvider>
       </AuthProvider>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 
 describe("UploadDropzone", () => {
@@ -79,13 +72,11 @@ describe("UploadDropzone", () => {
   it("notes chat-composer uploads when the queue would otherwise look empty", async () => {
     renderDropzone();
 
-    expect(
-      screen.queryByText(/in progress from the chat composer/i)
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/in progress from the chat composer/i)).not.toBeInTheDocument();
 
     screen.getByText("add-chat").click();
     expect(
-      await screen.findByText(/1 upload in progress from the chat composer/i)
+      await screen.findByText(/1 upload in progress from the chat composer/i),
     ).toBeInTheDocument();
     await act(async () => {});
   });

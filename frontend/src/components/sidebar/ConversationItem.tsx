@@ -48,15 +48,15 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
   onRemoveTag,
   isHighlighted = false,
 }) => {
-  const [isEditing, setIsEditing]         = useState(false);
-  const [editTitle, setEditTitle]         = useState(conversation.title);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(conversation.title);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting]       = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Swipe gesture
-  const [swipeOffset, setSwipeOffset]   = useState(0);
-  const touchStart                      = useRef<{ x: number; y: number } | null>(null);
-  const isSwiping                       = useRef(false);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const isSwiping = useRef(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -83,8 +83,11 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter")  handleSaveRename();
-    if (e.key === "Escape") { setIsEditing(false); setEditTitle(conversation.title); }
+    if (e.key === "Enter") handleSaveRename();
+    if (e.key === "Escape") {
+      setIsEditing(false);
+      setEditTitle(conversation.title);
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -118,7 +121,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
       isSwiping.current = true;
       if (dx < 0) setSwipeOffset(Math.max(-130, dx));
-      else        setSwipeOffset(Math.min(0, dx));
+      else setSwipeOffset(Math.min(0, dx));
     }
   };
 
@@ -138,19 +141,27 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
         onTouchEnd={handleTouchEnd}
         className={cn(
           "relative overflow-hidden group select-none rounded-[var(--radius-md)] transition-all duration-150",
-          isHighlighted && !isActive && "ring-1 ring-[var(--border-hover)] bg-[var(--bg-tertiary)]/50"
+          isHighlighted &&
+            !isActive &&
+            "ring-1 ring-[var(--border-hover)] bg-[var(--bg-tertiary)]/50",
         )}
       >
         {/* Swipe quick-actions drawer */}
         <div
           className={cn(
             "absolute right-0 top-0 bottom-0 z-0 flex items-center bg-[var(--bg-secondary)] border-l border-[var(--border-subtle)] transition-opacity duration-150",
-            swipeOffset < 0 ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none invisible"
+            swipeOffset < 0
+              ? "opacity-100 pointer-events-auto"
+              : "opacity-0 pointer-events-none invisible",
           )}
           aria-hidden={swipeOffset === 0}
         >
           <button
-            onClick={(e) => { e.stopPropagation(); onTogglePin(); setSwipeOffset(0); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePin();
+              setSwipeOffset(0);
+            }}
             className="flex flex-col items-center justify-center h-full w-[42px] bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 cursor-pointer transition-colors"
             title="Pin"
             aria-label="Pin conversation"
@@ -159,7 +170,10 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
             <span className="text-[8px] mt-0.5">Pin</span>
           </button>
           <button
-            onClick={(e) => { e.stopPropagation(); setSwipeOffset(0); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSwipeOffset(0);
+            }}
             className="flex flex-col items-center justify-center h-full w-[42px] bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/20 cursor-pointer transition-colors"
             title="Archive"
             aria-label="Archive conversation"
@@ -168,7 +182,11 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
             <span className="text-[8px] mt-0.5">Arch</span>
           </button>
           <button
-            onClick={(e) => { e.stopPropagation(); setShowDeleteDialog(true); setSwipeOffset(0); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDeleteDialog(true);
+              setSwipeOffset(0);
+            }}
             className="flex flex-col items-center justify-center h-full w-[46px] bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer transition-colors"
             title="Delete"
             aria-label="Delete conversation"
@@ -187,8 +205,8 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
             isActive
               ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] font-medium"
               : swipeOffset < 0
-              ? "bg-[var(--bg-secondary)] text-[var(--text-secondary)]"
-              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60"
+                ? "bg-[var(--bg-secondary)] text-[var(--text-secondary)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60",
           )}
           role="button"
           aria-current={isActive ? "page" : undefined}
@@ -200,7 +218,9 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
                 size={13}
                 className={cn(
                   "transition-colors",
-                  isActive ? "text-[var(--accent-primary)]" : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"
+                  isActive
+                    ? "text-[var(--accent-primary)]"
+                    : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]",
                 )}
               />
               {isPinned && (
@@ -232,7 +252,10 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
                   {tags.map((t) => (
                     <span
                       key={t.name}
-                      className={cn("inline-block h-1.5 w-1.5 rounded-full", t.color || "bg-[var(--accent-primary)]")}
+                      className={cn(
+                        "inline-block h-1.5 w-1.5 rounded-full",
+                        t.color || "bg-[var(--accent-primary)]",
+                      )}
                       title={t.name}
                     />
                   ))}
@@ -270,7 +293,8 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
               <span>Delete Conversation?</span>
             </DialogTitle>
             <DialogDescription>
-              Permanently delete "{conversation.title}" and all its message history? This cannot be undone.
+              Permanently delete "{conversation.title}" and all its message history? This cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 pt-2">

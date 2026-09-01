@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  act,
-} from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -45,16 +39,13 @@ function QueueProbe() {
     <div>
       <button
         onClick={() =>
-          addFiles(
-            [new File(["x"], "a.pdf", { type: "application/pdf" })],
-            {
-              source: "chat",
-              conversationId: "conv-1",
-              acceptedExtensions: ["pdf"],
-              autoUpload: true,
-              silent: true,
-            }
-          )
+          addFiles([new File(["x"], "a.pdf", { type: "application/pdf" })], {
+            source: "chat",
+            conversationId: "conv-1",
+            acceptedExtensions: ["pdf"],
+            autoUpload: true,
+            silent: true,
+          })
         }
       >
         add-chat
@@ -79,7 +70,7 @@ const renderWithQueue = (ui: React.ReactElement) =>
       <AuthProvider>
         <UploadQueueProvider>{ui}</UploadQueueProvider>
       </AuthProvider>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 
 describe("ConversationDocumentChips", () => {
@@ -88,62 +79,44 @@ describe("ConversationDocumentChips", () => {
       http.get("*/api/v1/documents", ({ request }) => {
         const conv = new URL(request.url).searchParams.get("conversation_id");
         return HttpResponse.json(
-          conv
-            ? [chatDoc("chat-doc-1", "a.pdf"), chatDoc("chat-doc-2", "b.pdf")]
-            : []
+          conv ? [chatDoc("chat-doc-1", "a.pdf"), chatDoc("chat-doc-2", "b.pdf")] : [],
         );
-      })
+      }),
     );
 
-    renderWithQueue(
-      <ConversationDocumentChips conversationId="conv-1" />
-    );
+    renderWithQueue(<ConversationDocumentChips conversationId="conv-1" />);
 
     expect(await screen.findByText("a.pdf")).toBeInTheDocument();
     expect(screen.getByText("b.pdf")).toBeInTheDocument();
-    expect(
-      screen.getByText(/only this conversation can use them/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/only this conversation can use them/i)).toBeInTheDocument();
     // The caption under the chips spells out the two-tier lifecycle.
     expect(
-      screen.getByText(/Only usable in this chat — deleted with the conversation/i)
+      screen.getByText(/Only usable in this chat — deleted with the conversation/i),
     ).toBeInTheDocument();
     await act(async () => {});
   });
 
   it("renders nothing without a conversation", async () => {
-    renderWithQueue(
-      <ConversationDocumentChips conversationId={null} />
-    );
+    renderWithQueue(<ConversationDocumentChips conversationId={null} />);
+    expect(screen.queryByText(/only this conversation can use them/i)).not.toBeInTheDocument();
     expect(
-      screen.queryByText(/only this conversation can use them/i)
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(/Only usable in this chat — deleted with the conversation/i)
+      screen.queryByText(/Only usable in this chat — deleted with the conversation/i),
     ).not.toBeInTheDocument();
     await act(async () => {});
   });
 
   it("shows the lifecycle caption in the empty state before any files are attached", async () => {
-    server.use(
-      http.get("*/api/v1/documents", () => HttpResponse.json([]))
-    );
+    server.use(http.get("*/api/v1/documents", () => HttpResponse.json([])));
 
-    renderWithQueue(
-      <ConversationDocumentChips conversationId="conv-1" />
-    );
+    renderWithQueue(<ConversationDocumentChips conversationId="conv-1" />);
 
     // No files yet — the strip shows just the lifecycle note, so users know
     // chat files die with the conversation before attaching anything.
     expect(
-      await screen.findByText(
-        /Only usable in this chat — deleted with the conversation/i
-      )
+      await screen.findByText(/Only usable in this chat — deleted with the conversation/i),
     ).toBeInTheDocument();
     // No header and no chips in the empty state.
-    expect(
-      screen.queryByText(/only this conversation can use them/i)
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/only this conversation can use them/i)).not.toBeInTheDocument();
     await act(async () => {});
   });
 
@@ -164,23 +137,21 @@ describe("ConversationDocumentChips", () => {
       // conversation list returns), so the chip's remove must also cancel the
       // matching in-flight queue row.
       http.post("*/api/v1/documents/upload", () =>
-        HttpResponse.json(chatDoc("chat-doc-1", "a.pdf"))
-      )
+        HttpResponse.json(chatDoc("chat-doc-1", "a.pdf")),
+      ),
     );
 
     renderWithQueue(
       <div>
         <QueueProbe />
         <ConversationDocumentChips conversationId="conv-1" />
-      </div>
+      </div>,
     );
 
     // Attach a file through the queue — its row gains documentId chat-doc-1
     // once the mocked upload resolves.
     fireEvent.click(screen.getByText("add-chat"));
-    await waitFor(() =>
-      expect(screen.getByTestId("queue-count")).toHaveTextContent("1")
-    );
+    await waitFor(() => expect(screen.getByTestId("queue-count")).toHaveTextContent("1"));
     await waitFor(() => {
       const rows = screen.getAllByTestId("queue-row");
       expect(rows[0].getAttribute("data-doc")).toBe("chat-doc-1");
@@ -192,30 +163,22 @@ describe("ConversationDocumentChips", () => {
     expect(
       await screen.findByRole("button", {
         name: "Remove a.pdf from this chat",
-      })
+      }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Remove b.pdf from this chat" })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove b.pdf from this chat" })).toBeInTheDocument();
 
     // Removing a.pdf deletes it server-side (chip disappears) and drops the
     // queue row for the same document.
-    fireEvent.click(
-      screen.getByRole("button", { name: "Remove a.pdf from this chat" })
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Remove a.pdf from this chat" }));
     await waitFor(() =>
       expect(
         screen.queryByRole("button", {
           name: "Remove a.pdf from this chat",
-        })
-      ).not.toBeInTheDocument()
+        }),
+      ).not.toBeInTheDocument(),
     );
-    expect(
-      screen.getByRole("button", { name: "Remove b.pdf from this chat" })
-    ).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByTestId("queue-count")).toHaveTextContent("0")
-    );
+    expect(screen.getByRole("button", { name: "Remove b.pdf from this chat" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("queue-count")).toHaveTextContent("0"));
     await act(async () => {});
   });
 });

@@ -41,9 +41,7 @@ const STATUS_BG = {
 
 /** Shared footer caption rendered under the ring + label row. */
 const Footer: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <span className="text-[11px] leading-snug text-[var(--text-muted)]">
-    {children}
-  </span>
+  <span className="text-[11px] leading-snug text-[var(--text-muted)]">{children}</span>
 );
 
 export const UploadProgress: React.FC<UploadProgressProps> = ({
@@ -74,11 +72,24 @@ export const UploadProgress: React.FC<UploadProgressProps> = ({
             className={cn("flex-shrink-0", STATUS_COLORS[status])}
             style={{ width: config.ringSize, height: config.ringSize }}
           >
-            <svg width={config.ringSize} height={config.ringSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width={config.ringSize}
+              height={config.ringSize}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </span>
-          {showLabel && <span className="text-xs font-mono font-bold" style={{ color: "var(--text-muted)" }}>Done</span>}
+          {showLabel && (
+            <span className="text-xs font-mono font-bold" style={{ color: "var(--text-muted)" }}>
+              Done
+            </span>
+          )}
         </div>
         {footer && <Footer>{footer}</Footer>}
       </div>
@@ -93,13 +104,26 @@ export const UploadProgress: React.FC<UploadProgressProps> = ({
             className={cn("flex-shrink-0", STATUS_COLORS[status])}
             style={{ width: config.ringSize, height: config.ringSize }}
           >
-            <svg width={config.ringSize} height={config.ringSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width={config.ringSize}
+              height={config.ringSize}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <circle cx="12" cy="12" r="10" />
               <line x1="15" y1="9" x2="9" y2="15" />
               <line x1="9" y1="9" x2="15" y2="15" />
             </svg>
           </span>
-          {showLabel && <span className="text-xs font-mono font-bold" style={{ color: "var(--text-muted)" }}>Error</span>}
+          {showLabel && (
+            <span className="text-xs font-mono font-bold" style={{ color: "var(--text-muted)" }}>
+              Error
+            </span>
+          )}
         </div>
         {footer && <Footer>{footer}</Footer>}
       </div>
@@ -145,7 +169,10 @@ export const UploadProgress: React.FC<UploadProgressProps> = ({
             </svg>
           </span>
           {showLabel && progress > 0 && (
-            <span className="text-xs font-mono font-bold min-w-[28px] text-right" style={{ color: "var(--text-muted)" }}>
+            <span
+              className="text-xs font-mono font-bold min-w-[28px] text-right"
+              style={{ color: "var(--text-muted)" }}
+            >
               {progress}%
             </span>
           )}
@@ -161,7 +188,10 @@ export const UploadProgress: React.FC<UploadProgressProps> = ({
         <svg
           width={config.ringSize}
           height={config.ringSize}
-          className={cn("transform -rotate-90", animated ? "transition-transform duration-300" : "")}
+          className={cn(
+            "transform -rotate-90",
+            animated ? "transition-transform duration-300" : "",
+          )}
         >
           <circle
             cx={config.ringSize / 2}
@@ -184,7 +214,10 @@ export const UploadProgress: React.FC<UploadProgressProps> = ({
           />
         </svg>
         {showLabel && (
-          <span className="text-xs font-mono font-bold min-w-[28px] text-right" style={{ color: "var(--text-muted)" }}>
+          <span
+            className="text-xs font-mono font-bold min-w-[28px] text-right"
+            style={{ color: "var(--text-muted)" }}
+          >
             {progress}%
           </span>
         )}

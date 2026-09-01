@@ -37,17 +37,14 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       setIsStreaming(false);
-      
+
       // Update last message status to interrupted when stopped by user — the
       // backend persists the partial answer with the same INTERRUPTED status.
       setChatMessages((prev) => {
         if (prev.length === 0) return prev;
         const last = prev[prev.length - 1];
         if (last.role === "assistant" && last.status !== "completed") {
-          return [
-            ...prev.slice(0, -1),
-            { ...last, status: "interrupted" as const },
-          ];
+          return [...prev.slice(0, -1), { ...last, status: "interrupted" as const }];
         }
         return prev;
       });
@@ -69,7 +66,7 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
         filters?: Record<string, unknown> | null;
         truncateFromMessageId?: string | null;
         deleteBeforeStreamMessageId?: string | null;
-      }
+      },
     ) => {
       if (isStreaming) return;
 
@@ -179,9 +176,7 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
             }
             setCurrentConversationId(conversation_id);
 
-            const diagnostics = data.diagnostics as
-              | { retrieval_skipped?: boolean }
-              | undefined;
+            const diagnostics = data.diagnostics as { retrieval_skipped?: boolean } | undefined;
 
             updateAssistant((msg) => ({
               ...msg,
@@ -213,9 +208,7 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
             updateAssistant((msg) => ({
               ...msg,
               toolCalls: (msg.toolCalls || []).map((tc) =>
-                tc.id === toolCallId
-                  ? { ...tc, result: toolResult, status: "done" as const }
-                  : tc
+                tc.id === toolCallId ? { ...tc, result: toolResult, status: "done" as const } : tc,
               ),
             }));
           } else if (eventType === "done") {
@@ -234,16 +227,13 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
               });
             }
 
-            const doneDiagnostics = data.diagnostics as
-              | { retrieval_skipped?: boolean }
-              | undefined;
+            const doneDiagnostics = data.diagnostics as { retrieval_skipped?: boolean } | undefined;
 
             updateAssistant((msg) => ({
               ...msg,
               content: (data.answer as string) || msg.content,
               citations: (data.citations as Citation[]) || msg.citations,
-              retrievalSkipped:
-                doneDiagnostics?.retrieval_skipped ?? msg.retrievalSkipped ?? false,
+              retrievalSkipped: doneDiagnostics?.retrieval_skipped ?? msg.retrievalSkipped ?? false,
               status: "completed" as const,
             }));
 
@@ -288,7 +278,7 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
         setIsStreaming(false);
       }
     },
-    [currentConversationId, isStreaming, queryClient]
+    [currentConversationId, isStreaming, queryClient],
   );
 
   const retry = useCallback(() => {
@@ -317,7 +307,7 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
         retry();
         return;
       }
-      
+
       // Remove last failed assistant message
       setChatMessages((prev) => {
         if (prev.length === 0) return prev;
@@ -326,7 +316,7 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
 
       // Prepend context to instruction
       const followUp = `Here is the partial response generated so far: "${partialText}". Please continue generating the response from exactly where it left off without repeating the text.`;
-      
+
       send(followUp, {
         conversationId: currentConversationId,
         documentIds: lastDocIdsRef.current,
@@ -343,10 +333,7 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
     setChatMessages((prev) => {
       if (prev.length === 0) return prev;
       const last = prev[prev.length - 1];
-      return [
-        ...prev.slice(0, -1),
-        { ...last, status: "interrupted" as const },
-      ];
+      return [...prev.slice(0, -1), { ...last, status: "interrupted" as const }];
     });
   }, []);
 
@@ -374,7 +361,7 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
                 };
               }),
             };
-          }
+          },
         );
       }
 
@@ -385,7 +372,7 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
         deleteBeforeStreamMessageId: messageId,
       });
     },
-    [isStreaming, send, currentConversationId, queryClient]
+    [isStreaming, send, currentConversationId, queryClient],
   );
 
   const regenerate = useCallback(
@@ -422,7 +409,7 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
         });
       }
     },
-    [isStreaming, send, currentConversationId]
+    [isStreaming, send, currentConversationId],
   );
 
   const clearChat = useCallback(() => {
@@ -450,4 +437,3 @@ export const useSSEChat = (options?: UseSSEChatOptions) => {
     clearChat,
   };
 };
-

@@ -114,7 +114,9 @@ export const AdminDashboardPage: React.FC = () => {
         })
         .catch((err) => {
           toast.error("Failed to load report HTML");
-          setReportHtml(`<div style="color:red;padding:20px;">Error loading report: ${err.message || err}</div>`);
+          setReportHtml(
+            `<div style="color:red;padding:20px;">Error loading report: ${err.message || err}</div>`,
+          );
         })
         .finally(() => {
           setIsLoadingReport(false);
@@ -182,7 +184,10 @@ export const AdminDashboardPage: React.FC = () => {
       .join(" ");
 
     return (
-      <svg className="w-full h-full text-[var(--accent-primary)]" viewBox={`0 0 ${width} ${height}`}>
+      <svg
+        className="w-full h-full text-[var(--accent-primary)]"
+        viewBox={`0 0 ${width} ${height}`}
+      >
         <defs>
           <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.2" />
@@ -190,11 +195,42 @@ export const AdminDashboardPage: React.FC = () => {
           </linearGradient>
         </defs>
         {/* Grid lines */}
-        <line x1={padding} y1={padding} x2={width - padding} y2={padding} stroke="var(--border-subtle)" strokeWidth={0.5} strokeDasharray="3 3" />
-        <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="var(--border-default)" strokeWidth={1} />
+        <line
+          x1={padding}
+          y1={padding}
+          x2={width - padding}
+          y2={padding}
+          stroke="var(--border-subtle)"
+          strokeWidth={0.5}
+          strokeDasharray="3 3"
+        />
+        <line
+          x1={padding}
+          y1={height - padding}
+          x2={width - padding}
+          y2={height - padding}
+          stroke="var(--border-default)"
+          strokeWidth={1}
+        />
         {/* Y Axis labels */}
-        <text x={padding - 5} y={padding + 5} textAnchor="end" fontSize={8} fill="var(--text-muted)">{Math.round(maxLat)}ms</text>
-        <text x={padding - 5} y={height - padding + 3} textAnchor="end" fontSize={8} fill="var(--text-muted)">{Math.round(minLat)}ms</text>
+        <text
+          x={padding - 5}
+          y={padding + 5}
+          textAnchor="end"
+          fontSize={8}
+          fill="var(--text-muted)"
+        >
+          {Math.round(maxLat)}ms
+        </text>
+        <text
+          x={padding - 5}
+          y={height - padding + 3}
+          textAnchor="end"
+          fontSize={8}
+          fill="var(--text-muted)"
+        >
+          {Math.round(minLat)}ms
+        </text>
         {/* Area fill */}
         {points && (
           <polygon
@@ -204,21 +240,26 @@ export const AdminDashboardPage: React.FC = () => {
         )}
         {/* Line */}
         {points && (
-          <polyline
-            fill="none"
-            stroke="var(--accent-primary)"
-            strokeWidth={2}
-            points={points}
-          />
+          <polyline fill="none" stroke="var(--accent-primary)" strokeWidth={2} points={points} />
         )}
         {/* Data points */}
         {data.map((d, index) => {
           const x = padding + (index * (width - padding * 2)) / (data.length - 1);
-          const y = height - padding - ((d.avg_latency_ms - minLat) * (height - padding * 2)) / delta;
+          const y =
+            height - padding - ((d.avg_latency_ms - minLat) * (height - padding * 2)) / delta;
           return (
             <g key={index} className="group cursor-pointer">
-              <circle cx={x} cy={y} r={4} fill="var(--bg-elevated)" stroke="var(--accent-primary)" strokeWidth={2} />
-              <title>{d.date}: {d.avg_latency_ms}ms</title>
+              <circle
+                cx={x}
+                cy={y}
+                r={4}
+                fill="var(--bg-elevated)"
+                stroke="var(--accent-primary)"
+                strokeWidth={2}
+              />
+              <title>
+                {d.date}: {d.avg_latency_ms}ms
+              </title>
             </g>
           );
         })}
@@ -227,7 +268,16 @@ export const AdminDashboardPage: React.FC = () => {
           const x = padding + (index * (width - padding * 2)) / (data.length - 1);
           const shortDate = d.date.substring(5); // MM-DD
           return (
-            <text key={index} x={x} y={height - 15} textAnchor="middle" fontSize={8} fill="var(--text-muted)">{shortDate}</text>
+            <text
+              key={index}
+              x={x}
+              y={height - 15}
+              textAnchor="middle"
+              fontSize={8}
+              fill="var(--text-muted)"
+            >
+              {shortDate}
+            </text>
           );
         })}
       </svg>
@@ -245,10 +295,13 @@ export const AdminDashboardPage: React.FC = () => {
     const maxTokens = Math.max(...tokens, 1000);
     const chartHeight = height - padding * 2;
     const barWidth = Math.max(10, ((width - padding * 2) / data.length) * 0.6);
-    const spacing = ((width - padding * 2) / data.length);
+    const spacing = (width - padding * 2) / data.length;
 
     return (
-      <svg className="w-full h-full text-[var(--accent-secondary)]" viewBox={`0 0 ${width} ${height}`}>
+      <svg
+        className="w-full h-full text-[var(--accent-secondary)]"
+        viewBox={`0 0 ${width} ${height}`}
+      >
         <defs>
           <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--accent-primary)" />
@@ -256,11 +309,42 @@ export const AdminDashboardPage: React.FC = () => {
           </linearGradient>
         </defs>
         {/* Grid lines */}
-        <line x1={padding} y1={padding} x2={width - padding} y2={padding} stroke="var(--border-subtle)" strokeWidth={0.5} strokeDasharray="3 3" />
-        <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="var(--border-default)" strokeWidth={1} />
+        <line
+          x1={padding}
+          y1={padding}
+          x2={width - padding}
+          y2={padding}
+          stroke="var(--border-subtle)"
+          strokeWidth={0.5}
+          strokeDasharray="3 3"
+        />
+        <line
+          x1={padding}
+          y1={height - padding}
+          x2={width - padding}
+          y2={height - padding}
+          stroke="var(--border-default)"
+          strokeWidth={1}
+        />
         {/* Y Axis labels */}
-        <text x={padding - 5} y={padding + 5} textAnchor="end" fontSize={8} fill="var(--text-muted)">{Math.round(maxTokens)}</text>
-        <text x={padding - 5} y={height - padding + 3} textAnchor="end" fontSize={8} fill="var(--text-muted)">0</text>
+        <text
+          x={padding - 5}
+          y={padding + 5}
+          textAnchor="end"
+          fontSize={8}
+          fill="var(--text-muted)"
+        >
+          {Math.round(maxTokens)}
+        </text>
+        <text
+          x={padding - 5}
+          y={height - padding + 3}
+          textAnchor="end"
+          fontSize={8}
+          fill="var(--text-muted)"
+        >
+          0
+        </text>
         {/* Bars */}
         {data.map((d, index) => {
           const x = padding + index * spacing + (spacing - barWidth) / 2;
@@ -269,7 +353,9 @@ export const AdminDashboardPage: React.FC = () => {
           return (
             <g key={index} className="group cursor-pointer">
               <rect x={x} y={y} width={barWidth} height={h} rx={2} fill="url(#barGrad)" />
-              <title>{d.date}: {d.tokens} tokens</title>
+              <title>
+                {d.date}: {d.tokens} tokens
+              </title>
             </g>
           );
         })}
@@ -278,7 +364,16 @@ export const AdminDashboardPage: React.FC = () => {
           const x = padding + index * spacing + spacing / 2;
           const shortDate = d.date.substring(5); // MM-DD
           return (
-            <text key={index} x={x} y={height - 15} textAnchor="middle" fontSize={8} fill="var(--text-muted)">{shortDate}</text>
+            <text
+              key={index}
+              x={x}
+              y={height - 15}
+              textAnchor="middle"
+              fontSize={8}
+              fill="var(--text-muted)"
+            >
+              {shortDate}
+            </text>
           );
         })}
       </svg>
@@ -375,7 +470,9 @@ export const AdminDashboardPage: React.FC = () => {
                 <DollarSign size={20} />
               </div>
               <div>
-                <p className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Est. API Cost</p>
+                <p className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                  Est. API Cost
+                </p>
                 <h3 className="text-xl font-bold mt-0.5">${obMetrics?.total_cost ?? "0.0000"}</h3>
               </div>
             </div>
@@ -385,9 +482,13 @@ export const AdminDashboardPage: React.FC = () => {
                 <Clock size={20} />
               </div>
               <div>
-                <p className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Avg Latency</p>
+                <p className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                  Avg Latency
+                </p>
                 <h3 className="text-xl font-bold mt-0.5">
-                  {obMetrics?.avg_total_latency_ms ? `${(obMetrics.avg_total_latency_ms / 1000).toFixed(2)}s` : "0.00s"}
+                  {obMetrics?.avg_total_latency_ms
+                    ? `${(obMetrics.avg_total_latency_ms / 1000).toFixed(2)}s`
+                    : "0.00s"}
                 </h3>
               </div>
             </div>
@@ -397,8 +498,12 @@ export const AdminDashboardPage: React.FC = () => {
                 <Zap size={20} />
               </div>
               <div>
-                <p className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Total Tokens</p>
-                <h3 className="text-xl font-bold mt-0.5">{obMetrics?.total_tokens?.toLocaleString() ?? "0"}</h3>
+                <p className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                  Total Tokens
+                </p>
+                <h3 className="text-xl font-bold mt-0.5">
+                  {obMetrics?.total_tokens?.toLocaleString() ?? "0"}
+                </h3>
               </div>
             </div>
 
@@ -407,7 +512,9 @@ export const AdminDashboardPage: React.FC = () => {
                 <TrendingUp size={20} />
               </div>
               <div>
-                <p className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Total LLM Calls</p>
+                <p className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                  Total LLM Calls
+                </p>
                 <h3 className="text-xl font-bold mt-0.5">{obTraces?.total ?? "0"}</h3>
               </div>
             </div>
@@ -426,7 +533,9 @@ export const AdminDashboardPage: React.FC = () => {
                 ) : obMetrics?.daily_usage?.length ? (
                   renderSVGLineChart(obMetrics.daily_usage)
                 ) : (
-                  <p className="text-xs text-[var(--text-muted)] font-medium">No latency stats available.</p>
+                  <p className="text-xs text-[var(--text-muted)] font-medium">
+                    No latency stats available.
+                  </p>
                 )}
               </div>
             </div>
@@ -442,7 +551,9 @@ export const AdminDashboardPage: React.FC = () => {
                 ) : obMetrics?.daily_usage?.length ? (
                   renderSVGBarChart(obMetrics.daily_usage)
                 ) : (
-                  <p className="text-xs text-[var(--text-muted)] font-medium">No token stats available.</p>
+                  <p className="text-xs text-[var(--text-muted)] font-medium">
+                    No token stats available.
+                  </p>
                 )}
               </div>
             </div>
@@ -451,12 +562,14 @@ export const AdminDashboardPage: React.FC = () => {
           {/* Latency split detail */}
           {obMetrics && (
             <div className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-lg)] p-5">
-              <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-4">Pipeline Latency Breakdown</h3>
+              <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-4">
+                Pipeline Latency Breakdown
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <div className="flex justify-between text-xs text-[var(--text-secondary)] font-medium mb-1">
                     <span>Average Retrieval Time</span>
-                    <span>{(obMetrics.avg_retrieval_latency_ms).toFixed(1)}ms</span>
+                    <span>{obMetrics.avg_retrieval_latency_ms.toFixed(1)}ms</span>
                   </div>
                   <div className="h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
                     <div
@@ -464,7 +577,9 @@ export const AdminDashboardPage: React.FC = () => {
                       style={{
                         width: `${Math.min(
                           100,
-                          (obMetrics.avg_retrieval_latency_ms / Math.max(1, obMetrics.avg_total_latency_ms)) * 100
+                          (obMetrics.avg_retrieval_latency_ms /
+                            Math.max(1, obMetrics.avg_total_latency_ms)) *
+                            100,
                         )}%`,
                       }}
                     />
@@ -473,7 +588,7 @@ export const AdminDashboardPage: React.FC = () => {
                 <div>
                   <div className="flex justify-between text-xs text-[var(--text-secondary)] font-medium mb-1">
                     <span>Average Generation Time</span>
-                    <span>{(obMetrics.avg_generation_latency_ms).toFixed(1)}ms</span>
+                    <span>{obMetrics.avg_generation_latency_ms.toFixed(1)}ms</span>
                   </div>
                   <div className="h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
                     <div
@@ -481,7 +596,9 @@ export const AdminDashboardPage: React.FC = () => {
                       style={{
                         width: `${Math.min(
                           100,
-                          (obMetrics.avg_generation_latency_ms / Math.max(1, obMetrics.avg_total_latency_ms)) * 100
+                          (obMetrics.avg_generation_latency_ms /
+                            Math.max(1, obMetrics.avg_total_latency_ms)) *
+                            100,
                         )}%`,
                       }}
                     />
@@ -503,7 +620,9 @@ export const AdminDashboardPage: React.FC = () => {
           {/* Trace log Table */}
           <div className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-lg)] overflow-hidden">
             <div className="p-4 border-b border-[var(--border-default)] flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Live LLM Traces (Latest 50 Runs)</h3>
+              <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                Live LLM Traces (Latest 50 Runs)
+              </h3>
               <Button
                 variant="ghost"
                 size="xs"
@@ -522,7 +641,9 @@ export const AdminDashboardPage: React.FC = () => {
                 <div className="animate-spin h-6 w-6 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full" />
               </div>
             ) : obTraces?.items?.length === 0 ? (
-              <p className="p-8 text-center text-xs text-[var(--text-muted)] font-medium">No traces recorded yet.</p>
+              <p className="p-8 text-center text-xs text-[var(--text-muted)] font-medium">
+                No traces recorded yet.
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -551,45 +672,73 @@ export const AdminDashboardPage: React.FC = () => {
                                 {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                               </button>
                             </td>
-                            <td className="p-3 max-w-xs truncate font-medium text-[var(--text-primary)]">{trace.question}</td>
+                            <td className="p-3 max-w-xs truncate font-medium text-[var(--text-primary)]">
+                              {trace.question}
+                            </td>
                             <td className="p-3 font-mono">${trace.cost.toFixed(5)}</td>
                             <td className="p-3 font-mono text-[var(--text-secondary)]">
                               in: {trace.prompt_tokens} / out: {trace.completion_tokens}
                             </td>
                             <td className="p-3 font-mono text-[var(--text-secondary)]">
-                              {trace.total_time_ms ? `${(trace.total_time_ms / 1000).toFixed(2)}s` : "N/A"}
+                              {trace.total_time_ms
+                                ? `${(trace.total_time_ms / 1000).toFixed(2)}s`
+                                : "N/A"}
                             </td>
                             <td className="p-3 font-mono">{trace.citations_count}</td>
-                            <td className="p-3 text-[var(--text-muted)]">{formatDate(trace.created_at)}</td>
+                            <td className="p-3 text-[var(--text-muted)]">
+                              {formatDate(trace.created_at)}
+                            </td>
                           </tr>
                           {isExpanded && (
                             <tr className="bg-[var(--bg-tertiary)]/10 border-b border-[var(--border-default)] text-xs">
                               <td colSpan={7} className="p-4">
                                 <div className="space-y-3 font-medium">
                                   <div>
-                                    <h4 className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider">Full Prompt Query:</h4>
+                                    <h4 className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider">
+                                      Full Prompt Query:
+                                    </h4>
                                     <p className="bg-[var(--bg-input)] border border-[var(--border-subtle)] p-2.5 rounded-md mt-1 font-mono text-[11px] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap">
                                       {trace.question}
                                     </p>
                                   </div>
                                   <div>
-                                    <h4 className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider">Assistant Response:</h4>
+                                    <h4 className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider">
+                                      Assistant Response:
+                                    </h4>
                                     <p className="bg-[var(--bg-input)] border border-[var(--border-subtle)] p-2.5 rounded-md mt-1 font-mono text-[11px] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap">
                                       {trace.answer}
                                     </p>
                                   </div>
                                   <div className="grid grid-cols-3 gap-4 text-[11px]">
                                     <div>
-                                      <span className="font-bold text-[var(--text-muted)]">Retrieval Latency: </span>
-                                      <span className="font-mono">{trace.retrieval_time_ms ? `${trace.retrieval_time_ms.toFixed(1)}ms` : "N/A"}</span>
+                                      <span className="font-bold text-[var(--text-muted)]">
+                                        Retrieval Latency:{" "}
+                                      </span>
+                                      <span className="font-mono">
+                                        {trace.retrieval_time_ms
+                                          ? `${trace.retrieval_time_ms.toFixed(1)}ms`
+                                          : "N/A"}
+                                      </span>
                                     </div>
                                     <div>
-                                      <span className="font-bold text-[var(--text-muted)]">Generation Latency: </span>
-                                      <span className="font-mono">{trace.generation_time_ms ? `${trace.generation_time_ms.toFixed(1)}ms` : "N/A"}</span>
+                                      <span className="font-bold text-[var(--text-muted)]">
+                                        Generation Latency:{" "}
+                                      </span>
+                                      <span className="font-mono">
+                                        {trace.generation_time_ms
+                                          ? `${trace.generation_time_ms.toFixed(1)}ms`
+                                          : "N/A"}
+                                      </span>
                                     </div>
                                     <div>
-                                      <span className="font-bold text-[var(--text-muted)]">Total Response Latency: </span>
-                                      <span className="font-mono">{trace.total_time_ms ? `${trace.total_time_ms.toFixed(1)}ms` : "N/A"}</span>
+                                      <span className="font-bold text-[var(--text-muted)]">
+                                        Total Response Latency:{" "}
+                                      </span>
+                                      <span className="font-mono">
+                                        {trace.total_time_ms
+                                          ? `${trace.total_time_ms.toFixed(1)}ms`
+                                          : "N/A"}
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
@@ -613,7 +762,9 @@ export const AdminDashboardPage: React.FC = () => {
           {/* Historical Runs List Table */}
           <div className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-lg)] overflow-hidden">
             <div className="p-4 border-b border-[var(--border-default)] flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Offline Evaluation Runs</h3>
+              <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                Offline Evaluation Runs
+              </h3>
               <Button
                 variant="ghost"
                 size="xs"
@@ -632,7 +783,9 @@ export const AdminDashboardPage: React.FC = () => {
                 <div className="animate-spin h-6 w-6 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full" />
               </div>
             ) : evalRuns.length === 0 ? (
-              <p className="p-8 text-center text-xs text-[var(--text-muted)] font-medium">No evaluation runs found. Click "Trigger Benchmark" to start.</p>
+              <p className="p-8 text-center text-xs text-[var(--text-muted)] font-medium">
+                No evaluation runs found. Click "Trigger Benchmark" to start.
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -651,14 +804,23 @@ export const AdminDashboardPage: React.FC = () => {
                   </thead>
                   <tbody>
                     {evalRuns.map((run: EvaluationRun) => (
-                      <tr key={run.id} className="border-b border-[var(--border-default)] hover:bg-[var(--bg-tertiary)]/30 text-xs transition-colors">
+                      <tr
+                        key={run.id}
+                        className="border-b border-[var(--border-default)] hover:bg-[var(--bg-tertiary)]/30 text-xs transition-colors"
+                      >
                         <td className="p-3">
                           <div className="font-semibold text-[var(--text-primary)]">{run.name}</div>
-                          <div className="text-[10px] text-[var(--text-muted)] font-mono mt-0.5">{run.id}</div>
+                          <div className="text-[10px] text-[var(--text-muted)] font-mono mt-0.5">
+                            {run.id}
+                          </div>
                         </td>
                         <td className="p-3">
-                          <span className="font-mono text-[var(--text-secondary)]">{run.dataset_id}</span>
-                          <span className="text-[10px] text-[var(--text-muted)] ml-1">v{run.dataset_version}</span>
+                          <span className="font-mono text-[var(--text-secondary)]">
+                            {run.dataset_id}
+                          </span>
+                          <span className="text-[10px] text-[var(--text-muted)] ml-1">
+                            v{run.dataset_version}
+                          </span>
                         </td>
                         <td className="p-3 capitalize">{run.profile}</td>
                         <td className="p-3">
@@ -667,8 +829,8 @@ export const AdminDashboardPage: React.FC = () => {
                               run.status === "COMPLETED"
                                 ? "bg-green-500/10 text-green-400"
                                 : run.status === "RUNNING"
-                                ? "bg-blue-500/10 text-blue-400 animate-pulse"
-                                : "bg-red-500/10 text-red-400"
+                                  ? "bg-blue-500/10 text-blue-400 animate-pulse"
+                                  : "bg-red-500/10 text-red-400"
                             }`}
                           >
                             {run.status}
@@ -677,9 +839,13 @@ export const AdminDashboardPage: React.FC = () => {
                         <td className="p-3 font-mono">
                           {run.completed_samples} / {run.total_samples}
                         </td>
-                        <td className="p-3 font-mono">{run.avg_latency ? `${run.avg_latency.toFixed(2)}s` : "0.00s"}</td>
+                        <td className="p-3 font-mono">
+                          {run.avg_latency ? `${run.avg_latency.toFixed(2)}s` : "0.00s"}
+                        </td>
                         <td className="p-3 font-mono">${run.total_cost.toFixed(5)}</td>
-                        <td className="p-3 text-[var(--text-muted)]">{formatDate(run.created_at)}</td>
+                        <td className="p-3 text-[var(--text-muted)]">
+                          {formatDate(run.created_at)}
+                        </td>
                         <td className="p-3">
                           {run.status === "COMPLETED" && (
                             <Button
@@ -709,13 +875,17 @@ export const AdminDashboardPage: React.FC = () => {
           <div className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-lg)] w-full max-w-md overflow-hidden shadow-xl animate-in fade-in-50 zoom-in-95 duration-150">
             <div className="p-5 border-b border-[var(--border-default)]">
               <h3 className="text-sm font-bold font-title">Start Pipeline Benchmark Suite</h3>
-              <p className="text-[11px] text-[var(--text-muted)] mt-1">Configure parameters to run RAG evaluation pipelines.</p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                Configure parameters to run RAG evaluation pipelines.
+              </p>
             </div>
 
             <form onSubmit={handleStartBenchmark}>
               <div className="p-5 space-y-4 text-xs font-semibold">
                 <div>
-                  <label className="block text-[var(--text-secondary)] mb-1">Dataset File Path</label>
+                  <label className="block text-[var(--text-secondary)] mb-1">
+                    Dataset File Path
+                  </label>
                   <input
                     type="text"
                     required
@@ -727,7 +897,9 @@ export const AdminDashboardPage: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[var(--text-secondary)] mb-1">Dataset Identifier</label>
+                    <label className="block text-[var(--text-secondary)] mb-1">
+                      Dataset Identifier
+                    </label>
                     <input
                       type="text"
                       required
@@ -737,7 +909,9 @@ export const AdminDashboardPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[var(--text-secondary)] mb-1">Dataset Version</label>
+                    <label className="block text-[var(--text-secondary)] mb-1">
+                      Dataset Version
+                    </label>
                     <input
                       type="text"
                       required
@@ -811,7 +985,9 @@ export const AdminDashboardPage: React.FC = () => {
             <div className="p-5 border-b border-[var(--border-default)] flex justify-between items-center">
               <div>
                 <h3 className="text-sm font-bold font-title">Compare Runs (Regression Check)</h3>
-                <p className="text-[11px] text-[var(--text-muted)] mt-1">Select candidate and baseline evaluation runs to perform delta comparisons.</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                  Select candidate and baseline evaluation runs to perform delta comparisons.
+                </p>
               </div>
               <Button
                 variant="ghost"
@@ -830,7 +1006,9 @@ export const AdminDashboardPage: React.FC = () => {
               <div className="p-5 space-y-4 text-xs font-semibold">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[var(--text-secondary)] mb-1">Candidate Run ID</label>
+                    <label className="block text-[var(--text-secondary)] mb-1">
+                      Candidate Run ID
+                    </label>
                     <select
                       value={candidateRunId}
                       required
@@ -848,7 +1026,9 @@ export const AdminDashboardPage: React.FC = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[var(--text-secondary)] mb-1">Baseline Run ID</label>
+                    <label className="block text-[var(--text-secondary)] mb-1">
+                      Baseline Run ID
+                    </label>
                     <select
                       value={baselineRunId}
                       required
@@ -889,8 +1069,17 @@ export const AdminDashboardPage: React.FC = () => {
                         return (
                           <div key={metric} className="flex justify-between items-center py-0.5">
                             <span>{metric}</span>
-                            <span className={isPos ? "text-green-400" : isNeg ? "text-red-400 font-bold" : "text-[var(--text-muted)]"}>
-                              {val >= 0 ? `+${val.toFixed(3)}` : val.toFixed(3)} {isPos ? "▲" : isNeg ? "▼" : "—"}
+                            <span
+                              className={
+                                isPos
+                                  ? "text-green-400"
+                                  : isNeg
+                                    ? "text-red-400 font-bold"
+                                    : "text-[var(--text-muted)]"
+                              }
+                            >
+                              {val >= 0 ? `+${val.toFixed(3)}` : val.toFixed(3)}{" "}
+                              {isPos ? "▲" : isNeg ? "▼" : "—"}
                             </span>
                           </div>
                         );
@@ -938,7 +1127,9 @@ export const AdminDashboardPage: React.FC = () => {
             <div className="p-4 border-b border-[var(--border-default)] flex justify-between items-center">
               <div>
                 <h3 className="text-sm font-bold font-title">Benchmark HTML Performance Report</h3>
-                <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Run: {selectedReportRunId}</p>
+                <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                  Run: {selectedReportRunId}
+                </p>
               </div>
               <Button
                 variant="outline"
@@ -957,7 +1148,9 @@ export const AdminDashboardPage: React.FC = () => {
               {isLoadingReport ? (
                 <div className="flex flex-col items-center gap-2">
                   <div className="animate-spin h-6 w-6 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full" />
-                  <p className="text-xs text-[var(--text-muted)] font-medium">Fetching report from server...</p>
+                  <p className="text-xs text-[var(--text-muted)] font-medium">
+                    Fetching report from server...
+                  </p>
                 </div>
               ) : (
                 <iframe

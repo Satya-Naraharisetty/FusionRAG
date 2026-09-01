@@ -22,10 +22,7 @@ export interface ConversationMetadataContextType {
   createFolder: (name: string, description?: string, color?: string) => void;
   renameFolder: (id: string, name: string) => void;
   deleteFolder: (id: string) => void;
-  moveConversationToFolder: (
-    conversationId: string,
-    folderId: string | null
-  ) => void;
+  moveConversationToFolder: (conversationId: string, folderId: string | null) => void;
   addTag: (conversationId: string, tag: Tag) => void;
   removeTag: (conversationId: string, tagName: string) => void;
   syncStatus: "synced" | "saving" | "error";
@@ -36,25 +33,20 @@ export interface ConversationMetadataContextType {
   setActiveFilterFolderId: (folderId: string | null) => void;
 }
 
-const ConversationMetadataContext =
-  createContext<ConversationMetadataContextType | null>(null);
+const ConversationMetadataContext = createContext<ConversationMetadataContextType | null>(null);
 
 const DEFAULT_FOLDERS: Folder[] = [
   { id: "folder-general", name: "General", conversationIds: [] },
   { id: "folder-research", name: "Research", conversationIds: [] },
 ];
 
-export const ConversationMetadataProvider: React.FC<{ children: ReactNode }> = ({
-  children,
-}) => {
+export const ConversationMetadataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const { data: settingsData, isPending, isError } = useUserSettings();
   const updateSettingsMutation = useUpdateUserSettings();
 
   const [activeFilterTag, setActiveFilterTag] = useState<string | null>(null);
-  const [activeFilterFolderId, setActiveFilterFolderId] = useState<
-    string | null
-  >(null);
+  const [activeFilterFolderId, setActiveFilterFolderId] = useState<string | null>(null);
   const hasMigratedLocalData = useRef(false);
 
   // 1. One-time auto-migration of legacy local storage on login
@@ -73,14 +65,11 @@ export const ConversationMetadataProvider: React.FC<{ children: ReactNode }> = (
       const parsedTags: Record<string, Tag[]> = legacyTags ? JSON.parse(legacyTags) : {};
 
       const hasLegacyData =
-        parsedFolders.length > 0 ||
-        parsedPins.length > 0 ||
-        Object.keys(parsedTags).length > 0;
+        parsedFolders.length > 0 || parsedPins.length > 0 || Object.keys(parsedTags).length > 0;
 
       const isCloudEmpty =
         (!settingsData.folders || settingsData.folders.length <= 2) &&
-        (!settingsData.pinned_conversations ||
-          settingsData.pinned_conversations.length === 0) &&
+        (!settingsData.pinned_conversations || settingsData.pinned_conversations.length === 0) &&
         (!settingsData.conversation_tags ||
           Object.keys(settingsData.conversation_tags).length === 0);
 
@@ -89,13 +78,9 @@ export const ConversationMetadataProvider: React.FC<{ children: ReactNode }> = (
         updateSettingsMutation.mutate({
           folders: parsedFolders.length > 0 ? parsedFolders : settingsData.folders,
           pinned_conversations:
-            parsedPins.length > 0
-              ? parsedPins
-              : settingsData.pinned_conversations,
+            parsedPins.length > 0 ? parsedPins : settingsData.pinned_conversations,
           conversation_tags:
-            Object.keys(parsedTags).length > 0
-              ? parsedTags
-              : settingsData.conversation_tags,
+            Object.keys(parsedTags).length > 0 ? parsedTags : settingsData.conversation_tags,
         });
 
         // Clean up legacy keys once migrated
@@ -125,10 +110,9 @@ export const ConversationMetadataProvider: React.FC<{ children: ReactNode }> = (
     return settingsData?.conversation_tags ?? {};
   }, [settingsData?.conversation_tags]);
 
-  const syncStatus: "synced" | "saving" | "error" =
-    updateSettingsMutation.isPending
-      ? "saving"
-      : isError || updateSettingsMutation.isError
+  const syncStatus: "synced" | "saving" | "error" = updateSettingsMutation.isPending
+    ? "saving"
+    : isError || updateSettingsMutation.isError
       ? "error"
       : "synced";
 
@@ -166,10 +150,7 @@ export const ConversationMetadataProvider: React.FC<{ children: ReactNode }> = (
     updateSettingsMutation.mutate({ folders: updated });
   };
 
-  const moveConversationToFolder = (
-    conversationId: string,
-    folderId: string | null
-  ) => {
+  const moveConversationToFolder = (conversationId: string, folderId: string | null) => {
     const updated = folders.map((f) => {
       const ids = f.conversationIds.filter((id) => id !== conversationId);
       if (f.id === folderId) {
@@ -196,9 +177,7 @@ export const ConversationMetadataProvider: React.FC<{ children: ReactNode }> = (
     const current = tags[conversationId] || [];
     const updated = {
       ...tags,
-      [conversationId]: current.filter(
-        (t) => t.name.toLowerCase() !== tagName.toLowerCase()
-      ),
+      [conversationId]: current.filter((t) => t.name.toLowerCase() !== tagName.toLowerCase()),
     };
     updateSettingsMutation.mutate({ conversation_tags: updated });
   };
@@ -233,7 +212,7 @@ export const useLocalConversationMetadata = () => {
   const context = useContext(ConversationMetadataContext);
   if (!context) {
     throw new Error(
-      "useLocalConversationMetadata must be used within a ConversationMetadataProvider"
+      "useLocalConversationMetadata must be used within a ConversationMetadataProvider",
     );
   }
   return context;

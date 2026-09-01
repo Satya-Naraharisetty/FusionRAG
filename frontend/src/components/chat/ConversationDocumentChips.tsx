@@ -2,16 +2,8 @@ import React, { useCallback } from "react";
 import { X, Loader2, Paperclip } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FileTypeBadge } from "../ui/FileTypeBadge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "../ui/tooltip";
-import {
-  useConversationDocuments,
-  useDeleteDocument,
-} from "../../hooks/useDocuments";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { useConversationDocuments, useDeleteDocument } from "../../hooks/useDocuments";
 import { useUploadQueue } from "../../context/UploadQueueContext";
 import { QUERY_KEYS } from "../../lib/constants";
 import { t } from "../../lib/messages";
@@ -31,9 +23,9 @@ interface ConversationDocumentChipsProps {
  * in the composer tray. In-flight uploads that the server hasn't persisted yet
  * are surfaced by the composer tray itself, not here.
  */
-export const ConversationDocumentChips: React.FC<
-  ConversationDocumentChipsProps
-> = ({ conversationId }) => {
+export const ConversationDocumentChips: React.FC<ConversationDocumentChipsProps> = ({
+  conversationId,
+}) => {
   const queryClient = useQueryClient();
   const { data: docs = [] } = useConversationDocuments(conversationId);
   const deleteMutation = useDeleteDocument();
@@ -51,7 +43,7 @@ export const ConversationDocumentChips: React.FC<
         queryKey: [QUERY_KEYS.DOCUMENTS, "conversation", conversationId],
       });
     },
-    [queue, cancelUpload, deleteMutation, queryClient, conversationId]
+    [queue, cancelUpload, deleteMutation, queryClient, conversationId],
   );
 
   // The strip is the "chat files" section for this conversation: the
@@ -70,48 +62,45 @@ export const ConversationDocumentChips: React.FC<
               <span>{t("chatFiles.header")}</span>
             </div>
             <div className="flex flex-wrap gap-2">
-          {docs.map((doc) => {
-            const busy =
-              doc.status === "pending" || doc.status === "processing";
-            return (
-              <Tooltip key={doc.id}>
-                <TooltipTrigger asChild>
-                  <div className="flex select-none items-center gap-1.5 rounded-sm border-y border-r border-l-2 border-l-[var(--accent-tertiary)] border-[var(--border-subtle)] bg-[var(--bg-input)] py-1 pl-2 pr-1 text-xs text-[var(--text-primary)] font-mono uppercase tracking-wider transition-colors">
-                    <FileTypeBadge
-                      filename={doc.original_filename}
-                      variant="minimal"
-                      size="sm"
-                      className="flex-shrink-0"
-                    />
-                    <span className="max-w-40 truncate font-medium text-[11px]">
-                      {doc.original_filename}
-                    </span>
-                    {busy && (
-                      <Loader2
-                        size={11}
-                        className="flex-shrink-0 animate-spin text-[var(--text-secondary)]"
-                        aria-label="Processing"
-                      />
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => void handleRemove(doc.id)}
-                      disabled={deleteMutation.isPending}
-                      className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--accent-error)] disabled:opacity-50"
-                      aria-label={t("chatFiles.removeAria", {
-                        filename: doc.original_filename,
-                      })}
-                    >
-                      <X size={11} />
-                    </button>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  {t("chatFiles.tooltip")}
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
+              {docs.map((doc) => {
+                const busy = doc.status === "pending" || doc.status === "processing";
+                return (
+                  <Tooltip key={doc.id}>
+                    <TooltipTrigger asChild>
+                      <div className="flex select-none items-center gap-1.5 rounded-sm border-y border-r border-l-2 border-l-[var(--accent-tertiary)] border-[var(--border-subtle)] bg-[var(--bg-input)] py-1 pl-2 pr-1 text-xs text-[var(--text-primary)] font-mono uppercase tracking-wider transition-colors">
+                        <FileTypeBadge
+                          filename={doc.original_filename}
+                          variant="minimal"
+                          size="sm"
+                          className="flex-shrink-0"
+                        />
+                        <span className="max-w-40 truncate font-medium text-[11px]">
+                          {doc.original_filename}
+                        </span>
+                        {busy && (
+                          <Loader2
+                            size={11}
+                            className="flex-shrink-0 animate-spin text-[var(--text-secondary)]"
+                            aria-label="Processing"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void handleRemove(doc.id)}
+                          disabled={deleteMutation.isPending}
+                          className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--accent-error)] disabled:opacity-50"
+                          aria-label={t("chatFiles.removeAria", {
+                            filename: doc.original_filename,
+                          })}
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{t("chatFiles.tooltip")}</TooltipContent>
+                  </Tooltip>
+                );
+              })}
             </div>
           </>
         )}

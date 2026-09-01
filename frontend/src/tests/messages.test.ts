@@ -1,11 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  t,
-  setLocale,
-  getLocale,
-  detectLocale,
-  LANGUAGE_OPTIONS,
-} from "../lib/messages";
+import { t, setLocale, getLocale, detectLocale, LANGUAGE_OPTIONS } from "../lib/messages";
 
 describe("messages i18n", () => {
   afterEach(() => {
@@ -17,27 +11,21 @@ describe("messages i18n", () => {
     expect(t("chatFiles.caption")).toContain("Only usable in this chat");
     expect(t("chatFiles.header")).toContain("only this conversation can use them");
     expect(t("chatFiles.tooltip")).toBe("Only this chat can use this file");
-    expect(t("chatFiles.removeAria", { filename: "a.pdf" })).toBe(
-      "Remove a.pdf from this chat"
-    );
+    expect(t("chatFiles.removeAria", { filename: "a.pdf" })).toBe("Remove a.pdf from this chat");
     expect(t("chat.placeholderDefault")).toBe("Message FusionRAG...");
     expect(t("chat.placeholderStreaming")).toBe("AI is responding...");
     expect(t("chat.placeholderDrop")).toBe("Drop files here to attach...");
     expect(t("commands.documents.label")).toBe("Documents priority");
-    expect(t("commands.documents.description")).toBe(
-      "Prioritize your uploaded documents"
-    );
+    expect(t("commands.documents.description")).toBe("Prioritize your uploaded documents");
   });
 
   it("interpolates {params} in messages", () => {
-    expect(t("chat.uploadLimit", { max: 5 })).toBe(
-      "You can attach up to 5 files per message."
-    );
+    expect(t("chat.uploadLimit", { max: 5 })).toBe("You can attach up to 5 files per message.");
     expect(t("chat.uploadRoomOne", { room: 1, max: 5 })).toBe(
-      "Only 1 more attachment can be added (max 5)."
+      "Only 1 more attachment can be added (max 5).",
     );
     expect(t("chat.uploadRoomOther", { room: 3, max: 5 })).toBe(
-      "Only 3 more attachments can be added (max 5)."
+      "Only 3 more attachments can be added (max 5).",
     );
     expect(t("chat.uploadFailed")).toBe("Upload failed");
   });

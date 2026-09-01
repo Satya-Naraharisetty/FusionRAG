@@ -25,7 +25,10 @@ export const RegisterForm: React.FC = () => {
     setError(null);
 
     if (isMagicLink) {
-      if (!email) { setError("Please enter your email to receive a registration link."); return; }
+      if (!email) {
+        setError("Please enter your email to receive a registration link.");
+        return;
+      }
       setIsSubmitting(true);
       setTimeout(() => {
         setIsSubmitting(false);
@@ -34,10 +37,22 @@ export const RegisterForm: React.FC = () => {
       return;
     }
 
-    if (!email || !password || !confirmPassword) { setError("Please fill in all fields."); return; }
-    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
-    if (password !== confirmPassword) { setError("Passwords do not match."); return; }
-    if (strength.score < 2) { setError("Password is too weak. Please choose a stronger one."); return; }
+    if (!email || !password || !confirmPassword) {
+      setError("Please fill in all fields.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (strength.score < 2) {
+      setError("Password is too weak. Please choose a stronger one.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {

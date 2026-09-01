@@ -54,7 +54,7 @@ export const chatApi = {
         ...payload,
         stream: true,
       },
-      signal
+      signal,
     );
   },
 };

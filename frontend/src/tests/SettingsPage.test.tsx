@@ -27,7 +27,7 @@ const renderSettings = () => {
           <SettingsPage />
         </ThemeProvider>
       </AuthProvider>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 };
 
@@ -68,7 +68,7 @@ describe("SettingsPage — Delete Account", () => {
       http.delete("*/api/v1/auth/account", () => {
         deleteCalled = true;
         return new HttpResponse(null, { status: 204 });
-      })
+      }),
     );
 
     await openDeleteDialog();
@@ -90,7 +90,7 @@ describe("SettingsPage — Delete Account", () => {
       http.delete("*/api/v1/auth/account", () => {
         deleteCalled = true;
         return new HttpResponse(null, { status: 204 });
-      })
+      }),
     );
 
     await openDeleteDialog();
@@ -140,8 +140,7 @@ describe("SettingsPage — Password Management", () => {
     renderSettings();
     await screen.findByText("test@example.com");
 
-    expect(screen.getByText("Account Password")
-  ).toBeInTheDocument();
+    expect(screen.getByText("Account Password")).toBeInTheDocument();
     const changeBtn = screen.getByRole("button", { name: /^Change Password$/i });
     expect(changeBtn).toBeInTheDocument();
 
@@ -165,7 +164,7 @@ describe("SettingsPage — Password Management", () => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
-      })
+      }),
     );
 
     renderSettings();
@@ -192,7 +191,7 @@ describe("SettingsPage — Password Management", () => {
           passwordUpdated = true;
         }
         return HttpResponse.json({ message: "Password updated successfully" });
-      })
+      }),
     );
 
     renderSettings();
@@ -217,4 +216,3 @@ describe("SettingsPage — Password Management", () => {
     await waitFor(() => expect(passwordUpdated).toBe(true));
   });
 });
-

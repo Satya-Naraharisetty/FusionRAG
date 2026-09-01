@@ -16,7 +16,7 @@ import { Document } from "../types";
  * row as orphaned instead of spinning forever.
  */
 export function useDocumentStatusMap(
-  documentIds: string[]
+  documentIds: string[],
 ): Map<string, Document | null> | undefined {
   const ids = useMemo(() => [...new Set(documentIds)].sort(), [documentIds]);
   const idKey = ids.join("|");
@@ -24,14 +24,12 @@ export function useDocumentStatusMap(
   const query = useQuery({
     queryKey: [QUERY_KEYS.DOCUMENTS, "status-map", idKey],
     queryFn: async () => {
-      const results = await Promise.allSettled(
-        ids.map((id) => documentsApi.getDocument(id))
-      );
+      const results = await Promise.allSettled(ids.map((id) => documentsApi.getDocument(id)));
       return new Map<string, Document | null>(
         ids.map((id, i) => {
           const r = results[i];
           return [id, r.status === "fulfilled" ? r.value : null];
-        })
+        }),
       );
     },
     enabled: ids.length > 0,

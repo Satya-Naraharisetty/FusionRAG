@@ -1,8 +1,8 @@
-import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] text-sm font-medium transition-all duration-200 ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-primary)] disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer select-none",
@@ -20,8 +20,7 @@ const buttonVariants = cva(
         ghost:
           "bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] active:bg-[var(--bg-elevated)]",
         link: "text-[var(--accent-primary)] underline-offset-4 hover:underline",
-        success:
-          "bg-emerald-600/90 text-white hover:bg-emerald-600 active:scale-[0.98] shadow-xs",
+        success: "bg-emerald-600/90 text-white hover:bg-emerald-600 active:scale-[0.98] shadow-xs",
       },
       size: {
         xs: "h-7 px-2.5 text-xs rounded-[var(--radius-sm)] gap-1.5",
@@ -44,23 +43,37 @@ const buttonVariants = cva(
       size: "default",
       loading: false,
     },
-  }
-)
+  },
+);
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
-  asChild?: boolean
-  loading?: boolean
-  leftIcon?: React.ReactNode
-  rightIcon?: React.ReactNode
-  fullWidth?: boolean
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+  loading?: boolean;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
+  fullWidth?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, loading, leftIcon, rightIcon, fullWidth, asChild = false, children, disabled, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
-    const isDisabled = disabled || loading
+  (
+    {
+      className,
+      variant,
+      size,
+      loading,
+      leftIcon,
+      rightIcon,
+      fullWidth,
+      asChild = false,
+      children,
+      disabled,
+      ...props
+    },
+    ref,
+  ) => {
+    const Comp = asChild ? Slot : "button";
+    const isDisabled = disabled || loading;
 
     return (
       <Comp
@@ -94,14 +107,20 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             />
           </svg>
         ) : leftIcon ? (
-          <span className="flex-shrink-0" aria-hidden="true">{leftIcon}</span>
+          <span className="flex-shrink-0" aria-hidden="true">
+            {leftIcon}
+          </span>
         ) : null}
         {children}
-        {!loading && rightIcon && <span className="flex-shrink-0" aria-hidden="true">{rightIcon}</span>}
+        {!loading && rightIcon && (
+          <span className="flex-shrink-0" aria-hidden="true">
+            {rightIcon}
+          </span>
+        )}
       </Comp>
-    )
-  }
-)
-Button.displayName = "Button"
+    );
+  },
+);
+Button.displayName = "Button";
 
-export { Button, buttonVariants }
+export { Button, buttonVariants };

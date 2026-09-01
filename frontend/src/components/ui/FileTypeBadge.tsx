@@ -38,8 +38,10 @@ const SIZE_CLASSES = {
 };
 
 const VARIANT_CLASSES = {
-  default: "inline-flex items-center font-bold uppercase tracking-wider rounded-full border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)]",
-  minimal: "inline-flex items-center font-medium rounded-full border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)]",
+  default:
+    "inline-flex items-center font-bold uppercase tracking-wider rounded-full border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)]",
+  minimal:
+    "inline-flex items-center font-medium rounded-full border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)]",
   card: "flex items-center justify-center font-bold uppercase tracking-wider rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] shadow-xs",
 };
 
@@ -63,7 +65,7 @@ export const FileTypeBadge: React.FC<FileTypeBadgeProps> = ({
       <div
         className={cn(
           "flex flex-col items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] shadow-xs flex-shrink-0",
-          className
+          className,
         )}
       >
         <div className="mb-0.5">{config.icon}</div>
@@ -73,13 +75,7 @@ export const FileTypeBadge: React.FC<FileTypeBadgeProps> = ({
   }
 
   return (
-    <span
-      className={cn(
-        SIZE_CLASSES[size],
-        VARIANT_CLASSES[variant],
-        className
-      )}
-    >
+    <span className={cn(SIZE_CLASSES[size], VARIANT_CLASSES[variant], className)}>
       <span className="flex-shrink-0">{config.icon}</span>
       <span>{config.label}</span>
     </span>

@@ -50,25 +50,27 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return (localStorage.getItem("ui-density") as Density) || "comfortable";
   });
 
+  const applyTheme = useCallback(
+    (newTheme: "dark" | "light" | "high-contrast", skipTransition = false) => {
+      const root = window.document.documentElement;
 
-  const applyTheme = useCallback((newTheme: "dark" | "light" | "high-contrast", skipTransition = false) => {
-    const root = window.document.documentElement;
+      if (skipTransition) {
+        root.classList.add("no-transition");
+      }
 
-    if (skipTransition) {
-      root.classList.add("no-transition");
-    }
+      root.classList.remove("light", "dark", "high-contrast");
+      root.classList.add(newTheme);
+      root.style.colorScheme = newTheme === "high-contrast" ? "dark" : newTheme;
+      root.setAttribute("data-theme", newTheme);
 
-    root.classList.remove("light", "dark", "high-contrast");
-    root.classList.add(newTheme);
-    root.style.colorScheme = newTheme === "high-contrast" ? "dark" : newTheme;
-    root.setAttribute("data-theme", newTheme);
-
-    if (skipTransition) {
-      requestAnimationFrame(() => {
-        root.classList.remove("no-transition");
-      });
-    }
-  }, []);
+      if (skipTransition) {
+        requestAnimationFrame(() => {
+          root.classList.remove("no-transition");
+        });
+      }
+    },
+    [],
+  );
 
   const setTheme = (newTheme: Theme) => {
     localStorage.setItem("theme", newTheme);
@@ -98,10 +100,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Sync density and font size to document element root
   useEffect(() => {
     const root = window.document.documentElement;
-    
+
     // Sync font size
     root.style.fontSize = `${fontSize}px`;
-    
+
     // Sync density
     root.classList.remove("density-comfortable", "density-cozy", "density-compact");
     root.classList.add(`density-${density}`);

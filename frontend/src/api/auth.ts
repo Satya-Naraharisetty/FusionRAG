@@ -90,7 +90,13 @@ export const authApi = {
 
   openOAuthPopup(provider: "google" | "github"): Window | null {
     const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
-    const rawBase = (envUrl !== undefined && envUrl !== "" ? envUrl : (import.meta.env.DEV ? "http://localhost:8000" : "")).replace(/\/$/, "");
+    const rawBase = (
+      envUrl !== undefined && envUrl !== ""
+        ? envUrl
+        : import.meta.env.DEV
+          ? "http://localhost:8000"
+          : ""
+    ).replace(/\/$/, "");
     const apiBase = rawBase.endsWith("/api/v1") ? rawBase.replace(/\/api\/v1$/, "") : rawBase;
     const width = 500;
     const height = 620;
@@ -99,7 +105,7 @@ export const authApi = {
     return window.open(
       `${apiBase}/api/v1/auth/oauth/${provider}`,
       `oauth_${provider}_popup`,
-      `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
+      `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`,
     );
   },
 
@@ -107,7 +113,13 @@ export const authApi = {
     const popup = this.openOAuthPopup("google");
     if (!popup || popup.closed || typeof popup.closed === "undefined") {
       const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
-      const rawBase = (envUrl !== undefined && envUrl !== "" ? envUrl : (import.meta.env.DEV ? "http://localhost:8000" : "")).replace(/\/$/, "");
+      const rawBase = (
+        envUrl !== undefined && envUrl !== ""
+          ? envUrl
+          : import.meta.env.DEV
+            ? "http://localhost:8000"
+            : ""
+      ).replace(/\/$/, "");
       const apiBase = rawBase.endsWith("/api/v1") ? rawBase.replace(/\/api\/v1$/, "") : rawBase;
       window.location.href = `${apiBase}/api/v1/auth/oauth/google`;
     }
@@ -117,10 +129,15 @@ export const authApi = {
     const popup = this.openOAuthPopup("github");
     if (!popup || popup.closed || typeof popup.closed === "undefined") {
       const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
-      const rawBase = (envUrl !== undefined && envUrl !== "" ? envUrl : (import.meta.env.DEV ? "http://localhost:8000" : "")).replace(/\/$/, "");
+      const rawBase = (
+        envUrl !== undefined && envUrl !== ""
+          ? envUrl
+          : import.meta.env.DEV
+            ? "http://localhost:8000"
+            : ""
+      ).replace(/\/$/, "");
       const apiBase = rawBase.endsWith("/api/v1") ? rawBase.replace(/\/api\/v1$/, "") : rawBase;
       window.location.href = `${apiBase}/api/v1/auth/oauth/github`;
     }
   },
 };
-

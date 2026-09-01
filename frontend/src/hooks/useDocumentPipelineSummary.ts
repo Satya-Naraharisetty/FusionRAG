@@ -16,6 +16,6 @@ export function useDocumentPipelineSummary() {
 
   return useMemo(
     () => summarizeDocumentPipeline(documents, embeddingStatus),
-    [documents, embeddingStatus]
+    [documents, embeddingStatus],
   );
 }

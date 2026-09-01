@@ -27,12 +27,7 @@ export const StreamingRecovery: React.FC<StreamingRecoveryProps> = ({
           : "The connection was interrupted before a response could be generated. Please retry or dismiss this notification."}
       </p>
       <div className="flex flex-wrap gap-2 mt-1">
-        <Button
-          onClick={onRetry}
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1.5 text-[10px]"
-        >
+        <Button onClick={onRetry} variant="outline" size="sm" className="h-8 gap-1.5 text-[10px]">
           <RefreshCcw size={12} />
           <span>Regenerate</span>
         </Button>
@@ -47,12 +42,7 @@ export const StreamingRecovery: React.FC<StreamingRecoveryProps> = ({
             <span>Continue Writing</span>
           </Button>
         )}
-        <Button
-          onClick={onCancel}
-          variant="ghost"
-          size="sm"
-          className="h-8 gap-1.5 text-[10px]"
-        >
+        <Button onClick={onCancel} variant="ghost" size="sm" className="h-8 gap-1.5 text-[10px]">
           <X size={12} />
           <span>{hasPartialContent ? "Cancel & Keep" : "Dismiss"}</span>
         </Button>

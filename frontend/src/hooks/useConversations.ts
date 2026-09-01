@@ -48,10 +48,10 @@ export const useRenameConversation = () => {
           return {
             ...old,
             conversations: old.conversations.map((c) =>
-              c.id === id ? { ...c, title, updated_at: new Date().toISOString() } : c
+              c.id === id ? { ...c, title, updated_at: new Date().toISOString() } : c,
             ),
           };
-        }
+        },
       );
 
       // Also update single conversation cache
@@ -75,10 +75,7 @@ export const useRenameConversation = () => {
       }
       // Rollback single conversation cache
       if (context?.previousConv) {
-        queryClient.setQueryData(
-          [QUERY_KEYS.CONVERSATIONS, variables.id],
-          context.previousConv
-        );
+        queryClient.setQueryData([QUERY_KEYS.CONVERSATIONS, variables.id], context.previousConv);
       }
       toast.error("Failed to rename conversation.");
     },
@@ -119,7 +116,7 @@ export const useDeleteConversation = () => {
             ...old,
             conversations: old.conversations.filter((c) => c.id !== id),
           };
-        }
+        },
       );
 
       // Remove deleted conversation and its messages from single-conversation query caches

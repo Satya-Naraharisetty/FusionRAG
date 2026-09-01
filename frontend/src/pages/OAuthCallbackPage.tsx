@@ -26,7 +26,7 @@ export default function OAuthCallbackPage() {
     // 1. Extract params from search and hash fragment
     const searchParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(
-      window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash
+      window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash,
     );
 
     const oauthError = searchParams.get("oauth_error") || hashParams.get("oauth_error");
@@ -38,7 +38,10 @@ export default function OAuthCallbackPage() {
     if (oauthError) {
       console.error("OAuth callback error:", oauthError);
       if (window.opener) {
-        window.opener.postMessage({ type: "OAUTH_ERROR", error: oauthError }, window.location.origin);
+        window.opener.postMessage(
+          { type: "OAUTH_ERROR", error: oauthError },
+          window.location.origin,
+        );
         window.close();
         return;
       }
@@ -48,7 +51,10 @@ export default function OAuthCallbackPage() {
 
     // ── If opened inside popup, notify opener window and close ────────────────
     if (window.opener) {
-      window.opener.postMessage({ type: "OAUTH_SUCCESS", token: token || undefined }, window.location.origin);
+      window.opener.postMessage(
+        { type: "OAUTH_SUCCESS", token: token || undefined },
+        window.location.origin,
+      );
       window.close();
       return;
     }
@@ -81,9 +87,7 @@ export default function OAuthCallbackPage() {
     <div className="flex h-dvh w-dvw items-center justify-center bg-[var(--bg-primary)]">
       <div className="flex flex-col items-center gap-4">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent-primary)] border-t-transparent" />
-        <p className="text-sm font-medium text-[var(--text-secondary)]">
-          Completing sign-in…
-        </p>
+        <p className="text-sm font-medium text-[var(--text-secondary)]">Completing sign-in…</p>
       </div>
     </div>
   );

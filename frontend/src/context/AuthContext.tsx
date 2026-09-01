@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { createContext, useCallback, useEffect, useRef, useState } from "react";
 import {
   getAccessToken,
   registerAuthFailureHandler,
@@ -22,11 +16,7 @@ export interface AuthContextType {
   loginWithGoogle: () => void;
   loginWithGithub: () => void;
   register: (email: string, password: string) => Promise<void>;
-  verifyEmail: (params: {
-    token?: string;
-    email?: string;
-    otp?: string;
-  }) => Promise<void>;
+  verifyEmail: (params: { token?: string; email?: string; otp?: string }) => Promise<void>;
   resendVerification: (email: string) => Promise<{ message: string }>;
   logout: () => Promise<void>;
   updatePassword: (newPassword: string, currentPassword?: string) => Promise<void>;
@@ -34,13 +24,9 @@ export interface AuthContextType {
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export const AuthContext = createContext<AuthContextType | undefined>(
-  undefined
-);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserResponse | null>(null);
   const [accessToken, setAccessTokenState] = useState<string | null>(getAccessToken());
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -89,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       refreshTimerRef.current = timer as unknown as number;
     },
-    [clearRefreshTimer]
+    [clearRefreshTimer],
   );
 
   const login = async (email: string, password: string) => {
@@ -112,11 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     await authApi.register(email, password);
   };
 
-  const verifyEmail = async (params: {
-    token?: string;
-    email?: string;
-    otp?: string;
-  }) => {
+  const verifyEmail = async (params: { token?: string; email?: string; otp?: string }) => {
     try {
       const response = await authApi.verifyEmail(params);
       setAccessTokenState(response.access_token);
@@ -151,35 +133,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [clearRefreshTimer]);
 
-  const updatePassword = useCallback(
-    async (newPassword: string, currentPassword?: string) => {
+  const updatePassword = useCallback(async (newPassword: string, currentPassword?: string) => {
+    setIsLoading(true);
+    try {
+      await authApi.updatePassword(newPassword, currentPassword);
+      const updatedUser = await authApi.getMe();
+      setUser(updatedUser);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const deleteAccount = useCallback(
+    async (password?: string) => {
       setIsLoading(true);
       try {
-        await authApi.updatePassword(newPassword, currentPassword);
-        const updatedUser = await authApi.getMe();
-        setUser(updatedUser);
+        await authApi.deleteAccount(password);
+        // Session state is now invalid server-side; clear it locally so
+        // ProtectedRoute immediately bounces the user back to /login.
+        // Errors propagate to the caller so the UI can show a failure toast.
+        setUser(null);
+        setAccessTokenState(null);
+        setAccessToken(null);
+        clearRefreshTimer();
       } finally {
         setIsLoading(false);
       }
     },
-    []
+    [clearRefreshTimer],
   );
-
-  const deleteAccount = useCallback(async (password?: string) => {
-    setIsLoading(true);
-    try {
-      await authApi.deleteAccount(password);
-      // Session state is now invalid server-side; clear it locally so
-      // ProtectedRoute immediately bounces the user back to /login.
-      // Errors propagate to the caller so the UI can show a failure toast.
-      setUser(null);
-      setAccessTokenState(null);
-      setAccessToken(null);
-      clearRefreshTimer();
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clearRefreshTimer]);
 
   // Handle initialization and callback sync from Axios interceptors
   useEffect(() => {
@@ -277,7 +259,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       clearRefreshTimer();
     };
   }, [scheduleRefresh, clearRefreshTimer]);
-
 
   const loginWithGoogle = () => {
     authApi.loginWithGoogle();

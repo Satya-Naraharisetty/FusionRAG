@@ -16,14 +16,10 @@ export const OfflinePage: React.FC = () => {
         You're Offline
       </h1>
       <p className="text-xs text-[var(--text-secondary)] max-w-sm mb-6 leading-relaxed">
-        We can't establish a connection to the network. Check your device's Wi-Fi or data connection and try again.
+        We can't establish a connection to the network. Check your device's Wi-Fi or data connection
+        and try again.
       </p>
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={handleReload}
-        className="gap-1.5"
-      >
+      <Button variant="secondary" size="sm" onClick={handleReload} className="gap-1.5">
         <RefreshCw size={14} />
         <span>Try Reconnecting</span>
       </Button>

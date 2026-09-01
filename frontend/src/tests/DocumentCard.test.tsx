@@ -48,7 +48,7 @@ const renderCard = ({
       onMoveToFolder={() => {}}
       onDuplicate={() => {}}
       onExport={() => {}}
-    />
+    />,
   );
 
 describe("DocumentCard pipeline step footer", () => {
@@ -61,7 +61,7 @@ describe("DocumentCard pipeline step footer", () => {
     });
 
     expect(
-      screen.getByText("Indexing into vector DB — 4 of 10 chunks embedded")
+      screen.getByText("Indexing into vector DB — 4 of 10 chunks embedded"),
     ).toBeInTheDocument();
     expect(screen.getByText("80%")).toBeInTheDocument();
   });
@@ -69,9 +69,7 @@ describe("DocumentCard pipeline step footer", () => {
   it("renders nothing extra when the document is idle", () => {
     renderCard({ processingStep: null });
 
-    expect(
-      screen.queryByText(/Indexing into vector DB/)
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Indexing into vector DB/)).not.toBeInTheDocument();
     expect(screen.queryByText(/%$/)).not.toBeInTheDocument();
   });
 });
@@ -81,9 +79,7 @@ describe("DocumentCard vectorization failure banner", () => {
     renderCard({ embeddingFailed: true });
 
     expect(screen.getByText(VECTORIZATION_FAILED_MESSAGE)).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Regenerate/i })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Regenerate/i })).toBeInTheDocument();
   });
 
   it("regenerate button triggers onRegenerateEmbeddings for the document", async () => {
@@ -97,11 +93,7 @@ describe("DocumentCard vectorization failure banner", () => {
   it("renders no banner when vectorization is healthy", () => {
     renderCard({ embeddingFailed: false });
 
-    expect(
-      screen.queryByText(VECTORIZATION_FAILED_MESSAGE)
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /Regenerate/i })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(VECTORIZATION_FAILED_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Regenerate/i })).not.toBeInTheDocument();
   });
 });

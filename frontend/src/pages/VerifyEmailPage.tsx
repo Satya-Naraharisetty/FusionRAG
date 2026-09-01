@@ -143,10 +143,7 @@ export const VerifyEmailPage: React.FC = () => {
     }
   };
 
-  const handleKeyDown = (
-    index: number,
-    e: React.KeyboardEvent<HTMLInputElement>
-  ) => {
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Backspace") {
       if (!otp[index] && index > 0 && inputRefs.current[index - 1]) {
         inputRefs.current[index - 1]?.focus();
@@ -318,9 +315,7 @@ export const VerifyEmailPage: React.FC = () => {
             <div className="flex items-center gap-2 rounded-full border border-[var(--accent-success)]/30 bg-[var(--accent-success)]/10 px-4 py-2 text-xs font-medium text-[var(--accent-success)]">
               <Sparkles size={14} /> Account activated successfully
             </div>
-            <p className="text-xs text-[var(--text-muted)]">
-              Redirecting you to the platform...
-            </p>
+            <p className="text-xs text-[var(--text-muted)]">Redirecting you to the platform...</p>
           </div>
         ) : (
           <div className="flex flex-col gap-6">
@@ -395,19 +390,14 @@ export const VerifyEmailPage: React.FC = () => {
 
             {/* Resend Code Section */}
             <div className="flex flex-col items-center gap-2 pt-2 border-t border-[var(--border-subtle)]">
-              <p className="text-xs text-[var(--text-muted)]">
-                Didn't receive the email?
-              </p>
+              <p className="text-xs text-[var(--text-muted)]">Didn't receive the email?</p>
               <button
                 type="button"
                 onClick={handleResend}
                 disabled={resendCooldown > 0 || isResending || !email}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-primary)] hover:underline disabled:opacity-50 disabled:no-underline cursor-pointer"
               >
-                <RefreshCw
-                  size={13}
-                  className={isResending ? "animate-spin" : ""}
-                />
+                <RefreshCw size={13} className={isResending ? "animate-spin" : ""} />
                 {resendCooldown > 0
                   ? `Resend available in ${resendCooldown}s`
                   : isResending

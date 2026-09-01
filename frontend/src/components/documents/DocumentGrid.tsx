@@ -40,10 +40,10 @@ interface DocumentGridProps {
 }
 
 const STATUS_ROW_CLASSES: Record<Document["status"], string> = {
-  pending:    "bg-amber-500/10   text-amber-400   border border-amber-500/20",
+  pending: "bg-amber-500/10   text-amber-400   border border-amber-500/20",
   processing: "bg-blue-500/10    text-blue-400    border border-blue-500/20",
-  completed:  "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
-  failed:     "bg-red-500/10     text-red-400     border border-red-500/20",
+  completed: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+  failed: "bg-red-500/10     text-red-400     border border-red-500/20",
 };
 
 export const DocumentGrid: React.FC<DocumentGridProps> = ({
@@ -108,13 +108,19 @@ export const DocumentGrid: React.FC<DocumentGridProps> = ({
   /* ── Empty ── */
   if (filteredAndSortedDocs.length === 0) {
     const hasFilters =
-      search || filter !== "all" || selectedFolderId !== null ||
-      selectedLanguages.length > 0 || dateRange.start || dateRange.end;
+      search ||
+      filter !== "all" ||
+      selectedFolderId !== null ||
+      selectedLanguages.length > 0 ||
+      dateRange.start ||
+      dateRange.end;
 
     return (
       <div className="flex flex-col items-center justify-center py-14 px-4 text-center border border-dashed border-[var(--border-default)] rounded-[var(--radius-2xl)] select-none">
         <FileText size={28} className="text-[var(--text-muted)] mb-3" />
-        <span className="text-sm font-semibold text-[var(--text-secondary)]">No documents found</span>
+        <span className="text-sm font-semibold text-[var(--text-secondary)]">
+          No documents found
+        </span>
         <p className="text-xs text-[var(--text-muted)] max-w-xs mt-1.5 leading-relaxed">
           {hasFilters
             ? "Try adjusting your filters or search terms."
@@ -137,22 +143,22 @@ export const DocumentGrid: React.FC<DocumentGridProps> = ({
               processingStep={getDocumentProcessingStep(doc, embedding)}
               embeddingFailed={isVectorizationFailed(doc, embedding)}
               onDelete={onDelete}
-            onReprocess={onReprocess}
-            onRegenerateEmbeddings={onRegenerateEmbeddings}
-            onReplace={onReplace}
-            isSelected={selectedIds.includes(doc.id)}
-            onSelectToggle={() => handleSelectToggle(doc.id)}
-            documentFolders={folders}
-            currentFolderId={folderMappings[doc.id]}
-            onMoveToFolder={(folderId) =>
-              setFolderMappings((prev) => {
-                const next = { ...prev };
-                if (folderId === null) delete next[doc.id];
-                else next[doc.id] = folderId;
-                return next;
-              })
-            }
-            onDuplicate={() => toast.success(`Duplicated "${doc.original_filename}"`)}
+              onReprocess={onReprocess}
+              onRegenerateEmbeddings={onRegenerateEmbeddings}
+              onReplace={onReplace}
+              isSelected={selectedIds.includes(doc.id)}
+              onSelectToggle={() => handleSelectToggle(doc.id)}
+              documentFolders={folders}
+              currentFolderId={folderMappings[doc.id]}
+              onMoveToFolder={(folderId) =>
+                setFolderMappings((prev) => {
+                  const next = { ...prev };
+                  if (folderId === null) delete next[doc.id];
+                  else next[doc.id] = folderId;
+                  return next;
+                })
+              }
+              onDuplicate={() => toast.success(`Duplicated "${doc.original_filename}"`)}
               onExport={() => toast.success(`Exported metadata for "${doc.original_filename}"`)}
               onDragStart={() => handleDragStart(doc.id)}
               onDragOver={handleDragOver}
@@ -196,10 +202,7 @@ export const DocumentGrid: React.FC<DocumentGridProps> = ({
             const processingStep = getDocumentProcessingStep(doc, embedding);
             const embeddingFailed = isVectorizationFailed(doc, embedding);
             return (
-              <tr
-                key={doc.id}
-                className={cn(isChecked && "bg-[var(--bg-tertiary)]/40")}
-              >
+              <tr key={doc.id} className={cn(isChecked && "bg-[var(--bg-tertiary)]/40")}>
                 <td>
                   <input
                     type="checkbox"
@@ -223,7 +226,7 @@ export const DocumentGrid: React.FC<DocumentGridProps> = ({
                     <span
                       className={cn(
                         "inline-flex items-center text-[9px] px-2 py-0.5 rounded-[var(--radius-pill)] font-bold uppercase tracking-wider",
-                        STATUS_ROW_CLASSES[doc.status]
+                        STATUS_ROW_CLASSES[doc.status],
                       )}
                       title={processingStep?.detail}
                     >

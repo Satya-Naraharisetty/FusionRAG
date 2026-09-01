@@ -46,8 +46,8 @@ describe("ChatMessage", () => {
     renderWithSuspense(<ChatMessage message={msg} />);
     expect(
       await screen.findByText(
-        /Answering from general knowledge — attach files here or use @documents/
-      )
+        /Answering from general knowledge — attach files here or use @documents/,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -62,8 +62,6 @@ describe("ChatMessage", () => {
     };
     renderWithSuspense(<ChatMessage message={msg} />);
     await screen.findByText("A grounded answer.");
-    expect(
-      screen.queryByText(/Answering from general knowledge/)
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Answering from general knowledge/)).not.toBeInTheDocument();
   });
 });

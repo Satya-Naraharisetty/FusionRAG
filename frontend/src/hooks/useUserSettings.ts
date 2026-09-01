@@ -15,10 +15,7 @@ export const useUserSettings = () => {
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
-  const queryKey = useMemo(
-    () => [USER_SETTINGS_QUERY_KEY, user?.id],
-    [user?.id]
-  );
+  const queryKey = useMemo(() => [USER_SETTINGS_QUERY_KEY, user?.id], [user?.id]);
 
   // Helper to read local per-user cached fallback
   const getLocalCache = (): UserSettingsResponse | null => {
@@ -92,16 +89,12 @@ export const useUpdateUserSettings = () => {
         const optimistic: UserSettingsResponse = {
           ...previous,
           folders: newPatch.folders ?? previous.folders,
-          pinned_conversations:
-            newPatch.pinned_conversations ?? previous.pinned_conversations,
-          conversation_tags:
-            newPatch.conversation_tags ?? previous.conversation_tags,
-          document_folders:
-            newPatch.document_folders ?? previous.document_folders,
+          pinned_conversations: newPatch.pinned_conversations ?? previous.pinned_conversations,
+          conversation_tags: newPatch.conversation_tags ?? previous.conversation_tags,
+          document_folders: newPatch.document_folders ?? previous.document_folders,
           document_folder_mappings:
             newPatch.document_folder_mappings ?? previous.document_folder_mappings,
-          document_custom_order:
-            newPatch.document_custom_order ?? previous.document_custom_order,
+          document_custom_order: newPatch.document_custom_order ?? previous.document_custom_order,
           document_filter_presets:
             newPatch.document_filter_presets ?? previous.document_filter_presets,
           preferences: newPatch.preferences
@@ -115,10 +108,7 @@ export const useUpdateUserSettings = () => {
         // Update local cache
         if (user?.id) {
           try {
-            localStorage.setItem(
-              `user_${user.id}_settings`,
-              JSON.stringify(optimistic)
-            );
+            localStorage.setItem(`user_${user.id}_settings`, JSON.stringify(optimistic));
           } catch {
             // Ignore
           }
@@ -136,11 +126,7 @@ export const useUpdateUserSettings = () => {
       queryClient.invalidateQueries({ queryKey });
 
       // Broadcast across tabs
-      if (
-        typeof window !== "undefined" &&
-        "BroadcastChannel" in window &&
-        user?.id
-      ) {
+      if (typeof window !== "undefined" && "BroadcastChannel" in window && user?.id) {
         try {
           const channel = new BroadcastChannel(SYNC_CHANNEL_NAME);
           channel.postMessage({

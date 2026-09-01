@@ -34,9 +34,12 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({ toolCall }) => {
           <span
             className={cn(
               "text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider",
-              toolCall.status === "running" && "bg-[var(--accent-primary)]/12 text-[var(--accent-primary)]",
-              toolCall.status === "done" && "bg-[var(--accent-success)]/12 text-[var(--accent-success)]",
-              toolCall.status === "failed" && "bg-[var(--accent-error)]/12 text-[var(--accent-error)]"
+              toolCall.status === "running" &&
+                "bg-[var(--accent-primary)]/12 text-[var(--accent-primary)]",
+              toolCall.status === "done" &&
+                "bg-[var(--accent-success)]/12 text-[var(--accent-success)]",
+              toolCall.status === "failed" &&
+                "bg-[var(--accent-error)]/12 text-[var(--accent-error)]",
             )}
           >
             {toolCall.status}
@@ -51,14 +54,18 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({ toolCall }) => {
       {expanded && (
         <div className="flex flex-col gap-2.5 border-t border-[var(--border-subtle)] bg-[var(--bg-elevated)]/80 p-3 font-mono text-[10px] text-[var(--text-secondary)]">
           <div>
-            <span className="mb-1 block font-semibold uppercase tracking-wide text-[var(--text-muted)]">Arguments:</span>
+            <span className="mb-1 block font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Arguments:
+            </span>
             <pre className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-tertiary)]/70 p-2">
               {JSON.stringify(toolCall.arguments, null, 2)}
             </pre>
           </div>
           {toolCall.result !== undefined && (
             <div>
-              <span className="mb-1 block font-semibold uppercase tracking-wide text-[var(--text-muted)]">Result:</span>
+              <span className="mb-1 block font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Result:
+              </span>
               <pre className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-tertiary)]/70 p-2 text-[var(--text-primary)]">
                 {typeof toolCall.result === "object"
                   ? JSON.stringify(toolCall.result, null, 2)
@@ -68,7 +75,9 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({ toolCall }) => {
           )}
           {toolCall.error && (
             <div>
-              <span className="mb-1 block font-semibold uppercase tracking-wide text-[var(--accent-error)]">Error:</span>
+              <span className="mb-1 block font-semibold uppercase tracking-wide text-[var(--accent-error)]">
+                Error:
+              </span>
               <pre className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--accent-error)]/20 bg-[var(--accent-error)]/8 p-2 text-[var(--accent-error)]">
                 {toolCall.error}
               </pre>

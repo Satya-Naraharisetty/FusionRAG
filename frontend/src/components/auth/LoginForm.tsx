@@ -32,9 +32,7 @@ export const LoginForm: React.FC = () => {
   useEffect(() => {
     const oauthError = searchParams.get("oauth_error");
     if (oauthError) {
-      const msg =
-        OAUTH_ERROR_MESSAGES[oauthError] ||
-        "Google sign-in failed. Please try again.";
+      const msg = OAUTH_ERROR_MESSAGES[oauthError] || "Google sign-in failed. Please try again.";
       toast.error(msg);
       // Remove the param so refreshing doesn't re-show it
       setSearchParams((prev) => {
@@ -46,7 +44,10 @@ export const LoginForm: React.FC = () => {
 
   useEffect(() => {
     const saved = localStorage.getItem("login-remember-email");
-    if (saved) { setEmail(saved); setRememberMe(true); }
+    if (saved) {
+      setEmail(saved);
+      setRememberMe(true);
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,7 +55,10 @@ export const LoginForm: React.FC = () => {
     setError(null);
 
     if (isMagicLink) {
-      if (!email) { setError("Please enter your email to receive a magic link."); return; }
+      if (!email) {
+        setError("Please enter your email to receive a magic link.");
+        return;
+      }
       setIsSubmitting(true);
       try {
         const res = await authApi.requestMagicLink(email);
@@ -78,7 +82,10 @@ export const LoginForm: React.FC = () => {
       return;
     }
 
-    if (!email || !password) { setError("Please fill in all fields."); return; }
+    if (!email || !password) {
+      setError("Please fill in all fields.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -112,12 +119,14 @@ export const LoginForm: React.FC = () => {
 
       const errorMessage =
         e.status === 429
-          ? (typeof e.data?.detail === "string" ? e.data.detail : "Too many login attempts. Please wait 5 minutes and try again.")
+          ? typeof e.data?.detail === "string"
+            ? e.data.detail
+            : "Too many login attempts. Please wait 5 minutes and try again."
           : e.data?.error?.message ||
-          (typeof e.data?.detail === "string" ? e.data.detail : undefined) ||
-          e.data?.message ||
-          e.message ||
-          "Invalid email or password.";
+            (typeof e.data?.detail === "string" ? e.data.detail : undefined) ||
+            e.data?.message ||
+            e.message ||
+            "Invalid email or password.";
       setError(errorMessage);
     } finally {
       setIsSubmitting(false);

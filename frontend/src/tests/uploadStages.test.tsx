@@ -42,14 +42,10 @@ describe("deriveUploadStage", () => {
     vi.setSystemTime(1000);
     const startedAt = 1000;
 
-    expect(deriveUploadStage("processing", undefined, startedAt).detail).toBe(
-      "Extracting text…"
-    );
+    expect(deriveUploadStage("processing", undefined, startedAt).detail).toBe("Extracting text…");
 
     vi.setSystemTime(1000 + 2600 * 3);
-    expect(deriveUploadStage("processing", undefined, startedAt).detail).toBe(
-      "Chunking…"
-    );
+    expect(deriveUploadStage("processing", undefined, startedAt).detail).toBe("Chunking…");
 
     // Past the last sub-step, stays on the final one.
     vi.setSystemTime(1000 + 2600 * 99);
@@ -66,7 +62,7 @@ describe("deriveUploadStage", () => {
     const stage = deriveUploadStage(
       "processing",
       undefined,
-      1000 + 60_000 // startedAt in the future
+      1000 + 60_000, // startedAt in the future
     );
     expect(stage.detail).toBe("Extracting text…");
   });
@@ -81,7 +77,7 @@ describe("deriveUploadStage", () => {
     const stage = deriveUploadStage(
       "completed",
       embedding({ status: "generating", chunks_total: 10, embedded_chunks: 4 }),
-      null
+      null,
     );
     // 70 + 25 * (4/10) = 80
     expect(stage.progress).toBe(80);
@@ -92,7 +88,7 @@ describe("deriveUploadStage", () => {
     const stage = deriveUploadStage(
       "completed",
       embedding({ status: "generating", chunks_total: 10, embedded_chunks: 10 }),
-      null
+      null,
     );
     expect(stage.progress).toBe(95);
   });
@@ -101,7 +97,7 @@ describe("deriveUploadStage", () => {
     const stage = deriveUploadStage(
       "completed",
       embedding({ status: "completed", chunks_total: 10, embedded_chunks: 10 }),
-      null
+      null,
     );
     expect(stage.progress).toBe(100);
     expect(stage.detail).toContain("ready");
@@ -111,7 +107,7 @@ describe("deriveUploadStage", () => {
     const stage = deriveUploadStage(
       "completed",
       embedding({ status: "failed", failed_chunks: 3 }),
-      null
+      null,
     );
     expect(stage.detail).toContain("failed");
   });
@@ -148,10 +144,7 @@ describe("getDocumentProcessingStep", () => {
 
   it("is null for an indexed document", () => {
     expect(
-      getDocumentProcessingStep(
-        doc({ id: "a" }),
-        embedding({ status: "completed" })
-      )
+      getDocumentProcessingStep(doc({ id: "a" }), embedding({ status: "completed" })),
     ).toBeNull();
   });
 
@@ -178,24 +171,19 @@ describe("getDocumentProcessingStep", () => {
   });
 
   it("reports the queued vector-DB stage when the embedding job is pending", () => {
-    const step = getDocumentProcessingStep(
-      doc({ id: "a" }),
-      embedding({ status: "pending" })
-    );
+    const step = getDocumentProcessingStep(doc({ id: "a" }), embedding({ status: "pending" }));
     expect(step?.progress).toBe(70);
     expect(step?.detail).toBe("Queued — preparing to index in vector DB…");
   });
 
   it("is null when vectorization failed (doc unsearchable but not busy)", () => {
-    expect(
-      getDocumentProcessingStep(doc({ id: "a" }), embedding({ status: "failed" }))
-    ).toBeNull();
+    expect(getDocumentProcessingStep(doc({ id: "a" }), embedding({ status: "failed" }))).toBeNull();
   });
 
   it("reports real counts while embeddings are generating", () => {
     const step = getDocumentProcessingStep(
       doc({ id: "a" }),
-      embedding({ status: "generating", chunks_total: 10, embedded_chunks: 4 })
+      embedding({ status: "generating", chunks_total: 10, embedded_chunks: 4 }),
     );
     expect(step?.progress).toBe(80);
     expect(step?.detail).toContain("4 of 10");
@@ -239,53 +227,37 @@ describe("isVectorizationFailed", () => {
   });
 
   it("is true when chunking completed but the embedding job failed", () => {
-    expect(
-      isVectorizationFailed(doc({ id: "a" }), embedding({ status: "failed" }))
-    ).toBe(true);
+    expect(isVectorizationFailed(doc({ id: "a" }), embedding({ status: "failed" }))).toBe(true);
   });
 
   it("is false while the embedding job is still working or unknown", () => {
-    expect(
-      isVectorizationFailed(doc({ id: "a" }), embedding({ status: "pending" }))
-    ).toBe(false);
-    expect(
-      isVectorizationFailed(doc({ id: "a" }), embedding({ status: "generating" }))
-    ).toBe(false);
+    expect(isVectorizationFailed(doc({ id: "a" }), embedding({ status: "pending" }))).toBe(false);
+    expect(isVectorizationFailed(doc({ id: "a" }), embedding({ status: "generating" }))).toBe(
+      false,
+    );
     expect(isVectorizationFailed(doc({ id: "a" }), undefined)).toBe(false);
   });
 
   it("is false once embeddings completed", () => {
-    expect(
-      isVectorizationFailed(doc({ id: "a" }), embedding({ status: "completed" }))
-    ).toBe(false);
+    expect(isVectorizationFailed(doc({ id: "a" }), embedding({ status: "completed" }))).toBe(false);
   });
 
   it("is false for documents that never reached completed", () => {
     expect(
       isVectorizationFailed(
         doc({ id: "a", status: "processing" }),
-        embedding({ status: "failed" })
-      )
+        embedding({ status: "failed" }),
+      ),
     ).toBe(false);
     expect(
-      isVectorizationFailed(
-        doc({ id: "a", status: "failed" }),
-        embedding({ status: "failed" })
-      )
+      isVectorizationFailed(doc({ id: "a", status: "failed" }), embedding({ status: "failed" })),
     ).toBe(false);
   });
 });
 
 describe("UploadProgress processing state", () => {
   it("renders the step footer beneath the ring", () => {
-    render(
-      <UploadProgress
-        progress={40}
-        status="processing"
-        showLabel
-        footer="Chunking…"
-      />
-    );
+    render(<UploadProgress progress={40} status="processing" showLabel footer="Chunking…" />);
     expect(screen.getByText("Chunking…")).toBeTruthy();
     expect(screen.getByText("40%")).toBeTruthy();
   });
@@ -321,19 +293,15 @@ describe("summarizeDocumentPipeline", () => {
   });
 
   it("is idle once everything is indexed", () => {
-    const summary = summarizeDocumentPipeline(
-      [doc({ id: "a" })],
-      { a: embedding({ status: "completed" }) }
-    );
+    const summary = summarizeDocumentPipeline([doc({ id: "a" })], {
+      a: embedding({ status: "completed" }),
+    });
     expect(summary.processing).toBe(0);
     expect(summary.detail).toBeNull();
   });
 
   it("reports queued documents", () => {
-    const summary = summarizeDocumentPipeline(
-      [doc({ id: "a", status: "pending" })],
-      {}
-    );
+    const summary = summarizeDocumentPipeline([doc({ id: "a", status: "pending" })], {});
     expect(summary.processing).toBe(1);
     expect(summary.detail).toContain("queued");
   });
@@ -341,18 +309,15 @@ describe("summarizeDocumentPipeline", () => {
   it("reports the chunking sub-step for processing documents", () => {
     const summary = summarizeDocumentPipeline(
       [doc({ id: "a", status: "processing", processing_started_at: null })],
-      {}
+      {},
     );
     expect(summary.detail).toBe("Extracting text…");
   });
 
   it("reports the vector-DB stage with real counts once chunking finished", () => {
-    const summary = summarizeDocumentPipeline(
-      [doc({ id: "a", status: "completed" })],
-      {
-        a: embedding({ status: "generating", chunks_total: 10, embedded_chunks: 4 }),
-      }
-    );
+    const summary = summarizeDocumentPipeline([doc({ id: "a", status: "completed" })], {
+      a: embedding({ status: "generating", chunks_total: 10, embedded_chunks: 4 }),
+    });
     expect(summary.processing).toBe(1);
     expect(summary.progress).toBe(80);
     expect(summary.detail).toContain("4 of 10");
@@ -366,23 +331,17 @@ describe("summarizeDocumentPipeline", () => {
   });
 
   it("excludes failed documents", () => {
-    const summary = summarizeDocumentPipeline(
-      [doc({ id: "a", status: "failed" })],
-      {}
-    );
+    const summary = summarizeDocumentPipeline([doc({ id: "a", status: "failed" })], {});
     expect(summary.processing).toBe(0);
     expect(summary.detail).toBeNull();
   });
 
   it("prefixes the count when multiple files are processing", () => {
     const summary = summarizeDocumentPipeline(
-      [
-        doc({ id: "a", status: "processing" }),
-        doc({ id: "b", status: "completed" }),
-      ],
+      [doc({ id: "a", status: "processing" }), doc({ id: "b", status: "completed" })],
       {
         b: embedding({ status: "generating", chunks_total: 5, embedded_chunks: 2 }),
-      }
+      },
     );
     expect(summary.processing).toBe(2);
     expect(summary.detail).toContain("2 files processing");

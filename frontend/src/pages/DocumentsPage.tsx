@@ -89,17 +89,16 @@ const DocumentsPage: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [draggedDocId, setDraggedDocId] = useState<string | null>(null);
 
-  const handleUpdateFolderMappings = (
-    updater: React.SetStateAction<Record<string, string>>
-  ) => {
-    const updated =
-      typeof updater === "function" ? updater(folderMappings) : updater;
+  const handleUpdateFolderMappings = (updater: React.SetStateAction<Record<string, string>>) => {
+    const updated = typeof updater === "function" ? updater(folderMappings) : updater;
     updateSettingsMutation.mutate({ document_folder_mappings: updated });
   };
 
   const availableLanguages = useMemo(() => {
     const langs = new Set<string>();
-    documents.forEach((d) => { if (d.language) langs.add(d.language.toLowerCase()); });
+    documents.forEach((d) => {
+      if (d.language) langs.add(d.language.toLowerCase());
+    });
     return Array.from(langs);
   }, [documents]);
 
@@ -118,18 +117,22 @@ const DocumentsPage: React.FC = () => {
   };
 
   const handleClearAllFilters = () => {
-    setSearch(""); setSort("newest"); setFilter("all");
-    setSelectedFolderId(null); setSelectedLanguages([]); setDateRange({ start: "", end: "" });
+    setSearch("");
+    setSort("newest");
+    setFilter("all");
+    setSelectedFolderId(null);
+    setSelectedLanguages([]);
+    setDateRange({ start: "", end: "" });
   };
 
   const handleSelectToggle = (id: string) =>
-    setSelectedIds((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
 
   const handleSelectAllToggle = (visibleDocs: Document[]) => {
     const ids = visibleDocs.map((d) => d.id);
     const allSelected = ids.every((id) => selectedIds.includes(id));
     setSelectedIds((prev) =>
-      allSelected ? prev.filter((id) => !ids.includes(id)) : Array.from(new Set([...prev, ...ids]))
+      allSelected ? prev.filter((id) => !ids.includes(id)) : Array.from(new Set([...prev, ...ids])),
     );
   };
 
@@ -142,13 +145,17 @@ const DocumentsPage: React.FC = () => {
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
-        (d) => d.original_filename.toLowerCase().includes(q) || d.filename.toLowerCase().includes(q)
+        (d) =>
+          d.original_filename.toLowerCase().includes(q) || d.filename.toLowerCase().includes(q),
       );
     }
 
-    if (selectedFolderId !== null) result = result.filter((d) => folderMappings[d.id] === selectedFolderId);
+    if (selectedFolderId !== null)
+      result = result.filter((d) => folderMappings[d.id] === selectedFolderId);
     if (selectedLanguages.length > 0)
-      result = result.filter((d) => d.language && selectedLanguages.includes(d.language.toLowerCase()));
+      result = result.filter(
+        (d) => d.language && selectedLanguages.includes(d.language.toLowerCase()),
+      );
     if (dateRange.start) {
       const start = new Date(dateRange.start).getTime();
       result = result.filter((d) => new Date(d.created_at).getTime() >= start);
@@ -159,11 +166,13 @@ const DocumentsPage: React.FC = () => {
     }
 
     result.sort((a, b) => {
-      if (sort === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      if (sort === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      if (sort === "name")   return a.original_filename.localeCompare(b.original_filename);
+      if (sort === "newest")
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      if (sort === "oldest")
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (sort === "name") return a.original_filename.localeCompare(b.original_filename);
       if (sort === "status") return a.status.localeCompare(b.status);
-      if (sort === "size")   return b.file_size - a.file_size;
+      if (sort === "size") return b.file_size - a.file_size;
       return 0;
     });
 
@@ -173,7 +182,17 @@ const DocumentsPage: React.FC = () => {
     }
 
     return result;
-  }, [documents, search, sort, filter, selectedFolderId, selectedLanguages, dateRange, folderMappings, customOrder]);
+  }, [
+    documents,
+    search,
+    sort,
+    filter,
+    selectedFolderId,
+    selectedLanguages,
+    dateRange,
+    folderMappings,
+    customOrder,
+  ]);
 
   const handleBulkDelete = async () => {
     if (!window.confirm(`Delete ${selectedIds.length} selected file(s)?`)) return;
@@ -204,12 +223,12 @@ const DocumentsPage: React.FC = () => {
   };
 
   const handleDragStart = (id: string) => setDraggedDocId(id);
-  const handleDragOver  = (e: React.DragEvent) => e.preventDefault();
-  const handleDrop      = (targetId: string) => {
+  const handleDragOver = (e: React.DragEvent) => e.preventDefault();
+  const handleDrop = (targetId: string) => {
     if (!draggedDocId || draggedDocId === targetId) return;
     const newOrder = customOrder.length > 0 ? [...customOrder] : documents.map((d) => d.id);
     const fromIdx = newOrder.indexOf(draggedDocId);
-    const toIdx   = newOrder.indexOf(targetId);
+    const toIdx = newOrder.indexOf(targetId);
     if (fromIdx !== -1 && toIdx !== -1) {
       newOrder.splice(fromIdx, 1);
       newOrder.splice(toIdx, 0, draggedDocId);
@@ -221,16 +240,13 @@ const DocumentsPage: React.FC = () => {
   return (
     <div className="flex-1 overflow-y-auto bg-(--bg-primary) text-(--text-primary)">
       <div className="max-w-4xl mx-auto px-4 py-6 pt-14 md:py-8 md:px-8 space-y-6 relative pb-20">
-
         {/* ── Page header ── */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-(--text-primary)">
               {t("docs.title")}
             </h1>
-            <p className="mt-1 text-sm text-(--text-secondary)">
-              {t("docs.subtitle")}
-            </p>
+            <p className="mt-1 text-sm text-(--text-secondary)">{t("docs.subtitle")}</p>
           </div>
 
           {/* View toggle + new folder */}
@@ -311,7 +327,9 @@ const DocumentsPage: React.FC = () => {
             toast.success(`Saved preset "${name}"`);
           }}
           onDeletePreset={(name) => {
-            const updatedPresets = (settingsData?.document_filter_presets ?? []).filter((p) => p.name !== name);
+            const updatedPresets = (settingsData?.document_filter_presets ?? []).filter(
+              (p) => p.name !== name,
+            );
             updateSettingsMutation.mutate({ document_filter_presets: updatedPresets });
             toast.success(`Deleted preset "${name}"`);
           }}
@@ -371,7 +389,7 @@ const DocumentsPage: React.FC = () => {
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val === "none") handleBulkMoveToFolder(null);
-                  else if (val)       handleBulkMoveToFolder(val);
+                  else if (val) handleBulkMoveToFolder(val);
                   e.target.value = "";
                 }}
                 className="h-8 cursor-pointer rounded-md border border-(--border-default) bg-(--bg-input) px-2 text-xs text-(--text-primary) outline-none transition-colors focus:border-(--accent-primary)/50"
@@ -381,16 +399,28 @@ const DocumentsPage: React.FC = () => {
                 <option value="">Move to folder…</option>
                 <option value="none">No folder</option>
                 {folders.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
                 ))}
               </select>
 
-              <Button size="sm" variant="secondary" onClick={handleBulkExport} className="h-8 gap-1.5">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleBulkExport}
+                className="h-8 gap-1.5"
+              >
                 <Download size={12} />
                 Export
               </Button>
 
-              <Button size="sm" variant="destructive" onClick={handleBulkDelete} className="h-8 gap-1.5">
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={handleBulkDelete}
+                className="h-8 gap-1.5"
+              >
                 <Trash2 size={12} />
                 Delete
               </Button>
@@ -423,7 +453,9 @@ const DocumentsPage: React.FC = () => {
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               placeholder="e.g. Legal, Finance, Reports"
-              onKeyDown={(e) => { if (e.key === "Enter") handleCreateFolder(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCreateFolder();
+              }}
               autoFocus
             />
           </div>

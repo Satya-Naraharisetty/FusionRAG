@@ -42,32 +42,35 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   const prevMessagesLength = useRef(messages.length);
 
-  const scrollToBottom = useCallback((smooth = true) => {
-    const container = parentRef.current;
-    if (messages.length > 0) {
-      try {
-        virtualizer.scrollToIndex(messages.length - 1, {
-          align: "end",
+  const scrollToBottom = useCallback(
+    (smooth = true) => {
+      const container = parentRef.current;
+      if (messages.length > 0) {
+        try {
+          virtualizer.scrollToIndex(messages.length - 1, {
+            align: "end",
+            behavior: smooth ? "smooth" : "auto",
+          });
+        } catch {
+          // Fallback
+        }
+      }
+      if (container) {
+        container.scrollTo({
+          top: container.scrollHeight,
           behavior: smooth ? "smooth" : "auto",
         });
-      } catch {
-        // Fallback
       }
-    }
-    if (container) {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: smooth ? "smooth" : "auto",
-      });
-    }
-    bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+      bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
 
-    requestAnimationFrame(() => {
-      if (container && !isUserScrolling.current) {
-        container.scrollTop = container.scrollHeight;
-      }
-    });
-  }, [messages.length, virtualizer]);
+      requestAnimationFrame(() => {
+        if (container && !isUserScrolling.current) {
+          container.scrollTop = container.scrollHeight;
+        }
+      });
+    },
+    [messages.length, virtualizer],
+  );
 
   const handleScroll = useCallback(() => {
     const container = parentRef.current;
@@ -178,7 +181,10 @@ export const MessageList: React.FC<MessageListProps> = ({
           })}
         </div>
         {/* Scroll anchor spacer positioned outside the absolute virtual container */}
-        <div ref={bottomRef} className="h-[calc(var(--space-factor,1)*144px)] w-full flex-shrink-0" />
+        <div
+          ref={bottomRef}
+          className="h-[calc(var(--space-factor,1)*144px)] w-full flex-shrink-0"
+        />
       </div>
 
       {showScrollBtn && (
@@ -188,11 +194,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           className="absolute bottom-4 right-4 z-10 h-10 w-10 animate-fade-in-up cursor-pointer rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 text-[var(--text-secondary)] shadow-lg backdrop-blur-sm transition-all duration-300 ease-emphasized hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
           aria-label={scrollDirection === "down" ? "Scroll to bottom" : "Scroll to top"}
         >
-          {scrollDirection === "down" ? (
-            <ArrowDown size={18} />
-          ) : (
-            <ArrowUp size={18} />
-          )}
+          {scrollDirection === "down" ? <ArrowDown size={18} /> : <ArrowUp size={18} />}
         </Button>
       )}
     </div>

@@ -15,7 +15,7 @@ export const useDocuments = () => {
       const docs = query.state.data;
       if (!Array.isArray(docs)) return false;
       const hasPendingOrProcessing = docs.some(
-        (d) => d.status === "pending" || d.status === "processing"
+        (d) => d.status === "pending" || d.status === "processing",
       );
       return hasPendingOrProcessing ? 5000 : false;
     },
@@ -37,9 +37,7 @@ export const useConversationDocuments = (conversationId: string | null) => {
     refetchInterval: (query) => {
       const docs = query.state.data;
       if (!Array.isArray(docs)) return false;
-      const busy = docs.some(
-        (d) => d.status === "pending" || d.status === "processing"
-      );
+      const busy = docs.some((d) => d.status === "pending" || d.status === "processing");
       return busy ? 5000 : false;
     },
   });
@@ -160,7 +158,7 @@ export const useDeleteDocument = () => {
         (old) => {
           if (!old) return [];
           return old.filter((d) => d.id !== id);
-        }
+        },
       );
 
       return { previousDocs };
@@ -263,7 +261,7 @@ export const useReplaceDocument = () => {
                 status: "pending" as const,
                 updated_at: new Date().toISOString(),
               }
-            : d
+            : d,
         );
       });
 
@@ -293,4 +291,3 @@ export const useReplaceDocument = () => {
     },
   });
 };
-

@@ -13,10 +13,7 @@ import { useDocuments, useUploadDocument } from "../hooks/useDocuments";
 import { useEmbeddingStatus } from "../hooks/useEmbeddingStatus";
 import { useDocumentStatusMap } from "../hooks/useDocumentStatusMap";
 import { documentsApi } from "../api/documents";
-import {
-  STALE_DOC_GRACE_MS,
-  VECTORIZATION_FAILED_MESSAGE,
-} from "../lib/uploadStages";
+import { STALE_DOC_GRACE_MS, VECTORIZATION_FAILED_MESSAGE } from "../lib/uploadStages";
 import { QUERY_KEYS, UPLOAD_LIMITS } from "../lib/constants";
 import { type EmbeddingStatus } from "../types";
 import toast from "react-hot-toast";
@@ -71,7 +68,17 @@ export interface AddFilesOptions {
   onUploaded?: (file: File) => void;
 }
 
-const DEFAULT_ACCEPTED_EXTENSIONS = ["pdf", "txt", "docx", "doc", "md", "png", "jpg", "jpeg", "webp"];
+const DEFAULT_ACCEPTED_EXTENSIONS = [
+  "pdf",
+  "txt",
+  "docx",
+  "doc",
+  "md",
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
+];
 
 /**
  * The upload queue is app-level state, not page state: processing continues
@@ -133,7 +140,7 @@ export function pickSnapshotItems(queue: QueueFile[]): SnapshotItem[] {
         detail,
         source,
         conversationId,
-      })
+      }),
     );
 }
 
@@ -145,7 +152,7 @@ export function pickSnapshotItems(queue: QueueFile[]): SnapshotItem[] {
  */
 export function restoreableFromSnapshot(
   snapshot: QueueSnapshot | null,
-  userId: string | undefined
+  userId: string | undefined,
 ): QueueFile[] {
   if (!snapshot || !userId || snapshot.userId !== userId) return [];
   return snapshot.items
@@ -190,9 +197,7 @@ interface UploadQueueContextValue {
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export const UploadQueueContext = createContext<
-  UploadQueueContextValue | undefined
->(undefined);
+export const UploadQueueContext = createContext<UploadQueueContextValue | undefined>(undefined);
 
 const revokePreview = (item: QueueFile) => {
   if (item.preview) {
@@ -236,14 +241,9 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
   const chatProcessingDocIds = useMemo(
     () =>
       queue
-        .filter(
-          (q) =>
-            q.source === "chat" &&
-            q.status === "processing" &&
-            Boolean(q.documentId)
-        )
+        .filter((q) => q.source === "chat" && q.status === "processing" && Boolean(q.documentId))
         .map((q) => q.documentId as string),
-    [queue]
+    [queue],
   );
   const embeddingStatus = useEmbeddingStatus(chatProcessingDocIds);
   const chatDocStatusMap = useDocumentStatusMap(chatProcessingDocIds);
@@ -257,14 +257,9 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
   const inFlightRef = useRef<Set<string>>(new Set());
   // Per-row timers for auto-dismissing completed document rows. Kept in a ref
   // so re-scans of the queue never double-schedule a row.
-  const cleanupTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
-    new Map()
-  );
+  const cleanupTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const docById = useMemo(
-    () => new Map(documents.map((d) => [d.id, d])),
-    [documents]
-  );
+  const docById = useMemo(() => new Map(documents.map((d) => [d.id, d])), [documents]);
 
   // Keep a ref so action callbacks always read the latest queue.
   const queueRef = useRef<QueueFile[]>([]);
@@ -362,11 +357,7 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
             detail: doc.failure_reason || "Processing failed",
           };
         }
-        if (
-          !doc &&
-          item.startedAt &&
-          now - item.startedAt > STALE_DOC_GRACE_MS
-        ) {
+        if (!doc && item.startedAt && now - item.startedAt > STALE_DOC_GRACE_MS) {
           changed = true;
           return {
             ...item,
@@ -388,11 +379,7 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
             detail: scoped.failure_reason || "Processing failed",
           };
         }
-        if (
-          scoped === null &&
-          item.startedAt &&
-          now - item.startedAt > STALE_DOC_GRACE_MS
-        ) {
+        if (scoped === null && item.startedAt && now - item.startedAt > STALE_DOC_GRACE_MS) {
           changed = true;
           return {
             ...item,
@@ -485,9 +472,7 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
       inFlightRef.current.add(item.id);
       const controller = new AbortController();
       setQueue((prev) =>
-        prev.map((q) =>
-          q.id === item.id ? { ...q, status: "uploading", controller } : q
-        )
+        prev.map((q) => (q.id === item.id ? { ...q, status: "uploading", controller } : q)),
       );
       try {
         const uploaded = await uploadMutation.mutateAsync({
@@ -497,12 +482,8 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
           conversationId: item.conversationId,
           onProgress: (progressEvent: unknown) => {
             const pe = progressEvent as { loaded: number; total?: number };
-            const progress = pe.total
-              ? Math.round((pe.loaded * 100) / pe.total)
-              : 0;
-            setQueue((prev) =>
-              prev.map((q) => (q.id === item.id ? { ...q, progress } : q))
-            );
+            const progress = pe.total ? Math.round((pe.loaded * 100) / pe.total) : 0;
+            setQueue((prev) => prev.map((q) => (q.id === item.id ? { ...q, progress } : q)));
           },
           signal: controller.signal,
         });
@@ -518,8 +499,8 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
                   documentId: uploaded.id,
                   startedAt: Date.now(),
                 }
-              : q
-          )
+              : q,
+          ),
         );
         // The composer tray is its own feedback — chat attachments were
         // quiet on success before joining the shared queue, so keep it that
@@ -530,15 +511,12 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
         item.onUploaded?.(item.file);
       } catch (err: unknown) {
         const isAborted =
-          (err as Error)?.name === "CanceledError" ||
-          (err as Error)?.name === "AbortError";
+          (err as Error)?.name === "CanceledError" || (err as Error)?.name === "AbortError";
         if (!isAborted) {
           setQueue((prev) =>
             prev.map((q) =>
-              q.id === item.id
-                ? { ...q, status: "error", controller: undefined }
-                : q
-            )
+              q.id === item.id ? { ...q, status: "error", controller: undefined } : q,
+            ),
           );
           toast.error(`Failed to upload "${item.fileName}".`);
         }
@@ -546,7 +524,7 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
         inFlightRef.current.delete(item.id);
       }
     },
-    [uploadMutation]
+    [uploadMutation],
   );
 
   const startUpload = useCallback(
@@ -555,7 +533,7 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
       if (!item) return;
       void runUpload(item);
     },
-    [runUpload]
+    [runUpload],
   );
 
   const addFiles = useCallback(
@@ -597,9 +575,7 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
       if (created.length > 0) {
         setQueue((prev) => [...prev, ...created]);
         if (!silent) {
-          toast.success(
-            `Added ${created.length} file${created.length > 1 ? "s" : ""} to queue.`
-          );
+          toast.success(`Added ${created.length} file${created.length > 1 ? "s" : ""} to queue.`);
         }
         if (autoUpload) {
           // runUpload reads the row passed in (not the still-stale queueRef),
@@ -610,7 +586,7 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
       }
       return created;
     },
-    [runUpload]
+    [runUpload],
   );
 
   const pauseUpload = useCallback((itemId: string) => {
@@ -618,11 +594,7 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
     if (item?.status === "uploading" && item.controller) {
       item.controller.abort();
       setQueue((prev) =>
-        prev.map((q) =>
-          q.id === itemId
-            ? { ...q, status: "paused", controller: undefined }
-            : q
-        )
+        prev.map((q) => (q.id === itemId ? { ...q, status: "paused", controller: undefined } : q)),
       );
     }
   }, []);
@@ -643,27 +615,21 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
       }
       setQueue((prev) => prev.filter((q) => q.id !== itemId));
     },
-    [queryClient]
+    [queryClient],
   );
 
   const removeItems = useCallback((itemIds: string[]) => {
     const idSet = new Set(itemIds);
-    queueRef.current
-      .filter((q) => idSet.has(q.id))
-      .forEach(revokePreview);
+    queueRef.current.filter((q) => idSet.has(q.id)).forEach(revokePreview);
     setQueue((prev) => prev.filter((q) => !idSet.has(q.id)));
   }, []);
 
   const clearCompleted = useCallback(() => {
     // Scoped to document rows: "Clear done" lives on the Documents queue, and
     // chat-tray rows are dismissed by sending the message or cancelling them.
-    const removed = queueRef.current.filter(
-      (q) => q.status === "completed" && q.source !== "chat"
-    );
+    const removed = queueRef.current.filter((q) => q.status === "completed" && q.source !== "chat");
     removed.forEach(revokePreview);
-    setQueue((prev) =>
-      prev.filter((q) => !(q.status === "completed" && q.source !== "chat"))
-    );
+    setQueue((prev) => prev.filter((q) => !(q.status === "completed" && q.source !== "chat")));
   }, []);
 
   const moveItem = useCallback((fromIndex: number, toIndex: number) => {
@@ -685,9 +651,7 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
 
   const discardConversationRows = useCallback((conversationId: string) => {
     const removed = queueRef.current.filter(
-      (q) =>
-        q.source === "chat" &&
-        (q.conversationId ?? null) === conversationId
+      (q) => q.source === "chat" && (q.conversationId ?? null) === conversationId,
     );
     if (removed.length === 0) return;
     // The conversation (and its documents) are being deleted server-side —
@@ -699,10 +663,7 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
     removed.forEach((q) => q.controller?.abort());
     removed.forEach(revokePreview);
     setQueue((prev) =>
-      prev.filter(
-        (q) =>
-          !(q.source === "chat" && (q.conversationId ?? null) === conversationId)
-      )
+      prev.filter((q) => !(q.source === "chat" && (q.conversationId ?? null) === conversationId)),
     );
   }, []);
 
@@ -713,31 +674,25 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
       // Hand them to the now-known conversation, then dismiss them from the
       // tray — same "uploads continue server-side" semantics as send.
       const rows = queueRef.current.filter(
-        (q) => q.source === "chat" && !q.conversationId && q.status === "queued"
+        (q) => q.source === "chat" && !q.conversationId && q.status === "queued",
       );
       if (rows.length === 0) return;
       setQueue((prev) =>
-        prev.filter(
-          (q) =>
-            !(q.source === "chat" && !q.conversationId && q.status === "queued")
-        )
+        prev.filter((q) => !(q.source === "chat" && !q.conversationId && q.status === "queued")),
       );
       rows.forEach((row) => void runUpload({ ...row, conversationId }));
     },
-    [runUpload]
+    [runUpload],
   );
 
   const discardQueuedNewChatRows = useCallback(() => {
     const removed = queueRef.current.filter(
-      (q) => q.source === "chat" && !q.conversationId && q.status === "queued"
+      (q) => q.source === "chat" && !q.conversationId && q.status === "queued",
     );
     if (removed.length === 0) return;
     removed.forEach(revokePreview);
     setQueue((prev) =>
-      prev.filter(
-        (q) =>
-          !(q.source === "chat" && !q.conversationId && q.status === "queued")
-      )
+      prev.filter((q) => !(q.source === "chat" && !q.conversationId && q.status === "queued")),
     );
   }, []);
 
@@ -769,14 +724,10 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
       discardConversationRows,
       uploadQueuedChatRows,
       discardQueuedNewChatRows,
-    ]
+    ],
   );
 
-  return (
-    <UploadQueueContext.Provider value={value}>
-      {children}
-    </UploadQueueContext.Provider>
-  );
+  return <UploadQueueContext.Provider value={value}>{children}</UploadQueueContext.Provider>;
 };
 
 export function useUploadQueue(): UploadQueueContextValue {

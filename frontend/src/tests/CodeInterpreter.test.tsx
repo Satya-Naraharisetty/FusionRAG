@@ -16,24 +16,14 @@ vi.mock("../lib/pyodide/pyodideManager", () => {
 
 describe("CodeBlock & CodeInterpreter Component", () => {
   it("renders 'Run in Sandbox' button for python code blocks", () => {
-    render(
-      <CodeBlock
-        code="import pandas as pd\nprint(pd.__version__)"
-        language="python"
-      />
-    );
+    render(<CodeBlock code="import pandas as pd\nprint(pd.__version__)" language="python" />);
 
     expect(screen.getByText("Run in Sandbox")).toBeInTheDocument();
     expect(screen.getByText("wasm sandbox")).toBeInTheDocument();
   });
 
   it("does not render 'Run in Sandbox' button for standard json or typescript blocks", () => {
-    render(
-      <CodeBlock
-        code='{"name": "test"}'
-        language="json"
-      />
-    );
+    render(<CodeBlock code='{"name": "test"}' language="json" />);
 
     expect(screen.queryByText("Run in Sandbox")).not.toBeInTheDocument();
     expect(screen.queryByText("wasm sandbox")).not.toBeInTheDocument();
@@ -47,12 +37,7 @@ describe("CodeBlock & CodeInterpreter Component", () => {
       executionTimeMs: 120,
     });
 
-    render(
-      <CodeBlock
-        code="import pandas as pd\nprint(pd.__version__)"
-        language="python"
-      />
-    );
+    render(<CodeBlock code="import pandas as pd\nprint(pd.__version__)" language="python" />);
 
     const runBtn = screen.getByText("Run in Sandbox");
     fireEvent.click(runBtn);
@@ -66,16 +51,13 @@ describe("CodeBlock & CodeInterpreter Component", () => {
     const mockResult = {
       success: true,
       stdout: "Mean sales: 1540.50",
-      plots: ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="],
+      plots: [
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      ],
       executionTimeMs: 250,
     };
 
-    render(
-      <CodeInterpreterOutput
-        result={mockResult}
-        isRunning={false}
-      />
-    );
+    render(<CodeInterpreterOutput result={mockResult} isRunning={false} />);
 
     expect(screen.getByText("Console Output")).toBeInTheDocument();
     expect(screen.getByText("Mean sales: 1540.50")).toBeInTheDocument();
@@ -92,12 +74,7 @@ describe("CodeBlock & CodeInterpreter Component", () => {
       error: "NameError: name 'df' is not defined",
     };
 
-    render(
-      <CodeInterpreterOutput
-        result={mockErrorResult}
-        isRunning={false}
-      />
-    );
+    render(<CodeInterpreterOutput result={mockErrorResult} isRunning={false} />);
 
     expect(screen.getByText("Execution Error")).toBeInTheDocument();
     expect(screen.getByText("NameError: name 'df' is not defined")).toBeInTheDocument();

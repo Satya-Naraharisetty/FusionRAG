@@ -16,12 +16,7 @@ describe("ChatMessage Editing and Truncation", () => {
   it("renders edit button and triggers onEditPrompt on save", async () => {
     const handleEditPrompt = vi.fn();
 
-    render(
-      <ChatMessageComponent
-        message={userMessage}
-        onEditPrompt={handleEditPrompt}
-      />
-    );
+    render(<ChatMessageComponent message={userMessage} onEditPrompt={handleEditPrompt} />);
 
     // Find the edit button
     const editBtn = screen.getByLabelText("Edit message");
@@ -42,10 +37,7 @@ describe("ChatMessage Editing and Truncation", () => {
     fireEvent.click(saveBtn);
 
     // Verify onEditPrompt callback is called with message ID and trimmed text
-    expect(handleEditPrompt).toHaveBeenCalledWith(
-      "msg-1",
-      "Edited query text"
-    );
+    expect(handleEditPrompt).toHaveBeenCalledWith("msg-1", "Edited query text");
   });
 
   it("calls conversationsApi.deleteMessagesFrom to truncate messages on backend", async () => {
@@ -54,9 +46,7 @@ describe("ChatMessage Editing and Truncation", () => {
     });
 
     const res = await conversationsApi.deleteMessagesFrom("conv-1", "msg-1");
-    expect(deleteSpy).toHaveBeenCalledWith(
-      "/conversations/conv-1/messages/msg-1"
-    );
+    expect(deleteSpy).toHaveBeenCalledWith("/conversations/conv-1/messages/msg-1");
     expect(res).toEqual({ deleted_count: 3 });
   });
 });
