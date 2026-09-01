@@ -969,6 +969,7 @@ dependencies = [
     { name = "scipy" },
     { name = "sqlalchemy" },
     { name = "sympy" },
+    { name = "tiktoken" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1027,6 +1028,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.13.0" },
     { name = "sqlalchemy", specifier = ">=2.0.28" },
     { name = "sympy", specifier = ">=1.13.0" },
+    { name = "tiktoken", specifier = ">=0.7.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.28.0" },
 ]
 provides-extras = ["dev", "eval"]

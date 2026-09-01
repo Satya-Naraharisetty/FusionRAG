@@ -28,7 +28,7 @@ export const conversationsApi = {
     limit = 20,
     cursor?: string | null
   ): Promise<ConversationsListResponse> {
-    const params: Record<string, any> = { limit };
+    const params: Record<string, string | number> = { limit };
     if (cursor) params.cursor = cursor;
 
     return api.get<ConversationsListResponse>("/conversations", { params });
@@ -54,7 +54,7 @@ export const conversationsApi = {
     limit = 50,
     cursor?: string | null
   ): Promise<MessagesListResponse> {
-    const params: Record<string, any> = { limit };
+    const params: Record<string, string | number> = { limit };
     if (cursor) params.cursor = cursor;
 
     return api.get<MessagesListResponse>(`/conversations/${id}/messages`, {
