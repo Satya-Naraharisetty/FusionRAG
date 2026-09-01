@@ -107,15 +107,6 @@ async def lifespan(app: FastAPI):
             settings.QDRANT_URL,
         )
 
-        # Verify S3 connection if using S3
-        if settings.STORAGE_PROVIDER.lower() == "s3":
-            from app.api.dependencies import get_storage_provider
-
-            logger.info("Verifying S3 storage connectivity...")
-            storage_provider = get_storage_provider(db=None)
-            storage_provider.verify_connection()
-            logger.info("S3 storage connection verified.")
-
         # Trigger background recovery of pending/failed durable cleanup jobs
         from app.documents.services.cleanup_worker import run_durable_cleanup_recovery
 

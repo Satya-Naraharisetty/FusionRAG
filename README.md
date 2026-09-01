@@ -38,7 +38,7 @@ A high-performance, observable, and modular reference implementation of an enter
   * **Global Library Documents**: Uploaded via the Documents manager, shared across sessions, and addressable via `@documents` mentions.
   * **Conversation-Scoped Attachments**: Attached directly in the chat composer, automatically scoped to the active conversation, and cascade-deleted when the conversation is deleted.
   * **Multi-Format Ingestion**: Supports PDF, DOCX, TXT, Markdown (`.md`), HTML, CSV, and Images (PNG, JPG, JPEG, WEBP via Gemini Vision OCR).
-  * **Multi-Target Storage**: Supports PostgreSQL binary BLOB, Local filesystem, or S3 / MinIO Object Storage.
+  * **Multi-Target Storage**: Supports PostgreSQL binary BLOB (Supabase) or Local filesystem.
   * **Security & Sanitization**: Magic-byte signature verification, zip-bomb expansion ratio checks (< 100x), SHA-256 deduplication, and streaming ClamAV antivirus socket integration.
 
 * **Production Security & Authentication**:

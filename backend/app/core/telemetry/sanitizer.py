@@ -23,7 +23,6 @@ SENSITIVE_KEYS = set(_AGENT_SENSITIVE_KEYS) | {
     "gemini_api_key",
     "qdrant_api_key",
     "jina_api_key",
-    "s3_secret_access_key",
 }
 
 # Regex to scrub Bearer tokens and passwords in raw strings/error messages

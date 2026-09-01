@@ -29,10 +29,6 @@ def run_startup_validations() -> None:
         infra_vars["POSTGRES_SERVER"] = settings.POSTGRES_SERVER
         infra_vars["POSTGRES_DB"] = settings.POSTGRES_DB
 
-    # Dynamically validate S3 settings if storage provider is S3
-    if settings.STORAGE_PROVIDER.lower() == "s3":
-        infra_vars["S3_BUCKET"] = getattr(settings, "S3_BUCKET", None)
-
     empty_infra = [k for k, v in infra_vars.items() if not v or not str(v).strip()]
 
     # On Vercel serverless, skip presence checks for Redis and Qdrant

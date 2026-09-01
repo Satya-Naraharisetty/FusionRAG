@@ -21,7 +21,7 @@ graph TD
     Resend["Resend API (Transactional Email & Magic Links)"]
     ClamAV["ClamAV Daemon (:3310 Antivirus Socket)"]
     WebSearch["Web Search APIs (SerpAPI / Firecrawl / DuckDuckGo)"]
-    Storage["Object Storage (S3 / MinIO / Local FS / DB BLOB)"]
+    Storage["StorageProvider (PostgreSQL DB BLOB / Local FS)"]
 
     Browser -->|HTTPS / WSS / SSE| Nginx
     Nginx -->|Static UI Assets & PWA| Browser
@@ -48,7 +48,7 @@ flowchart TD
     Upload["1. POST /api/v1/documents/upload"] --> Magic["2. MagicByteValidator (Signature & Zip-Bomb Check)"]
     Magic --> Malware["3. ClamAVScanner (Fail-Closed Antivirus Scan)"]
     Malware --> Checksum["4. SHA-256 Checksum Deduplication"]
-    Checksum --> Storage["5. StorageProvider (Database BLOB, Local FS, or S3)"]
+    Checksum --> Storage["5. StorageProvider (Database BLOB or Local FS)"]
     Storage --> PrimaryProc["6. DocumentProcessingService (Extract & Clean Text)"]
     PrimaryProc --> Chunk["7. ChunkingService (Recursive / Semantic / Parent-Child / Sentence-Window)"]
     Chunk --> SaveDB["8. Batch Insert Chunks into PostgreSQL (document_chunks)"]
@@ -342,7 +342,7 @@ flowchart TD
 6. **Durable Cleanup Worker**: Processes `durable_cleanup_jobs` for orphan Qdrant vector and file purging after document deletion.
 7. **InMemoryIndexCache**: LRU cache tracking whether a user has any indexed document chunks; prevents unnecessary Qdrant API calls when the knowledge base is empty.
 8. **Multi-key Gemini Workload Isolation**: Three separate Gemini API keys (LLM, Planner, Fallback) prevent rate-limit cascades under concurrent agent operations.
-9. **Multi-Target Storage Providers**: Supports PostgreSQL binary BLOB, local filesystem, and cloud Object Storage (S3 / MinIO) configured via `STORAGE_PROVIDER`.
+9. **Multi-Target Storage Providers**: Supports PostgreSQL binary BLOB (Supabase) and local filesystem configured via `STORAGE_PROVIDER`.
 
 ---
 

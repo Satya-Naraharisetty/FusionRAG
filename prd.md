@@ -59,7 +59,7 @@ gantt
    - Pre-ingestion validation: Magic-byte inspection, zip-bomb expansion ratio checks ($< 100\times$, max 25 MB).
    - Fail-closed ClamAV antivirus socket scanner (`clamd` TCP port 3310).
    - SHA-256 content deduplication avoiding redundant processing.
-   - Multi-target storage providers (`STORAGE_PROVIDER`: Database BLOB, Local Filesystem, or AWS S3 / MinIO).
+   - Multi-target storage providers (`STORAGE_PROVIDER`: Database BLOB / Supabase, or Local Filesystem).
 
 3. **Milestone 1.3 — Baseline Hybrid Retrieval Engine**:
    - Dense vector indexing via Qdrant (768-dim cosine metric, strict tenant payload filtering).

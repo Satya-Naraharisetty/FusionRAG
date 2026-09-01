@@ -227,8 +227,8 @@ Standard Retrieval-Augmented Generation (RAG) implementations suffer from five p
 |  Durable Ingestion Reaper (60s)    |                  |  +-------------------------------------+  |
 |  - Reclaims stalled processing jobs|                  |  | Dual-Layer Orchestration:           |  |
 |                                    |                  |  |  1. Adaptive RAG (app/rag/)         |  |
-|  Durable Cleanup Worker (2PC)      |                  |  |  2. MasterAgent DAG (app/chat/)     |  |
-|  - Cascade delete S3/DB/Qdrant     |                  |  +-------------------------------------+  |
+|  Durable Cleanup Worker (2PC)      |                  |  | 2. MasterAgent DAG (app/chat/)     |  |
+|  - Cascade delete DB/Storage/Qdrant |                  |  +-------------------------------------+  |
 +------------------------------------+                  |                     |                     |
                                                         |  +-------------------------------------+  |
                                                         |  | Answer Generation (Gemini LLM):     |  |
@@ -1540,7 +1540,7 @@ Located in `backend/app/core/events/` and `backend/app/core/queue/`:
 
 Located in `backend/app/documents/services/cleanup_worker.py` and `app/documents/infrastructure/storage.py`:
 
-- **Storage Providers**: Supported via `StorageProvider` abstraction with native production engines: `database` (BYTEA storage in `document_files`), `local` (`data/uploads`), and cloud-ready `s3` / MinIO object storage.
+- **Storage Providers**: Supported via `StorageProvider` abstraction with native production engines: `database` (BYTEA storage in `document_files` / Supabase), and `local` (`data/uploads`).
 - Two-Phase Durable Cleanup executes a 2PC cascade delete across underlying object storage/blobs, Qdrant vector payload points, and PostgreSQL metadata rows.
 
 ---
@@ -1577,7 +1577,7 @@ Located in `backend/app/main.py` and `backend/app/core/startup.py`:
 
 ### 45.1 Multi-Phase Ingestion State Machine (`ProcessDocumentJobHandler`)
 
-1. **Stage 1 (File Retrieval)**: Retrieves raw binary payload from configured `StorageProvider` (`database`, `local`, `s3`).
+1. **Stage 1 (File Retrieval)**: Retrieves raw binary payload from configured `StorageProvider` (`database`, `local`).
 2. **Stage 2 (Parsing)**: Invokes `ExtractorFactory` (`PDFExtractor`, `DocxExtractor`, `ImageVisionExtractor`, `MarkdownExtractor`, `PlainTextExtractor`).
 3. **Stage 3 (Knowledge Graph NER)**: Extracts entity triplets into `graph_entities` and `graph_relationships`.
 4. **Stage 4 (Chunking)**: Generates character-bounded chunks with token estimations and full-text GIN search vectors.
