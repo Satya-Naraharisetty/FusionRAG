@@ -145,7 +145,7 @@ Standard Retrieval-Augmented Generation (RAG) implementations suffer from five p
 - **Maximal Marginal Relevance (MMR) & Cross-Encoder Reranking**: Balances information diversity ($\lambda=0.5$) before passing candidates to a heavy multilingual cross-encoder (`jina-reranker-v2`) bounded by async semaphores.
 - **Dual-Layer Orchestration Architecture**:
   1. *Lightweight Adaptive RAG Layer* (`app/rag/orchestration/`): Sub-second routing (`DIRECT`, `HYDE`, `MULTI_HOP`, `SPECIALIST`) with evidence sufficiency gating ($S_{\text{evidence}} \ge 0.70$).
-  2. *Full Hierarchical Multi-Agent DAG* (`app/chat/services/multi_agent/`): Decomposes complex multi-domain analytical tasks into topological waves across 8 specialist agents.
+  2. *Full Hierarchical Multi-Agent DAG* (`app/chat/services/multi_agent/`): Decomposes complex multi-domain analytical tasks into topological waves across 7 specialist agents (`RESEARCH`, `DOCUMENT`, `ANALYSIS`, `WEB_SEARCH`, `TABLE`, `VISION`, `GRAPH`) + `SynthesisAgent` grounding layer.
 - **Two-Tier Document Model with Scope Isolation**: Strict separation between user-wide persistent Library documents and session-bound Conversation documents with cryptographic multi-tenancy.
 - **Zero-PyTorch Cloud-Native Architecture**: Achieves sub-second cold starts and container images under 450 MB by delegating heavy matrix operations to specialized, resilient REST APIs.
 
@@ -656,32 +656,38 @@ The platform distinguishes between two separate orchestration layers depending o
 +---------------------------------------------------------------------------------------------------+
 | 2. FULL HIERARCHICAL MULTI-AGENT DAG LAYER (app/chat/services/multi_agent/)                       |
 |    - Purpose: Multi-domain reasoning, AST math computation, live web searching, tabular/graph.   |
-|    - Components: MasterAgent, PlanValidator, AgentExecutionEngine, ResultEvaluator, 8 Specialists. |
+|    - Components: MasterAgent, PlanValidator, AgentExecutionEngine, ResultEvaluator, 7 Specialists, |
+|      SynthesisAgent, TaskRouter, CapabilityRegistry, and single-agent Tool Calling loop.          |
 +---------------------------------------------------------------------------------------------------+
 ```
 
 ```
 ========================================================================================================================
-                                     COMPREHENSIVE SPECIALIST AGENT MATRIX
+                                     MULTI-AGENT & SPECIALIST AGENT ARCHITECTURE MATRIX
 ========================================================================================================================
-Agent Name          File Location                                      Primary Capabilities & Tools
+Component / Agent   File Location                                      Primary Role & Capabilities
 ------------------------------------------------------------------------------------------------------------------------
+-- 1. Orchestrator, Planners & Verification Infrastructure --
 1. MasterAgent      app/chat/services/multi_agent/master_agent.py      LLM DAG Planner, Bounded Replanner, Domain Context Gate
 2. ExecutionEngine  app/chat/services/multi_agent/execution_engine.py  Topological Wave Executor, Async Sorter, Timeout Guard
-3. ResearchAgent    app/chat/services/multi_agent/research_agent.py    Decomposed Sub-Query Search, Hybrid RAG, Provenance Deduplication
-4. ResearchPlanner  app/chat/services/multi_agent/research_planner.py  Pure Sub-Query DAG Planner (Zero I/O)
-5. DocumentAgent    app/chat/services/multi_agent/document_agent.py    UUID Inspection, Chunk Lookup, Scoped Document Listing
-6. AnalysisAgent    app/chat/services/multi_agent/analysis_agent.py    Deterministic SafeCalculator AST, SymPy MathEngine, Python Scripts
-7. WebSearchAgent   app/chat/services/multi_agent/web_search_agent.py  SerpAPI -> Firecrawl -> DuckDuckGo Cascade, Snippet Extractor
-8. TableAgent       app/chat/services/multi_agent/table_agent.py       TableProcessor, Markdown/CSV Parsers, Column Aggregations (SUM/AVG)
-9. VisionAgent      app/chat/services/multi_agent/vision_agent.py      VisionProcessor, Multimodal Diagram/Chart OCR via Gemini Vision
-10. GraphAgent      app/chat/services/multi_agent/graph_agent.py       PostgresGraphRetriever, Entity Relationship Traversal, Multi-Hop
-11. SynthesisAgent  app/chat/services/multi_agent/synthesis_agent.py   Evidence Grounding, Refusal Faithfulness, Citation Tagging
-12. ResultEvaluator app/chat/services/multi_agent/result_evaluator.py  LLM-as-Judge Result Scoring (0.0-1.0), Accept/Replan Decisions
-13. PlanValidator   app/chat/services/multi_agent/plan_validator.py    Schema Validator, Topological Cycle Detector, Whitelist Guard
-14. TaskRouter      app/chat/services/multi_agent/task_router.py       Capability Matching, Cost/Latency Constraint Router
-15. CapabilityReg   app/chat/services/multi_agent/capability_registry.py Domain Definitions, Tool Whitelists, Token Limit Budgets
-16. AgentExecutor   app/chat/services/agent_executor.py                Single-Agent Function Calling Loop (7 Registered Tools)
+3. PlanValidator   app/chat/services/multi_agent/plan_validator.py    Schema Validator, Topological Cycle Detector, Whitelist Guard
+4. ResultEvaluator app/chat/services/multi_agent/result_evaluator.py  LLM-as-Judge Result Scoring (0.0-1.0), Accept/Replan Decisions
+5. TaskRouter      app/chat/services/multi_agent/task_router.py       Capability Matching, Cost/Latency Constraint Router
+6. CapabilityReg   app/chat/services/multi_agent/capability_registry.py Domain Definitions, Tool Whitelists, Token Limit Budgets
+7. AgentExecutor   app/chat/services/agent_executor.py                Single-Agent Function Calling Loop (7 Registered Tools)
+
+-- 2. Seven Core Specialist Execution Workers --
+8. ResearchAgent    app/chat/services/multi_agent/research_agent.py    Decomposed Sub-Query Search, Hybrid RAG, Provenance Deduplication
+9. ResearchPlanner  app/chat/services/multi_agent/research_planner.py  Pure Sub-Query DAG Planner (Zero I/O)
+10. DocumentAgent   app/chat/services/multi_agent/document_agent.py    UUID Inspection, Chunk Lookup, Scoped Document Listing
+11. AnalysisAgent   app/chat/services/multi_agent/analysis_agent.py    Deterministic SafeCalculator AST, SymPy MathEngine, Python Scripts
+12. WebSearchAgent  app/chat/services/multi_agent/web_search_agent.py  SerpAPI -> Firecrawl -> DuckDuckGo Cascade, Snippet Extractor
+13. TableAgent      app/chat/services/multi_agent/table_agent.py       TableProcessor, Markdown/CSV Parsers, Column Aggregations (SUM/AVG)
+14. VisionAgent     app/chat/services/multi_agent/vision_agent.py      VisionProcessor, Multimodal Diagram/Chart OCR via Gemini Vision
+15. GraphAgent     app/chat/services/multi_agent/graph_agent.py       PostgresGraphRetriever, Entity Relationship Traversal, Multi-Hop
+
+-- 3. Grounding & Response Synthesis --
+16. SynthesisAgent  app/chat/services/multi_agent/synthesis_agent.py   Evidence Grounding, Refusal Faithfulness, Citation Tagging
 ========================================================================================================================
 ```
 
@@ -1116,7 +1122,7 @@ Persistence / Repo Class     File Location                                      
 - `created_at` (TIMESTAMPTZ, default `now()`)
 - `updated_at` (TIMESTAMPTZ, default `now()`, Indexed)
 - **Indexes**:
-  - `idx_conversations_user_created_id` ON `(user_id, created_at DESC, id DESC)` — Composite index for $O(1)$ keyset cursor pagination.
+  - `ix_conversations_user_last_msg_id` ON `("user_id", last_message_at DESC, id DESC) WHERE state <> 'deleted'` — Partial composite index for $O(1)$ active conversation keyset cursor pagination.
   - `ix_conversations_user_id`, `ix_conversations_state`, `ix_conversations_last_message_at`, `ix_conversations_updated_at`.
 
 ### 32.2 `conversation_messages` Table
@@ -1134,7 +1140,7 @@ Persistence / Repo Class     File Location                                      
 - `completion_tokens` (INTEGER, default `0`)
 - `created_at` (TIMESTAMPTZ, default `now()`, Indexed)
 - **Indexes**:
-  - `idx_messages_conv_created_id` ON `(conversation_id, created_at DESC, id DESC)` — Composite index for keyset cursor pagination.
+  - `ix_conv_messages_conv_created_id` ON `(conversation_id, created_at DESC, id DESC)` — Composite index for message history keyset cursor pagination.
   - `ix_conversation_messages_conversation_id`, `ix_conversation_messages_created_at`.
 
 ### 32.3 `conversation_summaries` Table
@@ -1478,8 +1484,8 @@ Located in `backend/app/core/events/` and `backend/app/core/queue/`:
 ## 42. Storage Provider Abstraction & Two-Phase Durable Cleanup Worker
 
 Located in `backend/app/documents/services/cleanup_worker.py` and `app/documents/infrastructure/storage.py`:
-- 3 Storage Providers: `database`, `local` (`data/uploads`), `s3`.
-- Two-Phase Durable Cleanup executes a 2PC cascade delete across S3 object storage, Qdrant vector payload points, and PostgreSQL metadata rows.
+- **Storage Providers**: Supported via `StorageProvider` abstraction with native production engines: `database` (BYTEA storage in `document_files`), `local` (`data/uploads`), and cloud-ready `s3` / MinIO object storage.
+- Two-Phase Durable Cleanup executes a 2PC cascade delete across underlying object storage/blobs, Qdrant vector payload points, and PostgreSQL metadata rows.
 
 ---
 
@@ -1487,7 +1493,7 @@ Located in `backend/app/documents/services/cleanup_worker.py` and `app/documents
 
 - **Transactional Email (`resend_service.py`)**: Integration with Resend REST API with styled HTML templates (`_build_magic_link_html`, `_build_verification_email_html`) and 6-digit OTP delivery.
 - **Distributed Idempotency (`idempotency.py`)**: Redis-backed fingerprinting (`IdempotencyService`) preventing duplicate uploads and redundant LLM executions.
-- **Real-Time Pricing Engine (`pricing_provider.py`, `pricing.yaml`)**: `YAMLPricingProvider` parses model token rates (e.g. `gemini-3.5-flash-lite`: $0.075 / $0.30 per 1M tokens) and calculates USD consumption on every stream completion.
+- **Real-Time Pricing Engine (`pricing_provider.py`, `pricing.yaml`)**: `YAMLPricingProvider` parses model token rates (e.g. `gemini-3.5-flash-lite`: $0.10 input / $0.40 output per 1M tokens) and calculates USD consumption on every stream completion.
 - **Request Context Propagation (`request_context.py`)**: `RequestContext` dataclass (`user_id`, `role`, `request_id`, `client_ip`) propagated via `contextvars.ContextVar` across async tasks.
 - **Structured Logging (`logger.py`)**: Contextual log filters with JSON/TEXT switch and automatic masking of API keys, Authorization headers, and emails.
 - **Resource Quotas (`quotas.py`)**: Sliding-window tracking of `USER_DAILY_TOKEN_LIMIT` (1M tokens) and `USER_MAX_STORAGE_BYTES` (500MB).
@@ -1753,7 +1759,7 @@ POST         /api/v1/chat                                       Yes            S
 POST         /api/v1/search                                     Yes            Unified hybrid retrieval (Dense + Sparse + RRF + MMR)
 
 5. Conversations Router (app/api/v1/conversations.py)
-GET          /api/v1/conversations                              Yes            List user conversations with keyset pagination (?cursor=, ?limit=50) -> CursorPage
+GET          /api/v1/conversations                              Yes            List user conversations with keyset pagination (?cursor=, ?limit=20) -> CursorPage
 GET          /api/v1/conversations/{id}                         Yes            Get conversation details and active document filters
 PATCH        /api/v1/conversations/{id}                         Yes            Update title, pinned status, or folder metadata
 DELETE       /api/v1/conversations/{id}                         Yes            Delete conversation and schedule cleanup
@@ -1781,7 +1787,7 @@ GET          /api/v1/evaluation/reports/{run_id}                Admin          G
 
 8. Observability Router (app/api/v1/observability.py)
 GET          /api/v1/observability/metrics                      Admin          Retrieve aggregated multi-agent & quality metrics
-GET          /api/v1/observability/traces                       Admin          List recent multi-agent execution traces
+GET          /api/v1/observability/traces                       Admin          List recent assistant message execution traces (?limit=50, ?offset=0)
 
 9. Health & Diagnostics Router (app/api/v1/health.py)
 GET          /api/v1/health/liveness                            No             Kubernetes liveness probe (Process alive)
@@ -1970,11 +1976,12 @@ Revision Hash    Migration File Name                                          Sc
 7. b1c2d3e4f5a6  add_search_vector_to_document_chunks                         Adds TSVECTOR column and GIN index to chunks
 8. 8b635d42caa0  add_document_files_table                                     Adds document_files table for BYTEA raw storage
 9. 2129ce1a6bd9  add_phase211_multimodal_and_graph_tables                     Adds processing_runs, elements, and 4 graph tables
-10. c2d3e4f5a6b7 add_email_verification                                       Adds email_verification_tokens table and is_verified
-11. d13913a3e9a6 add_oauth_fields_to_users                                    Adds oauth_provider and oauth_sub to users
-12. d3e4f5a6b7c8 add_user_settings_table                                      Adds user_settings table with JSONB folders/presets
-13. e4f5a6b7c8d9 create_user_encryption_keys_table                            Adds user_encryption_keys for envelope encryption
-14. e5f6a7b8c9d0 add_user_id_composite_and_session_indexes                    Creates composite indexes for multi-tenant isolation
+10. 3a4b5c6d7e8f add_keyset_pagination_composite_indexes                    Adds ix_conversations_user_last_msg_id and ix_conv_messages_conv_created_id
+11. c2d3e4f5a6b7 add_email_verification                                       Adds email_verification_tokens table and is_verified
+12. d13913a3e9a6 add_oauth_fields_to_users                                    Adds oauth_provider and oauth_sub to users
+13. d3e4f5a6b7c8 add_user_settings_table                                      Adds user_settings table with JSONB folders/presets
+14. e4f5a6b7c8d9 create_user_encryption_keys_table                            Adds user_encryption_keys for envelope encryption
+15. e5f6a7b8c9d0 add_user_id_composite_and_session_indexes                    Creates composite indexes for multi-tenant isolation
 ========================================================================================================================
 ```
 
@@ -2110,8 +2117,9 @@ CREATE INDEX idx_documents_user_scope ON documents(user_id, scope, conversation_
 -- 3. Document Deduplication Index on Checksums
 CREATE INDEX idx_documents_user_checksum ON documents(user_id, checksum);
 
--- 4. Fast Message History Retrieval Index
-CREATE INDEX idx_messages_conversation_created ON conversation_messages(conversation_id, created_at DESC);
+-- 4. Fast Message & Conversation Keyset Pagination Composite Indexes
+CREATE INDEX ix_conversations_user_last_msg_id ON conversations(user_id, last_message_at DESC, id DESC) WHERE state <> 'deleted';
+CREATE INDEX ix_conv_messages_conv_created_id ON conversation_messages(conversation_id, created_at DESC, id DESC);
 
 -- 5. Refresh Session Lookup Index
 CREATE INDEX idx_refresh_sessions_token_hash ON refresh_sessions(token_hash);
@@ -2137,18 +2145,18 @@ Pydantic Variable Name           Default Value                       Category & 
 # 1. Project & Application Core
 PROJECT_NAME                     FusionRAG                           Application metadata display name
 API_V1_STR                       /api/v1                             Prefix path for version 1 API routers
-ENVIRONMENT                      production                          Runtime environment (development, staging, production)
+ENV                              development                         Runtime environment (development, staging, production, testing)
 DEBUG                            False                               Enable FastAPI debug mode and tracebacks
 LOG_LEVEL                        INFO                                Logging severity threshold (DEBUG, INFO, WARNING)
 SERVICE_NAME                     fusion-rag-backend                  Microservice identifier in distributed traces
 
 # 2. PostgreSQL & Database Connection Pool
-POSTGRES_SERVER                  db                                  PostgreSQL server hostname
+POSTGRES_SERVER                  None                                PostgreSQL server hostname
 POSTGRES_PORT                    5432                                PostgreSQL TCP listening port
-POSTGRES_USER                    postgres                            Database master authentication username
-POSTGRES_PASSWORD                ""                                  Database master authentication password
-POSTGRES_DB                      fusion_rag                          Primary application database name
-DATABASE_URL                     postgresql+asyncpg://...            Complete asynchronous database connection URI
+POSTGRES_USER                    None                                Database master authentication username
+POSTGRES_PASSWORD                None                                Database master authentication password
+POSTGRES_DB                      None                                Primary application database name
+DATABASE_URL                     None                                Complete asynchronous database connection URI
 DATABASE_POOL_SIZE               20                                  SQLAlchemy async connection pool capacity
 DATABASE_MAX_OVERFLOW            10                                  Maximum temporary connection burst pool
 DATABASE_POOL_TIMEOUT            30.0                                Seconds to wait before timing out connection lease
@@ -2156,15 +2164,15 @@ DATABASE_POOL_RECYCLE            1800                                Seconds aft
 DATABASE_ECHO                    False                               Log raw SQL queries to stdout
 
 # 3. Redis In-Memory & Streams
-REDIS_HOST                       redis                               Redis 7 cache and queue server host
+REDIS_HOST                       None                                Redis 7 cache and queue server host
 REDIS_PORT                       6379                                Redis TCP listening port
-REDIS_PASSWORD                   ""                                  Redis authentication password
+REDIS_PASSWORD                   None                                Redis authentication password
 REDIS_SSL                        False                               Enable SSL/TLS encryption for Redis transport
-REDIS_URL                        redis://redis:6379/0                Direct connection URI for Redis asyncio client
+REDIS_URL                        None                                Direct connection URI for Redis asyncio client
 REDIS_DB                         0                                   Redis database index number
 
 # 4. Asynchronous Queue & Ingestion Reaper
-QUEUE_TYPE                       redis_stream                        Queue provider ("redis_stream" | "in_memory")
+QUEUE_TYPE                       in_memory                           Queue provider ("in_memory" | "redis_stream")
 QUEUE_STREAM_NAME                stream:jobs:document_processing     Redis Stream key for document ingestion jobs
 QUEUE_CONSUMER_GROUP             group:document_workers              Redis Stream consumer group name
 QUEUE_DEAD_LETTER_STREAM         stream:jobs:dead_letter             Dead-letter stream for exhausted retry jobs
@@ -2177,15 +2185,14 @@ QUEUE_VISIBILITY_TIMEOUT_SECONDS 180                                 Worker leas
 QUEUE_WORKER_CONCURRENCY         4                                   Concurrent worker coroutines per process
 QUEUE_WORKER_BLOCK_MS            2000                                Block time on XREADGROUP stream consumer
 INGESTION_REAPER_INTERVAL_SECONDS 60.0                               Frequency of stale worker lease reap checks
-INGESTION_REAPER_STALE_THRESHOLD 60.0                                Inactivity threshold triggering job reclaim
+INGESTION_REAPER_STALE_THRESHOLD_SECONDS 60.0                        Inactivity threshold triggering job reclaim
 
 # 5. Qdrant Vector Database
-QDRANT_HOST                      qdrant                              Qdrant vector engine host
+QDRANT_HOST                      None                                Qdrant vector engine host
 QDRANT_PORT                      6333                                Qdrant HTTP REST API port
-QDRANT_GRPC_PORT                 6334                                Qdrant high-performance gRPC port
 QDRANT_COLLECTION                documents                           Default collection name for chunk vectors
-QDRANT_API_KEY                   ""                                  Authentication API key for Qdrant
-QDRANT_URL                       http://qdrant:6333                  Direct connection URI for Qdrant client
+QDRANT_API_KEY                   None                                Authentication API key for Qdrant
+QDRANT_URL                       None                                Direct connection URI for Qdrant client
 
 # 6. Dense Embeddings & Sparse Search
 EMBEDDING_PROVIDER               jina                                Dense vector provider ("jina")
@@ -2193,80 +2200,76 @@ EMBEDDING_MODEL                  jina-embeddings-v3                  Model tag (
 EMBEDDING_DIMENSION              768                                 Vector coordinate dimension count
 EMBEDDING_BATCH_SIZE             32                                  Batch size for outbound embedding calls
 EMBEDDING_VERSION                v1                                  Version identifier for vector index
-SPARSE_RETRIEVER_TYPE            postgres_fts                        Sparse search engine ("postgres_fts" | "bm25")
+SPARSE_RETRIEVER_TYPE            postgres_fts                        Sparse search engine ("postgres_fts" | "bm25_memory")
 
 # 7. CORS & Edge Security
-BACKEND_CORS_ORIGINS             ["http://localhost:5173"]           Allowed origin list for React SPA
+BACKEND_CORS_ORIGINS             ["http://localhost:5173", ...]      Allowed origin list for React SPA
 BACKEND_CORS_ORIGIN_REGEX        https://(.*\.vercel\.app|.*\.onrender\.com) Origin regex for cloud previews
 
 # 8. Cryptography, JWT, Cookies & Security Policies
-ENCRYPTION_MASTER_KEY            ""                                  256-bit Hex Key Encryption Key (KEK)
+ENCRYPTION_MASTER_KEY            None                                256-bit Hex Key Encryption Key (KEK)
 JWT_SECRET                       ""                                  Cryptographic signing secret for JWT access tokens
 JWT_ALGORITHM                    HS256                               Signature algorithm for access token claims
 ACCESS_TOKEN_EXPIRE_MINUTES      15                                  JWT access token lifetime duration
-REFRESH_TOKEN_EXPIRE_DAYS        30                                  Refresh session persistence window in PostgreSQL
+REFRESH_TOKEN_EXPIRE_DAYS        7                                   Refresh session persistence window in PostgreSQL
 COOKIE_NAME                      refresh_token                       Name of refresh token HttpOnly cookie
-ACCESS_TOKEN_COOKIE_NAME         access_token                        Optional access token cookie name
+ACCESS_TOKEN_COOKIE_NAME         access_token                        HttpOnly access token cookie name
 COOKIE_PATH                      /api/v1/auth                        Restricted HTTP path for refresh cookie
 COOKIE_MAX_AGE                   604800                              Cookie max age in seconds (7 days)
-COOKIE_DOMAIN                    ""                                  HttpOnly cookie domain restriction
+COOKIE_DOMAIN                    None                                HttpOnly cookie domain restriction
 COOKIE_SECURE                    True                                Enforce HTTPS on refresh cookies
-COOKIE_SAMESITE                  lax                                 SameSite policy on cookies ("lax" | "strict")
+COOKIE_SAMESITE                  none                                SameSite policy on cookies ("none" | "lax" | "strict")
 LOGIN_RATE_LIMIT_MAX_ATTEMPTS    5                                   Strict login brute-force attempts limit
-LOGIN_RATE_LIMIT_WINDOW_SECONDS  300                                 Lockout window for brute-force attempts
+LOGIN_RATE_LIMIT_WINDOW_SECONDS  300                                 Lockout window for brute-force attempts (seconds)
 ACCOUNT_DELETE_RATE_LIMIT_PER_MINUTE 10                              Rate limit on account deletion endpoint
 UNVERIFIED_USER_CLEANUP_DAYS     7                                   Days before purging unverified user records
 MAGIC_LINK_EXPIRE_MINUTES        10                                  Expiry window for passwordless magic links
-CURSOR_SIGNING_KEY                 ""                                  HMAC-SHA256 signing secret for keyset pagination tokens
-CURSOR_TTL_SECONDS                 604800                              7 days TTL for opaque pagination cursor tokens
-ADMIN_EMAIL                      ""                                  Auto-seeded administrator email
-ADMIN_PASSWORD                   ""                                  Auto-seeded administrator password
-OAUTH_REDIRECT_BASE_URL          ""                                  Base redirect URI for OAuth callbacks
+CURSOR_SIGNING_KEY               None                                HMAC-SHA256 signing secret for keyset pagination tokens
+CURSOR_TTL_SECONDS               604800                              7 days TTL for opaque pagination cursor tokens
+ADMIN_EMAIL                      None                                Auto-seeded administrator email
+ADMIN_PASSWORD                   None                                Auto-seeded administrator password
+OAUTH_REDIRECT_BASE_URL          http://localhost:8000               Base redirect URI for OAuth callbacks
 FRONTEND_URL                     http://localhost:5173               Frontend URL for email links and CORS
 
 # 9. Google Gemini LLM Multi-Key Pools
 GEMINI_API_KEY                   ""                                  Primary Gemini key for foreground chat streaming
 GEMINI_PLANNER_API_KEY           ""                                  Dedicated key for MasterAgent DAG planning
 GEMINI_FALLBACK_API_KEY          ""                                  Emergency failover key for rate-limit isolation
+GEMINI_LLM_API_KEY               ""                                  Dedicated key for LLM answer generation
 GEMINI_CHAT_MODEL                gemini-3.5-flash-lite               Default LLM model identifier for chat
-GEMINI_VISION_MODEL              gemini-3.5-flash-lite               Multimodal model for OCR & chart inspection
-GEMINI_TEMPERATURE               0.2                                 Sampling temperature for deterministic generation
-GEMINI_MAX_OUTPUT_TOKENS         4096                                Maximum completion token limit per LLM call
+TEMPERATURE                      0.0                                 Sampling temperature for deterministic generation
+MAX_RESPONSE_TOKENS              4096                                Maximum completion token limit per LLM call
 
 # 10. Jina AI API (Embeddings & Reranking)
 JINA_API_KEY                     ""                                  Jina AI API key for embeddings and cross-encoder
-JINA_RERANKER_MODEL              jina-reranker-v2-base-multilingual  Cross-encoder multilingual joint reranker model
+RERANKER_MODEL                   jina-reranker-v2-base-multilingual  Cross-encoder multilingual joint reranker model
+RERANKER_PROVIDER                jina                                Cross-encoder provider engine ("jina")
 
 # 11. Live Web Search Providers
-SERPAPI_API_KEY                  ""                                  Primary live search provider API key
-FIRECRAWL_API_KEY                ""                                  Secondary web crawling & scraping fallback key
+SERPAPI_API_KEY                  None                                Primary live search provider API key
+FIRECRAWL_API_KEY                None                                Secondary web crawling & scraping fallback key
+WEB_SEARCH_PROVIDER              auto                                Web search provider resolution strategy
 
 # 12. Antivirus & Malware Defense
-CLAMAV_HOST                      clamav                              ClamAV antivirus daemon container host
+MALWARE_SCANNER_TYPE             stub                                Scanner backend ("stub" | "clamav")
+CLAMAV_HOST                      None                                ClamAV antivirus daemon container host
 CLAMAV_PORT                      3310                                ClamAV TCP daemon streaming port
-CLAMAV_TIMEOUT                   10.0                                Socket timeout for antivirus byte streaming
+CLAMAV_TIMEOUT_SECONDS           10.0                                Socket timeout for antivirus byte streaming
 
 # 13. Multi-Tier Semantic Caching
-CACHE_NAMESPACE_EMBEDDINGS       cache:embeddings                    Redis namespace for dense embedding vectors
-CACHE_NAMESPACE_EXACT_LLM        cache:exact_llm                     Redis namespace for exact query LLM cache
-CACHE_NAMESPACE_RETRIEVAL        cache:retrieval                     Redis namespace for hybrid retrieval chunks
-CACHE_NAMESPACE_QUERY_REWRITE    cache:query_rewrite                 Redis namespace for rewritten user queries
-CACHE_TTL_EMBEDDINGS_SECONDS     86400                               24 hours TTL for embedding vectors
-CACHE_TTL_EXACT_LLM_SECONDS      3600                                1 hour TTL for exact query responses
-CACHE_TTL_RETRIEVAL_SECONDS      1800                                30 minutes TTL for retrieved chunks
-CACHE_TTL_QUERY_REWRITE_SECONDS  7200                                2 hours TTL for rewritten questions
-L1_CACHE_MAX_ENTRIES             1000                                Max LRU entries in in-memory L1 cache
-L1_CACHE_TTL_SECONDS             60.0                                TTL for L1 in-memory hot cache
+CACHE_TTL_DEFAULT                3600                                Default cache TTL in seconds
+CACHE_TTL_RETRIEVAL              1800                                30 minutes TTL for retrieved chunks
+CACHE_TTL_EMBEDDING              86400                               24 hours TTL for embedding vectors
+CACHE_TTL_LLM                    3600                                1 hour TTL for exact query responses
+CACHE_TTL_REWRITE                7200                                2 hours TTL for rewritten questions
 INDEX_CACHE_MAX_USERS            500                                 Max entries in empty KB index cache
 
-# 14. Document Ingestion, Chunking & Limits
+# 14. Document Ingestion, Chunking & Storage
 MAX_UPLOAD_SIZE                  26214400                            25MB maximum single-file upload size (bytes)
-UPLOAD_DIR                       data/uploads                        Local filesystem fallback upload directory
-STORAGE_PROVIDER                 local                               Storage backend ("database" | "local" | "s3")
-S3_BUCKET_NAME                   fusion-rag-documents                AWS S3 / MinIO storage bucket name
-S3_ENDPOINT_URL                  ""                                  Custom S3 API endpoint for MinIO
-DEFAULT_CHUNK_SIZE               500                                 Standard recursive chunk character length
-DEFAULT_CHUNK_OVERLAP            50                                  Character overlap between adjacent chunks
+UPLOAD_DIR                       data/uploads                        Local filesystem upload directory
+STORAGE_PROVIDER                 database                            Storage backend ("database" | "local")
+CHUNK_SIZE                       500                                 Standard recursive chunk character length
+CHUNK_OVERLAP                    50                                  Character overlap between adjacent chunks
 PARENT_CHUNK_SIZE                1500                                Parent chunk size for contextual expansion
 CHILD_CHUNK_SIZE                 400                                 Child chunk size for vector search precision
 SENTENCE_WINDOW_SIZE             2                                   Neighboring sentences in window retrieval
@@ -2279,38 +2282,37 @@ RRF_K                            60                                  Reciprocal 
 MMR_LAMBDA                       0.5                                 Diversity trade-off parameter in MMR scoring
 RERANK_TOP_K                     5                                   Golden chunks selected after cross-encoder
 CONTEXT_MAX_TOKENS               6000                                Maximum token budget assembled for LLM context
-MAX_RETRIEVAL_CHUNKS             12                                  Hard cap on chunks passed to prompt builder
+CONTEXT_MAX_CHUNKS               12                                  Hard cap on chunks passed to prompt builder
 
 # 16. Multi-Agent & Orchestration Budgets
 MAX_SPECIALIST_TASKS             5                                   Maximum tasks allowed in MasterAgent DAG
 MAX_PLAN_ITERATIONS              2                                   Maximum replanning iterations on low evidence
 MULTI_AGENT_TASK_TIMEOUT         20.0                                Hard per-task execution timeout in seconds
-EVIDENCE_SUFFICIENCY_THRESHOLD   0.70                                Minimum confidence score to accept retrieval
+HYDE_MIN_QUERY_CONFIDENCE        0.70                                Minimum confidence score to accept retrieval
 
 # 17. Rate Limiting & Resource Quotas
-RATE_LIMIT_WINDOW_SECONDS        60                                  Sliding window size for rate limiting
-RATE_LIMIT_MAX_REQUESTS          60                                  Allowed requests per window per user IP
-USER_DAILY_TOKEN_LIMIT           1000000                             Daily LLM token budget per standard user
-USER_MAX_STORAGE_BYTES           524288000                           500MB total document storage quota per user
+RATE_LIMIT_REQUESTS_PER_MINUTE   60                                  Allowed requests per window per user IP
+RATE_LIMIT_BURST                 10                                  Allowed request burst headroom
+ACCOUNT_DELETE_RATE_LIMIT_PER_MINUTE 10                              Rate limit on account deletion endpoint
 
 # 18. Observability & Distributed Tracing
-OTEL_EXPORTER_OTLP_ENDPOINT      http://jaeger:4317                  Jaeger OpenTelemetry gRPC endpoint
+OTEL_EXPORTER_OTLP_ENDPOINT      http://localhost:4317               Jaeger OpenTelemetry gRPC endpoint
 OTEL_SERVICE_NAME                fusion-rag-backend                  Service name tag in distributed traces
-PROMETHEUS_METRICS_ENABLED       True                                Enable Prometheus operational metrics scraping
-TELEMETRY_MAX_STRING_LENGTH      500                                 String truncation length in span attributes
+ENABLE_PROMETHEUS_METRICS        True                                Enable Prometheus operational metrics scraping
+AGENT_MAX_TELEMETRY_STRING_LEN   500                                 String truncation length in span attributes
 
 # 19. Transactional Email & Notifications
 RESEND_API_KEY                   ""                                  Resend REST API key for transactional emails
-RESEND_FROM_EMAIL                noreply@fusionrag.io                Sender email address for verification & reset
-EMAIL_OTP_EXPIRE_MINUTES         15                                  Lifetime for 6-digit email signup OTPs
+RESEND_FROM_EMAIL                onboarding@resend.dev               Sender email address for verification & reset
+EMAIL_VERIFICATION_EXPIRE_MINUTES 15                                 Lifetime for 6-digit email signup OTPs
 
 # 20. Dynamic Feature Flags (Runtime Toggles)
 ENABLE_SEMANTIC_CACHE            True                                Enable L1/L2 Redis semantic caching
 ENABLE_DISTRIBUTED_LOCKS         True                                Enable Redis mutexes during chunking
 ENABLE_RATE_LIMITER              True                                Enforce Redis sliding-window rate limiting
-ENABLE_PARENT_CHILD_RAG          True                                Enable parent-child contextual chunk retrieval
-ENABLE_HYDE                      True                                Enable hypothetical document embeddings
-ENABLE_INTENT_GUARDRAILS         True                                Enable pre-retrieval intent guardrail checks
+ENABLE_PARENT_CHILD_RAG          False                               Enable parent-child contextual chunk retrieval
+ENABLE_HYDE                      False                               Enable hypothetical document embeddings
+ENABLE_INTENT_GUARDRAILS         False                               Enable pre-retrieval intent guardrail checks
 ENABLE_WEIGHTED_RRF              False                               Enable custom weights in rank fusion
 ========================================================================================================================
 ```
