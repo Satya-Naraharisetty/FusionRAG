@@ -20,7 +20,8 @@ from app.core.config import settings
 
 
 @pytest.fixture
-def mock_deps():
+def mock_deps(monkeypatch):
+    monkeypatch.setattr(settings, "REQUIRE_EMAIL_VERIFICATION", True)
     user_repo = AsyncMock()
     session_repo = AsyncMock()
     hasher = MagicMock()

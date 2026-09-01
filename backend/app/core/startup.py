@@ -229,7 +229,7 @@ async def cleanup_stale_unverified_signups(session_factory) -> int:
     """
     Purges unverified user accounts created older than UNVERIFIED_USER_CLEANUP_DAYS.
     """
-    if settings.is_testing:
+    if settings.is_testing or not settings.REQUIRE_EMAIL_VERIFICATION:
         return 0
 
     async with session_factory() as db_session:

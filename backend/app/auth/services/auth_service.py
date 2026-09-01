@@ -81,20 +81,21 @@ class AuthService:
                     raise DuplicateAccountException("Email is already registered.")
 
             hashed_password = self._hasher.hash(password)
+            is_verified_default = not bool(settings.REQUIRE_EMAIL_VERIFICATION)
             user = UserDomain(
                 id=self._uuid_generator.generate(),
                 email=normalized_email,
                 hashed_password=hashed_password,
                 role="user",
                 is_active=True,
-                is_verified=False,
+                is_verified=is_verified_default,
                 created_at=now,
                 updated_at=now,
             )
             saved_user = await self._user_repo.save(user)
 
-            # Generate verification token & OTP and dispatch email
-            if self._verification_repo:
+            # Generate verification token & OTP and dispatch email only if verification is required
+            if self._verification_repo and settings.REQUIRE_EMAIL_VERIFICATION:
                 raw_token = secrets.token_urlsafe(32)
                 token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
                 otp_code = f"{secrets.randbelow(1000000):06d}"
