@@ -208,6 +208,7 @@ class Settings(BaseSettings):
     ENABLE_TRACING: bool = True
     ENABLE_PROMETHEUS_METRICS: bool = True
     OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://localhost:4317"
+    OTEL_EXPORTER_OTLP_HEADERS: str | None = None
     OTEL_SERVICE_NAME: str = "fusion-rag-backend"
     OTEL_TRACES_SAMPLER_RATIO: float = 1.0
 
@@ -495,6 +496,8 @@ class Settings(BaseSettings):
     # Rate Limiting settings
     RATE_LIMIT_REQUESTS_PER_MINUTE: int = 60
     RATE_LIMIT_BURST: int = 10
+    METRICS_RATE_LIMIT_PER_MINUTE: int = 30
+    METRICS_CACHE_TTL_SECONDS: float = 5.0
     # Stricter per-user limit for the password-gated DELETE /auth/account so a
     # compromised access token cannot be used to brute-force the re-entry field.
     ACCOUNT_DELETE_RATE_LIMIT_PER_MINUTE: int = 10

@@ -20,3 +20,14 @@ async def test_metrics_endpoint_returns_prometheus_format():
         body = metrics_resp.text
         assert "http_server_requests_total" in body
         assert "http_server_duration_seconds" in body
+
+
+@pytest.mark.asyncio
+async def test_metrics_endpoint_micro_caching():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp1 = await client.get("/metrics")
+        assert resp1.status_code == 200
+        resp2 = await client.get("/metrics")
+        assert resp2.status_code == 200
+        assert resp1.text == resp2.text

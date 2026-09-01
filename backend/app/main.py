@@ -585,13 +585,37 @@ app.include_router(observability_router, prefix=settings.API_V1_STR)
 app.include_router(user_settings_router, prefix=settings.API_V1_STR)
 
 
+_last_metrics_cache: bytes | str | None = None
+_last_metrics_timestamp: float = 0.0
+
+
 @app.get("/metrics")
-def metrics_endpoint():
-    """Prometheus scraping endpoint backed by live prometheus-client registry."""
-    from app.core.telemetry import export_prometheus_metrics
+async def metrics_endpoint(request: Request):
+    """
+    Prometheus scraping endpoint backed by live prometheus-client registry.
+    Protected by sliding-window rate limiting and short in-memory micro-caching to prevent scraping DoS.
+    """
+    from app.api.dependencies import check_metrics_rate_limit, get_metrics_rate_limiter
+
+    limiter = get_metrics_rate_limiter(request)
+    await check_metrics_rate_limit(request, rate_limiter=limiter)
+
+    global _last_metrics_cache, _last_metrics_timestamp
+    now = time.time()
+    cache_ttl = getattr(settings, "METRICS_CACHE_TTL_SECONDS", 5.0)
+
+    content: bytes | str
+    if _last_metrics_cache is not None and (now - _last_metrics_timestamp) < cache_ttl:
+        content = _last_metrics_cache
+    else:
+        from app.core.telemetry import export_prometheus_metrics
+
+        content = export_prometheus_metrics()
+        _last_metrics_cache = content
+        _last_metrics_timestamp = now
 
     return Response(
-        content=export_prometheus_metrics(),
+        content=content,
         media_type="text/plain; version=0.0.4; charset=utf-8",
     )
 

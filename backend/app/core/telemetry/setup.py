@@ -87,13 +87,68 @@ def init_telemetry(app: Any = None) -> None:
             and not (is_prod and is_local_endpoint)
         )
 
-        if should_export_network:
+        if should_export_network and isinstance(endpoint, str):
+            endpoint_str = endpoint.strip()
             try:
-                from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
-                    OTLPSpanExporter,
-                )
+                import os
 
-                exporter = OTLPSpanExporter(endpoint=endpoint, timeout=2.0)
+                raw_headers = getattr(
+                    settings, "OTEL_EXPORTER_OTLP_HEADERS", None
+                ) or os.getenv("OTEL_EXPORTER_OTLP_HEADERS")
+                headers_dict: dict[str, str] = {}
+                if raw_headers:
+                    if isinstance(raw_headers, dict):
+                        headers_dict = raw_headers
+                    elif isinstance(raw_headers, str):
+                        for item in raw_headers.split(","):
+                            if "=" in item:
+                                k, v = item.split("=", 1)
+                                headers_dict[k.strip()] = v.strip()
+
+                insecure = not endpoint_str.startswith("https")
+                if endpoint_str.startswith("http://") or endpoint_str.startswith(
+                    "https://"
+                ):
+                    # Use HTTP/protobuf exporter for HTTP(S) OTLP endpoints (e.g. Grafana Cloud /v1/traces)
+                    try:
+                        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+                            OTLPSpanExporter as HTTPSpanExporter,
+                        )
+
+                        target_url = (
+                            endpoint_str
+                            if "/v1/traces" in endpoint_str
+                            or not endpoint_str.endswith("/otlp")
+                            else f"{endpoint_str.rstrip('/')}/v1/traces"
+                        )
+                        exporter: Any = HTTPSpanExporter(
+                            endpoint=target_url,
+                            headers=headers_dict if headers_dict else None,
+                            timeout=3.0,
+                        )
+                    except Exception:
+                        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+                            OTLPSpanExporter,
+                        )
+
+                        exporter = OTLPSpanExporter(
+                            endpoint=endpoint_str,
+                            headers=headers_dict if headers_dict else None,
+                            insecure=insecure,
+                            timeout=3.0,
+                        )
+                else:
+                    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+                        OTLPSpanExporter,
+                    )
+
+                    exporter = OTLPSpanExporter(
+                        endpoint=endpoint_str,
+                        headers=headers_dict if headers_dict else None,
+                        insecure=insecure,
+                        timeout=3.0,
+                    )
+
                 processor = BatchSpanProcessor(
                     exporter,
                     max_queue_size=2048,
@@ -102,7 +157,7 @@ def init_telemetry(app: Any = None) -> None:
                 )
                 provider.add_span_processor(processor)
                 logger.info(
-                    f"OpenTelemetry OTLP gRPC span exporter configured for {endpoint}"
+                    f"OpenTelemetry OTLP span exporter configured for {endpoint}"
                 )
             except Exception as exp_err:
                 logger.warning(

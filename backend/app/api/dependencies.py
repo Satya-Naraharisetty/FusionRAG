@@ -283,6 +283,29 @@ async def check_account_delete_rate_limit(
         )
 
 
+def get_metrics_rate_limiter(request: Request) -> Any:
+    """Rate limiter for /metrics endpoint to prevent scraping DoS."""
+    return _build_rate_limiter(
+        request,
+        getattr(settings, "METRICS_RATE_LIMIT_PER_MINUTE", 30),
+        burst=5,
+        window_seconds=60.0,
+    )
+
+
+async def check_metrics_rate_limit(
+    request: Request,
+    rate_limiter: Any = Depends(get_metrics_rate_limiter),
+) -> None:
+    identifier = _resolve_rate_limit_identifier(request)
+    if await rate_limiter.is_rate_limited(identifier):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many metrics requests. Please try again later.",
+            headers={"Retry-After": "60"},
+        )
+
+
 def get_login_failed_attempts_tracker(request: Request) -> Any:
     """
     Tracker for consecutive failed login attempts (5 wrong attempts -> 5-minute lockout).
