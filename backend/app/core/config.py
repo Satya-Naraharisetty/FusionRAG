@@ -151,16 +151,10 @@ class Settings(BaseSettings):
                 except json.JSONDecodeError:
                     pass
             return [
-                x.strip().rstrip("/")
-                for x in v.split(",")
-                if x.strip().rstrip("/")
+                x.strip().rstrip("/") for x in v.split(",") if x.strip().rstrip("/")
             ]
         elif isinstance(v, (list, set, tuple)):
-            return [
-                str(x).strip().rstrip("/")
-                for x in v
-                if str(x).strip().rstrip("/")
-            ]
+            return [str(x).strip().rstrip("/") for x in v if str(x).strip().rstrip("/")]
         return ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     @field_validator("COOKIE_DOMAIN", mode="before")
