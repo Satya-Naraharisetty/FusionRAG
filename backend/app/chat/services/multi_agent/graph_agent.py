@@ -27,7 +27,10 @@ class GraphAgent(BaseSpecialistAgent):
     agent_type = AgentType.GRAPH
 
     def __init__(self, graph_retriever: PostgresGraphRetriever | None = None) -> None:
-        self.graph_retriever = graph_retriever
+        if graph_retriever is not None and hasattr(graph_retriever, "dependency"):
+            self.graph_retriever = None
+        else:
+            self.graph_retriever = graph_retriever
 
     async def execute_task(
         self, task: AgentTask, context: AgentExecutionContext
@@ -49,6 +52,32 @@ class GraphAgent(BaseSpecialistAgent):
                         active_config_id=UUID("00000000-0000-0000-0000-000000000000"),
                         active_embedding_contract_id="contract_default",
                     )
+            else:
+                # If no specific document IDs passed, query all active user document versions from repo
+                try:
+                    from sqlalchemy import select
+
+                    from app.documents.infrastructure.persistence.models import (
+                        SQLAlchemyRelationshipEvidence,
+                    )
+                    if hasattr(self.graph_retriever.graph_repo, "_db"):
+                        stmt = select(
+                            SQLAlchemyRelationshipEvidence.document_id,
+                            SQLAlchemyRelationshipEvidence.document_version
+                        ).where(
+                            SQLAlchemyRelationshipEvidence.user_id == context.user_id,
+                            SQLAlchemyRelationshipEvidence.status == "VALID"
+                        ).distinct()
+                        res = await self.graph_retriever.graph_repo._db.execute(stmt)
+                        for doc_id, doc_ver in res.all():
+                            auth_docs[doc_id] = AuthorizedDocumentVersion(
+                                active_version=doc_ver,
+                                active_config_id=UUID("00000000-0000-0000-0000-000000000000"),
+                                active_embedding_contract_id="contract_default",
+                            )
+                except Exception:
+                    pass
+
             scope = AuthorizedDocumentScope(
                 user_id=context.user_id,
                 authorized_docs=auth_docs,

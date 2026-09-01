@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import and_, func, select, text
+from sqlalchemy import and_, delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.documents.domain.interfaces import DocumentElementRepository
@@ -69,6 +69,17 @@ class SQLAlchemyDocumentElementRepository(DocumentElementRepository):
         result = await self._db.execute(stmt)
         db_elems = result.scalars().all()
         return [self._to_domain(e) for e in db_elems]
+
+    async def delete_by_version(
+        self, user_id: UUID, document_id: UUID, document_version: int
+    ) -> None:
+        stmt = delete(SQLAlchemyDocumentElement).where(
+            SQLAlchemyDocumentElement.user_id == user_id,
+            SQLAlchemyDocumentElement.document_id == document_id,
+            SQLAlchemyDocumentElement.document_version == document_version,
+        )
+        await self._db.execute(stmt)
+        await self._db.flush()
 
     async def search_sparse(
         self,

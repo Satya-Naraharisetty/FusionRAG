@@ -490,7 +490,30 @@ def get_document_processing_service(
         task_queue = SyncTaskQueue()
 
     def handle_document_completed(event: DocumentProcessingCompleted) -> None:
+        from app.documents.infrastructure.persistence.repositories.document_element_repository import (
+            SQLAlchemyDocumentElementRepository,
+        )
+        from app.documents.infrastructure.persistence.repositories.graph_repository import (
+            SQLAlchemyGraphRepository,
+        )
+        from app.documents.services.document_enrichment_service import (
+            DocumentEnrichmentService,
+        )
+        from app.documents.services.table_processor import TableProcessor
+
         task_queue.enqueue(embedding_service.generate_embeddings, event.document_id)
+        enrichment_service = DocumentEnrichmentService(
+            document_repo=SQLAlchemyDocumentRepository(db),
+            element_repo=SQLAlchemyDocumentElementRepository(db),
+            graph_repo=SQLAlchemyGraphRepository(db),
+            table_processor=TableProcessor(),
+            uow=SQLAlchemyUnitOfWork(db),
+        )
+        task_queue.enqueue(
+            enrichment_service.enrich_document,
+            event.document_id,
+            event.user_id,
+        )
 
     dispatcher.register(DocumentProcessingCompleted, handle_document_completed)
 
@@ -1361,11 +1384,80 @@ def get_task_router(
     )
 
 
+def get_document_element_repository(
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    from app.documents.infrastructure.persistence.repositories.document_element_repository import (
+        SQLAlchemyDocumentElementRepository,
+    )
+
+    return SQLAlchemyDocumentElementRepository(db)
+
+
+def get_graph_repository(
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    from app.documents.infrastructure.persistence.repositories.graph_repository import (
+        SQLAlchemyGraphRepository,
+    )
+
+    return SQLAlchemyGraphRepository(db)
+
+
+def get_graph_retriever(
+    graph_repo=Depends(get_graph_repository),
+) -> Any:
+    from app.documents.services.graph_retriever import PostgresGraphRetriever
+
+    return PostgresGraphRetriever(graph_repository=graph_repo)
+
+
+def get_table_processor() -> Any:
+    from app.documents.services.table_processor import TableProcessor
+
+    return TableProcessor()
+
+
+def get_vision_processor() -> Any:
+    from app.documents.services.vision_processor import VisionProcessor
+
+    return VisionProcessor()
+
+
+def get_table_agent(
+    table_processor=Depends(get_table_processor),
+    element_repo=Depends(get_document_element_repository),
+) -> Any:
+    from app.chat.services.multi_agent.table_agent import TableAgent
+
+    return TableAgent(table_processor=table_processor, element_repo=element_repo)
+
+
+def get_vision_agent(
+    vision_processor=Depends(get_vision_processor),
+    element_repo=Depends(get_document_element_repository),
+) -> Any:
+    from app.chat.services.multi_agent.vision_agent import VisionAgent
+
+    return VisionAgent(vision_processor=vision_processor, element_repo=element_repo)
+
+
+def get_graph_agent(
+    graph_retriever=Depends(get_graph_retriever),
+) -> Any:
+    from app.chat.services.multi_agent.graph_agent import GraphAgent
+
+    return GraphAgent(graph_retriever=graph_retriever)
+
+
 def get_agent_execution_engine(
     research_agent=Depends(get_research_agent),
     document_agent=Depends(get_document_agent),
     analysis_agent=Depends(get_analysis_agent),
     web_search_agent=Depends(get_web_search_agent),
+    table_agent=Depends(get_table_agent),
+    vision_agent=Depends(get_vision_agent),
+    graph_agent=Depends(get_graph_agent),
     task_router=Depends(get_task_router),
     capability_registry=Depends(get_capability_registry),
     observability=Depends(get_agent_observability_service),
@@ -1378,6 +1470,9 @@ def get_agent_execution_engine(
             document_agent,
             analysis_agent,
             web_search_agent,
+            table_agent,
+            vision_agent,
+            graph_agent,
         ],
         task_router=task_router,
         capability_registry=capability_registry,

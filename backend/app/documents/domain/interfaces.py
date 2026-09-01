@@ -587,6 +587,13 @@ class DocumentElementRepository(ABC):
         pass
 
     @abstractmethod
+    async def delete_by_version(
+        self, user_id: UUID, document_id: UUID, document_version: int
+    ) -> None:
+        """Deletes all elements belonging to a specific document version."""
+        pass
+
+    @abstractmethod
     async def search_sparse(
         self,
         query: str,

@@ -42,16 +42,19 @@ PLANNER_SYSTEM_PROMPT = """You are a master planning agent in a hierarchical mul
 Decompose the user's request into a structured execution plan containing specialist tasks with explicit dependencies.
 
 Available Specialist Agents:
-- RESEARCH: Performs Fusion RAG search across uploaded knowledge base chunks. Use for questions about user uploaded documents, internal company policies, or documentation.
+- RESEARCH: Performs Fusion RAG search across uploaded knowledge base chunks (dense vectors + sparse BM25 + reranker). Use for text questions about uploaded documents, company policies, or internal knowledge.
 - DOCUMENT: Inspects specific known documents/chunks by ID, or lists documents in conversation. Use when specific document UUIDs or document metadata are explicitly mentioned.
-- ANALYSIS: Solves mathematical, scientific, engineering, financial, and statistical problems via MathEngine & SafeCalculator, or provides executable Python/Pandas/Matplotlib scripts for browser-sandboxed dataset analysis.
+- ANALYSIS: Solves mathematical, scientific, engineering, financial, and statistical problems via MathEngine & SafeCalculator (CAGR, NPV, algebraic equations, stats), or provides executable analysis scripts.
 - WEB_SEARCH: Searches the live public web for real-time information, current facts, news, online market data, or external topics not found in uploaded documents.
+- TABLE: Specialist for structured tabular data extraction, aggregation (SUM, AVG, MIN, MAX, COUNT), column filtering, and table reasoning from markdown/CSV tables.
+- VISION: Specialist for multimodal visual reasoning, architectural diagram inspection, OCR transcription of image regions, and chart/figure trend extraction.
+- GRAPH: Specialist for knowledge graph traversal, entity relationship queries, multi-hop entity reasoning, and cross-document concept linkages.
 
 Planning Rules:
 1. Only create tasks for necessary specialists.
 2. Max 5 tasks in a single plan.
-3. Use 'dependencies' to sequence tasks (e.g. ANALYSIS depending on RESEARCH and/or WEB_SEARCH).
-4. Independent tasks should have empty dependencies [] so they run concurrently.
+3. Use 'dependencies' to sequence tasks (e.g. ANALYSIS depending on TABLE and/or RESEARCH; TABLE depending on RESEARCH; GRAPH depending on RESEARCH).
+4. Independent tasks should have empty dependencies [] so they run concurrently in parallel topological waves.
 5. Return strictly valid JSON conforming to the schema below.
 
 JSON Schema:
@@ -60,7 +63,7 @@ JSON Schema:
   "tasks": [
     {
       "task_id": "task_1",
-      "agent_type": "RESEARCH" | "DOCUMENT" | "ANALYSIS" | "WEB_SEARCH",
+      "agent_type": "RESEARCH" | "DOCUMENT" | "ANALYSIS" | "WEB_SEARCH" | "TABLE" | "VISION" | "GRAPH",
       "request": "Detailed task description",
       "dependencies": [],
       "parameters": {},
@@ -376,20 +379,31 @@ class MasterAgent:
             r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
             req_lower,
         )
+        req_no_uuid = re.sub(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "", req_lower
+        )
         has_math = any(
-            op in req_lower
+            op in req_no_uuid
             for op in [
                 "calculate",
                 "compute",
                 "growth rate",
+                "growth",
+                "cagr",
                 "percentage",
+                "difference",
                 "sum",
+                "total",
+                "totals",
                 "average",
                 "+",
                 "*",
                 "/",
             ]
-        ) and any(c.isdigit() for c in request)
+        ) or (
+            any(c.isdigit() for c in req_no_uuid)
+            and any(op in req_no_uuid for op in ["+", "-", "*", "/", "%", "="])
+        )
 
         clean_math_str = re.sub(
             r"^(calculate|compute|eval|evaluate|what is|how much is)\s*", "", req_lower
@@ -414,6 +428,9 @@ class MasterAgent:
                     "describe",
                     "doc",
                     "pdf",
+                    "table",
+                    "chart",
+                    "market",
                 ]
             )
             and bool(re.match(r"^[\d\s\+\-\*\/\(\)\.\,]+$", clean_math_str))
@@ -452,6 +469,26 @@ class MasterAgent:
                 )
             )
         else:
+            table_keywords = ["table", "csv", "tabular", "rows", "columns", "revenue table", "spreadsheet"]
+            is_table_query = any(w in req_lower for w in table_keywords)
+
+            vision_keywords = ["image", "chart", "diagram", "figure", "visual", "picture", "plot", "screenshot"]
+            is_vision_query = any(w in req_lower for w in vision_keywords)
+
+            graph_keywords = [
+                "related to",
+                "relationship",
+                "relationships",
+                "connected to",
+                "connection between",
+                "knowledge graph",
+                "lineage",
+                "entity relation",
+                "who is linked to",
+                "how is",
+            ]
+            is_graph_query = any(w in req_lower for w in graph_keywords)
+
             web_keywords = [
                 "web",
                 "online",
@@ -463,6 +500,8 @@ class MasterAgent:
                 "internet",
                 "live",
                 "stock price",
+                "market data",
+                "external market",
             ]
             is_web_query = any(w in req_lower for w in web_keywords)
             doc_keywords = [
@@ -481,7 +520,82 @@ class MasterAgent:
                 or getattr(context, "include_library_documents", False)
             )
 
-            if is_web_query and has_doc_context:
+            if is_table_query:
+                # Table DAG: Research -> Table -> (optional Analysis)
+                tasks.append(
+                    AgentTask(
+                        task_id="research_1",
+                        request=f"Retrieve document chunks containing table data for: {request}",
+                        agent_type=AgentType.RESEARCH,
+                        dependencies=[],
+                        parameters={"query": request, "top_k": 5},
+                        expected_outputs=["Document text containing tabular data"],
+                    )
+                )
+                tasks.append(
+                    AgentTask(
+                        task_id="table_1",
+                        request=f"Extract and aggregate tabular data for: {request}",
+                        agent_type=AgentType.TABLE,
+                        dependencies=["research_1"],
+                        parameters={"request": request},
+                        expected_outputs=["Structured table extraction and summary"],
+                    )
+                )
+                if has_math:
+                    tasks.append(
+                        AgentTask(
+                            task_id="analysis_1",
+                            request=f"Perform calculation on extracted table data: {request}",
+                            agent_type=AgentType.ANALYSIS,
+                            dependencies=["table_1"],
+                            parameters={"action": "calculate"},
+                        )
+                    )
+            elif is_vision_query:
+                tasks.append(
+                    AgentTask(
+                        task_id="vision_1",
+                        request=request,
+                        agent_type=AgentType.VISION,
+                        dependencies=[],
+                        parameters={"request": request},
+                        expected_outputs=["Visual analysis of diagram or chart"],
+                    )
+                )
+                if has_doc_context:
+                    tasks.append(
+                        AgentTask(
+                            task_id="research_1",
+                            request=request,
+                            agent_type=AgentType.RESEARCH,
+                            dependencies=[],
+                            parameters={"query": request, "top_k": 5},
+                            expected_outputs=["Contextual document text for visual element"],
+                        )
+                    )
+            elif is_graph_query:
+                tasks.append(
+                    AgentTask(
+                        task_id="graph_1",
+                        request=request,
+                        agent_type=AgentType.GRAPH,
+                        dependencies=[],
+                        parameters={"query": request},
+                        expected_outputs=["Knowledge graph entity relationships"],
+                    )
+                )
+                tasks.append(
+                    AgentTask(
+                        task_id="research_1",
+                        request=request,
+                        agent_type=AgentType.RESEARCH,
+                        dependencies=[],
+                        parameters={"query": request, "top_k": 5},
+                        expected_outputs=["Supporting text evidence for graph entities"],
+                    )
+                )
+            elif is_web_query and has_doc_context:
                 tasks.append(
                     AgentTask(
                         task_id="research_1",
