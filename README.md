@@ -48,6 +48,14 @@ A high-performance, observable, and modular reference implementation of an enter
   * **Multi-Tier Rate Limiting**: Sliding-window rate limiters backed by Redis (with in-memory circuit-breaker fallback) and brute-force lockout defense on authentication routes.
   * **Prompt Injection Defense**: Pre-flight heuristic injection scanner, `<retrieved_context>` XML prompt isolation, and untrusted data system instructions.
 
+* **Enterprise-Grade Multi-Tier & Cross-User Caching**:
+  * **L1/L2/L3 Multi-Tier Architecture**: In-memory LRU process cache (L1), distributed Redis (L2), and RAG Response Cache (L3).
+  * **Active-Version Document Fingerprinting**: Cache keys hash `(doc_id, active_version)` across all authorized documents in scope. Document edits, uploads, or deletions instantly invalidate affected entries, guaranteeing zero stale answers.
+  * **Global Cross-User Caching**: Standalone general knowledge queries (with zero document dependencies) fall back to a shared global cache, saving cross-user LLM tokens and returning answers in <10ms.
+  * **Envelope Encryption & Crypto-Shredding**: All private cached answer payloads in Redis are encrypted with user-specific Data Encryption Keys (AES-256-GCM); account deletion mathematically shreds all cached data.
+  * **Document OCR & Vision Extraction Cache**: Caches extracted page text and table layouts per page image hash to avoid redundant Gemini Vision API calls during document re-indexing.
+  * **Synthetic Paced SSE Stream Replay**: Replays cached answers at 5ms intervals with structured SSE events (`metadata`, `text`, `synthesis_done`, `done`) to maintain frontend typewriter animations and message persistence in PostgreSQL.
+
 * **Zero Local Deep Learning Dependencies**:
   * Completely free of PyTorch, CUDA, and heavy local neural network weights.
   * Embeddings via **Jina AI API** (`jina-embeddings-v3`, 768-dim Matryoshka) or **Google Gemini** (`text-embedding-004`).

@@ -225,6 +225,7 @@ class ChatOrchestrator:
         enable_multi_agent: bool = True,
         adaptive_rag_orchestrator: Any | None = None,
         enable_adaptive_rag: bool | None = None,
+        rag_cache_service: Any | None = None,
     ) -> None:
         from app.core.config import settings
 
@@ -252,6 +253,7 @@ class ChatOrchestrator:
             if enable_adaptive_rag is not None
             else getattr(settings, "ENABLE_ADAPTIVE_RAG", False)
         )
+        self.rag_cache_service = rag_cache_service
 
     async def generate_answer(
         self,
@@ -361,6 +363,92 @@ class ChatOrchestrator:
                         rewrite_applied=False,
                     )
                     query_to_retrieve = question
+
+                # --- RAG Response Cache Probe (Synchronous) ---
+                parent_message_id = (
+                    context_obj.recent_messages[-1].id
+                    if context_obj and context_obj.recent_messages
+                    else None
+                )
+                doc_vers = (
+                    dict.fromkeys(retrieval_doc_ids, 1) if retrieval_doc_ids else None
+                )
+                cache_key = None
+                global_cache_key = None
+                if self.rag_cache_service and self.rag_cache_service.is_enabled:
+                    cache_key = self.rag_cache_service.compute_cache_key(
+                        user_id=user_id,
+                        conversation_id=conversation_id,
+                        parent_message_id=parent_message_id,
+                        query=query_to_retrieve,
+                        doc_versions=doc_vers,
+                        model=self.model,
+                        temperature=self.temperature,
+                    )
+                    if not retrieval_doc_ids and parent_message_id is None:
+                        global_cache_key = (
+                            self.rag_cache_service.compute_global_cache_key(
+                                query=query_to_retrieve,
+                                model=self.model,
+                                temperature=self.temperature,
+                            )
+                        )
+                    cached_resp = await self.rag_cache_service.get_cached_response(
+                        cache_key,
+                        user_id=user_id,
+                        fallback_global_key=global_cache_key,
+                    )
+                    if cached_resp:
+                        assistant_message_id = uuid.uuid4()
+                        await self.conversation_manager._message_repo.create_assistant_message(
+                            conversation_id=conversation_id,
+                            message_id=assistant_message_id,
+                            role=MessageRole.ASSISTANT,
+                        )
+                        citations_data = cached_resp.get("citations", [])
+                        answer_text = cached_resp.get("answer", "")
+                        await self.conversation_manager.finalize_message(
+                            conversation_id=conversation_id,
+                            message_id=assistant_message_id,
+                            assistant_content=answer_text,
+                            prompt_tokens=0,
+                            completion_tokens=0,
+                            citations=citations_data,
+                            metadata={
+                                **(cached_resp.get("metadata") or {}),
+                                "cache_hit": True,
+                            },
+                        )
+                        total_time_ms = round(
+                            (time.perf_counter() - start_time) * 1000, 2
+                        )
+                        status_label = "success"
+                        return AnswerResponse(
+                            answer=answer_text,
+                            citations=[
+                                Citation(**c) if isinstance(c, dict) else c
+                                for c in citations_data
+                            ],
+                            retrieval_time_ms=0.0,
+                            generation_time_ms=0.0,
+                            total_time_ms=total_time_ms,
+                            model=self.model,
+                            usage=Usage(
+                                prompt_tokens=0,
+                                completion_tokens=0,
+                                total_tokens=0,
+                            ),
+                            conversation_id=conversation_id,
+                            diagnostics=RetrievalDiagnostics(
+                                rewritten=rewrite_result.rewrite_applied,
+                                retrieval_skipped=True,
+                                dense_count=len(citations_data),
+                                sparse_count=0,
+                                fusion_count=len(citations_data),
+                                rerank_count=len(citations_data),
+                                latencies={"cache_hit": 5.0},
+                            ),
+                        )
 
                 # 3. Execution Branching: Multi-Agent vs Baseline Single-Agent RAG
                 if self.enable_multi_agent and self.master_agent is not None:
@@ -519,6 +607,33 @@ class ChatOrchestrator:
                     )
 
                     status_label = "success"
+                    if (
+                        self.rag_cache_service
+                        and cache_key
+                        and self.rag_cache_service.should_cache_response(
+                            answer=answer_text,
+                            diagnostics=diagnostics,
+                            agent_diagnostics=sanitized_agent_diagnostics,
+                            status=status_label,
+                        )
+                    ):
+                        await self.rag_cache_service.set_cached_response(
+                            key=cache_key,
+                            payload={
+                                "answer": answer_text,
+                                "citations": citations_data,
+                                "usage": usage.model_dump()
+                                if hasattr(usage, "model_dump")
+                                else usage,
+                                "diagnostics": diagnostics.model_dump()
+                                if hasattr(diagnostics, "model_dump")
+                                else diagnostics,
+                                "metadata": metadata,
+                            },
+                            user_id=user_id,
+                            global_key=global_cache_key,
+                        )
+
                     return AnswerResponse(
                         answer=answer_text,
                         citations=citations,
@@ -760,6 +875,33 @@ class ChatOrchestrator:
                 )
 
                 status_label = "success"
+                if (
+                    self.rag_cache_service
+                    and cache_key
+                    and self.rag_cache_service.should_cache_response(
+                        answer=answer_text,
+                        diagnostics=diagnostics,
+                        agent_diagnostics=None,
+                        status=status_label,
+                    )
+                ):
+                    await self.rag_cache_service.set_cached_response(
+                        key=cache_key,
+                        payload={
+                            "answer": answer_text,
+                            "citations": citations_data,
+                            "usage": usage.model_dump()
+                            if hasattr(usage, "model_dump")
+                            else usage,
+                            "diagnostics": diagnostics.model_dump()
+                            if hasattr(diagnostics, "model_dump")
+                            else diagnostics,
+                            "metadata": metadata,
+                        },
+                        user_id=user_id,
+                        global_key=global_cache_key,
+                    )
+
                 return AnswerResponse(
                     answer=answer_text,
                     citations=citations,
@@ -891,6 +1033,73 @@ class ChatOrchestrator:
 
         assistant_message_id = uuid.uuid4()
         message_finalized = False
+
+        # --- RAG Response Cache Probe (Streaming) ---
+        parent_message_id = (
+            context_obj.recent_messages[-1].id
+            if context_obj and context_obj.recent_messages
+            else None
+        )
+        doc_vers = dict.fromkeys(retrieval_doc_ids, 1) if retrieval_doc_ids else None
+        stream_cache_key = None
+        global_stream_cache_key = None
+        if self.rag_cache_service and self.rag_cache_service.is_enabled:
+            stream_cache_key = self.rag_cache_service.compute_cache_key(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                parent_message_id=parent_message_id,
+                query=query_to_retrieve,
+                doc_versions=doc_vers,
+                model=self.model,
+                temperature=self.temperature,
+            )
+            if not retrieval_doc_ids and parent_message_id is None:
+                global_stream_cache_key = (
+                    self.rag_cache_service.compute_global_cache_key(
+                        query=query_to_retrieve,
+                        model=self.model,
+                        temperature=self.temperature,
+                    )
+                )
+            cached_stream_resp = await self.rag_cache_service.get_cached_response(
+                stream_cache_key,
+                user_id=user_id,
+                fallback_global_key=global_stream_cache_key,
+            )
+            if cached_stream_resp:
+                await self.conversation_manager._message_repo.create_assistant_message(
+                    conversation_id=conversation_id,
+                    message_id=assistant_message_id,
+                    role=MessageRole.ASSISTANT,
+                )
+                async for event in self.rag_cache_service.replay_stream_events(
+                    cached_payload=cached_stream_resp,
+                    assistant_message_id=assistant_message_id,
+                    conversation_id=conversation_id,
+                ):
+                    if event.get("event") == "text":
+                        text_val = event.get("data", {}).get("text", "")
+                        await (
+                            self.conversation_manager._message_repo.append_stream_chunk(
+                                assistant_message_id, text_val
+                            )
+                        )
+                    yield event
+
+                await self.conversation_manager.finalize_message(
+                    conversation_id=conversation_id,
+                    message_id=assistant_message_id,
+                    assistant_content=cached_stream_resp.get("answer", ""),
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    citations=cached_stream_resp.get("citations", []),
+                    metadata={
+                        **(cached_stream_resp.get("metadata") or {}),
+                        "cache_hit": True,
+                    },
+                )
+                message_finalized = True
+                return
 
         async def _mark_interrupted_if_incomplete() -> None:
             if message_finalized:
@@ -1085,6 +1294,31 @@ class ChatOrchestrator:
                 }
                 if stream_agent_diagnostics is not None:
                     done_payload["agent_diagnostics"] = stream_agent_diagnostics
+
+                if (
+                    self.rag_cache_service
+                    and stream_cache_key
+                    and self.rag_cache_service.should_cache_response(
+                        answer=full_answer_text,
+                        diagnostics=done_payload.get("diagnostics"),
+                        agent_diagnostics=stream_agent_diagnostics,
+                        status="completed",
+                    )
+                ):
+                    await self.rag_cache_service.set_cached_response(
+                        key=stream_cache_key,
+                        payload={
+                            "answer": full_answer_text,
+                            "citations": citations_data,
+                            "usage": usage_to_save.model_dump()
+                            if hasattr(usage_to_save, "model_dump")
+                            else usage_to_save,
+                            "diagnostics": done_payload.get("diagnostics"),
+                            "metadata": metadata,
+                        },
+                        user_id=user_id,
+                        global_key=global_stream_cache_key,
+                    )
 
                 yield {
                     "event": "done",
@@ -1361,6 +1595,29 @@ class ChatOrchestrator:
                     metadata=metadata,
                 )
                 message_finalized = True
+
+                if (
+                    self.rag_cache_service
+                    and stream_cache_key
+                    and self.rag_cache_service.should_cache_response(
+                        answer=full_answer,
+                        diagnostics=diagnostics,
+                        agent_diagnostics=None,
+                        status="completed",
+                    )
+                ):
+                    await self.rag_cache_service.set_cached_response(
+                        key=stream_cache_key,
+                        payload={
+                            "answer": full_answer,
+                            "citations": [cit.model_dump() for cit in citations],
+                            "usage": final_usage.model_dump(),
+                            "diagnostics": diagnostics.model_dump(),
+                            "metadata": metadata,
+                        },
+                        user_id=user_id,
+                        global_key=global_stream_cache_key,
+                    )
 
                 # Yield done event
                 yield {

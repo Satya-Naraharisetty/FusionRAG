@@ -1578,6 +1578,7 @@ def get_chat_orchestrator(
 
     llm_gen = LLMGenerationService(llm_provider)
     model = settings.GEMINI_CHAT_MODEL
+    rag_cache = get_rag_cache_service()
     return ChatOrchestrator(
         retrieval_service=retrieval_service,
         prompt_builder=prompt_builder,
@@ -1599,6 +1600,7 @@ def get_chat_orchestrator(
         enable_multi_agent=settings.ENABLE_MULTI_AGENT,
         adaptive_rag_orchestrator=adaptive_rag_orchestrator,
         enable_adaptive_rag=settings.ENABLE_ADAPTIVE_RAG,
+        rag_cache_service=rag_cache,
     )
 
 
@@ -1721,6 +1723,13 @@ def get_cache(request: Request = None) -> Any:  # type: ignore[assignment]  # Fa
         else:
             _cache_instance = l1
     return _cache_instance
+
+
+def get_rag_cache_service(cache: Any = None) -> Any:
+    from app.chat.services.rag_cache_service import RAGCacheService
+
+    c = cache or get_cache()
+    return RAGCacheService(cache=c)
 
 
 def get_distributed_lock(request: Request = None) -> Any:  # type: ignore[assignment]  # FastAPI injects Request

@@ -295,6 +295,15 @@ class Settings(BaseSettings):
     ENABLE_CONTEXTUAL_RETRIEVAL: bool = False
     TOTAL_ADVANCED_RAG_TIMEOUT_MS: int = 3000
 
+    # RAG Caching Configurations
+    ENABLE_RAG_CACHE: bool = True
+    RAG_RESPONSE_CACHE_TTL_SECONDS: int = 3600  # 1 hour
+    RAG_EMBEDDING_CACHE_TTL_SECONDS: int = 86400  # 24 hours
+    RAG_CONTEXT_CACHE_TTL_SECONDS: int = 1800  # 30 minutes
+    RAG_CACHE_MIN_CONFIDENCE: float = 0.70
+    RAG_CACHE_STREAM_CHUNK_DELAY_MS: float = 5.0
+    RAG_CACHE_ENABLE_ENCRYPTION: bool = True
+
     # Adaptive / Agentic RAG Orchestration Configurations
     ENABLE_ADAPTIVE_RAG: bool = False
     ENABLE_HYDE: bool = False

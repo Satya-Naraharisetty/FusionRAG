@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import io
 
 import httpx
@@ -8,6 +9,7 @@ try:
 except ImportError:
     Image = None  # type: ignore[assignment]
 
+from app.core.cache.interfaces import BaseCache
 from app.core.config import settings
 from app.documents.domain.exceptions import DocumentCorrupted, UnsupportedDocumentType
 from app.documents.domain.interfaces import OCRProvider
@@ -107,8 +109,33 @@ class GeminiOCRProvider(OCRProvider):
 
 
 class OCRService:
-    def __init__(self, provider: OCRProvider | None = None) -> None:
+    def __init__(
+        self,
+        provider: OCRProvider | None = None,
+        cache: BaseCache | None = None,
+        ttl_seconds: int = 7 * 24 * 3600,
+    ) -> None:
         self.provider = provider or MockOCRProvider()
+        self._cache = cache
+        self._ttl = ttl_seconds
 
     async def extract_text(self, image_bytes: bytes) -> str:
-        return await self.provider.extract_text_from_image(image_bytes)
+        if self._cache is not None:
+            cache_key = f"ocr:page:{hashlib.sha256(image_bytes).hexdigest()}"
+            try:
+                cached = await self._cache.get(cache_key)
+                if cached is not None and isinstance(cached, str):
+                    return cached
+            except Exception:
+                pass
+
+        text = await self.provider.extract_text_from_image(image_bytes)
+
+        if self._cache is not None and text:
+            try:
+                cache_key = f"ocr:page:{hashlib.sha256(image_bytes).hexdigest()}"
+                await self._cache.set(cache_key, text, ttl=self._ttl)
+            except Exception:
+                pass
+
+        return text

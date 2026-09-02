@@ -255,6 +255,44 @@ flowchart TD
 
 ---
 
+## 6.1 Multi-Tier RAG Caching Architecture
+
+Fusion RAG implements an enterprise-grade, multi-tier caching system for RAG Q&A queries that eliminates redundant LLM inference costs and slashes response latency from ~1,500ms to <15ms for repeated queries:
+
+```mermaid
+flowchart TD
+    UserQuery["User Query"] --> CacheKeyGen["Generate Active-Version Scoped Key<br/>(User + Thread + ParentMsg + DocVersionSig + QueryHash)"]
+    CacheKeyGen --> L3Check{"L3 Response Cache Hit?<br/>(RAGCacheService)"}
+    
+    L3Check -- "Hit" --> PersistDB["Persist Assistant Message to PostgreSQL"]
+    PersistDB --> PacedSSE["Fast-Replay Paced SSE Stream<br/>(metadata, text @ 5ms, citations, done)"]
+    PacedSSE --> ClientFast["Stream to Frontend (15ms)"]
+    
+    L3Check -- "Miss" --> LockCheck{"Acquire Single-Flight Lock<br/>(RedisLock)"}
+    LockCheck -- "Lock Acquired" --> L2Check{"L2 Context Cache Hit?"}
+    LockCheck -- "Wait" --> L3Check
+    
+    L2Check -- "Hit" --> LLM["Synthesizer / Multi-Agent DAG"]
+    L2Check -- "Miss" --> L1Check{"L1 Query Vector Cache Hit?"}
+    
+    L1Check -- "Hit" --> Search["Hybrid Retrieval (Qdrant + Postgres FTS)"]
+    L1Check -- "Miss" --> JinaEmbed["Jina Embedding API"] --> WriteL1["Cache Vector (24h TTL)"] --> Search
+    
+    Search --> Rerank["Cross-Encoder Reranker"] --> WriteL2["Cache Context (30m TTL)"] --> LLM
+    
+    LLM --> Gate{"Quality Gate Check<br/>No WebSearch, Not Refusal, Score ≥ 0.70"}
+    Gate -- "Pass" --> Encrypt["Encrypt with User DEK (AES-256-GCM) & Save to L3 Cache (1h TTL)"] --> Finalize["Finalize & Stream"]
+    Gate -- "Bypass" --> Finalize
+```
+
+### Key Architectural Properties:
+1. **Active-Version Fingerprinting**: Cache keys hash `(doc_id, active_version)` across all authorized documents in scope. When any document is uploaded, updated, or deleted, `active_version` changes, guaranteeing immediate cache invalidation and zero stale answers.
+2. **AES-256-GCM Envelope Encryption**: Cache payloads in Redis are encrypted using the user's Data Encryption Key (DEK). Deleting an account and shredding its DEK achieves instant cryptographic shredding across Redis dumps.
+3. **Paced SSE Stream Replayer**: Replays cached answers as structured SSE events at 5ms intervals, preserving the frontend typewriter animation and rich UI cards.
+4. **Mandatory DB Persistence**: Every cache hit persists the completed assistant message into PostgreSQL `conversation_messages` before streaming, ensuring chat history is permanently durable.
+
+---
+
 ## 7. Security, Isolation & Attack Mitigation Subsystem
 
 Fusion RAG applies defense-in-depth across all system entry points:

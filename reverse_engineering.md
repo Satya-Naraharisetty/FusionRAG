@@ -1486,22 +1486,46 @@ Located in `backend/app/core/security/`:
 
 ---
 
-## 39. Multi-Tier Caching (L1 Memory + L2 Redis) & Distributed Heartbeat Locking
+## 39. Multi-Tier Caching (L1 Memory + L2 Redis) & Production RAG Q&A Caching
 
 ```mermaid
 flowchart TD
-    Req[Incoming Request] --> L1Check{L1 Memory Cache Hit?}
-    L1Check -->|Hit| RetL1[Return cached data in 0.05ms]
-    L1Check -->|Miss| L2Check{L2 Redis Cache Hit?}
-  
-    L2Check -->|Hit| PopL1[Populate L1 Cache] --> RetL2[Return cached data in 1ms]
-    L2Check -->|Miss| Compute[Execute DB Query / Vector Search / LLM]
-    Compute --> WriteBoth[Write-Through: Save to L2 Redis + L1 Memory] --> RetData[Return fresh result]
+    Req[Incoming Chat/RAG Request] --> L3Check{L3 RAG Answer Cache Hit?<br/>rag:ans:user:conv:parent:doc_ver:query}
+    L3Check -->|Hit| DBInsert[Persist Assistant Msg to PostgreSQL] --> ReplaySSE[Paced SSE Stream Replay<br/>metadata, text @ 5ms, citations, done]
+    ReplaySSE --> ClientFast[Return Stream in <15ms]
+    
+    L3Check -->|Miss| SingleFlight{Acquire RedisLock<br/>Single-Flight Mutex}
+    SingleFlight -->|Lock Acquired| L2Check{L2 Retrieval Context Cache Hit?}
+    SingleFlight -->|Waiting| L3Check
+    
+    L2Check -->|Hit| Synthesizer[LLM Synthesizer / MasterAgent DAG]
+    L2Check -->|Miss| L1VectorCheck{L1 Query Vector Cache Hit?}
+    
+    L1VectorCheck -->|Hit| HybridSearch[Hybrid Search: Qdrant + Postgres FTS]
+    L1VectorCheck -->|Miss| JinaEmbed[Jina AI Embedding API] --> WriteL1[Write Vector to Redis Cache] --> HybridSearch
+    
+    HybridSearch --> Rerank[Cross-Encoder Reranker] --> WriteL2[Write Context to L2 Cache] --> Synthesizer
+    
+    Synthesizer --> GateCheck{Quality & Plan Gate?<br/>No WebSearch, Not Refusal, Score ≥ 0.70}
+    GateCheck -->|Pass| EncryptCache[Encrypt with User DEK (AES-256-GCM) & Save to L3 Cache] --> Finalize[Finalize & Stream to Client]
+    GateCheck -->|Bypass| Finalize
 ```
 
-- **L1 In-Memory Cache**: LRU eviction ($N=1000$ entries, TTL=60s).
-- **L2 Redis Cache**: Partitioned by 6 managed namespaces (`prompt_rewrite`, `embeddings`, `conversation_memory`, `retrieval_results`, `evaluation_benchmarks`, `tool_executions`).
-- **Distributed Heartbeat Lock (`lock.py`)**: Mutex with background coroutine extending TTL during active long-running jobs.
+- **L1 In-Memory Cache (`InMemoryCache`)**: LRU process memory ($N=1000$ entries, TTL=60s) for sub-millisecond hot access within active worker pods.
+- **L2 Redis Cache (`RedisCache`)**: Distributed Redis caching partitioned by managed namespaces (`prompt_rewrite`, `embeddings`, `conversation_memory`, `retrieval_results`, `ocr_pages`, `evaluation_benchmarks`, `tool_executions`).
+- **L3 Production RAG Q&A Response Cache (`RAGCacheService` in `app/chat/services/rag_cache_service.py`)**:
+  - **Deterministic Active-Version Fingerprinting**:
+    $$\text{Cache Key} = \text{rag:ans:}\{\text{user\_id}\}:\{\text{conv\_id}\}:\{\text{parent\_msg\_id}\}:\{\text{doc\_version\_sig}\}:\{\text{query\_hash}\}$$
+    where $\text{doc\_version\_sig} = \text{SHA-256}\left(\sum \text{doc\_id} : \text{active\_version}\right)$. Any document upload, edit, or deletion instantly invalidates all affected cache entries with zero risk of stale answers.
+  - **Global Cross-User Caching for General Knowledge Queries**:
+    For standalone queries with **zero attached documents** (`no_docs`) and **zero conversation history** (`root`), the system implements a 2-tier lookup that falls back to a tenant-agnostic global cache:
+    $$\text{Global Cache Key} = \text{rag:ans:global:root:no\_docs:}\{\text{SHA-256}(\text{normalized\_query} : \text{model} : \text{temp})\}$$
+    When User A asks a general question (e.g. *"Write a quicksort in Python"*), the answer is cached globally. When User B asks the identical question, User B receives the cached response in **<10ms** with **0 LLM token cost**. Private document queries with citations are strictly excluded from the global cache.
+  - **AES-256-GCM Envelope Encryption for Redis Payloads**: All private cached answer payloads written to Redis are encrypted using the user's wrapped Data Encryption Key (DEK). When an account is deleted and its DEK is shredded, Redis cache entries become mathematically unrecoverable (Crypto-Shredding compliance).
+  - **Quality & Plan Gating (`should_cache_response`)**: Prevents caching live `WebSearchAgent` runs, refusal messages (*"I do not have enough evidence"*), and responses with evidence score $S_{\text{evidence}} < 0.70$.
+  - **Paced SSE Stream Replayer (`replay_stream_events`)**: Yields structured SSE events (`metadata`, word chunks at 5ms intervals, `synthesis_done`, and `done`) so frontend typewriter animations and message cards render identically to live streams.
+  - **Atomic Chat History Persistence**: Persists a new assistant message row into PostgreSQL `conversation_messages` on every cache hit before streaming, ensuring chat history is permanently durable.
+- **Distributed Heartbeat Lock (`lock.py`)**: Single-flight distributed mutex with background coroutine extending TTL during active generation runs, preventing cache stampedes (thundering herd problem).
 
 ---
 
