@@ -31,7 +31,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   const [scrollDirection, setScrollDirection] = useState<"up" | "down">("down");
   const lastScrollTop = useRef(0);
   const isUserScrolling = useRef(false);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const virtualizer = useVirtualizer({
     count: messages.length,

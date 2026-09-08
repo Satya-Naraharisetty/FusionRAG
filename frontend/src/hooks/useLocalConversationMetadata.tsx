@@ -183,7 +183,7 @@ export const ConversationMetadataProvider: React.FC<{ children: ReactNode }> = (
   };
 
   return (
-    <ConversationMetadataContext.Provider
+    <ConversationMetadataContext
       value={{
         pinnedIds,
         folders,
@@ -204,7 +204,7 @@ export const ConversationMetadataProvider: React.FC<{ children: ReactNode }> = (
       }}
     >
       {children}
-    </ConversationMetadataContext.Provider>
+    </ConversationMetadataContext>
   );
 };
 

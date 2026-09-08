@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "./Button";
 
-interface EmptyStateProps {
+interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
   icon?: React.ReactNode;
   title: string;
   description?: string;
@@ -11,95 +11,99 @@ interface EmptyStateProps {
   onAction?: () => void;
   variant?: "default" | "inline" | "fullscreen";
   className?: string;
+  ref?: React.Ref<HTMLDivElement>;
 }
 
-export const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(
-  (
-    {
-      icon,
-      title,
-      description,
-      action,
-      actionLabel,
-      onAction,
-      variant = "default",
-      className,
-      ...props
-    },
-    ref,
-  ) => {
-    const handleAction = () => {
-      if (action) return;
-      onAction?.();
-    };
+export const EmptyState = ({
+  icon,
+  title,
+  description,
+  action,
+  actionLabel,
+  onAction,
+  variant = "default",
+  className,
+  ref,
+  ...props
+}: EmptyStateProps) => {
+  const handleAction = () => {
+    if (action) return;
+    onAction?.();
+  };
 
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          "flex flex-col items-center justify-center text-center",
-          variant === "default" && "py-12 px-6",
-          variant === "inline" && "py-8 px-4",
-          variant === "fullscreen" && "min-h-[400px] px-6",
-          className,
-        )}
-        {...props}
-      >
-        {icon && (
-          <div
-            className={cn(
-              "mb-3 flex items-center justify-center text-[var(--text-muted)]",
-              variant === "fullscreen" && "text-5xl mb-4",
-              variant !== "fullscreen" && "text-3xl",
-            )}
-            aria-hidden="true"
-          >
-            {icon}
-          </div>
-        )}
-        <h3
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "flex flex-col items-center justify-center text-center",
+        variant === "default" && "py-12 px-6",
+        variant === "inline" && "py-8 px-4",
+        variant === "fullscreen" && "min-h-[400px] px-6",
+        className,
+      )}
+      {...props}
+    >
+      {icon && (
+        <div
           className={cn(
-            "font-semibold text-[var(--text-primary)]",
-            variant === "fullscreen" && "text-lg",
-            variant !== "fullscreen" && "text-sm",
+            "mb-3 flex items-center justify-center text-[var(--text-muted)]",
+            variant === "fullscreen" && "text-5xl mb-4",
+            variant !== "fullscreen" && "text-3xl",
+          )}
+          aria-hidden="true"
+        >
+          {icon}
+        </div>
+      )}
+      <h3
+        className={cn(
+          "font-semibold text-[var(--text-primary)]",
+          variant === "fullscreen" && "text-lg",
+          variant !== "fullscreen" && "text-sm",
+        )}
+      >
+        {title}
+      </h3>
+      {description && (
+        <p
+          className={cn(
+            "mt-1.5 text-[var(--text-secondary)] max-w-sm text-xs leading-relaxed",
+            variant === "fullscreen" && "text-sm mt-2",
           )}
         >
-          {title}
-        </h3>
-        {description && (
-          <p
-            className={cn(
-              "mt-1.5 text-[var(--text-secondary)] max-w-sm text-xs leading-relaxed",
-              variant === "fullscreen" && "text-sm mt-2",
-            )}
-          >
-            {description}
-          </p>
-        )}
-        {(action || (actionLabel && onAction)) && (
-          <div className="mt-5">
-            {action || (
-              <Button onClick={handleAction} variant="secondary" size="sm" className="gap-2">
-                {actionLabel}
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  },
-);
+          {description}
+        </p>
+      )}
+      {(action || (actionLabel && onAction)) && (
+        <div className="mt-5">
+          {action || (
+            <Button onClick={handleAction} variant="secondary" size="sm" className="gap-2">
+              {actionLabel}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 EmptyState.displayName = "EmptyState";
 
-interface LoadingStateProps {
+interface LoadingStateProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: "sm" | "md" | "lg" | "xl";
   label?: string;
   variant?: "spinner" | "dots" | "pulse" | "skeleton";
   className?: string;
+  ref?: React.Ref<HTMLDivElement>;
 }
 
-export const LoadingState = React.forwardRef<HTMLDivElement, LoadingStateProps>(
-  ({ size = "md", label, variant = "spinner", className, ...props }, ref) => {
+export const LoadingState = ({
+  size = "md",
+  label,
+  variant = "spinner",
+  className,
+  ref,
+  ...props
+}: LoadingStateProps) => {
     const sizeClasses = {
       sm: "h-4 w-4",
       md: "h-6 w-6",
@@ -226,11 +230,10 @@ export const LoadingState = React.forwardRef<HTMLDivElement, LoadingStateProps>(
         )}
       </div>
     );
-  },
-);
+};
 LoadingState.displayName = "LoadingState";
 
-interface ErrorStateProps {
+interface ErrorStateProps extends React.HTMLAttributes<HTMLDivElement> {
   icon?: React.ReactNode;
   title: string;
   description?: string;
@@ -239,27 +242,25 @@ interface ErrorStateProps {
   onAction?: () => void;
   variant?: "default" | "inline" | "toast";
   className?: string;
+  ref?: React.Ref<HTMLDivElement>;
 }
 
-export const ErrorState = React.forwardRef<HTMLDivElement, ErrorStateProps>(
-  (
-    {
-      icon,
-      title,
-      description,
-      action,
-      actionLabel,
-      onAction,
-      variant = "default",
-      className,
-      ...props
-    },
-    ref,
-  ) => {
-    const handleAction = () => {
-      if (action) return;
-      onAction?.();
-    };
+export const ErrorState = ({
+  icon,
+  title,
+  description,
+  action,
+  actionLabel,
+  onAction,
+  variant = "default",
+  className,
+  ref,
+  ...props
+}: ErrorStateProps) => {
+  const handleAction = () => {
+    if (action) return;
+    onAction?.();
+  };
 
     return (
       <div
@@ -337,8 +338,7 @@ export const ErrorState = React.forwardRef<HTMLDivElement, ErrorStateProps>(
         </div>
       </div>
     );
-  },
-);
+};
 ErrorState.displayName = "ErrorState";
 
 export { LoadingState as Loader };

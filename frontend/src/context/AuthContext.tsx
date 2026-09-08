@@ -284,5 +284,5 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     deleteAccount,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext value={value}>{children}</AuthContext>;
 };

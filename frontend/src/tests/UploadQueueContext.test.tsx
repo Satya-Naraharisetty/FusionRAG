@@ -295,7 +295,7 @@ describe("UploadQueueProvider", () => {
 
     await waitFor(() => expect(screen.queryByText("stale.pdf")).not.toBeInTheDocument());
     // A foreign user's snapshot is dropped, not kept.
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeNull());
     await act(async () => {});
   });
 

@@ -727,7 +727,7 @@ export const UploadQueueProvider: React.FC<UploadQueueProviderProps> = ({
     ],
   );
 
-  return <UploadQueueContext.Provider value={value}>{children}</UploadQueueContext.Provider>;
+  return <UploadQueueContext value={value}>{children}</UploadQueueContext>;
 };
 
 export function useUploadQueue(): UploadQueueContextValue {

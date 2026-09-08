@@ -12,7 +12,11 @@ export default defineConfig(({ mode }) => {
   return {
     root: rootDir,
     plugins: [
-      react(),
+      react({
+        babel: {
+          plugins: [["babel-plugin-react-compiler", {}]],
+        },
+      }),
       tailwindcss(),
     ],
     resolve: {

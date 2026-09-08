@@ -6,11 +6,11 @@ This document provides an exhaustive architectural specification of the design, 
 
 ## 1. High-Level System Architecture
 
-The application is structured into decoupled, modular layers: a responsive React SPA frontend (React 18 + Vite 5 + TypeScript + Tailwind CSS v4 + TanStack Query v5), an Nginx reverse proxy gateway, a FastAPI (Python 3.12+) asynchronous application server, authoritative PostgreSQL 16 transactional storage, ephemeral Redis 7 cache and Streams queue, Qdrant vector database, ClamAV antivirus daemon, and upstream REST AI inference providers (Jina AI, Google Gemini, Resend, SerpAPI/Firecrawl).
+The application is structured into decoupled, modular layers: a responsive React SPA frontend (React 19 + Vite 5 + TypeScript + Tailwind CSS v4 + TanStack Query v5), an Nginx reverse proxy gateway, a FastAPI (Python 3.12+) asynchronous application server, authoritative PostgreSQL 16 transactional storage, ephemeral Redis 7 cache and Streams queue, Qdrant vector database, ClamAV antivirus daemon, and upstream REST AI inference providers (Jina AI, Google Gemini, Resend, SerpAPI/Firecrawl).
 
 ```mermaid
 graph TD
-    Browser["React SPA (Client UI: React 18, Vite 5, Tailwind v4, TanStack)"]
+    Browser["React SPA (Client UI: React 19, Vite 5, Tailwind v4, TanStack)"]
     Nginx["Nginx Reverse Proxy (:80 / :443)"]
     FastAPI["FastAPI Web Application (:8000)"]
     Postgres["PostgreSQL Database (Async SQLAlchemy + asyncpg)"]

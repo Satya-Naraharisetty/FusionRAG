@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 export type Theme = "dark" | "light" | "system" | "high-contrast";
 export type Density = "comfortable" | "cozy" | "compact";
@@ -50,34 +50,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return (localStorage.getItem("ui-density") as Density) || "comfortable";
   });
 
-  const applyTheme = useCallback(
-    (newTheme: "dark" | "light" | "high-contrast", skipTransition = false) => {
-      const root = window.document.documentElement;
-
-      if (skipTransition) {
-        root.classList.add("no-transition");
-      }
-
-      root.classList.remove("light", "dark", "high-contrast");
-      root.classList.add(newTheme);
-      root.style.colorScheme = newTheme === "high-contrast" ? "dark" : newTheme;
-      root.setAttribute("data-theme", newTheme);
-
-      if (skipTransition) {
-        requestAnimationFrame(() => {
-          root.classList.remove("no-transition");
-        });
-      }
-    },
-    [],
-  );
-
   const setTheme = (newTheme: Theme) => {
     localStorage.setItem("theme", newTheme);
     setThemeState(newTheme);
     const resolved = resolveTheme(newTheme);
     setResolvedTheme(resolved);
-    applyTheme(resolved);
   };
 
   const setFontSize = (size: number) => {
@@ -97,6 +74,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setTheme(themes[nextIndex]);
   };
 
+  // Sync theme to document element root
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove("light", "dark", "high-contrast");
+    root.classList.add(resolvedTheme);
+    root.style.colorScheme = resolvedTheme === "high-contrast" ? "dark" : resolvedTheme;
+    root.setAttribute("data-theme", resolvedTheme);
+  }, [resolvedTheme]);
+
   // Sync density and font size to document element root
   useEffect(() => {
     const root = window.document.documentElement;
@@ -109,26 +95,25 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     root.classList.add(`density-${density}`);
   }, [fontSize, density]);
 
+  // Listen for system theme changes
   useEffect(() => {
     const resolved = resolveTheme(theme);
     setResolvedTheme(resolved);
-    applyTheme(resolved, true);
 
     if (theme === "system") {
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
       const listener = () => {
         const newResolved = getSystemTheme();
         setResolvedTheme(newResolved);
-        applyTheme(newResolved);
       };
       mediaQuery.addEventListener("change", listener);
       return () => mediaQuery.removeEventListener("change", mediaQuery ? listener : () => {});
     }
     return undefined;
-  }, [theme, applyTheme]);
+  }, [theme]);
 
   return (
-    <ThemeContext.Provider
+    <ThemeContext
       value={{
         theme,
         resolvedTheme,
@@ -141,7 +126,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }}
     >
       {children}
-    </ThemeContext.Provider>
+    </ThemeContext>
   );
 };
 

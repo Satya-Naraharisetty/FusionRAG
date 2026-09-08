@@ -1,6 +1,6 @@
 # Production-Grade Fusion RAG Platform
 
-A high-performance, observable, and modular reference implementation of an enterprise-grade **Fusion RAG (Retrieval-Augmented Generation) Platform** built with **FastAPI (Python 3.12+)**, **React 18 + Vite 5 + TypeScript + Tailwind CSS v4**, **PostgreSQL 16**, **Qdrant**, **Redis 7**, **Jina AI**, and **Google Gemini**.
+A high-performance, observable, and modular reference implementation of an enterprise-grade **Fusion RAG (Retrieval-Augmented Generation) Platform** built with **FastAPI (Python 3.12+)**, **React 19 + Vite 5 + TypeScript + Tailwind CSS v4**, **PostgreSQL 16**, **Qdrant**, **Redis 7**, **Jina AI**, and **Google Gemini**.
 
 ---
 
@@ -83,7 +83,7 @@ A high-performance, observable, and modular reference implementation of an enter
 | **Cross-Encoder Reranker** | Jina AI REST API | `jina-reranker-v2-base-multilingual` with asynchronous semaphore concurrency bounding |
 | **LLM Generation** | Google Gemini | `gemini-3.5-flash-lite` for streaming SSE chat completion, vision parsing, and query rewriting |
 | **Transactional Email** | Resend API | User email verification and magic link authentication flows |
-| **Frontend SPA** | React 18, Vite 5, TypeScript, Tailwind CSS v4 | Responsive UI with TanStack Query v5, Radix UI primitives, Shiki syntax highlighting, KaTeX math, and PWA |
+| **Frontend SPA** | React 19, Vite 5, TypeScript, Tailwind CSS v4 | Responsive UI with TanStack Query v5, Radix UI primitives, Shiki syntax highlighting, KaTeX math, and PWA |
 | **Telemetry & Metrics** | OpenTelemetry, Prometheus, Jaeger, Grafana | Distributed tracing and time-series metrics with privacy sanitization |
 | **Malware Defense** | ClamAV Daemon | Antivirus stream scanning over clamd TCP port 3310 (fail-closed in production) |
 
@@ -93,7 +93,7 @@ A high-performance, observable, and modular reference implementation of an enter
 
 ```mermaid
 graph TD
-    User["Web Browser Client (React 18 + Vite 5 + Tailwind v4 SPA)"]
+    User["Web Browser Client (React 19 + Vite 5 + Tailwind v4 SPA)"]
     Nginx["Nginx Reverse Proxy (:80 / :443)"]
     FastAPI["FastAPI Web Application (:8000)"]
     Postgres["PostgreSQL DB (Metadata, FTS & Graph)"]

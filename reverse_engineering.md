@@ -6,7 +6,7 @@
 
 ## Document Overview & How to Use This Guide
 
-This document is the **definitive, exhaustive technical specification, data flow blueprint, database manual, frontend breakdown, DevOps manual, and architectural guide** for the **Fusion RAG Platform**. It is engineered to enable a Principal Software Engineer, Staff Architect, or Technical Lead to understand, maintain, scale, or recreate the entire distributed system from scratch without external documentation or AI assistance.
+This document is the **definitive, exhaustive technical specification, data flow blueprint, database manual, frontend breakdown, DevOps manual, and architectural guide** for the **Fusion RAG Platform**. It is should engineered to enable a Principal Software Engineer, Staff Architect, or Technical Lead to understand, maintain, scale, or recreate the entire distributed system from scratch without external documentation or AI assistance.
 
 ```
 ========================================================================================================================
@@ -24,7 +24,7 @@ This document is the **definitive, exhaustive technical specification, data flow
                         2. Full Multi-Agent DAG (app/chat/services/multi_agent/) for complex wave reasoning
 * Observability:        OpenTelemetry SDK + Jaeger (OTLP gRPC) + Prometheus + Grafana + PII Sanitizer
 * Evaluation Engine:    Ragas + DeepEval + 6 Evaluator Services + 5 Runners + 33 Registered Metrics Suite
-* Frontend Architecture:React 18 + Vite 5 + TypeScript + Vanilla CSS Tokens + Pyodide WebAssembly (WASM)
+* Frontend Architecture:React 19 + Vite 5 + TypeScript + Tailwind CSS v4 + Pyodide WebAssembly (WASM)
 * Security & Crypto:    Envelope Encryption (AES-256-GCM + DEK/KEK), ClamAV Antivirus, AST Sandboxing, Intent Guardrails
 * Reliability:          Bulkheads, Circuit Breakers, Exponential Full-Jitter Retries, Outbox Pattern
 * DevOps & CI/CD:       4 GitHub Actions Workflows (CI, E2E Playwright, Eval, Nightly Benchmark) + 12 CLI Scripts + Nginx SSE
@@ -173,7 +173,7 @@ Standard Retrieval-Augmented Generation (RAG) implementations suffer from five p
 ```
 +---------------------------------------------------------------------------------------------------+
 |                                       CLIENT TIER                                                 |
-|   React 18 + Vite 5 + TypeScript SPA (HTML5 SSE Reader, Upload Queue, Token Buffer, Citation UI) |
+|   React 19 + Vite 5 + TypeScript SPA (HTML5 SSE Reader, Upload Queue, Token Buffer, Citation UI) |
 |   In-Browser Pyodide WebAssembly (WASM) Sandbox for Client-Side Mathematical Execution & Pandas   |
 +---------------------------------------------------------------------------------------------------+
                                                   |
@@ -420,7 +420,7 @@ sequenceDiagram
     Qdrant-->>Worker: HTTP 200 Upsert OK
     Worker->>Postgres: INSERT INTO document_embeddings (status='completed')
     Worker->>Postgres: UPDATE documents SET status='completed', processing_completed_at=now()
-    Worker->>RedisQueue: XACK stream:jobs:document_processing doc_workers <job_id>
+    Worker->>RedisQueue: XACK stream:jobs:document_processing doc_workers [job_id]
 ```
 
 ---
@@ -459,11 +459,11 @@ sequenceDiagram
     Orch->>RetService: retrieve(query="What is the warranty...", user_id, scope)
     RetService-->>Orch: SearchResult(retrieved_chunks=[Top-5 Cross-Encoder Ranked Chunks])
   
-    Orch->>Orch: PromptBuilder: Build XML Context Fencing (<retrieved_context>)
+    Orch->>Orch: PromptBuilder: Build XML Context Fencing ([retrieved_context])
     Orch->>Gemini: generate_stream(messages=[SystemPrompt, XMLContext, RewrittenQuestion])
   
     loop Token Streaming
-        Gemini-->>Orch: Yield Token Chunk ("The ", "warranty ", "covers...")
+        Gemini-->>Orch: Yield Token Chunk ('The ', 'warranty ', 'covers...')
         Orch-->>Nginx: SSE data: {"type": "token", "content": "..."}
         Nginx-->>Client: Incremental Render in Chat UI
     end
@@ -481,23 +481,24 @@ sequenceDiagram
 ## 7. Production Hybrid Retrieval Pipeline Sequence (Dense + Sparse + RRF + MMR + Reranker)
 
 ```mermaid
-graph TD
-    Query[User Standalone Query] --> Split{Parallel Execution}
+flowchart TD
+    Query["User Standalone Query"] --> Split{"Parallel Execution"}
   
-    Split -->|Dense Branch| JinaAPI[Jina Embeddings v3 API<br/>task='retrieval.query']
-    JinaAPI --> Qdrant[Qdrant HNSW Cosine Search<br/>user_id + scope payload filter]
-    Qdrant --> DenseCandidates[Top-20 Dense Chunks]
+    Split -->|Dense Branch| JinaAPI["Jina Embeddings v3 API<br/>task='retrieval.query'"]
+    JinaAPI --> Qdrant["Qdrant HNSW Cosine Search<br/>user_id + scope payload filter"]
+    Qdrant --> DenseCandidates["Top-20 Dense Chunks"]
   
-    Split -->|Sparse Branch| TSQuery[websearch_to_tsquery english]
-    TSQuery --> PostgresGIN[PostgreSQL GIN tsvector Index<br/>ts_rank_cd scoring]
-    PostgresGIN --> SparseCandidates[Top-20 Sparse Chunks]
+    Split -->|Sparse Branch| TSQuery["websearch_to_tsquery english"]
+    TSQuery --> PostgresGIN["PostgreSQL GIN tsvector Index<br/>ts_rank_cd scoring"]
+    PostgresGIN --> SparseCandidates["Top-20 Sparse Chunks"]
   
-    DenseCandidates & SparseCandidates --> RRF[Reciprocal Rank Fusion RRF<br/>Score = SUM 1 / 60 + Rank]
-    RRF --> MMR[Maximal Marginal Relevance MMR<br/>lambda = 0.5 Diversity Filter]
-    MMR --> CrossEncoder[Jina Reranker v2 Multilingual<br/>Joint Cross-Attention scoring]
-    CrossEncoder --> Top5[Top-5 Golden Context Chunks]
-    Top5 --> Budget[ContextSelector Token Budget<br/>Max 6000 tokens / 12 chunks]
-    Budget --> ContextBlock[XML Fenced LLM Context]
+    DenseCandidates --> RRF["Reciprocal Rank Fusion (RRF)<br/>Score = SUM(1 / (60 + Rank))"]
+    SparseCandidates --> RRF
+    RRF --> MMR["Maximal Marginal Relevance (MMR)<br/>&lambda; = 0.5 Diversity Filter"]
+    MMR --> CrossEncoder["Jina Reranker v2 Multilingual<br/>Joint Cross-Attention scoring"]
+    CrossEncoder --> Top5["Top-5 Golden Context Chunks"]
+    Top5 --> Budget["ContextSelector Token Budget<br/>Max 6000 tokens / 12 chunks"]
+    Budget --> ContextBlock["XML Fenced LLM Context"]
 ```
 
 ---
@@ -527,10 +528,10 @@ sequenceDiagram
     Note over Engine,Wave0: Wave 0: Tasks with dependencies = [] (Parallel asyncio.gather)
     par Wave 0 Execution
         Engine->>Wave0: Task 1 (RESEARCH): Extract Q3 Cloud Costs from doc_1.pdf
-        Wave0->>Wave0: Fusion RAG Search -> Chunks (Q3 AWS Spend = $120,000)
+        Wave0->>Wave0: Fusion RAG Search to Chunks (Q3 AWS Spend = $120,000)
     and
         Engine->>Wave0: Task 2 (WEB_SEARCH): Search current AWS Reserved Instance rates
-        Wave0->>Wave0: Live Search Cascade -> Live Market Rates ($85,000 equivalent)
+        Wave0->>Wave0: Live Search Cascade to Live Market Rates ($85,000 equivalent)
     end
     Wave0-->>Engine: Return AgentResult(task_1), AgentResult(task_2)
   
@@ -563,7 +564,7 @@ sequenceDiagram
     participant Hasher as Argon2id / SHA-256 Engine
 
     Note over Client,DB: Token Refresh Flow (Every 14 Minutes)
-    Client->>API: POST /api/v1/auth/refresh (Cookie: refresh_token=<raw_token>)
+    Client->>API: POST /api/v1/auth/refresh (Cookie: refresh_token=[raw_token])
     API->>Hasher: token_hash = sha256(raw_token).hexdigest()
     API->>DB: SELECT * FROM refresh_sessions WHERE token_hash=:token_hash
   
@@ -606,7 +607,7 @@ sequenceDiagram
     Note over Dispatcher,RedisBus: Asynchronous Outbox Poller
     Dispatcher->>DB: SELECT * FROM outbox_events WHERE status='PENDING' ORDER BY created_at FOR UPDATE SKIP LOCKED
     DB-->>Dispatcher: Batch of pending events
-    Dispatcher->>RedisBus: XADD stream:events:<topic> (event_payload)
+    Dispatcher->>RedisBus: XADD stream:events:[topic] (event_payload)
     RedisBus-->>Dispatcher: Published OK
     Dispatcher->>DB: UPDATE outbox_events SET status='PUBLISHED', published_at=now() WHERE id IN (:ids)
   
@@ -636,7 +637,7 @@ sequenceDiagram
     Note over GraphAgent,Retriever: Query Phase (Multi-Hop Traversal)
     GraphAgent->>Retriever: retrieve_candidates(query="How is Entity A related to Entity C?", scope)
     Retriever->>DB: Recursive CTE: SELECT * FROM graph_relationships WHERE source_id=:A (Depth 1..3)
-    DB-->>Retriever: Multi-Hop Relationship Path (A -> B -> C)
+    DB-->>Retriever: Multi-Hop Relationship Path (A to B to C)
     Retriever-->>GraphAgent: Structured Path Evidence Items
 ```
 
@@ -1490,24 +1491,30 @@ Located in `backend/app/core/security/`:
 
 ```mermaid
 flowchart TD
-    Req[Incoming Chat/RAG Request] --> L3Check{L3 RAG Answer Cache Hit?<br/>rag:ans:user:conv:parent:doc_ver:query}
-    L3Check -->|Hit| DBInsert[Persist Assistant Msg to PostgreSQL] --> ReplaySSE[Paced SSE Stream Replay<br/>metadata, text @ 5ms, citations, done]
-    ReplaySSE --> ClientFast[Return Stream in <15ms]
-    
-    L3Check -->|Miss| SingleFlight{Acquire RedisLock<br/>Single-Flight Mutex}
-    SingleFlight -->|Lock Acquired| L2Check{L2 Retrieval Context Cache Hit?}
+    Req["Incoming Chat/RAG Request"] --> L3Check{"L3 RAG Answer Cache Hit?<br/>rag:ans:user:conv:parent:doc_ver:query"}
+    L3Check -->|Hit| DBInsert["Persist Assistant Msg to PostgreSQL"]
+    DBInsert --> ReplaySSE["Paced SSE Stream Replay<br/>metadata, text @ 5ms, citations, done"]
+    ReplaySSE --> ClientFast["Return Stream in &lt;15ms"]
+  
+    L3Check -->|Miss| SingleFlight{"Acquire RedisLock<br/>Single-Flight Mutex"}
+    SingleFlight -->|Lock Acquired| L2Check{"L2 Retrieval Context Cache Hit?"}
     SingleFlight -->|Waiting| L3Check
-    
-    L2Check -->|Hit| Synthesizer[LLM Synthesizer / MasterAgent DAG]
-    L2Check -->|Miss| L1VectorCheck{L1 Query Vector Cache Hit?}
-    
-    L1VectorCheck -->|Hit| HybridSearch[Hybrid Search: Qdrant + Postgres FTS]
-    L1VectorCheck -->|Miss| JinaEmbed[Jina AI Embedding API] --> WriteL1[Write Vector to Redis Cache] --> HybridSearch
-    
-    HybridSearch --> Rerank[Cross-Encoder Reranker] --> WriteL2[Write Context to L2 Cache] --> Synthesizer
-    
-    Synthesizer --> GateCheck{Quality & Plan Gate?<br/>No WebSearch, Not Refusal, Score ≥ 0.70}
-    GateCheck -->|Pass| EncryptCache[Encrypt with User DEK (AES-256-GCM) & Save to L3 Cache] --> Finalize[Finalize & Stream to Client]
+  
+    L2Check -->|Hit| Synthesizer["LLM Synthesizer / MasterAgent DAG"]
+    L2Check -->|Miss| L1VectorCheck{"L1 Query Vector Cache Hit?"}
+  
+    L1VectorCheck -->|Hit| HybridSearch["Hybrid Search: Qdrant + Postgres FTS"]
+    L1VectorCheck -->|Miss| JinaEmbed["Jina AI Embedding API"]
+    JinaEmbed --> WriteL1["Write Vector to Redis Cache"]
+    WriteL1 --> HybridSearch
+  
+    HybridSearch --> Rerank["Cross-Encoder Reranker"]
+    Rerank --> WriteL2["Write Context to L2 Cache"]
+    WriteL2 --> Synthesizer
+  
+    Synthesizer --> GateCheck{"Quality & Plan Gate?<br/>No WebSearch, Not Refusal, Score &ge; 0.70"}
+    GateCheck -->|Pass| EncryptCache["Encrypt with User DEK (AES-256-GCM) & Save to L3 Cache"]
+    EncryptCache --> Finalize["Finalize & Stream to Client"]
     GateCheck -->|Bypass| Finalize
 ```
 
@@ -1515,11 +1522,19 @@ flowchart TD
 - **L2 Redis Cache (`RedisCache`)**: Distributed Redis caching partitioned by managed namespaces (`prompt_rewrite`, `embeddings`, `conversation_memory`, `retrieval_results`, `ocr_pages`, `evaluation_benchmarks`, `tool_executions`).
 - **L3 Production RAG Q&A Response Cache (`RAGCacheService` in `app/chat/services/rag_cache_service.py`)**:
   - **Deterministic Active-Version Fingerprinting**:
-    $$\text{Cache Key} = \text{rag:ans:}\{\text{user\_id}\}:\{\text{conv\_id}\}:\{\text{parent\_msg\_id}\}:\{\text{doc\_version\_sig}\}:\{\text{query\_hash}\}$$
+
+    $$
+    \text{Cache Key} = \text{rag:ans:}\{\text{user\_id}\}:\{\text{conv\_id}\}:\{\text{parent\_msg\_id}\}:\{\text{doc\_version\_sig}\}:\{\text{query\_hash}\}
+    $$
+
     where $\text{doc\_version\_sig} = \text{SHA-256}\left(\sum \text{doc\_id} : \text{active\_version}\right)$. Any document upload, edit, or deletion instantly invalidates all affected cache entries with zero risk of stale answers.
   - **Global Cross-User Caching for General Knowledge Queries**:
     For standalone queries with **zero attached documents** (`no_docs`) and **zero conversation history** (`root`), the system implements a 2-tier lookup that falls back to a tenant-agnostic global cache:
-    $$\text{Global Cache Key} = \text{rag:ans:global:root:no\_docs:}\{\text{SHA-256}(\text{normalized\_query} : \text{model} : \text{temp})\}$$
+
+    $$
+    \text{Global Cache Key} = \text{rag:ans:global:root:no\_docs:}\{\text{SHA-256}(\text{normalized\_query} : \text{model} : \text{temp})\}
+    $$
+
     When User A asks a general question (e.g. *"Write a quicksort in Python"*), the answer is cached globally. When User B asks the identical question, User B receives the cached response in **<10ms** with **0 LLM token cost**. Private document queries with citations are strictly excluded from the global cache.
   - **AES-256-GCM Envelope Encryption for Redis Payloads**: All private cached answer payloads written to Redis are encrypted using the user's wrapped Data Encryption Key (DEK). When an account is deleted and its DEK is shredded, Redis cache entries become mathematically unrecoverable (Crypto-Shredding compliance).
   - **Quality & Plan Gating (`should_cache_response`)**: Prevents caching live `WebSearchAgent` runs, refusal messages (*"I do not have enough evidence"*), and responses with evidence score $S_{\text{evidence}} < 0.70$.
@@ -1535,14 +1550,20 @@ flowchart TD
 stateDiagram-v2
     [*] --> CLOSED
     CLOSED --> OPEN : 5 consecutive failures
-    note right of CLOSED : Normal operation: all requests pass through
+    note right of CLOSED
+        Normal operation: all requests pass through
+    end note
   
     OPEN --> HALF_OPEN : 30s recovery timeout expires
-    note right of OPEN : Fails fast immediately: 0 requests sent to LLM
+    note right of OPEN
+        Fails fast immediately: 0 requests sent to LLM
+    end note
   
     HALF_OPEN --> CLOSED : Probe request succeeds
     HALF_OPEN --> OPEN : Probe request fails
-    note right of HALF_OPEN : Lets 1 test request through to check health
+    note right of HALF_OPEN
+        Lets 1 test request through to check health
+    end note
 ```
 
 ---
@@ -1683,16 +1704,18 @@ Located in `backend/app/documents/services/`:
 
 ```mermaid
 flowchart TD
-    Query[User Prompt] --> Classifier{Strategy Router}
+    Query["User Prompt"] --> Classifier{"Strategy Router"}
   
-    Classifier -->|Simple Factual| Direct[DIRECT: Single-Pass Hybrid Search]
-    Classifier -->|Abstract / Jargon Mismatch| HyDE[HYDE: Generate Hypothetical Chunk -> Embed]
-    Classifier -->|Multi-Part Comparative| MultiHop[MULTI_HOP: Decompose into Sub-Queries]
-    Classifier -->|Math / Cross-Domain / Live Web| Specialist[SPECIALIST: MasterAgent Multi-Agent DAG]
+    Classifier -->|Simple Factual| Direct["DIRECT: Single-Pass Hybrid Search"]
+    Classifier -->|Abstract / Jargon Mismatch| HyDE["HYDE: Generate Hypothetical Chunk &rarr; Embed"]
+    Classifier -->|Multi-Part Comparative| MultiHop["MULTI_HOP: Decompose into Sub-Queries"]
+    Classifier -->|Math / Cross-Domain / Live Web| Specialist["SPECIALIST: MasterAgent Multi-Agent DAG"]
   
-    Direct & HyDE & MultiHop --> RetCheck{Evidence Sufficiency >= 0.70?}
-    RetCheck -->|Yes| LLM[Gemini Response Generation]
-    RetCheck -->|No & Replan Left| Replan[Trigger Replanner / Broaden Scope]
+    Direct --> RetCheck{"Evidence Sufficiency &ge; 0.70?"}
+    HyDE --> RetCheck
+    MultiHop --> RetCheck
+    RetCheck -->|Yes| LLM["Gemini Response Generation"]
+    RetCheck -->|No & Replan Left| Replan["Trigger Replanner / Broaden Scope"]
     Replan --> RetCheck
     Specialist --> LLM
 ```
@@ -1755,7 +1778,7 @@ stateDiagram-v2
     CHUNKING --> INDEXING : Chunks generated
     INDEXING --> COMPLETED : Qdrant & GIN indexed
   
-    VALIDATING --> FAILED : Invalid MIME / Size > 25MB
+    VALIDATING --> FAILED : Invalid MIME / Size exceeds 25MB
     SCANNING --> FAILED : Malware detected
     UPLOADING --> FAILED : Network timeout
     INDEXING --> FAILED : Embedding failure

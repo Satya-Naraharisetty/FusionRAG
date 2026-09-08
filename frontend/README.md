@@ -1,6 +1,6 @@
 # Fusion RAG — Frontend Client
 
-The frontend Single Page Application (SPA) for the **Fusion RAG Platform**, built with **React 18**, **Vite 5**, **TypeScript**, **Tailwind CSS v4**, **TanStack Query v5**, and **Radix UI**.
+The frontend Single Page Application (SPA) for the **Fusion RAG Platform**, built with **React 19**, **Vite 5**, **TypeScript**, **Tailwind CSS v4**, **TanStack Query v5**, and **Radix UI**.
 
 ---
 

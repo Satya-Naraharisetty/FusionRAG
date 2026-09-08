@@ -32,7 +32,7 @@ gantt
     Dual-Gate CI Regression Governance  :done, p4_3, 2026-04-21, 2026-04-30
     section Phase 5: Production Hardening
     Zero-PyTorch REST Cloud Inference   :done, p5_1, 2026-05-01, 2026-05-10
-    Frontend SPA (React 18 + Vite 5 + v4):done, p5_2, 2026-05-11, 2026-05-20
+    Frontend SPA (React 19 + Vite 5 + v4):done, p5_2, 2026-05-11, 2026-05-20
     Containerized Deployment & Runbooks :done, p5_3, 2026-05-21, 2026-05-31
 ```
 
@@ -198,7 +198,7 @@ gantt
    - `InMemoryIndexCache`: LRU cache tracking active chunk state to bypass Qdrant when knowledge bases are empty.
 
 3. **Milestone 5.3 — Modern Frontend Client SPA**:
-   - React 18, Vite 5, TypeScript, Tailwind CSS v4, and `@tailwindcss/vite`.
+   - React 19, Vite 5, TypeScript, Tailwind CSS v4, and `@tailwindcss/vite`.
    - TanStack Query v5 for server state caching; TanStack Virtual for virtualized message scrolling.
    - Radix UI accessible component primitives.
    - Shiki code syntax highlighting and KaTeX LaTeX math rendering.
