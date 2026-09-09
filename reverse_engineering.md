@@ -494,7 +494,7 @@ flowchart TD
   
     DenseCandidates --> RRF["Reciprocal Rank Fusion (RRF)<br/>Score = SUM(1 / (60 + Rank))"]
     SparseCandidates --> RRF
-    RRF --> MMR["Maximal Marginal Relevance (MMR)<br/>&lambda; = 0.5 Diversity Filter"]
+    RRF --> MMR["Maximal Marginal Relevance (MMR)<br/>λ = 0.5 Diversity Filter"]
     MMR --> CrossEncoder["Jina Reranker v2 Multilingual<br/>Joint Cross-Attention scoring"]
     CrossEncoder --> Top5["Top-5 Golden Context Chunks"]
     Top5 --> Budget["ContextSelector Token Budget<br/>Max 6000 tokens / 12 chunks"]
@@ -1494,7 +1494,7 @@ flowchart TD
     Req["Incoming Chat/RAG Request"] --> L3Check{"L3 RAG Answer Cache Hit?<br/>rag:ans:user:conv:parent:doc_ver:query"}
     L3Check -->|Hit| DBInsert["Persist Assistant Msg to PostgreSQL"]
     DBInsert --> ReplaySSE["Paced SSE Stream Replay<br/>metadata, text @ 5ms, citations, done"]
-    ReplaySSE --> ClientFast["Return Stream in &lt;15ms"]
+    ReplaySSE --> ClientFast["Return Stream in <15ms"]
   
     L3Check -->|Miss| SingleFlight{"Acquire RedisLock<br/>Single-Flight Mutex"}
     SingleFlight -->|Lock Acquired| L2Check{"L2 Retrieval Context Cache Hit?"}
@@ -1512,7 +1512,7 @@ flowchart TD
     Rerank --> WriteL2["Write Context to L2 Cache"]
     WriteL2 --> Synthesizer
   
-    Synthesizer --> GateCheck{"Quality & Plan Gate?<br/>No WebSearch, Not Refusal, Score &ge; 0.70"}
+    Synthesizer --> GateCheck{"Quality & Plan Gate?<br/>No WebSearch, Not Refusal, Score ≥ 0.70"}
     GateCheck -->|Pass| EncryptCache["Encrypt with User DEK (AES-256-GCM) & Save to L3 Cache"]
     EncryptCache --> Finalize["Finalize & Stream to Client"]
     GateCheck -->|Bypass| Finalize
@@ -1707,11 +1707,11 @@ flowchart TD
     Query["User Prompt"] --> Classifier{"Strategy Router"}
   
     Classifier -->|Simple Factual| Direct["DIRECT: Single-Pass Hybrid Search"]
-    Classifier -->|Abstract / Jargon Mismatch| HyDE["HYDE: Generate Hypothetical Chunk &rarr; Embed"]
+    Classifier -->|Abstract / Jargon Mismatch| HyDE["HYDE: Generate Hypothetical Chunk → Embed"]
     Classifier -->|Multi-Part Comparative| MultiHop["MULTI_HOP: Decompose into Sub-Queries"]
     Classifier -->|Math / Cross-Domain / Live Web| Specialist["SPECIALIST: MasterAgent Multi-Agent DAG"]
   
-    Direct --> RetCheck{"Evidence Sufficiency &ge; 0.70?"}
+    Direct --> RetCheck{"Evidence Sufficiency ≥ 0.70?"}
     HyDE --> RetCheck
     MultiHop --> RetCheck
     RetCheck -->|Yes| LLM["Gemini Response Generation"]
