@@ -7837,13 +7837,17 @@ Incoming Turn ──► [DocumentScopeIntentParser] ──► Checks @documents 
 
 ---
 
-### Question 111 [Query - Intermediate]: Query Intent Classification & Routing State Machine
+### Question 111 [Query & Synthesis Routing - Advanced]: Query Intent Classification & Dynamic Complexity Model Routing
+
 **Context & Motivation:**
-Not every query requires full hybrid RAG or multi-agent execution. FusionRAG uses a `QueryClassifier`.
+Not every query requires full hybrid RAG, multi-agent execution, or high-capacity LLM inference. In enterprise production, routing a simple chitchat or single-fact query to an expensive high-parameter model wastes budget and increases TTFT, while routing complex cross-document tables or multi-hop reasoning to a small model induces hallucinations. FusionRAG addresses this with a two-dimensional routing architecture: intent classification for retrieval execution paths, and dynamic complexity model routing for synthesis models.
+
 **Key Focus Areas to Address:**
-- What are the four primary query categories: `DIRECT` (conversational/chitchat), `HYDE` (conceptual question needing expansion), `MULTI_HOP` (complex cross-document query), and `SPECIALIST` (math, tables, charts)?
-- How does the classifier determine intent using a combination of fast regex/keyword heuristics and low-latency LLM classification?
+- What are the four primary retrieval query categories: `DIRECT` (conversational/chitchat), `HYDE` (conceptual question needing expansion), `MULTI_HOP` (complex cross-document query), and `SPECIALIST` (math, tables, charts)?
+- How does `DeterministicQueryClassifier` determine intent in $<0.2\text{ms}$ using compiled regexes before falling back to a low-latency LLM classifier?
 - Why is it critical to bypass the retrieval pipeline entirely for greetings or general knowledge ("Hello", "Who was Napoleon?")?
+- How does `ComplexityModelRouter` calculate a deterministic complexity score ($0.0 \le \text{score} \le 1.0$), and what modifier rules (decomposition, multiple targets, compound queries, length $>350$, context tokens $>4000$) escalate requests past the $0.60$ threshold?
+- How do `ModelTier.LIGHT` (`gemini-3.5-flash-lite`) and `ModelTier.HEAVY` (`gemini-2.5-flash`) interact with downstream `RAGCacheService` key generation and OpenTelemetry distributed tracing (`rag.model_routing` span)?
 
 #### Master Answer & Architectural Explanation:
 
@@ -7891,6 +7895,46 @@ Executing the full retrieval pipeline (embedding generation $\to$ Qdrant ANN $\t
 - For conversational pleasantries ("Hello!", "Thank you for your help", "Good morning"):
   - Running retrieval is completely pointless and harmful. The vector search will retrieve random chunks that happen to contain greetings, potentially confusing the LLM into thinking the user is asking about document contents.
   - When `DeterministicQueryClassifier` detects `QueryType.CONVERSATIONAL`, it sets `recommended_top_k = 0`. The `ChatOrchestrator` bypasses the retrieval pipeline entirely and streams an immediate conversational greeting back to the client in $< 100\text{ms}$.
+
+##### 4. Dynamic Complexity Model Routing (`ComplexityModelRouter`)
+A natural evolution of query classification in FusionRAG is **Dynamic Complexity Model Routing** (`backend/app/chat/services/model_router.py`). In production RAG systems, routing every question to a heavy, high-parameter model burns unnecessary API budget and increases TTFT (Time-To-First-Token), while routing everything to a lightweight model degrades performance on multi-hop reasoning, tabular math, and long contexts.
+
+FusionRAG solves this via a **sub-millisecond, zero-API-cost router**:
+
+1. **Dual Model Tiers**:
+   - `ModelTier.LIGHT` (`gemini-3.5-flash-lite`): Fast, sub-second latency, optimized for direct conversational chitchat, single-fact QA, and low-token responses.
+   - `ModelTier.HEAVY` (`gemini-2.5-flash`): High-capacity reasoning engine for multi-hop synthesis, table extraction, multi-document comparison, and dense context evaluation.
+
+2. **Deterministic Complexity Scoring Algorithm ($0.0 \le \text{score} \le 1.0$)**:
+   The router maps the output of `DeterministicQueryClassifier` to a base complexity score:
+   ```python
+   type_scores = {
+       QueryType.CONVERSATIONAL: 0.10,
+       QueryType.FACTUAL: 0.30,
+       QueryType.AMBIGUOUS: 0.30,
+       QueryType.EXPLANATION: 0.55,
+       QueryType.NUMERICAL: 0.70,
+       QueryType.TABLE: 0.85,
+       QueryType.GRAPH: 0.85,
+       QueryType.COMPARISON: 0.85,
+       QueryType.MULTI_DOCUMENT: 0.90,
+       QueryType.MULTI_HOP: 0.95,
+   }
+   ```
+   It then applies non-linear heuristic modifiers based on syntactic cues and context constraints:
+   - **Decomposition**: `requires_decomposition` $\to \max(\text{score}, 0.85)$
+   - **Target Count**: `has_multiple_evidence_targets` $\to \max(\text{score}, 0.80)$
+   - **Compound Syntactic Patterns**: Regex matching compound questions (`and what|who|where|how|why`) $\to \max(\text{score}, 0.75)$
+   - **Multi-Question Marks**: `count("?") > 1` $\to \max(\text{score}, 0.80)$
+   - **Query Length**: Queries $> 350$ characters $\to \min(1.0, \text{score} + 0.15)$
+   - **Context Token Ceiling**: If retrieved context $> 4,000$ tokens $\to \min(1.0, \text{score} + 0.15)$
+
+3. **Thresholding & Decision**:
+   If $\text{score} \ge \text{MODEL\_ROUTING\_MIN\_COMPLEXITY\_THRESHOLD}$ (default `0.60`), the router emits a `ModelRoutingDecision` targeting `HEAVY`; otherwise it selects `LIGHT`.
+
+4. **Orchestrator & Cache Interactions**:
+   - `ChatOrchestrator._resolve_effective_model()` resolves the effective model and creates an OpenTelemetry span (`rag.model_routing`) recording `llm.effective_model` and `llm.routing_reason`.
+   - The selected model identifier is explicitly hashed into `RAGCacheService.compute_cache_key()`. Because answers from `gemini-3.5-flash-lite` differ in formatting, depth, and citation structure from `gemini-2.5-flash`, this strict model-scoped cache key prevents tier cross-contamination and guarantees deterministic cache hits.
 
 ---
 
@@ -16718,6 +16762,13 @@ When upstream LLM quotas fail mid-DAG execution, the `AgentExecutionEngine` enga
      ```bash
      redis-cli SET config:cache:l3_ttl_seconds "14400" EX 7200
      ```
+3. **Dynamic Model Routing Load Shedding**:
+   - Raise the dynamic model routing threshold to instantly divert synthesis traffic from the overloaded `HEAVY` tier (`gemini-2.5-flash`) to the high-quota `LIGHT` tier (`gemini-3.5-flash-lite`):
+     ```bash
+     # Escalates the routing threshold so only extreme 0.95+ multi-hop queries use the heavy model
+     kubectl set env deployment/fusionrag-backend MODEL_ROUTING_MIN_COMPLEXITY_THRESHOLD="0.95" -n fusionrag
+     ```
+   - This immediately slashes quota consumption on the heavy model by ~85% while keeping all user chats active and responsive.
 
 ---
 

@@ -60,8 +60,12 @@ A high-performance, observable, and modular reference implementation of an enter
   * Completely free of PyTorch, CUDA, and heavy local neural network weights.
   * Embeddings via **Jina AI API** (`jina-embeddings-v3`, 768-dim Matryoshka) or **Google Gemini** (`text-embedding-004`).
   * Cross-encoder reranking via **Jina AI REST API** (`jina-reranker-v2-base-multilingual`).
-  * LLM generation via **Google Gemini** (`gemini-3.5-flash-lite`).
   * Instant sub-second server startup and lightweight container footprints (< 450 MB).
+
+* **Dynamic Complexity Model Routing**:
+  * **Zero-API-Overhead Routing**: Sub-millisecond, zero-cost classification using regex heuristics and token budgeting (<0.1ms).
+  * **Dual-Tier Model Dispatch**: Dynamically routes conversational/factual queries to `gemini-3.5-flash-lite` (LIGHT tier) and escalates multi-hop, tabular, comparison, or long-context queries (>4,000 tokens) to `gemini-2.5-flash` (HEAVY tier).
+  * **Multi-Tier Cache & Tracing**: Injects `effective_model` into `RAGCacheService` keys to guarantee tier-isolated caching, instrumented via OpenTelemetry `rag.model_routing` spans.
 
 * **Observability & Evaluation Suite**:
   * **Visual Admin Dashboard (`/admin/dashboard`)**: In-app UI for real-time KPI metrics, token volume tracking, latency breakdowns (retrieval vs. generation), execution traces, and evaluation report rendering.
@@ -81,7 +85,7 @@ A high-performance, observable, and modular reference implementation of an enter
 | **Cache & Queue** | Redis 7 (`redis.asyncio`) | Ephemeral response caching, sliding-window rate limiting, and durable Redis Streams task queue |
 | **Dense Embeddings** | Jina AI / Google Gemini | `jina-embeddings-v3` (768 dimensions) or `text-embedding-004` (768 dimensions) |
 | **Cross-Encoder Reranker** | Jina AI REST API | `jina-reranker-v2-base-multilingual` with asynchronous semaphore concurrency bounding |
-| **LLM Generation** | Google Gemini | `gemini-3.5-flash-lite` for streaming SSE chat completion, vision parsing, and query rewriting |
+| **LLM Generation** | Google Gemini | Dynamic Complexity Routing (`gemini-3.5-flash-lite` [LIGHT] vs `gemini-2.5-flash` [HEAVY]) with multi-key failover |
 | **Transactional Email** | Resend API | User email verification and magic link authentication flows |
 | **Frontend SPA** | React 19, Vite 5, TypeScript, Tailwind CSS v4 | Responsive UI with TanStack Query v5, Radix UI primitives, Shiki syntax highlighting, KaTeX math, and PWA |
 | **Telemetry & Metrics** | OpenTelemetry, Prometheus, Jaeger, Grafana | Distributed tracing and time-series metrics with privacy sanitization |
@@ -187,9 +191,12 @@ docker compose exec backend uv run python scripts/benchmark.py --profile multi_a
 ## Documentation Index
 
 * [ARCHITECTURE.md](ARCHITECTURE.md) — Comprehensive System Architecture Manual
+* [reverse_engineering.md](reverse_engineering.md) — Single Source of Truth & Reverse Engineering Blueprint
+* [INTERVIEW_QUESTIONS.md](INTERVIEW_QUESTIONS.md) — Definitive Master Engineering & System Architecture Interview Manual (246 Questions & Answers)
 * [prd.md](prd.md) — Product Requirements Document & Master Project Plan
 * [frontend/README.md](frontend/README.md) — Frontend Architecture & Component Guide
 * [docs/EVALUATION.md](docs/EVALUATION.md) — Quality Evaluation Framework & Regression Governance
 * [docs/SECURITY.md](docs/SECURITY.md) — Security Policy, Secrets Management & Threat Blueprint
 * [docs/architecture/deployment-architecture.md](docs/architecture/deployment-architecture.md) — Production Deployment Blueprint
 * [observability/README.md](observability/README.md) — Observability, Metrics & Distributed Tracing
+

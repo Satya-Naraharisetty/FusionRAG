@@ -198,6 +198,13 @@ When upstream LLM quotas fail mid-DAG execution, the `AgentExecutionEngine` enga
      ```bash
      redis-cli SET config:cache:l3_ttl_seconds "14400" EX 7200
      ```
+3. **Dynamic Model Routing Load Shedding**:
+   - Raise the dynamic model routing threshold to instantly divert synthesis traffic from the overloaded `HEAVY` tier (`gemini-2.5-flash`) to the high-quota `LIGHT` tier (`gemini-3.5-flash-lite`):
+     ```bash
+     # Escalates the routing threshold so only extreme 0.95+ multi-hop queries use the heavy model
+     kubectl set env deployment/fusionrag-backend MODEL_ROUTING_MIN_COMPLEXITY_THRESHOLD="0.95" -n fusionrag
+     ```
+   - This immediately slashes quota consumption on the heavy model by ~85% while keeping all user chats active and responsive.
 
 ---
 

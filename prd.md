@@ -89,6 +89,7 @@ gantt
 
 2. **Milestone 2.2 — Adaptive RAG & Query Routing**:
    - `QueryClassifier`: Categorizes questions into `direct`, `hyde`, `multi_hop`, or `specialist`.
+   - `ComplexityModelRouter`: Sub-millisecond, zero-API-cost deterministic complexity scoring ($0.0 \le \text{score} \le 1.0$) dynamically routing requests between `ModelTier.LIGHT` (`gemini-3.5-flash-lite`) and `ModelTier.HEAVY` (`gemini-2.5-flash`), with context-size escalation (>4,000 tokens) and cache-key isolation.
    - `SafeHyDEExecutor`: Generates hypothetical document embeddings to bridge semantic vocabulary gaps.
    - `QueryDecomposer`: Splits compound queries into up to 3 sub-queries.
    - Hierarchical chunk expansion: Parent-Child chunking (400-char child chunks mapped to 1500-char parent context) and Sentence-Window expansion ($\pm 2$ sentences).
