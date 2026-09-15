@@ -226,6 +226,7 @@ class ChatOrchestrator:
         adaptive_rag_orchestrator: Any | None = None,
         enable_adaptive_rag: bool | None = None,
         rag_cache_service: Any | None = None,
+        model_router: Any | None = None,
     ) -> None:
         from app.core.config import settings
 
@@ -254,6 +255,27 @@ class ChatOrchestrator:
             else getattr(settings, "ENABLE_ADAPTIVE_RAG", False)
         )
         self.rag_cache_service = rag_cache_service
+        self.model_router = model_router
+
+    def _resolve_effective_model(
+        self,
+        query: str,
+        classification: Any | None = None,
+        context_tokens: int = 0,
+    ) -> tuple[str, str | None]:
+        """
+        Dynamically resolves the optimal model using ComplexityModelRouter if configured.
+        Returns (effective_model_name, routing_reason).
+        """
+        if self.model_router is not None:
+            decision = self.model_router.resolve_model(
+                query=query,
+                classification=classification,
+                fallback_model=self.model,
+                context_tokens=context_tokens,
+            )
+            return decision.selected_model, decision.reason
+        return self.model, None
 
     async def generate_answer(
         self,
@@ -364,6 +386,16 @@ class ChatOrchestrator:
                     )
                     query_to_retrieve = question
 
+                # --- Dynamic Model Resolution ---
+                classification = getattr(rewrite_result, "classification", None)
+                effective_model, routing_reason = self._resolve_effective_model(
+                    query=query_to_retrieve,
+                    classification=classification,
+                )
+                orch_span.set_attribute("llm.effective_model", effective_model)
+                if routing_reason:
+                    orch_span.set_attribute("llm.routing_reason", routing_reason)
+
                 # --- RAG Response Cache Probe (Synchronous) ---
                 parent_message_id = (
                     context_obj.recent_messages[-1].id
@@ -382,14 +414,14 @@ class ChatOrchestrator:
                         parent_message_id=parent_message_id,
                         query=query_to_retrieve,
                         doc_versions=doc_vers,
-                        model=self.model,
+                        model=effective_model,
                         temperature=self.temperature,
                     )
                     if not retrieval_doc_ids and parent_message_id is None:
                         global_cache_key = (
                             self.rag_cache_service.compute_global_cache_key(
                                 query=query_to_retrieve,
-                                model=self.model,
+                                model=effective_model,
                                 temperature=self.temperature,
                             )
                         )
@@ -432,7 +464,7 @@ class ChatOrchestrator:
                             retrieval_time_ms=0.0,
                             generation_time_ms=0.0,
                             total_time_ms=total_time_ms,
-                            model=self.model,
+                            model=effective_model,
                             usage=Usage(
                                 prompt_tokens=0,
                                 completion_tokens=0,
@@ -522,7 +554,7 @@ class ChatOrchestrator:
                         multi_resp = await self.master_agent.execute_request(
                             request=query_to_retrieve,
                             context=agent_ctx,
-                            model=self.model,
+                            model=effective_model,
                             temperature=self.temperature,
                             max_tokens=self.max_response_tokens,
                         )
@@ -602,7 +634,7 @@ class ChatOrchestrator:
                     req_id = request_id_ctx.get() or "N/A"
                     logger.info(
                         f"Multi-Agent answer generation completed - RequestID: {req_id} - "
-                        f"ConversationID: {conversation_id} - Model: {self.model} - "
+                        f"ConversationID: {conversation_id} - Model: {effective_model} - "
                         f"Retrieval latency: {research_latency:.2f}ms - Total latency: {total_time_ms:.2f}ms"
                     )
 
@@ -640,7 +672,7 @@ class ChatOrchestrator:
                         retrieval_time_ms=round(research_latency, 2),
                         generation_time_ms=round(generation_time_ms, 2),
                         total_time_ms=round(total_time_ms, 2),
-                        model=self.model,
+                        model=effective_model,
                         usage=usage,
                         conversation_id=conversation_id,
                         diagnostics=diagnostics,
@@ -752,7 +784,7 @@ class ChatOrchestrator:
                         )
                         agent_resp = await self.agent_executor.execute(
                             messages=messages,
-                            model=self.model,
+                            model=effective_model,
                             temperature=self.temperature,
                             max_tokens=self.max_response_tokens,
                             context=tool_context,
@@ -780,7 +812,7 @@ class ChatOrchestrator:
 
                         response = await self.llm_generation_service.generate(
                             messages=messages,
-                            model=self.model,
+                            model=effective_model,
                             temperature=self.temperature,
                             max_tokens=effective_max_tokens,
                             stop_sequences=default_stop,
@@ -867,7 +899,7 @@ class ChatOrchestrator:
                 logger.info(
                     f"Answer generation completed - RequestID: {req_id} - "
                     f"ConversationID: {conversation_id} - "
-                    f"Model: {self.model} - AgentEnabled: {self.enable_tool_calling} - "
+                    f"Model: {effective_model} - AgentEnabled: {self.enable_tool_calling} - "
                     f"Retrieval latency: {retrieval_time_ms:.2f}ms - "
                     f"Generation latency: {generation_time_ms:.2f}ms - "
                     f"Total latency: {total_time_ms:.2f}ms - "
@@ -908,7 +940,7 @@ class ChatOrchestrator:
                     retrieval_time_ms=round(retrieval_time_ms, 2),
                     generation_time_ms=round(generation_time_ms, 2),
                     total_time_ms=round(total_time_ms, 2),
-                    model=self.model,
+                    model=effective_model,
                     usage=usage,
                     conversation_id=conversation_id,
                     diagnostics=diagnostics,
@@ -1031,6 +1063,17 @@ class ChatOrchestrator:
             )
             query_to_retrieve = question
 
+        # --- Dynamic Model Resolution ---
+        classification = getattr(rewrite_result, "classification", None)
+        effective_model, routing_reason = self._resolve_effective_model(
+            query=query_to_retrieve,
+            classification=classification,
+        )
+        with tracer.start_as_current_span("rag.model_routing") as route_span:
+            route_span.set_attribute("llm.effective_model", effective_model)
+            if routing_reason:
+                route_span.set_attribute("llm.routing_reason", routing_reason)
+
         assistant_message_id = uuid.uuid4()
         message_finalized = False
 
@@ -1050,14 +1093,14 @@ class ChatOrchestrator:
                 parent_message_id=parent_message_id,
                 query=query_to_retrieve,
                 doc_versions=doc_vers,
-                model=self.model,
+                model=effective_model,
                 temperature=self.temperature,
             )
             if not retrieval_doc_ids and parent_message_id is None:
                 global_stream_cache_key = (
                     self.rag_cache_service.compute_global_cache_key(
                         query=query_to_retrieve,
-                        model=self.model,
+                        model=effective_model,
                         temperature=self.temperature,
                     )
                 )
@@ -1206,7 +1249,7 @@ class ChatOrchestrator:
                 async for event in self.master_agent.execute_request_stream(
                     request=query_to_retrieve,
                     context=agent_ctx,
-                    model=self.model,
+                    model=effective_model,
                     temperature=self.temperature,
                     max_tokens=self.max_response_tokens,
                 ):
@@ -1479,6 +1522,7 @@ class ChatOrchestrator:
                     "retrieval_time_ms": round(retrieval_time_ms, 2),
                     "conversation_id": str(conversation_id),
                     "diagnostics": diagnostics.model_dump(),
+                    "model": effective_model,
                 },
             }
 
@@ -1501,7 +1545,7 @@ class ChatOrchestrator:
                     )
                     async for event in self.agent_executor.execute_stream(
                         messages=messages,
-                        model=self.model,
+                        model=effective_model,
                         temperature=self.temperature,
                         max_tokens=self.max_response_tokens,
                         context=tool_context,
@@ -1540,7 +1584,7 @@ class ChatOrchestrator:
 
                     async for chunk in self.llm_generation_service.stream(
                         messages=messages,
-                        model=self.model,
+                        model=effective_model,
                         temperature=self.temperature,
                         max_tokens=effective_max_tokens,
                         stop_sequences=default_stop,
@@ -1627,7 +1671,7 @@ class ChatOrchestrator:
                         "citations": [cit.model_dump() for cit in citations],
                         "generation_time_ms": round(generation_time_ms, 2),
                         "total_time_ms": round(total_time_ms, 2),
-                        "model": self.model,
+                        "model": effective_model,
                         "usage": final_usage.model_dump(),
                         "conversation_id": str(conversation_id),
                         "diagnostics": diagnostics.model_dump(),
@@ -1691,7 +1735,7 @@ class ChatOrchestrator:
         logger.info(
             f"Answer generation stream completed - RequestID: {req_id} - "
             f"ConversationID: {conversation_id} - "
-            f"Model: {self.model} - AgentEnabled: {self.enable_tool_calling} - "
+            f"Model: {effective_model} - AgentEnabled: {self.enable_tool_calling} - "
             f"Retrieval latency: {retrieval_time_ms:.2f}ms - "
             f"Generation latency: {generation_time_ms:.2f}ms - "
             f"Total latency: {total_time_ms:.2f}ms"

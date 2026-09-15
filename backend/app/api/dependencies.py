@@ -1562,6 +1562,19 @@ def get_master_agent(
     )
 
 
+def get_model_router() -> Any:
+    from app.chat.services.model_router import ComplexityModelRouter
+    from app.documents.services.query_classifier import DeterministicQueryClassifier
+
+    return ComplexityModelRouter(
+        enabled=settings.ENABLE_DYNAMIC_MODEL_ROUTING,
+        light_model=settings.MODEL_ROUTING_LIGHT_MODEL,
+        heavy_model=settings.MODEL_ROUTING_HEAVY_MODEL,
+        complexity_threshold=settings.MODEL_ROUTING_MIN_COMPLEXITY_THRESHOLD,
+        query_classifier=DeterministicQueryClassifier(),
+    )
+
+
 def get_chat_orchestrator(
     retrieval_service=Depends(get_retrieval_service),
     prompt_builder=Depends(get_prompt_builder),
@@ -1572,6 +1585,7 @@ def get_chat_orchestrator(
     agent_executor=Depends(get_agent_executor),
     master_agent=Depends(get_master_agent),
     adaptive_rag_orchestrator=Depends(get_adaptive_rag_orchestrator),
+    model_router=Depends(get_model_router),
 ) -> Any:
     from app.chat.services.chat_orchestrator import ChatOrchestrator
     from app.chat.services.llm_generation_service import LLMGenerationService
@@ -1601,6 +1615,7 @@ def get_chat_orchestrator(
         adaptive_rag_orchestrator=adaptive_rag_orchestrator,
         enable_adaptive_rag=settings.ENABLE_ADAPTIVE_RAG,
         rag_cache_service=rag_cache,
+        model_router=model_router,
     )
 
 

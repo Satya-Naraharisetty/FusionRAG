@@ -324,6 +324,10 @@ class Settings(BaseSettings):
     # LLM Orchestration & Answer Generation Configurations
     LLM_PROVIDER: str = "gemini"
     GEMINI_CHAT_MODEL: str = "gemini-3.5-flash-lite"
+    ENABLE_DYNAMIC_MODEL_ROUTING: bool = True
+    MODEL_ROUTING_LIGHT_MODEL: str = "gemini-3.5-flash-lite"
+    MODEL_ROUTING_HEAVY_MODEL: str = "gemini-2.5-flash"
+    MODEL_ROUTING_MIN_COMPLEXITY_THRESHOLD: float = 0.6
     TEMPERATURE: float = 0.0
     MAX_CONTEXT_TOKENS: int = 6500
     MAX_RESPONSE_TOKENS: int = 4096
