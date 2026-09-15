@@ -67,10 +67,14 @@ RERANKER_MODEL=jina-reranker-v2-base-multilingual
 RERANK_TOP_K=5
 JINA_API_KEY=[your-jina-api-key]
 
-# Google Gemini
+# Google Gemini & Dynamic Model Routing
 LLM_PROVIDER=gemini
 GEMINI_CHAT_MODEL=gemini-3.5-flash-lite
 GEMINI_API_KEY=[your-gemini-api-key]
+ENABLE_DYNAMIC_MODEL_ROUTING=True
+MODEL_ROUTING_LIGHT_MODEL=gemini-3.5-flash-lite
+MODEL_ROUTING_HEAVY_MODEL=gemini-2.5-flash
+MODEL_ROUTING_MIN_COMPLEXITY_THRESHOLD=0.6
 
 # Storage
 STORAGE_PROVIDER=database

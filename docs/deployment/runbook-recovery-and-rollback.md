@@ -25,7 +25,7 @@ GitHub (main branch)
            │                         (Redis Streams, Rate limiting, Token blacklists)
            │
            ├── Jina AI              → Stateless Embeddings & Cross-Encoder Reranker
-           ├── Google Gemini        → Stateless LLM Generation
+           ├── Google Gemini        → Stateless LLM Generation (Dynamic Model Routing: Flash-Lite / Flash)
            └── Resend               → Transactional Email
 ```
 
@@ -174,3 +174,26 @@ After any recovery or rollback incident, verify system health using this step-by
 | **4. Auth Flow** | `POST /api/v1/auth/login` | Returns valid JWT access token and session cookie |
 | **5. Document Retrieval** | `GET /api/v1/documents` | Returns user's uploaded document library list |
 | **6. End-to-End RAG Chat** | `POST /api/v1/chat/conversations/{id}/messages` with `@documents` | Streams response chunks via SSE with citations |
+
+---
+
+## 9. Emergency Model Routing Kill-Switch & Quota Load Shedding
+
+If upstream Google Gemini `gemini-2.5-flash` encounters HTTP 429 quota exhaustion or regional degradation:
+
+1. **Option A: Emergency Kill-Switch (Revert to Single-Model Mode)**:
+   Disable dynamic complexity routing in Render or Kubernetes dashboard:
+   ```bash
+   # Reverts all requests to GEMINI_CHAT_MODEL (gemini-3.5-flash-lite)
+   ENABLE_DYNAMIC_MODEL_ROUTING=False
+   ```
+2. **Option B: Runtime Load Shedding (Raise Threshold)**:
+   Divert 85%+ of complex queries back to the lightweight model without restarting the application:
+   ```bash
+   MODEL_ROUTING_MIN_COMPLEXITY_THRESHOLD=0.95
+   ```
+3. **Verification**:
+   Inspect OpenTelemetry Jaeger traces under `rag.model_routing` or server logs:
+   ```text
+   ModelRouter: routed '...' -> gemini-3.5-flash-lite (LIGHT, reason=routing_disabled)
+   ```

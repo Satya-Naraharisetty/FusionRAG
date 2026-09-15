@@ -135,6 +135,7 @@ Inspect Trace Waterfall Hierarchy:
     └── rag.chat_orchestration
           ├── conversation.prepare_context
           │     └── llm.query_rewrite
+          ├── rag.model_routing (Attributes: llm.effective_model, llm.routing_reason)
           ├── retrieval.dense_search
           ├── retrieval.sparse_search
           ├── retrieval.fusion
