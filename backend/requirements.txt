@@ -152,10 +152,8 @@ protobuf==7.35.1
     #   googleapis-common-protos
     #   opentelemetry-proto
     #   qdrant-client
-psycopg==3.3.6
+psycopg2-binary==2.9.13
     # via fusion-rag-backend
-psycopg-binary==3.3.6 ; implementation_name != 'pypy'
-    # via psycopg
 pycparser==3.0 ; implementation_name != 'PyPy'
     # via cffi
 pydantic==2.13.4
@@ -221,7 +219,6 @@ typing-extensions==4.16.0
     #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
-    #   psycopg
     #   pydantic
     #   pydantic-core
     #   python-docx
@@ -233,8 +230,6 @@ typing-inspection==0.4.2
     #   fastapi
     #   pydantic
     #   pydantic-settings
-tzdata==2026.3 ; sys_platform == 'win32'
-    # via psycopg
 urllib3==2.7.0
     # via
     #   qdrant-client
