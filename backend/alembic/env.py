@@ -41,9 +41,9 @@ def run_migrations_offline() -> None:
     url = settings.DATABASE_URL
     if url:
         if url.startswith("postgresql+asyncpg://"):
-            url = url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+            url = url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
         elif url.startswith("postgresql://"):
-            url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+            url = url.replace("postgresql://", "postgresql+psycopg://", 1)
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -64,9 +64,9 @@ def run_migrations_online() -> None:
     """
     url = str(settings.DATABASE_URL or "")
     if url.startswith("postgresql+asyncpg://"):
-        url = url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+        url = url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
     elif url.startswith("postgresql://"):
-        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
     connectable = create_engine(
         url,
         poolclass=pool.NullPool,
