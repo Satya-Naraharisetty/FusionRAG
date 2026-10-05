@@ -104,125 +104,74 @@ export const LoadingState = ({
   ref,
   ...props
 }: LoadingStateProps) => {
-    const sizeClasses = {
-      sm: "h-4 w-4",
-      md: "h-6 w-6",
-      lg: "h-8 w-8",
-      xl: "h-10 w-10",
-    };
+  const sizeClasses = {
+    sm: "h-4 w-4",
+    md: "h-6 w-6",
+    lg: "h-8 w-8",
+    xl: "h-10 w-10",
+  };
 
-    const labelClasses = {
-      sm: "text-xs mt-1.5",
-      md: "text-xs mt-2",
-      lg: "text-sm mt-2.5",
-      xl: "text-sm mt-3",
-    };
+  const labelClasses = {
+    sm: "text-xs mt-1.5",
+    md: "text-xs mt-2",
+    lg: "text-sm mt-2.5",
+    xl: "text-sm mt-3",
+  };
 
-    if (variant === "skeleton") {
-      return (
-        <div ref={ref} className={cn("space-y-2.5", className)} {...props}>
-          <div
-            className={cn(
-              "h-4 bg-[var(--bg-tertiary)] rounded-[var(--radius-md)] animate-pulse",
-              size === "lg" && "h-5",
-              size === "xl" && "h-6",
-            )}
-          />
-          <div
-            className={cn(
-              "h-4 bg-[var(--bg-tertiary)] rounded-[var(--radius-md)] animate-pulse w-3/4",
-              size === "lg" && "h-5",
-              size === "xl" && "h-6",
-            )}
-          />
-          <div
-            className={cn(
-              "h-4 bg-[var(--bg-tertiary)] rounded-[var(--radius-md)] animate-pulse w-1/2",
-              size === "lg" && "h-5",
-              size === "xl" && "h-6",
-            )}
-          />
-        </div>
-      );
-    }
-
-    if (variant === "dots") {
-      return (
-        <div ref={ref} className={cn("flex flex-col items-center gap-2", className)} {...props}>
-          <div className="flex gap-1.5" aria-hidden="true">
-            <span
-              className={cn(
-                "h-2 w-2 rounded-full bg-[var(--accent-primary)] animate-bounce",
-                sizeClasses[size],
-              )}
-              style={{ animationDelay: "0ms" }}
-            />
-            <span
-              className={cn(
-                "h-2 w-2 rounded-full bg-[var(--accent-primary)] animate-bounce",
-                sizeClasses[size],
-              )}
-              style={{ animationDelay: "150ms" }}
-            />
-            <span
-              className={cn(
-                "h-2 w-2 rounded-full bg-[var(--accent-primary)] animate-bounce",
-                sizeClasses[size],
-              )}
-              style={{ animationDelay: "300ms" }}
-            />
-          </div>
-          {label && (
-            <span className={cn("text-[var(--text-muted)] font-medium", labelClasses[size])}>
-              {label}
-            </span>
+  if (variant === "skeleton") {
+    return (
+      <div ref={ref} className={cn("space-y-2.5", className)} {...props}>
+        <div
+          className={cn(
+            "h-4 bg-[var(--bg-tertiary)] rounded-[var(--radius-md)] animate-pulse",
+            size === "lg" && "h-5",
+            size === "xl" && "h-6",
           )}
-        </div>
-      );
-    }
-
-    if (variant === "pulse") {
-      return (
-        <div ref={ref} className={cn("flex flex-col items-center gap-2", className)} {...props}>
-          <div
-            className={cn(
-              "rounded-full bg-[var(--accent-primary)]/20 animate-pulse",
-              sizeClasses[size],
-            )}
-            aria-hidden="true"
-          />
-          {label && (
-            <span className={cn("text-[var(--text-muted)] font-medium", labelClasses[size])}>
-              {label}
-            </span>
+        />
+        <div
+          className={cn(
+            "h-4 bg-[var(--bg-tertiary)] rounded-[var(--radius-md)] animate-pulse w-3/4",
+            size === "lg" && "h-5",
+            size === "xl" && "h-6",
           )}
-        </div>
-      );
-    }
+        />
+        <div
+          className={cn(
+            "h-4 bg-[var(--bg-tertiary)] rounded-[var(--radius-md)] animate-pulse w-1/2",
+            size === "lg" && "h-5",
+            size === "xl" && "h-6",
+          )}
+        />
+      </div>
+    );
+  }
 
+  if (variant === "dots") {
     return (
       <div ref={ref} className={cn("flex flex-col items-center gap-2", className)} {...props}>
-        <svg
-          className={cn("animate-spin text-[var(--text-muted)]", sizeClasses[size])}
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="3"
+        <div className="flex gap-1.5" aria-hidden="true">
+          <span
+            className={cn(
+              "h-2 w-2 rounded-full bg-[var(--accent-primary)] animate-bounce",
+              sizeClasses[size],
+            )}
+            style={{ animationDelay: "0ms" }}
           />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          <span
+            className={cn(
+              "h-2 w-2 rounded-full bg-[var(--accent-primary)] animate-bounce",
+              sizeClasses[size],
+            )}
+            style={{ animationDelay: "150ms" }}
           />
-        </svg>
+          <span
+            className={cn(
+              "h-2 w-2 rounded-full bg-[var(--accent-primary)] animate-bounce",
+              sizeClasses[size],
+            )}
+            style={{ animationDelay: "300ms" }}
+          />
+        </div>
         {label && (
           <span className={cn("text-[var(--text-muted)] font-medium", labelClasses[size])}>
             {label}
@@ -230,6 +179,57 @@ export const LoadingState = ({
         )}
       </div>
     );
+  }
+
+  if (variant === "pulse") {
+    return (
+      <div ref={ref} className={cn("flex flex-col items-center gap-2", className)} {...props}>
+        <div
+          className={cn(
+            "rounded-full bg-[var(--accent-primary)]/20 animate-pulse",
+            sizeClasses[size],
+          )}
+          aria-hidden="true"
+        />
+        {label && (
+          <span className={cn("text-[var(--text-muted)] font-medium", labelClasses[size])}>
+            {label}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={ref} className={cn("flex flex-col items-center gap-2", className)} {...props}>
+      <svg
+        className={cn("animate-spin text-[var(--text-muted)]", sizeClasses[size])}
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="3"
+        />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+        />
+      </svg>
+      {label && (
+        <span className={cn("text-[var(--text-muted)] font-medium", labelClasses[size])}>
+          {label}
+        </span>
+      )}
+    </div>
+  );
 };
 LoadingState.displayName = "LoadingState";
 
@@ -262,82 +262,82 @@ export const ErrorState = ({
     onAction?.();
   };
 
-    return (
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "flex flex-col items-center justify-center text-center gap-2.5",
+        variant === "default" && "py-12 px-6",
+        variant === "inline" && "py-6 px-4",
+        variant === "toast" &&
+          "flex-row items-start gap-3 p-4 rounded-[var(--radius-xl)] border border-red-500/20 bg-red-500/10 text-left",
+        className,
+      )}
+      role="alert"
+      {...props}
+    >
       <div
-        ref={ref}
         className={cn(
-          "flex flex-col items-center justify-center text-center gap-2.5",
-          variant === "default" && "py-12 px-6",
-          variant === "inline" && "py-6 px-4",
-          variant === "toast" &&
-            "flex-row items-start gap-3 p-4 rounded-[var(--radius-xl)] border border-red-500/20 bg-red-500/10 text-left",
-          className,
+          "flex items-center justify-center text-red-400",
+          variant === "toast" && "flex-shrink-0 mt-0.5",
+          variant !== "toast" && "text-2xl p-2.5 rounded-full bg-red-500/10",
         )}
-        role="alert"
-        {...props}
+        aria-hidden="true"
       >
-        <div
+        {icon || (
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
+          </svg>
+        )}
+      </div>
+      <div className={cn(variant === "toast" && "flex-1")}>
+        <h3
           className={cn(
-            "flex items-center justify-center text-red-400",
-            variant === "toast" && "flex-shrink-0 mt-0.5",
-            variant !== "toast" && "text-2xl p-2.5 rounded-full bg-red-500/10",
+            "font-medium text-[var(--text-primary)]",
+            variant === "toast" && "text-xs",
+            variant !== "toast" && "text-sm font-semibold",
           )}
-          aria-hidden="true"
         >
-          {icon || (
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-          )}
-        </div>
-        <div className={cn(variant === "toast" && "flex-1")}>
-          <h3
+          {title}
+        </h3>
+        {description && (
+          <p
             className={cn(
-              "font-medium text-[var(--text-primary)]",
-              variant === "toast" && "text-xs",
-              variant !== "toast" && "text-sm font-semibold",
+              "text-[var(--text-secondary)] max-w-sm text-xs mt-1 leading-relaxed",
+              variant === "toast" && "text-xs mt-0.5",
             )}
           >
-            {title}
-          </h3>
-          {description && (
-            <p
-              className={cn(
-                "text-[var(--text-secondary)] max-w-sm text-xs mt-1 leading-relaxed",
-                variant === "toast" && "text-xs mt-0.5",
-              )}
-            >
-              {description}
-            </p>
-          )}
-          {(action || (actionLabel && onAction)) && (
-            <div
-              className={cn(
-                "mt-4 flex gap-2 justify-center",
-                variant === "toast" && "mt-2 justify-start",
-              )}
-            >
-              {action || (
-                <Button onClick={handleAction} variant="destructive" size="xs">
-                  {actionLabel || "Retry"}
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
+            {description}
+          </p>
+        )}
+        {(action || (actionLabel && onAction)) && (
+          <div
+            className={cn(
+              "mt-4 flex gap-2 justify-center",
+              variant === "toast" && "mt-2 justify-start",
+            )}
+          >
+            {action || (
+              <Button onClick={handleAction} variant="destructive" size="xs">
+                {actionLabel || "Retry"}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
-    );
+    </div>
+  );
 };
 ErrorState.displayName = "ErrorState";
 

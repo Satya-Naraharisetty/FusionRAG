@@ -39,10 +39,7 @@ const Input = ({
       {label && (
         <label
           htmlFor={inputId}
-          className={cn(
-            "mb-1.5 block text-xs font-medium text-(--text-secondary)",
-            labelClassName,
-          )}
+          className={cn("mb-1.5 block text-xs font-medium text-(--text-secondary)", labelClassName)}
         >
           {label}
           {required && (

@@ -6,11 +6,7 @@ import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent } from "@/components/ui/Modal";
 
-const Command = ({
-  className,
-  ref,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive>) => (
+const Command = ({ className, ref, ...props }: React.ComponentProps<typeof CommandPrimitive>) => (
   <CommandPrimitive
     ref={ref}
     className={cn(
@@ -71,10 +67,7 @@ const CommandList = ({
 
 CommandList.displayName = CommandPrimitive.List.displayName;
 
-const CommandEmpty = ({
-  ref,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Empty>) => (
+const CommandEmpty = ({ ref, ...props }: React.ComponentProps<typeof CommandPrimitive.Empty>) => (
   <CommandPrimitive.Empty
     ref={ref}
     className="py-6 text-center text-sm text-[var(--text-muted)]"
