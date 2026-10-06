@@ -18,7 +18,7 @@ from app.documents.services.dense_retriever import QdrantDenseRetriever
 
 
 @pytest.mark.asyncio
-async def test_readiness_degrades_when_postgres_unresponsive(client):
+async def test_readiness_degrades_when_postgres_unresponsive(client, monkeypatch):
     """
     Chaos Test: Verifies that when PostgreSQL is unresponsive,
     /api/v1/health/readiness returns 503 Service Unavailable with postgres disconnected.
@@ -31,9 +31,11 @@ async def test_readiness_degrades_when_postgres_unresponsive(client):
         side_effect=ConnectionRefusedError("PostgreSQL connection refused")
     )
 
-    client.app.state.db_session_factory = MagicMock(return_value=mock_db)
-    client.app.state.redis.ping = AsyncMock(return_value=True)
-    client.app.state.qdrant.get_collections = AsyncMock()
+    monkeypatch.setattr(
+        client.app.state, "db_session_factory", MagicMock(return_value=mock_db)
+    )
+    monkeypatch.setattr(client.app.state.redis, "ping", AsyncMock(return_value=True))
+    monkeypatch.setattr(client.app.state.qdrant, "get_collections", AsyncMock())
 
     response = client.get("/api/v1/health/readiness")
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
@@ -46,7 +48,7 @@ async def test_readiness_degrades_when_postgres_unresponsive(client):
 
 
 @pytest.mark.asyncio
-async def test_readiness_degrades_when_redis_unresponsive(client):
+async def test_readiness_degrades_when_redis_unresponsive(client, monkeypatch):
     """
     Chaos Test: Verifies that when Redis is down,
     /api/v1/health/readiness returns 503 Service Unavailable with redis disconnected.
@@ -56,12 +58,16 @@ async def test_readiness_degrades_when_redis_unresponsive(client):
     mock_db.__aexit__ = AsyncMock()
     mock_db.execute = AsyncMock()
 
-    client.app.state.db_session_factory = MagicMock(return_value=mock_db)
-    # Simulate Redis connection failure
-    client.app.state.redis.ping = AsyncMock(
-        side_effect=ConnectionError("Redis connection lost")
+    monkeypatch.setattr(
+        client.app.state, "db_session_factory", MagicMock(return_value=mock_db)
     )
-    client.app.state.qdrant.get_collections = AsyncMock()
+    # Simulate Redis connection failure
+    monkeypatch.setattr(
+        client.app.state.redis,
+        "ping",
+        AsyncMock(side_effect=ConnectionError("Redis connection lost")),
+    )
+    monkeypatch.setattr(client.app.state.qdrant, "get_collections", AsyncMock())
 
     response = client.get("/api/v1/health/readiness")
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
@@ -73,7 +79,7 @@ async def test_readiness_degrades_when_redis_unresponsive(client):
 
 
 @pytest.mark.asyncio
-async def test_readiness_degrades_when_qdrant_unresponsive(client):
+async def test_readiness_degrades_when_qdrant_unresponsive(client, monkeypatch):
     """
     Chaos Test: Verifies that when Qdrant is down,
     /api/v1/health/readiness returns 503 Service Unavailable with vector_db disconnected.
@@ -83,11 +89,15 @@ async def test_readiness_degrades_when_qdrant_unresponsive(client):
     mock_db.__aexit__ = AsyncMock()
     mock_db.execute = AsyncMock()
 
-    client.app.state.db_session_factory = MagicMock(return_value=mock_db)
-    client.app.state.redis.ping = AsyncMock(return_value=True)
+    monkeypatch.setattr(
+        client.app.state, "db_session_factory", MagicMock(return_value=mock_db)
+    )
+    monkeypatch.setattr(client.app.state.redis, "ping", AsyncMock(return_value=True))
     # Simulate Qdrant HTTP/gRPC connection failure
-    client.app.state.qdrant.get_collections = AsyncMock(
-        side_effect=Exception("Qdrant connection timeout")
+    monkeypatch.setattr(
+        client.app.state.qdrant,
+        "get_collections",
+        AsyncMock(side_effect=Exception("Qdrant connection timeout")),
     )
 
     response = client.get("/api/v1/health/readiness")

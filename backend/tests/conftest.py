@@ -100,7 +100,9 @@ def _reset_process_global_state():
 
     dependencies_module._index_cache_instance = None
     dependencies_module._in_memory_task_queue_instance = None
+    app.main.app.state.is_draining = False
     yield
+    app.main.app.state.is_draining = False
     app.main.app.dependency_overrides.clear()
 
 
@@ -132,3 +134,4 @@ def client():
     """
     with TestClient(app.main.app) as c:
         yield c
+    app.main.app.state.is_draining = False
