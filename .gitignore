@@ -283,3 +283,4 @@ gitleaks-report.sarif
 .vscode/
 .agents/
 .vercel
+brag-output/

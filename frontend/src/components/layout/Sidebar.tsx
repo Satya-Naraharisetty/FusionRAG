@@ -90,11 +90,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ className }) => {
             onClick={handleNewChat}
             className="flex cursor-pointer items-center gap-2.5 pl-1 transition-opacity hover:opacity-90"
           >
-            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-xs font-semibold text-[var(--text-primary)] shadow-none">
-              <span className="font-title">F</span>
+            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[image:var(--gradient-main)] text-xs font-extrabold text-white shadow-[var(--shadow-glow)]">
+              <span className="font-title leading-none">F</span>
             </div>
-            <span className="font-title text-sm font-semibold tracking-tight text-[var(--text-primary)]">
-              FusionRAG
+            <span className="font-title text-sm font-bold tracking-tight text-[var(--text-primary)]">
+              Fusion<span className="text-[var(--accent-primary)]">RAG</span>
             </span>
           </div>
         )}
